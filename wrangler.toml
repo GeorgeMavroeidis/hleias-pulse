@@ -1,0 +1,6 @@
+name = "ilias"
+compatibility_date = "2026-06-14"
+
+[assets]
+directory = "./cloudflare-static-dist"
+not_found_handling = "single-page-application"
