@@ -301,6 +301,21 @@ function assertSupabase() {
   return supabase;
 }
 
+// crypto.randomUUID() only exists in secure contexts (HTTPS/localhost) and
+// on newer browser engines, so it can be missing when testing over plain
+// HTTP (e.g. a LAN IP) or on an older WebView. Fall back to
+// crypto.getRandomValues (unrestricted) and finally Math.random.
+function randomIdSuffix(length = 8): string {
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = crypto.getRandomValues(new Uint8Array(length));
+    return Array.from(bytes, (byte) => (byte % 36).toString(36)).join("");
+  }
+  return Math.random()
+    .toString(36)
+    .slice(2, 2 + length)
+    .padEnd(length, "0");
+}
+
 async function ensurePulseUserId() {
   const client = assertSupabase();
   const sessionResult = await client.auth.getSession();
@@ -803,7 +818,7 @@ export async function createPulsePost(input: CreatePulsePostInput): Promise<Post
       ...(input.vibes.length > 0 ? input.vibes.map((vibe) => vibe.toLowerCase()) : ["local"]),
     ]),
   );
-  const id = `user-post-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+  const id = `user-post-${Date.now()}-${randomIdSuffix()}`;
 
   const result = await client
     .from("posts")
@@ -891,7 +906,7 @@ export async function createPulsePlace(input: CreatePulsePlaceInput): Promise<Pl
 export async function createPulseStory(input: CreatePulseStoryInput): Promise<StoryItem> {
   const client = assertSupabase();
   const userId = await ensurePulseUserId();
-  const id = `user-story-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+  const id = `user-story-${Date.now().toString(36)}-${randomIdSuffix()}`;
 
   const result = await client
     .from("stories")
@@ -955,7 +970,7 @@ export async function setPulseMeetRsvp(
 export async function createPulseMeetEvent(input: CreatePulseMeetEventInput): Promise<MeetEvent> {
   const client = assertSupabase();
   const userId = await ensurePulseUserId();
-  const id = `user-meet-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+  const id = `user-meet-${Date.now().toString(36)}-${randomIdSuffix()}`;
 
   const result = await client
     .from("meet_events")

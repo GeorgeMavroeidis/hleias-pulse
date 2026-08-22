@@ -2742,8 +2742,24 @@ function CreateComposerModal({
       setStoryCaption("");
       setStoryCondition([]);
     } catch (submitError) {
-      console.warn("Could not create story.", submitError);
-      setError("Could not save story. Try again.");
+      const pgError = submitError as {
+        message?: string;
+        code?: string;
+        details?: string;
+        hint?: string;
+      };
+      console.error("Could not create story.", {
+        message: pgError?.message,
+        code: pgError?.code,
+        details: pgError?.details,
+        hint: pgError?.hint,
+        raw: submitError,
+      });
+      setError(
+        import.meta.env.DEV && pgError?.message
+          ? `Could not save story: ${pgError.message}${pgError.code ? ` (${pgError.code})` : ""}`
+          : "Could not save story. Try again.",
+      );
     } finally {
       setSaving(false);
     }
