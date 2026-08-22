@@ -2755,11 +2755,7 @@ function CreateComposerModal({
         hint: pgError?.hint,
         raw: submitError,
       });
-      setError(
-        import.meta.env.DEV && pgError?.message
-          ? `Could not save story: ${pgError.message}${pgError.code ? ` (${pgError.code})` : ""}`
-          : "Could not save story. Try again.",
-      );
+      setError("Could not save story. Try again.");
     } finally {
       setSaving(false);
     }
