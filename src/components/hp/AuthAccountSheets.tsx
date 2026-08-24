@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BadgeCheck, Camera, LockKeyhole, LogOut, Mail, Save, UserCircle2, X } from "lucide-react";
+import {
+  BadgeCheck,
+  Camera,
+  LockKeyhole,
+  LogOut,
+  Mail,
+  Save,
+  ShieldCheck,
+  UserCircle2,
+  X,
+} from "lucide-react";
+import type { AdminRole } from "@/lib/admin-api";
 import {
   normalizeHandle,
   profileAvatarUrl,
@@ -364,6 +375,8 @@ export function AccountSheet({
   onClose,
   onSaved,
   onOpenAuth,
+  adminRole,
+  onOpenAdmin,
 }: {
   open: boolean;
   account: PulseAccountState;
@@ -377,6 +390,8 @@ export function AccountSheet({
   onClose: () => void;
   onSaved: () => Promise<void>;
   onOpenAuth: () => void;
+  adminRole: AdminRole | null;
+  onOpenAdmin: () => void;
 }) {
   const profile = accountProfile(account);
   const userId = accountUserId(account);
@@ -547,6 +562,26 @@ export function AccountSheet({
                       <Camera size={12} />
                     </span>
                   </button>
+
+                  {adminRole && (
+                    <button
+                      type="button"
+                      onClick={onOpenAdmin}
+                      className="flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
+                    >
+                      <span className="grid h-10 w-10 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+                        <ShieldCheck size={16} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-black text-hp-ink">
+                          Admin workspace
+                        </span>
+                        <span className="block text-[11px] text-hp-muted">
+                          Open team tools · {adminRole}
+                        </span>
+                      </span>
+                    </button>
+                  )}
                   <input
                     ref={fileRef}
                     type="file"
