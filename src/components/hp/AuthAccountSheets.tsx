@@ -52,7 +52,7 @@ function fieldClass() {
 function authErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "Authentication failed.";
   return /confirm|confirmation|verify|verification/i.test(message)
-    ? "Authentication did not start. Try signing in again."
+    ? "This account needs email verification before it can sign in."
     : message;
 }
 
@@ -154,14 +154,8 @@ export function AuthSheet({
       });
 
       if (result.status === "needsConfirmation") {
-        try {
-          await signInWithPassword(email, password);
-          await onAuthenticated();
-          onClose();
-        } catch (signInError) {
-          console.warn("Could not start session after signup.", signInError);
-          setError("Account created, but automatic sign-in failed. Try signing in.");
-        }
+        setMessage("Account created. Check your email to confirm it, then sign in.");
+        setMode("signIn");
         return;
       }
 
