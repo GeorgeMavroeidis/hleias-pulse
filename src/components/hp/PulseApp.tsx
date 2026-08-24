@@ -68,6 +68,7 @@ import {
   type PulseAccountProfile,
   type PulseAccountState,
 } from "@/lib/hp-auth";
+import { getAdminRole, type AdminRole } from "@/lib/admin-api";
 import { ImageBox } from "./ImageBox";
 import {
   buildAreaClusters,
@@ -3699,6 +3700,7 @@ export function PulseApp() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [account, setAccount] = useState<PulseAccountState>({ status: "loading" });
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
   const [activeRouteStopIndex, setActiveRouteStopIndex] = useState(0);
@@ -3908,6 +3910,12 @@ export function PulseApp() {
     try {
       const nextAccount = await getCurrentPulseAccount();
       setAccount(nextAccount);
+      if (nextAccount.status === "ready") {
+        const nextAdminRole = await getAdminRole().catch(() => null);
+        setAdminRole(nextAdminRole);
+      } else {
+        setAdminRole(null);
+      }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
           ? nextAccount.profile
@@ -3924,6 +3932,7 @@ export function PulseApp() {
       console.warn("Could not load account state.", error);
       const fallback: PulseAccountState = { status: "signedOut" };
       setAccount(fallback);
+      setAdminRole(null);
       return fallback;
     }
   };
@@ -4972,6 +4981,10 @@ export function PulseApp() {
           await refreshAccount();
         }}
         onOpenAuth={() => setAuthOpen(true)}
+        adminRole={adminRole}
+        onOpenAdmin={() => {
+          window.location.assign("/admin");
+        }}
       />
 
       <OnboardingGate

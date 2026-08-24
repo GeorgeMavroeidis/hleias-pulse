@@ -836,6 +836,7 @@ export async function createPulsePost(input: CreatePulsePostInput): Promise<Post
       profile_id: input.profileId ?? null,
       posting_identity: identity,
       author_kind: "user",
+      moderation_status: "pending",
       sort_order: -Date.now(),
     })
     .select(POST_RETURN_COLUMNS)
@@ -880,7 +881,7 @@ export async function createPulsePlace(input: CreatePulsePlaceInput): Promise<Pl
       user_id: userId,
       profile_id: input.profileId ?? null,
       created_by_identity: identity,
-      moderation_status: "published",
+      moderation_status: "pending",
       sort_order: -Math.floor(Date.now() / 1000),
     })
     .select(PLACE_RETURN_COLUMNS)
@@ -927,7 +928,7 @@ export async function createPulseStory(input: CreatePulseStoryInput): Promise<St
       crowd: input.crowd ?? null,
       parking: input.parking ?? null,
       condition: input.condition ?? [],
-      moderation_status: "published",
+      moderation_status: "pending",
     })
     .select(STORY_RETURN_COLUMNS)
     .single();
@@ -998,7 +999,7 @@ export async function createPulseMeetEvent(input: CreatePulseMeetEventInput): Pr
       maybe_count: 0,
       hot: false,
       attendee_avatar_urls: [input.hostAvatarUrl],
-      moderation_status: "published",
+      moderation_status: "pending",
     })
     .select(MEET_EVENT_RETURN_COLUMNS)
     .single();
@@ -1081,6 +1082,7 @@ export async function addPulseComment(
       posting_identity: identity,
       author_kind: "user",
       text,
+      moderation_status: "pending",
       sort_order: Date.now(),
     })
     .select(COMMENT_RETURN_COLUMNS)
