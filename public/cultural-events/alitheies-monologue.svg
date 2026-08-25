@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="Solo stage performance under a spotlight">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0e0a17"/>
+      <stop offset="55%" stop-color="#181129"/>
+      <stop offset="100%" stop-color="#0e3a5b"/>
+    </linearGradient>
+    <radialGradient id="beam" cx="50%" cy="0%" r="85%">
+      <stop offset="0%" stop-color="#fff8ec" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#7a4dd8" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#7a4dd8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="floor2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#171130"/>
+      <stop offset="100%" stop-color="#07050c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="900" fill="url(#bg2)"/>
+
+  <!-- curtain folds -->
+  <g fill="#1c1030" opacity="0.9">
+    <path d="M0,0 L120,0 L60,900 L0,900 Z"/>
+    <path d="M150,0 L260,0 L170,900 L90,900 Z" opacity="0.7"/>
+    <path d="M1200,0 L1080,0 L1140,900 L1200,900 Z"/>
+    <path d="M1050,0 L940,0 L1030,900 L1110,900 Z" opacity="0.7"/>
+  </g>
+
+  <!-- spotlight cone -->
+  <polygon points="600,40 430,900 770,900" fill="url(#beam)"/>
+
+  <!-- stage floor -->
+  <rect x="0" y="760" width="1200" height="140" fill="url(#floor2)"/>
+  <ellipse cx="600" cy="800" rx="260" ry="34" fill="#fff8ec" opacity="0.12"/>
+
+  <!-- generic silhouette figure, mid-gesture, faceless -->
+  <g transform="translate(600,690)" fill="#0b0710">
+    <ellipse cx="0" cy="-168" rx="34" ry="38"/>
+    <path d="M-30,-132 Q0,-146 30,-132 L46,60 Q0,84 -46,60 Z"/>
+    <path d="M-40,-118 Q-92,-70 -78,10" stroke="#0b0710" stroke-width="20" fill="none" stroke-linecap="round"/>
+    <path d="M38,-118 Q92,-96 82,-30" stroke="#0b0710" stroke-width="20" fill="none" stroke-linecap="round"/>
+    <rect x="-30" y="55" width="24" height="120" rx="10"/>
+    <rect x="6" y="55" width="24" height="120" rx="10"/>
+  </g>
+
+  <!-- rim light on silhouette -->
+  <g transform="translate(600,690)" stroke="#ffe3b0" stroke-width="3" fill="none" opacity="0.55">
+    <path d="M-34,-198 Q0,-210 34,-198"/>
+    <path d="M-46,-72 Q0,-92 46,-72"/>
+  </g>
+</svg>
