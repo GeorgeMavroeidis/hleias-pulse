@@ -124,6 +124,7 @@ import {
   routeStopsLabel,
   activeRouteLabel,
 } from "@/lib/hp/routes-strings";
+import { NAV_TAB_LABELS, MEET_SUB_TAB_LABELS, TOP_BAR_STRINGS } from "@/lib/hp/nav-strings";
 import {
   COMPOSER_STRINGS,
   COMPOSER_MODE_LABELS,
@@ -163,11 +164,11 @@ const POSTING_IDENTITY_IDS: PostingIdentity[] = ["LOCAL", "TOURIST", "GUIDE"];
 const ROUTE_FILTERS = ["All", "Beach", "Nature", "Culture", "No car", "Free"] as const;
 type RouteFilter = (typeof ROUTE_FILTERS)[number];
 
-const TAB_ITEMS: { id: NavTab; label: string; Icon: LucideIcon }[] = [
-  { id: "map", label: "Map", Icon: MapIcon },
-  { id: "pulse", label: "Pulse", Icon: Radio },
-  { id: "routes", label: "Routes", Icon: RouteIcon },
-  { id: "meet", label: "Meet", Icon: CalendarHeart },
+const TAB_ITEMS: { id: NavTab; Icon: LucideIcon }[] = [
+  { id: "map", Icon: MapIcon },
+  { id: "pulse", Icon: Radio },
+  { id: "routes", Icon: RouteIcon },
+  { id: "meet", Icon: CalendarHeart },
 ];
 type ShareTarget = {
   type: "app" | "place" | "post" | "route" | "story";
@@ -337,8 +338,6 @@ function Toast({ msg }: { msg: string | null }) {
 interface TopBarProps {
   query: string;
   setQuery: (query: string) => void;
-  lang: "GR" | "EN";
-  setLang: Dispatch<SetStateAction<"GR" | "EN">>;
   showSearch: boolean;
   setShowSearch: Dispatch<SetStateAction<boolean>>;
   account: PulseAccountState;
@@ -349,14 +348,13 @@ interface TopBarProps {
 function TopBar({
   query,
   setQuery,
-  lang,
-  setLang,
   showSearch,
   setShowSearch,
   account,
   onOpenAccount,
   onOpenAuth,
 }: TopBarProps) {
+  const { lang, setLang } = useLang();
   return (
     <div className="relative z-30 border-b border-hp-ink/10 bg-hp-paper/95 backdrop-blur">
       <div className="flex items-center justify-between px-4 pt-2.5">
@@ -379,7 +377,7 @@ function TopBar({
             type="button"
             onClick={() => setShowSearch((s) => !s)}
             className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
-            aria-label={showSearch ? "Close search" : "Open search"}
+            aria-label={showSearch ? TOP_BAR_STRINGS.closeSearch[lang] : TOP_BAR_STRINGS.openSearch[lang]}
             aria-expanded={showSearch}
           >
             <Search size={16} />
@@ -388,7 +386,7 @@ function TopBar({
             type="button"
             onClick={() => setLang((current) => (current === "GR" ? "EN" : "GR"))}
             className="rounded-full border border-hp-ink/10 px-2.5 py-1.5 text-[11px] font-bold tracking-wider text-hp-ink/80"
-            aria-label="Toggle language"
+            aria-label={TOP_BAR_STRINGS.toggleLanguage[lang]}
           >
             {lang === "GR" ? "GR / en" : "gr / EN"}
           </button>
@@ -396,7 +394,7 @@ function TopBar({
         </div>
       </div>
       <div className="px-4 pb-1.5 pt-0.5">
-        <p className="text-[12px] text-hp-muted">Local spots, routes, and tips.</p>
+        <p className="text-[12px] text-hp-muted">{TOP_BAR_STRINGS.tagline[lang]}</p>
       </div>
       <AnimatePresence>
         {showSearch && (
@@ -410,13 +408,11 @@ function TopBar({
               <Search size={14} className="text-hp-muted" />
               <input
                 name="hp-search"
-                aria-label="Search ΗΛΕΙΑ PULSE"
+                aria-label={TOP_BAR_STRINGS.searchAppAriaLabel[lang]}
                 autoComplete="off"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={
-                  lang === "GR" ? "παραλία, πανηγύρι, sunset…" : "beach, panigyri, sunset…"
-                }
+                placeholder={TOP_BAR_STRINGS.searchPlaceholder[lang]}
                 className="w-full bg-transparent text-sm outline-none placeholder:text-hp-muted"
               />
             </div>
@@ -3672,6 +3668,7 @@ function CreateComposerModal({
 
 /* ============== Bottom Nav ============== */
 function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
+  const { lang } = useLang();
   return (
     <div className="relative z-50 shrink-0 border-t border-hp-ink/10 bg-hp-paper px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_28px_rgba(23,20,17,0.08)]">
       <div
@@ -3679,7 +3676,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
         className="pointer-events-none absolute inset-x-0 -top-7 h-7 bg-gradient-to-t from-hp-paper to-transparent"
       />
       <div className="grid grid-cols-4">
-        {TAB_ITEMS.map(({ id, label, Icon }) => {
+        {TAB_ITEMS.map(({ id, Icon }) => {
           const on = tab === id;
           return (
             <button
@@ -3701,7 +3698,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
                 <Icon size={16} />
               </motion.span>
               <span className={`text-[10px] font-bold ${on ? "text-hp-ink" : "text-hp-ink/50"}`}>
-                {label}
+                {NAV_TAB_LABELS[id][lang]}
               </span>
             </button>
           );
@@ -3734,7 +3731,7 @@ function PulseAppInner() {
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const { lang, setLang } = useLang();
+  const { lang } = useLang();
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
@@ -4976,10 +4973,10 @@ function PulseAppInner() {
           <div className="flex shrink-0 gap-1.5 px-4 pt-3">
             {(
               [
-                { id: "community" as MeetSubTab, label: "Community", Icon: CalendarHeart },
-                { id: "events" as MeetSubTab, label: "Εκδηλώσεις", Icon: Ticket },
-              ] satisfies { id: MeetSubTab; label: string; Icon: LucideIcon }[]
-            ).map(({ id, label, Icon }) => {
+                { id: "community" as MeetSubTab, Icon: CalendarHeart },
+                { id: "events" as MeetSubTab, Icon: Ticket },
+              ] satisfies { id: MeetSubTab; Icon: LucideIcon }[]
+            ).map(({ id, Icon }) => {
               const active = meetSubTab === id;
               return (
                 <button
@@ -4994,7 +4991,7 @@ function PulseAppInner() {
                   }`}
                 >
                   <Icon size={14} strokeWidth={2.6} />
-                  {label}
+                  {MEET_SUB_TAB_LABELS[id][lang]}
                 </button>
               );
             })}
@@ -5056,8 +5053,6 @@ function PulseAppInner() {
         <TopBar
           query={query}
           setQuery={setQuery}
-          lang={lang}
-          setLang={setLang}
           showSearch={showSearch}
           setShowSearch={setShowSearch}
           account={account}
