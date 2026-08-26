@@ -329,49 +329,8 @@ function activityLineForCluster(
   return `${postCount} posts`;
 }
 
-type MarkerPalette = { primary: string; accent: string; neutral: string };
-
-function tonePalette(tone: AreaTone): MarkerPalette {
-  if (tone === "beach") {
-    return { primary: "#142d46", accent: "#587286", neutral: "#a8aca9" };
-  }
-  if (tone === "culture") {
-    return { primary: "#10243d", accent: "#cf8738", neutral: "#858b8e" };
-  }
-  if (tone === "nature") {
-    return { primary: "#626c68", accent: "#d1a052", neutral: "#afb1aa" };
-  }
-  if (tone === "music" || tone === "village") {
-    return { primary: "#283a50", accent: "#858b92", neutral: "#da994c" };
-  }
-  return { primary: "#c96e28", accent: "#f0b955", neutral: "#8d9291" };
-}
-
-function typePalette(place: Place): MarkerPalette {
-  if (place.type === "beach") return tonePalette("beach");
-  if (place.type === "nature") return tonePalette("nature");
-  if (place.type === "night" || place.type === "village") return tonePalette("village");
-  if (place.type === "culture") return tonePalette("culture");
-  return tonePalette("local");
-}
-
-function pulseStyle(size: number, palette: MarkerPalette, id: string, status: AreaStatus) {
-  let hash = 0;
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
-  }
-  const delay = -((hash % 400) / 100);
-  const duration = status === "live" ? 2.7 : status === "hot" ? 3.35 : 4.1 + (hash % 6) * 0.12;
-  const strength = status === "live" ? 0.58 : status === "hot" ? 0.46 : 0.32;
-  return [
-    `--marker-size:${size}px`,
-    `--marker-color:${palette.primary}`,
-    `--marker-accent:${palette.accent}`,
-    `--marker-neutral:${palette.neutral}`,
-    `--marker-pulse-delay:${delay.toFixed(2)}s`,
-    `--marker-pulse-duration:${duration.toFixed(2)}s`,
-    `--marker-pulse-strength:${strength}`,
-  ].join(";");
+function markerStyle(size: number) {
+  return `--marker-size:${size}px`;
 }
 
 function clusterSize(status: AreaStatus) {
@@ -505,8 +464,7 @@ function createAreaIcon(
   resolve: (url: string) => string,
 ) {
   const size = clusterSize(cluster.status);
-  const palette = tonePalette(cluster.tone);
-  const images = cluster.places.slice(0, 1);
+  const images = cluster.places.slice(0, 3);
   const collage = images
     .map(
       (place, index) =>
@@ -523,21 +481,15 @@ function createAreaIcon(
     .join("");
   const statusLabel = cluster.status === "quiet" ? "" : cluster.status;
 
-  const glows = cluster.status === "live" || cluster.status === "hot";
-  const glowSize = Math.round(size * 1.9);
-  const glow = glows
-    ? `<span class="hp-marker-glow" style="width:${glowSize}px;height:${glowSize}px;--glow-color:${palette.primary};"></span>`
-    : "";
-
   return L.divIcon({
     className: "hp-area-marker",
     html: `
       <div
         class="hp-area-marker__shell ${selected ? "is-selected" : ""} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
-        style="${pulseStyle(size, palette, cluster.id, cluster.status)}"
+        style="${markerStyle(size)}"
       >
-        ${glow}<span class="hp-marker-pulse"></span><span class="hp-area-marker__ring"></span>
-        <span class="hp-area-marker__collage">${collage}</span>
+        <span class="hp-area-marker__ring"></span>
+        <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
         <span class="hp-area-marker__shade"></span>
         ${statusLabel ? `<span class="hp-area-marker__status">${escapeHtml(statusLabel)}</span>` : ""}
         <span class="hp-area-marker__copy">
@@ -564,7 +516,6 @@ function createChildIcon(
   solo = false,
   resolve: (url: string) => string = (url) => url,
 ) {
-  const palette = typePalette(place);
   const size = childSize(place);
   const line =
     eventCount > 0
@@ -585,10 +536,10 @@ function createChildIcon(
     html: `
       <div
         class="hp-child-marker__shell ${selected ? "is-selected" : ""} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${pulseStatus === "live" ? "is-live" : ""} ${pulseStatus === "hot" ? "is-hot" : ""}"
-        style="${pulseStyle(size, palette, place.id, pulseStatus)}"
+        style="${markerStyle(size)}"
       >
         ${hasStories ? '<span class="hp-child-marker__story-ring"></span>' : ""}
-        <span class="hp-marker-pulse"></span><span class="hp-child-marker__ring"></span>
+        <span class="hp-child-marker__ring"></span>
         <span class="hp-child-marker__media">
           <img class="hp-child-marker__image" src="${escapeHtml(
             resolveUrl(resolve, place.imageUrl),
@@ -615,9 +566,10 @@ function createActivityClusterIcon(
   resolve: (url: string) => string,
 ) {
   const size = activityClusterSize(node.pointCount);
-  const palette = tonePalette(node.tone);
   const status = statusForCluster(node.leaves, node.eventCount, node.hotness);
-  const images = node.leaves.slice(0, 1);
+  const images = [...node.leaves]
+    .sort((a, b) => scorePlace(b) - scorePlace(a) || a.id.localeCompare(b.id))
+    .slice(0, 3);
   const collage = images
     .map(
       (place, index) =>
@@ -636,10 +588,10 @@ function createActivityClusterIcon(
     html: `
       <div
         class="hp-area-marker__shell hp-area-marker__shell--activity ${node.selected ? "is-selected" : ""} ${status === "live" ? "is-live" : ""} ${status === "hot" ? "is-hot" : ""}"
-        style="${pulseStyle(size, palette, `activity-${node.clusterId}`, status)}"
+        style="${markerStyle(size)}"
       >
-        <span class="hp-marker-pulse"></span><span class="hp-area-marker__ring"></span>
-        <span class="hp-area-marker__collage">${collage}</span>
+        <span class="hp-area-marker__ring"></span>
+        <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
         <span class="hp-area-marker__shade"></span>
         <span class="hp-area-marker__copy">
           <strong>${escapeHtml(node.dominantCluster.name)}</strong>
@@ -686,9 +638,6 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   const childScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.35;
   const nearbyScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.07 + profile.ultra * 0.28;
   const soloScale = 0.32 + profile.medium * (nearbyScale - 0.32);
-  const surfaceOpacity = 0.62 + profile.medium * 0.2 + profile.detail * 0.14;
-  const heartbeatPeak = 1.1 - profile.medium * 0.03 - profile.detail * 0.03;
-  const heartbeatAmount = heartbeatPeak - 1;
   node.style.setProperty("--hp-map-medium", profile.medium.toFixed(4));
   node.style.setProperty("--hp-map-detail", profile.detail.toFixed(4));
   node.style.setProperty("--hp-map-rich", profile.rich.toFixed(4));
@@ -702,19 +651,11 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   );
   node.style.setProperty(
     "--hp-map-media-opacity",
-    (0.03 + profile.medium * 0.83 + profile.detail * 0.14).toFixed(4),
+    (0.78 + profile.medium * 0.14 + profile.detail * 0.08).toFixed(4),
   );
   node.style.setProperty("--hp-map-media-scale", (0.92 + profile.medium * 0.08).toFixed(4));
   node.style.setProperty("--hp-map-rich-scale", (0.8 + profile.rich * 0.2).toFixed(4));
   node.style.setProperty("--hp-map-dot-opacity", (0.35 + profile.medium * 0.65).toFixed(4));
-  node.style.setProperty("--hp-map-surface-opacity", surfaceOpacity.toFixed(4));
-  node.style.setProperty(
-    "--hp-map-pulse-opacity",
-    (0.38 - profile.medium * 0.12 - profile.detail * 0.08).toFixed(4),
-  );
-  node.style.setProperty("--hp-map-beat-peak", heartbeatPeak.toFixed(4));
-  node.style.setProperty("--hp-map-beat-settle", (1 + heartbeatAmount * 0.25).toFixed(4));
-  node.style.setProperty("--hp-map-beat-echo", (1 + heartbeatAmount * 0.65).toFixed(4));
   node.style.setProperty("--hp-map-solo-scale", soloScale.toFixed(4));
   node.style.setProperty("--hp-map-copy-offset", `${((1 - profile.rich) * 0.2).toFixed(4)}rem`);
 }
@@ -1377,10 +1318,6 @@ export function SocialMap({
       if (currentMarkerElement) {
         currentMarkerElement.style.pointerEvents = visibleForInteraction ? "auto" : "none";
         currentMarkerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
-        currentMarkerElement.style.setProperty(
-          "--hp-marker-pulse-state",
-          visibleForInteraction ? "running" : "paused",
-        );
         currentMarkerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
         currentMarkerElement.tabIndex = visibleForInteraction ? 0 : -1;
       }
@@ -1395,10 +1332,6 @@ export function SocialMap({
           const interactiveElement = markerElement as InteractiveMarkerElement;
           markerElement.style.pointerEvents = visibleForInteraction ? "auto" : "none";
           markerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
-          markerElement.style.setProperty(
-            "--hp-marker-pulse-state",
-            visibleForInteraction ? "running" : "paused",
-          );
           markerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
           if (interactiveElement.__hpClickHandler) {
             interactiveElement.removeEventListener(

@@ -244,15 +244,10 @@
   --hp-map-nearby-scale: 0.18;
   --hp-map-area-scale: 0.34;
   --hp-map-activity-scale: 0.46;
-  --hp-map-media-opacity: 0.04;
+  --hp-map-media-opacity: 0.78;
   --hp-map-media-scale: 0.92;
   --hp-map-rich-scale: 0.8;
   --hp-map-dot-opacity: 0.35;
-  --hp-map-surface-opacity: 0.62;
-  --hp-map-pulse-opacity: 0.38;
-  --hp-map-beat-peak: 1.1;
-  --hp-map-beat-settle: 1.025;
-  --hp-map-beat-echo: 1.065;
   --hp-map-solo-scale: 0.32;
   --hp-map-copy-offset: 0.2rem;
 }
@@ -297,27 +292,7 @@
   transition:
     opacity 90ms linear,
     transform 90ms linear;
-  animation: hp-marker-icon-beat var(--marker-pulse-duration, 4.2s) ease-in-out infinite;
-  animation-delay: var(--marker-pulse-delay, 0s);
-  animation-play-state: var(--hp-marker-pulse-state, running);
   will-change: transform, opacity;
-}
-
-@keyframes hp-marker-icon-beat {
-  0%,
-  32%,
-  100% {
-    scale: 1;
-  }
-  8% {
-    scale: var(--hp-map-beat-peak);
-  }
-  17% {
-    scale: var(--hp-map-beat-settle);
-  }
-  24% {
-    scale: var(--hp-map-beat-echo);
-  }
 }
 
 .hp-area-marker__shell {
@@ -365,109 +340,28 @@
 .hp-area-marker__ring,
 .hp-child-marker__ring {
   z-index: 0;
-  inset: -0.16rem;
-  border: 1px solid transparent;
-  background:
-    radial-gradient(
-        circle at 28% 22%,
-        color-mix(in srgb, var(--marker-accent) 64%, var(--hp-paper)) 0%,
-        color-mix(in srgb, var(--marker-accent) 44%, var(--marker-neutral)) 38%,
-        color-mix(in srgb, var(--marker-color) 68%, var(--marker-neutral)) 74%,
-        color-mix(in srgb, var(--marker-color) 88%, var(--marker-neutral)) 100%
-      )
-      padding-box,
-    conic-gradient(
-        from 220deg,
-        color-mix(in srgb, var(--marker-color) 76%, var(--marker-neutral)),
-        color-mix(in srgb, var(--marker-accent) 76%, var(--marker-neutral)) 34%,
-        color-mix(in srgb, var(--marker-neutral) 82%, var(--hp-paper)) 56%,
-        color-mix(in srgb, var(--marker-color) 82%, var(--marker-neutral)) 79%,
-        color-mix(in srgb, var(--marker-accent) 74%, var(--marker-neutral))
-      )
-      border-box;
-  opacity: var(--hp-map-surface-opacity);
+  inset: -0.14rem;
+  border: 1px solid color-mix(in srgb, var(--hp-paper) 84%, transparent);
+  background: color-mix(in srgb, var(--hp-paper) 32%, transparent);
   box-shadow:
-    0 0 0 0.75px color-mix(in srgb, var(--hp-paper) 68%, transparent),
-    0 0 0.42rem color-mix(in srgb, var(--marker-accent) 14%, transparent),
-    0 0.12rem 0.3rem rgba(16, 36, 61, 0.11);
-  transition: opacity 100ms linear;
-}
-
-.hp-area-marker__ring::after,
-.hp-child-marker__ring::after {
-  position: absolute;
-  inset: 0.08rem;
-  border: 0.75px solid color-mix(in srgb, var(--hp-paper) 38%, transparent);
-  border-radius: inherit;
-  background: radial-gradient(
-    circle at 30% 22%,
-    color-mix(in srgb, var(--hp-paper) 22%, transparent),
-    transparent 48%
-  );
-  content: "";
-  pointer-events: none;
+    0 0 0 0.5px color-mix(in srgb, var(--hp-paper) 58%, transparent),
+    0 0.12rem 0.32rem rgba(16, 36, 61, 0.13);
 }
 
 .hp-area-marker__shell.is-selected .hp-area-marker__ring,
 .hp-child-marker__shell.is-selected .hp-child-marker__ring {
-  opacity: max(0.9, var(--hp-map-surface-opacity));
+  border-color: color-mix(in srgb, var(--hp-sunset) 72%, var(--hp-paper));
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--hp-paper) 78%, transparent),
-    0 0 0.55rem color-mix(in srgb, var(--marker-accent) 20%, transparent),
+    0 0 0 1.5px color-mix(in srgb, var(--hp-sunset) 58%, var(--hp-paper)),
+    0 0 0.42rem color-mix(in srgb, var(--hp-sunset) 18%, transparent),
     0 0.14rem 0.34rem rgba(16, 36, 61, 0.14);
-}
-
-.hp-marker-pulse {
-  position: absolute;
-  inset: -0.58rem;
-  z-index: 0;
-  border-radius: 9999px;
-  pointer-events: none;
-  background: conic-gradient(
-    from 210deg,
-    color-mix(in srgb, var(--marker-color) 54%, transparent),
-    color-mix(in srgb, var(--marker-accent) 48%, transparent) 32%,
-    color-mix(in srgb, var(--marker-neutral) 38%, transparent) 54%,
-    color-mix(in srgb, var(--marker-color) 50%, transparent) 76%,
-    color-mix(in srgb, var(--marker-accent) 46%, transparent)
-  );
-  opacity: var(--hp-map-pulse-opacity);
-  filter: opacity(var(--marker-pulse-strength, 0.32))
-    drop-shadow(0 0 0.28rem color-mix(in srgb, var(--marker-accent) 24%, transparent));
-  -webkit-mask: radial-gradient(farthest-side, transparent 42%, #000 68%, transparent 100%);
-  mask: radial-gradient(farthest-side, transparent 42%, #000 68%, transparent 100%);
-  animation: hp-marker-breathe var(--marker-pulse-duration, 4.2s) ease-in-out infinite;
-  animation-delay: var(--marker-pulse-delay, 0s);
-  animation-play-state: var(--hp-marker-pulse-state, running);
-  transform-origin: center;
-  transition: opacity 100ms linear;
-}
-
-.hp-area-marker__shell.is-hot .hp-marker-pulse,
-.hp-child-marker__shell.is-hot .hp-marker-pulse {
-  filter: opacity(var(--marker-pulse-strength, 0.46))
-    drop-shadow(0 0 0.32rem color-mix(in srgb, var(--marker-accent) 48%, transparent));
-}
-
-.hp-area-marker__shell.is-live .hp-marker-pulse,
-.hp-child-marker__shell.is-live .hp-marker-pulse {
-  filter: opacity(var(--marker-pulse-strength, 0.58))
-    drop-shadow(0 0 0.42rem color-mix(in srgb, var(--marker-accent) 58%, transparent));
-}
-
-@keyframes hp-marker-breathe {
-  0%,
-  100% {
-    transform: scale(0.96);
-  }
-  50% {
-    transform: scale(1.09);
-  }
 }
 
 .hp-area-marker__collage {
   z-index: 1;
-  display: block;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--hp-paper) 82%, transparent);
   background: color-mix(in srgb, var(--hp-ink) 12%, var(--hp-paper));
@@ -476,6 +370,15 @@
   transition:
     opacity 90ms linear,
     transform 90ms linear;
+}
+
+.hp-area-marker__collage--2 {
+  grid-template-columns: 3fr 2fr;
+}
+
+.hp-area-marker__collage--3 {
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 1fr 1fr;
 }
 
 .hp-area-marker__photo,
@@ -489,8 +392,13 @@
   object-position: center;
 }
 
-.hp-area-marker__photo--1 {
+.hp-area-marker__photo {
+  min-height: 0;
   min-width: 0;
+}
+
+.hp-area-marker__collage--3 .hp-area-marker__photo--1 {
+  grid-row: 1 / span 2;
 }
 
 .hp-area-marker__photo--2,
@@ -501,6 +409,22 @@
 
 .hp-area-marker__photo--3 {
   border-top: 1px solid color-mix(in srgb, var(--hp-paper) 48%, transparent);
+}
+
+.hp-area-marker__collage::after,
+.hp-child-marker__media::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 28% 20%,
+    color-mix(in srgb, var(--hp-paper) 14%, transparent),
+    transparent 48%
+  );
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--hp-paper) 38%, transparent);
+  content: "";
+  pointer-events: none;
 }
 
 .hp-child-marker__image {
@@ -519,6 +443,11 @@
   contain: paint;
   opacity: var(--hp-map-media-opacity);
   transition: opacity 90ms linear;
+}
+
+.hp-area-marker__shell.is-selected .hp-area-marker__collage,
+.hp-child-marker__shell.is-selected .hp-child-marker__media {
+  opacity: 1;
 }
 
 .hp-area-marker__shade,
@@ -552,7 +481,7 @@
   right: 0.34rem;
   top: 0.42rem;
   border-radius: 9999px;
-  background: color-mix(in srgb, var(--marker-color) 88%, var(--hp-ink));
+  background: color-mix(in srgb, var(--hp-deep) 88%, var(--hp-ink));
   color: var(--hp-paper);
   font-size: 0.52rem;
   font-weight: 800;
@@ -563,6 +492,16 @@
   transition:
     opacity 90ms linear,
     transform 90ms linear;
+}
+
+.hp-area-marker__shell.is-hot .hp-area-marker__status,
+.hp-child-marker__shell.is-hot .hp-child-marker__status {
+  background: color-mix(in srgb, #b96d2d 86%, var(--hp-ink));
+}
+
+.hp-area-marker__shell.is-live .hp-area-marker__status,
+.hp-child-marker__shell.is-live .hp-child-marker__status {
+  background: color-mix(in srgb, var(--hp-sunset) 88%, var(--hp-ink));
 }
 
 .hp-area-marker__status {
@@ -982,22 +921,11 @@ select:focus-visible {
     linear-gradient(var(--hp-paper), var(--hp-paper)) padding-box,
     linear-gradient(135deg, #f0a85f 0%, #9b6fe6 100%) border-box;
   opacity: var(--hp-map-rich);
-  animation: hp-story-ring-pulse 2.6s ease-in-out infinite;
   transition: opacity 90ms linear;
-}
-@keyframes hp-story-ring-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.07);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hp-story-bubble__live,
-  .hp-child-marker__story-ring {
+  .hp-story-bubble__live {
     animation: none;
   }
   .hp-story-progress__fill.is-running {
@@ -1026,35 +954,6 @@ select:focus-visible {
   100% {
     transform: scale(1.35);
     box-shadow: 0 0 0 0 transparent;
-  }
-}
-
-/* Map: hotness heat glow rendered under live/hot clusters */
-.hp-marker-glow {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 0;
-  border-radius: 9999px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--glow-color, var(--hp-sunset)) 55%, transparent) 0%,
-    color-mix(in srgb, var(--glow-color, var(--hp-sunset)) 18%, transparent) 38%,
-    transparent 68%
-  );
-  opacity: var(--hp-map-rich);
-  animation: hp-glow-breathe 3.6s ease-in-out infinite;
-  transition: opacity 90ms linear;
-}
-@keyframes hp-glow-breathe {
-  0%,
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.12);
   }
 }
 
@@ -1246,17 +1145,7 @@ h3 {
   .hp-child-marker__avatars {
     transition: none;
   }
-  .hp-area-marker__shell,
-  .hp-child-marker__shell {
-    animation: none;
-    scale: 1;
-  }
-  .hp-marker-pulse {
-    animation: none;
-    transform: none;
-  }
   .hp-live-ping,
-  .hp-marker-glow,
   .hp-user-dot::after,
   .hp-real-map .hp-route-line,
   .hp-pin-target,
