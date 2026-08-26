@@ -686,6 +686,9 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   const childScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.35;
   const nearbyScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.07 + profile.ultra * 0.28;
   const soloScale = 0.32 + profile.medium * (nearbyScale - 0.32);
+  const surfaceOpacity = 0.62 + profile.medium * 0.2 + profile.detail * 0.14;
+  const heartbeatPeak = 1.1 - profile.medium * 0.03 - profile.detail * 0.03;
+  const heartbeatAmount = heartbeatPeak - 1;
   node.style.setProperty("--hp-map-medium", profile.medium.toFixed(4));
   node.style.setProperty("--hp-map-detail", profile.detail.toFixed(4));
   node.style.setProperty("--hp-map-rich", profile.rich.toFixed(4));
@@ -697,14 +700,21 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
     "--hp-map-activity-scale",
     (0.46 + profile.medium * 0.2 + profile.detail * 0.24).toFixed(4),
   );
-  node.style.setProperty("--hp-map-media-opacity", (0.04 + profile.medium * 0.96).toFixed(4));
+  node.style.setProperty(
+    "--hp-map-media-opacity",
+    (0.03 + profile.medium * 0.83 + profile.detail * 0.14).toFixed(4),
+  );
   node.style.setProperty("--hp-map-media-scale", (0.92 + profile.medium * 0.08).toFixed(4));
   node.style.setProperty("--hp-map-rich-scale", (0.8 + profile.rich * 0.2).toFixed(4));
   node.style.setProperty("--hp-map-dot-opacity", (0.35 + profile.medium * 0.65).toFixed(4));
+  node.style.setProperty("--hp-map-surface-opacity", surfaceOpacity.toFixed(4));
   node.style.setProperty(
     "--hp-map-pulse-opacity",
-    (0.58 - profile.medium * 0.38 - profile.detail * 0.1).toFixed(4),
+    (0.38 - profile.medium * 0.12 - profile.detail * 0.08).toFixed(4),
   );
+  node.style.setProperty("--hp-map-beat-peak", heartbeatPeak.toFixed(4));
+  node.style.setProperty("--hp-map-beat-settle", (1 + heartbeatAmount * 0.25).toFixed(4));
+  node.style.setProperty("--hp-map-beat-echo", (1 + heartbeatAmount * 0.65).toFixed(4));
   node.style.setProperty("--hp-map-solo-scale", soloScale.toFixed(4));
   node.style.setProperty("--hp-map-copy-offset", `${((1 - profile.rich) * 0.2).toFixed(4)}rem`);
 }
