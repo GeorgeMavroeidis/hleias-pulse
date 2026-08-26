@@ -115,8 +115,9 @@ import type {
 import { DEFAULT_ORGANIZER_BIO } from "@/lib/hp/cultural-events-types";
 import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
 
-type Tab = "map" | "pulse" | "routes" | "meet" | "events" | "saved";
+type Tab = "map" | "pulse" | "routes" | "meet" | "saved";
 type NavTab = Exclude<Tab, "saved">;
+type MeetSubTab = "community" | "events";
 type ComposerMode = "post" | "place" | "story" | "event";
 type CreateStoryInput = {
   placeId: string;
@@ -142,7 +143,6 @@ const TAB_ITEMS: { id: NavTab; label: string; Icon: LucideIcon }[] = [
   { id: "pulse", label: "Pulse", Icon: Radio },
   { id: "routes", label: "Routes", Icon: RouteIcon },
   { id: "meet", label: "Meet", Icon: CalendarHeart },
-  { id: "events", label: "Events", Icon: Ticket },
 ];
 type ShareTarget = {
   type: "app" | "place" | "post" | "route" | "story";
@@ -163,7 +163,6 @@ const isTab = (value: string | null): value is Tab =>
   value === "pulse" ||
   value === "routes" ||
   value === "meet" ||
-  value === "events" ||
   value === "saved";
 
 const truncateShareText = (text: string) =>
@@ -3685,6 +3684,7 @@ export function PulseApp() {
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
+  const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [mapBackStack, setMapBackStack] = useState<MapViewSnapshot[]>([]);
@@ -4202,7 +4202,11 @@ export function PulseApp() {
     initialShareHandled.current = true;
     setCreateOpen(false);
 
-    if (isTab(tabParam)) {
+    if (tabParam === "events") {
+      // Legacy deep link from before Cultural Events moved under Meet.
+      setTab("meet");
+      setMeetSubTab("events");
+    } else if (isTab(tabParam)) {
       setTab(tabParam);
     }
 
@@ -4552,6 +4556,7 @@ export function PulseApp() {
     setCreateOpen(false);
     setComposerPin(null);
     setTab("meet");
+    setMeetSubTab("community");
     showToast("Gathering hosted");
   };
 
@@ -4697,10 +4702,12 @@ export function PulseApp() {
     if (!event) {
       showToast("No gathering there yet");
       setTab("meet");
+      setMeetSubTab("community");
       return;
     }
     toggleMeetRsvp(event, "going");
     setTab("meet");
+    setMeetSubTab("community");
   };
 
   const openComposer = (mode: ComposerMode, pin: { lat: number; lng: number } | null = null) => {
@@ -4925,26 +4932,54 @@ export function PulseApp() {
 
     if (tab === "meet") {
       return (
-        <MeetScreen
-          events={meetEvents}
-          rsvp={rsvpMap}
-          findPlace={findPlace}
-          onToggleRsvp={toggleMeetRsvp}
-          onOpenPlace={jumpToMap}
-          onCreate={() => openComposer("event")}
-        />
-      );
-    }
-
-    if (tab === "events") {
-      return (
-        <CulturalEventsScreen
-          events={culturalEvents}
-          lang={lang}
-          onOpenDetail={setOpenCulturalEvent}
-          canCreate={organizerStatus?.verificationStatus === "verified"}
-          onCreate={() => setOrganizerComposerOpen(true)}
-        />
+        <div className="flex h-full flex-col">
+          <div className="flex shrink-0 gap-1.5 px-4 pt-3">
+            {(
+              [
+                { id: "community" as MeetSubTab, label: "Community", Icon: CalendarHeart },
+                { id: "events" as MeetSubTab, label: "Εκδηλώσεις", Icon: Ticket },
+              ] satisfies { id: MeetSubTab; label: string; Icon: LucideIcon }[]
+            ).map(({ id, label, Icon }) => {
+              const active = meetSubTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setMeetSubTab(id)}
+                  aria-pressed={active}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-2xl border py-2 text-[12.5px] font-bold transition active:scale-[0.98] ${
+                    active
+                      ? "border-hp-ink bg-hp-ink text-hp-paper"
+                      : "border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+                  }`}
+                >
+                  <Icon size={14} strokeWidth={2.6} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="min-h-0 flex-1">
+            {meetSubTab === "community" ? (
+              <MeetScreen
+                events={meetEvents}
+                rsvp={rsvpMap}
+                findPlace={findPlace}
+                onToggleRsvp={toggleMeetRsvp}
+                onOpenPlace={jumpToMap}
+                onCreate={() => openComposer("event")}
+              />
+            ) : (
+              <CulturalEventsScreen
+                events={culturalEvents}
+                lang={lang}
+                onOpenDetail={setOpenCulturalEvent}
+                canCreate={organizerStatus?.verificationStatus === "verified"}
+                onCreate={() => setOrganizerComposerOpen(true)}
+              />
+            )}
+          </div>
+        </div>
       );
     }
 
