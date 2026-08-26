@@ -15,12 +15,13 @@ import {
 import type { Place } from "@/lib/hp-model";
 import {
   MEET_CATEGORIES,
-  MEET_CATEGORY_META,
   type MeetCategory,
   type MeetEvent,
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
 import { EventCard } from "./EventCard";
+import { useLang } from "@/lib/hp/language-context";
+import { MEET_CATEGORY_LABELS, MEET_SCREEN_STRINGS, mineChipLabel } from "@/lib/hp/meet-strings";
 
 type Filter = "all" | "mine" | MeetCategory;
 
@@ -52,6 +53,7 @@ export function MeetScreen({
   onOpenPlace,
   onCreate,
 }: Props) {
+  const { lang } = useLang();
   const [filter, setFilter] = useState<Filter>("all");
 
   const filtered = useMemo(() => {
@@ -69,11 +71,11 @@ export function MeetScreen({
   const mineCount = events.filter((e) => rsvp[e.id]).length;
 
   const chips: { id: Filter; label: string; Icon?: LucideIcon }[] = [
-    { id: "all", label: "All" },
-    { id: "mine", label: mineCount > 0 ? `Mine · ${mineCount}` : "Mine" },
+    { id: "all", label: MEET_SCREEN_STRINGS.all[lang] },
+    { id: "mine", label: mineChipLabel(lang, mineCount) },
     ...MEET_CATEGORIES.map((c) => ({
       id: c as Filter,
-      label: MEET_CATEGORY_META[c].label,
+      label: MEET_CATEGORY_LABELS[c][lang],
       Icon: CATEGORY_ICONS[c],
     })),
   ];
@@ -86,10 +88,10 @@ export function MeetScreen({
             <CalendarHeart size={18} />
           </span>
           <div>
-            <h2 className="text-2xl font-black leading-none text-hp-ink">Meet</h2>
-            <p className="mt-0.5 text-[11.5px] text-hp-muted">
-              Gatherings & plans — say you&apos;re in.
-            </p>
+            <h2 className="text-2xl font-black leading-none text-hp-ink">
+              {MEET_SCREEN_STRINGS.title[lang]}
+            </h2>
+            <p className="mt-0.5 text-[11.5px] text-hp-muted">{MEET_SCREEN_STRINGS.subtitle[lang]}</p>
           </div>
         </div>
 
@@ -123,12 +125,10 @@ export function MeetScreen({
               <Sparkles size={20} />
             </div>
             <h3 className="text-[15px] font-bold text-hp-ink">
-              {filter === "mine" ? "Nothing planned yet" : "No gatherings here"}
+              {filter === "mine" ? MEET_SCREEN_STRINGS.emptyMineTitle[lang] : MEET_SCREEN_STRINGS.emptyAllTitle[lang]}
             </h3>
             <p className="mx-auto mt-1 max-w-[16rem] text-[12px] text-hp-muted">
-              {filter === "mine"
-                ? "RSVP to something, or host your own — a swim, a coffee, a panigyri."
-                : "Be the first to host something in this vibe."}
+              {filter === "mine" ? MEET_SCREEN_STRINGS.emptyMineHelper[lang] : MEET_SCREEN_STRINGS.emptyAllHelper[lang]}
             </p>
           </div>
         ) : (
@@ -157,10 +157,10 @@ export function MeetScreen({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         onClick={onCreate}
         className="absolute right-4 bottom-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-hp-sunset px-4 py-3 text-hp-paper shadow-[0_12px_28px_rgba(224,106,50,0.45)]"
-        aria-label="Host a gathering"
+        aria-label={MEET_SCREEN_STRINGS.hostAGathering[lang]}
       >
         <Plus size={18} strokeWidth={2.6} />
-        <span className="text-[13px] font-black">Host</span>
+        <span className="text-[13px] font-black">{MEET_SCREEN_STRINGS.host[lang]}</span>
       </motion.button>
     </div>
   );
