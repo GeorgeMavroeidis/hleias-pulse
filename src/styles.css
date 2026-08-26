@@ -248,7 +248,11 @@
   --hp-map-media-scale: 0.92;
   --hp-map-rich-scale: 0.8;
   --hp-map-dot-opacity: 0.35;
-  --hp-map-pulse-opacity: 0.58;
+  --hp-map-surface-opacity: 0.62;
+  --hp-map-pulse-opacity: 0.38;
+  --hp-map-beat-peak: 1.1;
+  --hp-map-beat-settle: 1.025;
+  --hp-map-beat-echo: 1.065;
   --hp-map-solo-scale: 0.32;
   --hp-map-copy-offset: 0.2rem;
 }
@@ -306,13 +310,13 @@
     scale: 1;
   }
   8% {
-    scale: 1.1;
+    scale: var(--hp-map-beat-peak);
   }
   17% {
-    scale: 1.025;
+    scale: var(--hp-map-beat-settle);
   }
   24% {
-    scale: 1.065;
+    scale: var(--hp-map-beat-echo);
   }
 }
 
@@ -361,53 +365,77 @@
 .hp-area-marker__ring,
 .hp-child-marker__ring {
   z-index: 0;
-  inset: -0.18rem;
-  border: 2px solid transparent;
+  inset: -0.16rem;
+  border: 1px solid transparent;
   background:
     radial-gradient(
-        circle at 30% 24%,
-        color-mix(in srgb, var(--marker-accent) 84%, var(--hp-paper)) 0%,
-        color-mix(in srgb, var(--marker-color) 90%, var(--marker-neutral)) 58%,
-        var(--marker-color) 100%
+        circle at 28% 22%,
+        color-mix(in srgb, var(--marker-accent) 64%, var(--hp-paper)) 0%,
+        color-mix(in srgb, var(--marker-accent) 44%, var(--marker-neutral)) 38%,
+        color-mix(in srgb, var(--marker-color) 68%, var(--marker-neutral)) 74%,
+        color-mix(in srgb, var(--marker-color) 88%, var(--marker-neutral)) 100%
       )
       padding-box,
     conic-gradient(
         from 220deg,
-        var(--marker-color),
-        var(--marker-accent) 34%,
-        var(--marker-neutral) 56%,
-        var(--marker-color) 79%,
-        var(--marker-accent)
+        color-mix(in srgb, var(--marker-color) 76%, var(--marker-neutral)),
+        color-mix(in srgb, var(--marker-accent) 76%, var(--marker-neutral)) 34%,
+        color-mix(in srgb, var(--marker-neutral) 82%, var(--hp-paper)) 56%,
+        color-mix(in srgb, var(--marker-color) 82%, var(--marker-neutral)) 79%,
+        color-mix(in srgb, var(--marker-accent) 74%, var(--marker-neutral))
       )
       border-box;
+  opacity: var(--hp-map-surface-opacity);
   box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--hp-paper) 96%, transparent),
-    0 0.16rem 0.4rem rgba(16, 36, 61, 0.2);
+    0 0 0 0.75px color-mix(in srgb, var(--hp-paper) 68%, transparent),
+    0 0 0.42rem color-mix(in srgb, var(--marker-accent) 14%, transparent),
+    0 0.12rem 0.3rem rgba(16, 36, 61, 0.11);
+  transition: opacity 100ms linear;
+}
+
+.hp-area-marker__ring::after,
+.hp-child-marker__ring::after {
+  position: absolute;
+  inset: 0.08rem;
+  border: 0.75px solid color-mix(in srgb, var(--hp-paper) 38%, transparent);
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 30% 22%,
+    color-mix(in srgb, var(--hp-paper) 22%, transparent),
+    transparent 48%
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.hp-area-marker__shell.is-selected .hp-area-marker__ring,
+.hp-child-marker__shell.is-selected .hp-child-marker__ring {
+  opacity: max(0.9, var(--hp-map-surface-opacity));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--hp-paper) 78%, transparent),
+    0 0 0.55rem color-mix(in srgb, var(--marker-accent) 20%, transparent),
+    0 0.14rem 0.34rem rgba(16, 36, 61, 0.14);
 }
 
 .hp-marker-pulse {
   position: absolute;
-  inset: -0.38rem;
+  inset: -0.58rem;
   z-index: 0;
   border-radius: 9999px;
   pointer-events: none;
   background: conic-gradient(
     from 210deg,
-    var(--marker-color),
-    var(--marker-accent) 32%,
-    var(--marker-neutral) 54%,
-    var(--marker-color) 76%,
-    var(--marker-accent)
+    color-mix(in srgb, var(--marker-color) 54%, transparent),
+    color-mix(in srgb, var(--marker-accent) 48%, transparent) 32%,
+    color-mix(in srgb, var(--marker-neutral) 38%, transparent) 54%,
+    color-mix(in srgb, var(--marker-color) 50%, transparent) 76%,
+    color-mix(in srgb, var(--marker-accent) 46%, transparent)
   );
   opacity: var(--hp-map-pulse-opacity);
   filter: opacity(var(--marker-pulse-strength, 0.32))
-    drop-shadow(0 0 0.22rem color-mix(in srgb, var(--marker-accent) 38%, transparent));
-  -webkit-mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 2.5px),
-    #000 calc(100% - 2px)
-  );
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+    drop-shadow(0 0 0.28rem color-mix(in srgb, var(--marker-accent) 24%, transparent));
+  -webkit-mask: radial-gradient(farthest-side, transparent 42%, #000 68%, transparent 100%);
+  mask: radial-gradient(farthest-side, transparent 42%, #000 68%, transparent 100%);
   animation: hp-marker-breathe var(--marker-pulse-duration, 4.2s) ease-in-out infinite;
   animation-delay: var(--marker-pulse-delay, 0s);
   animation-play-state: var(--hp-marker-pulse-state, running);
