@@ -4,6 +4,25 @@ import Supercluster from "supercluster";
 import "leaflet/dist/leaflet.css";
 import { type EventItem, type Place } from "@/lib/hp-model";
 import { useImageUrls } from "@/lib/hp/image-cache";
+import { useLang } from "@/lib/hp/language-context";
+import type { Lang } from "@/lib/hp/i18n";
+import {
+  MAP_CHROME_STRINGS,
+  areaPlacesSummary,
+  filterAreasSummary,
+  areasMovingTonightSummary,
+  eventsOrPostsLine,
+  AREA_STATUS_MARKER_LABELS,
+  zoomIntoClusterAriaLabel,
+  zoomIntoActivityAriaLabel,
+  openPlaceAriaLabel,
+  postsCountLabel,
+  tipsCountLabel,
+  postsAndEventsLine,
+  eventsTonightLine,
+  sunsetPostsLine,
+  tonightPostsLine,
+} from "@/lib/hp/map-strings";
 
 type LeafletModule = typeof import("leaflet");
 type LeafletMap = import("leaflet").Map;
@@ -307,17 +326,17 @@ function activityLineForCluster(
   places: Place[],
   postCount: number,
   eventCount: number,
+  lang: Lang,
 ) {
   const hasSunset = places.some(
     (place) => place.type === "sunset" || place.tags.includes("sunset"),
   );
-  if (eventCount > 0 && postCount > 0)
-    return `${postCount} posts · ${eventCount} event${eventCount === 1 ? "" : "s"}`;
-  if (eventCount > 0) return `${eventCount} event${eventCount === 1 ? "" : "s"} tonight`;
-  if (hasSunset) return `sunset · ${postCount} posts`;
-  if (tone === "nature" || tone === "village") return `${postCount} tips`;
-  if (tone === "music") return `tonight · ${postCount} posts`;
-  return `${postCount} posts`;
+  if (eventCount > 0 && postCount > 0) return postsAndEventsLine(lang, postCount, eventCount);
+  if (eventCount > 0) return eventsTonightLine(lang, eventCount);
+  if (hasSunset) return sunsetPostsLine(lang, postCount);
+  if (tone === "nature" || tone === "village") return tipsCountLabel(lang, postCount);
+  if (tone === "music") return tonightPostsLine(lang, postCount);
+  return postsCountLabel(lang, postCount);
 }
 
 function toneColor(tone: AreaTone) {
@@ -384,7 +403,11 @@ function centerOfPlaces(places: Place[], fallback: LatLngTuple): LatLngTuple {
   return [lat, lng];
 }
 
-export function buildAreaClusters(places: Place[], events: EventItem[]): MapAreaCluster[] {
+export function buildAreaClusters(
+  places: Place[],
+  events: EventItem[],
+  lang: Lang = "GR",
+): MapAreaCluster[] {
   const eventCounts = eventCountForPlace(events);
 
   // Group by curated neighbourhood; places not in any def become standalone
@@ -430,7 +453,7 @@ export function buildAreaClusters(places: Place[], events: EventItem[]): MapArea
         places: sortedPlaces,
         childPlaces: sortedPlaces,
         leadPlace: lead,
-        activityLine: activityLineForCluster(tone, areaPlaces, postCount, eventCount),
+        activityLine: activityLineForCluster(tone, areaPlaces, postCount, eventCount, lang),
         eventCount,
         postCount,
         hotness,
@@ -467,6 +490,7 @@ function createAreaIcon(
   selected: boolean,
   rank: number,
   resolve: (url: string) => string,
+  lang: Lang,
 ) {
   const compact = !selected && cluster.status !== "live" && rank > 1;
   const size = clusterSize(cluster.status, selected, compact);
@@ -491,7 +515,7 @@ function createAreaIcon(
     cluster.status === "quiet"
       ? ""
       : selected || rank <= 1 || cluster.status === "live"
-        ? cluster.status
+        ? AREA_STATUS_MARKER_LABELS[cluster.status][lang]
         : "";
 
   const glows = cluster.status === "live" || cluster.status === "hot";
@@ -533,6 +557,7 @@ function createChildIcon(
   hasStories = false,
   compact = false,
   resolve: (url: string) => string = (url) => url,
+  lang: Lang = "GR",
 ) {
   const color = typeColorToken(place);
 
@@ -547,10 +572,7 @@ function createChildIcon(
   }
 
   const size = childSize(place, selected);
-  const line =
-    eventCount > 0
-      ? `${eventCount} event${eventCount === 1 ? "" : "s"}`
-      : `${place.recentPostCount} posts`;
+  const line = eventsOrPostsLine(lang, eventCount, place.recentPostCount);
 
   return L.divIcon({
     className: "hp-child-marker",
@@ -583,6 +605,7 @@ function createActivityClusterIcon(
   L: LeafletModule,
   node: ActivityClusterRenderNode,
   resolve: (url: string) => string,
+  lang: Lang,
 ) {
   const size = activityClusterSize(node.pointCount, node.selected);
   const color = toneColor(node.tone);
@@ -595,10 +618,7 @@ function createActivityClusterIcon(
         )}" alt="" loading="lazy" />`,
     )
     .join("");
-  const line =
-    node.eventCount > 0
-      ? `${node.eventCount} event${node.eventCount === 1 ? "" : "s"}`
-      : `${node.postCount} posts`;
+  const line = eventsOrPostsLine(lang, node.eventCount, node.postCount);
 
   return L.divIcon({
     className: "hp-activity-cluster",
@@ -737,6 +757,7 @@ export function SocialMap({
   routePath = null,
   onMapLongPress,
 }: Props) {
+  const { lang } = useLang();
   const mapNodeRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<LeafletModule | null>(null);
@@ -940,14 +961,14 @@ export function SocialMap({
 
   const summaryText = useMemo(() => {
     if (selectedPlaceNode) return selectedPlaceNode.place.name;
-    if (selectedAreaCluster) return `${selectedAreaCluster.name} places`;
-    if (isSplitZoom) return "Tap a place or cluster";
-    if (activeFilterLabel) return `${activeFilterLabel} areas`;
+    if (selectedAreaCluster) return areaPlacesSummary(lang, selectedAreaCluster.name);
+    if (isSplitZoom) return MAP_CHROME_STRINGS.tapPlaceOrCluster[lang];
+    if (activeFilterLabel) return filterAreasSummary(lang, activeFilterLabel);
     if (clusters.some((cluster) => cluster.tone === "beach" && cluster.status !== "quiet")) {
-      return "Hot around the coast";
+      return MAP_CHROME_STRINGS.hotAroundCoast[lang];
     }
-    return `${clusters.length} area${clusters.length === 1 ? "" : "s"} moving tonight`;
-  }, [activeFilterLabel, clusters, isSplitZoom, selectedAreaCluster, selectedPlaceNode]);
+    return areasMovingTonightSummary(lang, clusters.length);
+  }, [activeFilterLabel, clusters, isSplitZoom, lang, selectedAreaCluster, selectedPlaceNode]);
 
   const zoomIntoCluster = useCallback(
     (cluster: MapAreaCluster) => {
@@ -1203,9 +1224,9 @@ export function SocialMap({
     renderNodes.forEach((node) => {
       const icon =
         node.kind === "cluster"
-          ? createAreaIcon(L, node.cluster, node.selected, node.rank, resolveImg)
+          ? createAreaIcon(L, node.cluster, node.selected, node.rank, resolveImg, lang)
           : node.kind === "activity-cluster"
-            ? createActivityClusterIcon(L, node, resolveImg)
+            ? createActivityClusterIcon(L, node, resolveImg, lang)
             : createChildIcon(
                 L,
                 node.place,
@@ -1214,6 +1235,7 @@ export function SocialMap({
                 storyPlaceIds?.has(node.place.id) ?? false,
                 node.compact,
                 resolveImg,
+                lang,
               );
       let marker = markersRef.current.get(node.id);
       const activateMarker = () => {
@@ -1264,6 +1286,7 @@ export function SocialMap({
             : resolveImg(node.place.imageUrl);
       const sig = [
         node.kind,
+        lang,
         node.kind === "cluster"
           ? `${node.cluster.id}:${node.cluster.status}:${node.selected ? 1 : 0}:${node.rank}:${imageToken}`
           : node.kind === "activity-cluster"
@@ -1329,10 +1352,10 @@ export function SocialMap({
           markerElement.setAttribute(
             "aria-label",
             node.kind === "cluster"
-              ? `Zoom into ${node.cluster.name}`
+              ? zoomIntoClusterAriaLabel(lang, node.cluster.name)
               : node.kind === "activity-cluster"
-                ? `Zoom into ${node.pointCount} activities near ${node.dominantCluster.name}`
-                : `Open ${node.place.name}`,
+                ? zoomIntoActivityAriaLabel(lang, node.pointCount, node.dominantCluster.name)
+                : openPlaceAriaLabel(lang, node.place.name),
           );
           markerElement.dataset.hpNodeId = node.id;
           markerElement.tabIndex = 0;
@@ -1346,6 +1369,7 @@ export function SocialMap({
       }
     });
   }, [
+    lang,
     mapReady,
     onSelectArea,
     onSelectPlace,
@@ -1477,12 +1501,12 @@ export function SocialMap({
 
   return (
     <div className="hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper">
-      <div ref={mapNodeRef} className="h-full w-full" aria-label="Interactive map of Ilia" />
+      <div ref={mapNodeRef} className="h-full w-full" aria-label={MAP_CHROME_STRINGS.interactiveMap[lang]} />
 
       {!mapReady && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-hp-paper/70">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-hp-ink/15 border-t-hp-sunset">
-            <span className="sr-only">Loading map</span>
+            <span className="sr-only">{MAP_CHROME_STRINGS.loadingMap[lang]}</span>
           </div>
         </div>
       )}
@@ -1492,7 +1516,7 @@ export function SocialMap({
           type="button"
           onClick={onBack}
           className="absolute left-3 top-14 z-20 grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur transition active:scale-95"
-          aria-label="Back to previous map view"
+          aria-label={MAP_CHROME_STRINGS.backToPreviousView[lang]}
         >
           <ChevronLeft size={18} strokeWidth={2.6} />
         </button>
@@ -1506,7 +1530,7 @@ export function SocialMap({
       {clusters.length > 0 && (
         <div
           className={`hp-no-scrollbar absolute ${canGoBack ? "left-16" : "left-3"} right-16 top-14 z-20 flex gap-2 overflow-x-auto pb-2`}
-          aria-label="Top map areas"
+          aria-label={MAP_CHROME_STRINGS.topMapAreas[lang]}
         >
           {clusters
             .filter((cluster) => cluster.places.length > 1)
@@ -1542,7 +1566,7 @@ export function SocialMap({
           onClick={() => mapRef.current?.zoomIn()}
           disabled={!mapReady || zoom >= MAX_ZOOM}
           className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label="Zoom in map"
+          aria-label={MAP_CHROME_STRINGS.zoomIn[lang]}
         >
           <Plus size={16} />
         </button>
@@ -1551,7 +1575,7 @@ export function SocialMap({
           onClick={zoomOut}
           disabled={!mapReady || zoom <= MIN_ZOOM}
           className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label="Zoom out map"
+          aria-label={MAP_CHROME_STRINGS.zoomOut[lang]}
         >
           <Minus size={16} />
         </button>
@@ -1560,7 +1584,7 @@ export function SocialMap({
           onClick={locateUser}
           disabled={!mapReady}
           className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label="Find my location"
+          aria-label={MAP_CHROME_STRINGS.findMyLocation[lang]}
         >
           <Crosshair size={16} />
         </button>
@@ -1569,7 +1593,7 @@ export function SocialMap({
           onClick={resetToOverview}
           disabled={!mapReady}
           className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label="Show Ilia overview"
+          aria-label={MAP_CHROME_STRINGS.showOverview[lang]}
         >
           <MapPinned size={16} />
         </button>

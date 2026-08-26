@@ -126,6 +126,17 @@ import {
 } from "@/lib/hp/routes-strings";
 import { NAV_TAB_LABELS, MEET_SUB_TAB_LABELS, TOP_BAR_STRINGS } from "@/lib/hp/nav-strings";
 import {
+  MAP_BOTTOM_SHEET_STRINGS,
+  setSheetAriaLabel,
+  clusteredPlacesCountLabel,
+  storiesFromAreaLabel,
+  openStoriesForPlaceAriaLabel,
+  postsCountLabel,
+  eventsCountLabel,
+  openInOpenStreetMapAriaLabel,
+  sharePlaceAriaLabel,
+} from "@/lib/hp/map-strings";
+import {
   COMPOSER_STRINGS,
   COMPOSER_MODE_LABELS,
   POSTING_IDENTITY_LABELS,
@@ -498,6 +509,7 @@ function MapBottomSheet({
   onSharePlace: (place: Place) => void;
   savedPlaceIds: string[];
 }) {
+  const { lang } = useLang();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
   const isSelectedCollapsed = Boolean(cluster) && height <= peek + 8;
   const isExpanded = Boolean(cluster) && height >= full - 24;
@@ -617,15 +629,15 @@ function MapBottomSheet({
         {cluster && !isSelectedCollapsed && (
           <div className="flex justify-center gap-2 pt-2">
             {[
-              { h: peek, label: "collapsed" },
-              { h: half, label: "preview" },
-              { h: full, label: "full" },
+              { h: peek, label: "collapsed" as const },
+              { h: half, label: "preview" as const },
+              { h: full, label: "full" as const },
             ].map((s) => (
               <button
                 key={s.label}
                 type="button"
                 onClick={() => onSetSnap(s.h)}
-                aria-label={`Set sheet to ${s.label}`}
+                aria-label={setSheetAriaLabel(lang, s.label)}
                 className={`h-1 w-6 rounded-full transition ${Math.abs(height - s.h) < 4 ? "bg-hp-ink" : "bg-hp-ink/15"}`}
               />
             ))}
@@ -664,13 +676,14 @@ function MapBottomSheet({
 }
 
 function TonightPulseContent() {
+  const { lang } = useLang();
   return (
     <div>
       <div>
         <div className="mb-2">
-          <h3 className="text-[16px] font-black text-hp-ink">Tonight's pulse</h3>
+          <h3 className="text-[16px] font-black text-hp-ink">{MAP_BOTTOM_SHEET_STRINGS.tonightsPulse[lang]}</h3>
         </div>
-        <p className="text-[12px] text-hp-muted">Tap a bubble to see what's happening.</p>
+        <p className="text-[12px] text-hp-muted">{MAP_BOTTOM_SHEET_STRINGS.tapBubbleHint[lang]}</p>
       </div>
     </div>
   );
@@ -699,6 +712,7 @@ function AreaSheetContent({
   onSharePlace: (place: Place) => void;
   onOpenDetails: (p: Place) => void;
 }) {
+  const { lang } = useLang();
   const placeIds = new Set(cluster.places.map((place) => place.id));
   const isPlaceSheet = Boolean(selectedPlace && placeIds.has(selectedPlace.id));
   const areaStoryGroups = storyGroups.filter((group) => placeIds.has(group.placeId));
@@ -730,16 +744,16 @@ function AreaSheetContent({
             </div>
             <h3 className="mt-1 text-[16px] font-black text-hp-ink">{cluster.name}</h3>
             <p className="text-[11px] text-hp-muted">
-              {cluster.places.length} clustered places in this area
+              {clusteredPlacesCountLabel(lang, cluster.places.length)}
             </p>
             <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
               <span className="inline-flex items-center gap-0.5">
                 <Radio size={11} />
-                {cluster.postCount} posts
+                {postsCountLabel(lang, cluster.postCount)}
               </span>
               <span className="inline-flex items-center gap-0.5">
                 <Clock size={11} />
-                {cluster.eventCount} events
+                {eventsCountLabel(lang, cluster.eventCount)}
               </span>
             </div>
           </div>
@@ -747,7 +761,7 @@ function AreaSheetContent({
 
         <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-            Clustered elements
+            {MAP_BOTTOM_SHEET_STRINGS.clusteredElements[lang]}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {cluster.places.map((place) => (
@@ -765,7 +779,7 @@ function AreaSheetContent({
           <div className="mt-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                Stories from {cluster.name}
+                {storiesFromAreaLabel(lang, cluster.name)}
               </span>
               <span className="text-[10px] font-semibold text-hp-muted">
                 {areaStoryGroups.length}
@@ -779,7 +793,7 @@ function AreaSheetContent({
                     key={group.placeId}
                     type="button"
                     onClick={() => onOpenStory(group.placeId)}
-                    aria-label={`Open stories for ${group.placeName}`}
+                    aria-label={openStoriesForPlaceAriaLabel(lang, group.placeName)}
                     className="flex w-14 shrink-0 flex-col items-center gap-1"
                   >
                     <div className="rounded-full p-[2px]" style={{ background: tone.gradient }}>
@@ -830,7 +844,7 @@ function AreaSheetContent({
               style={{ background: typeColor[focusPlace.type] }}
             />
             <span>
-              {focusPlace.type} · {focusPlace.bestTime}
+              {PLACE_TYPE_LABELS[focusPlace.type][lang]} · {focusPlace.bestTime}
             </span>
           </div>
           <h3 className="mt-1 text-[16px] font-black text-hp-ink">{focusPlace.name}</h3>
@@ -840,11 +854,11 @@ function AreaSheetContent({
           <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
             <span className="inline-flex items-center gap-0.5">
               <Radio size={11} />
-              {focusPlace.recentPostCount} posts
+              {postsCountLabel(lang, focusPlace.recentPostCount)}
             </span>
             <span className="inline-flex items-center gap-0.5">
               <Clock size={11} />
-              {placeEvents.length} events
+              {eventsCountLabel(lang, placeEvents.length)}
             </span>
           </div>
         </div>
@@ -875,20 +889,21 @@ function AreaSheetContent({
           onClick={() => onSavePlace(focusPlace.id)}
           className={`flex-1 whitespace-nowrap rounded-full border py-2 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
         >
-          <Bookmark size={13} className="mr-1 inline" /> {saved ? "Saved" : "Save"}
+          <Bookmark size={13} className="mr-1 inline" />{" "}
+          {saved ? MAP_BOTTOM_SHEET_STRINGS.saved[lang] : MAP_BOTTOM_SHEET_STRINGS.save[lang]}
         </button>
         <button
           type="button"
           onClick={() => onOpenDetails(focusPlace)}
           className="flex-1 whitespace-nowrap rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper"
         >
-          Details
+          {MAP_BOTTOM_SHEET_STRINGS.details[lang]}
         </button>
         <a
           href={openStreetMapUrl(focusPlace)}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`Open ${focusPlace.name} in OpenStreetMap`}
+          aria-label={openInOpenStreetMapAriaLabel(lang, focusPlace.name)}
           className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
         >
           <ExternalLink size={13} />
@@ -896,7 +911,7 @@ function AreaSheetContent({
         <button
           type="button"
           onClick={() => onSharePlace(focusPlace)}
-          aria-label={`Share ${focusPlace.name}`}
+          aria-label={sharePlaceAriaLabel(lang, focusPlace.name)}
           className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
         >
           <Share2 size={13} />
@@ -4814,8 +4829,8 @@ function PulseAppInner() {
     return first ?? null;
   }, [filteredPlaces]);
   const mapClusters = useMemo(
-    () => buildAreaClusters(filteredPlaces, events),
-    [events, filteredPlaces],
+    () => buildAreaClusters(filteredPlaces, events, lang),
+    [events, filteredPlaces, lang],
   );
   const selectedCluster = selectedAreaId
     ? (mapClusters.find((cluster) => cluster.id === selectedAreaId) ?? null)
