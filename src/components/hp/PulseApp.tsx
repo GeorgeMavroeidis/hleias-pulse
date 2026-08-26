@@ -137,6 +137,19 @@ import {
   sharePlaceAriaLabel,
 } from "@/lib/hp/map-strings";
 import {
+  PLACE_DETAIL_STRINGS,
+  placeDetailsAriaLabel,
+  placeStoriesCountLabel,
+  openPlaceStoriesAriaLabel,
+  postCommentOnAriaLabel,
+  POST_DETAIL_STRINGS,
+  postAtAriaLabel,
+  ROUTE_ARTICLE_STRINGS,
+  routeAriaLabel,
+  openInOpenStreetMapAriaLabel as modalOpenInOsmAriaLabel,
+  shareAriaLabel,
+} from "@/lib/hp/modal-strings";
+import {
   COMPOSER_STRINGS,
   COMPOSER_MODE_LABELS,
   POSTING_IDENTITY_LABELS,
@@ -1726,6 +1739,7 @@ function PlaceDetailModal({
   storyGroups: PlaceStoryGroup[];
   onOpenStory: (placeId: string) => void;
 }) {
+  const { lang } = useLang();
   const [commentText, setCommentText] = useState("");
   const eventCount = place ? events.filter((event) => event.placeId === place.id).length : 0;
   const noteCount = place ? place.commentCount + comments.length : 0;
@@ -1746,7 +1760,7 @@ function PlaceDetailModal({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label="Close place details"
+            aria-label={PLACE_DETAIL_STRINGS.closePlaceDetails[lang]}
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -1755,7 +1769,7 @@ function PlaceDetailModal({
             transition={{ type: "spring", damping: 28, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label={`${place.name} details`}
+            aria-label={placeDetailsAriaLabel(lang, place.name)}
             className="hp-place-detail-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper"
           >
             <div className="relative">
@@ -1770,7 +1784,7 @@ function PlaceDetailModal({
                 type="button"
                 onClick={onClose}
                 className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                aria-label="Close place details"
+                aria-label={PLACE_DETAIL_STRINGS.closePlaceDetails[lang]}
               >
                 <X size={16} />
               </button>
@@ -1779,7 +1793,7 @@ function PlaceDetailModal({
                   className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
                   style={{ background: typeColor[place.type] }}
                 >
-                  {place.type}
+                  {PLACE_TYPE_LABELS[place.type][lang]}
                 </span>
                 <h2 className="mt-2 text-2xl font-black">{place.name}</h2>
                 <p className="text-[12px] opacity-85">
@@ -1791,14 +1805,14 @@ function PlaceDetailModal({
               <div className="border-b border-hp-ink/10 px-4 py-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Place stories · {placeStories.length}
+                    {placeStoriesCountLabel(lang, placeStories.length)}
                   </span>
                   <button
                     type="button"
                     onClick={() => onOpenStory(place.id)}
                     className="text-[10px] font-bold text-hp-sunset"
                   >
-                    Play all
+                    {PLACE_DETAIL_STRINGS.playAll[lang]}
                   </button>
                 </div>
                 <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
@@ -1807,7 +1821,7 @@ function PlaceDetailModal({
                       key={story.id}
                       type="button"
                       onClick={() => onOpenStory(place.id)}
-                      aria-label={`Open ${place.name} stories`}
+                      aria-label={openPlaceStoriesAriaLabel(lang, place.name)}
                       className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-xl border border-hp-ink/10"
                     >
                       <ImageBox
@@ -1834,27 +1848,33 @@ function PlaceDetailModal({
                 ))}
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <Stat label="posts today" value={String(place.recentPostCount)} />
-                <Stat label="events tonight" value={String(eventCount)} />
-                <Stat label="crowd" value={place.crowd} />
-                <Stat label="budget" value={place.budget} />
-                <Stat label="best time" value={place.bestTime} />
-                <Stat label="local notes" value={String(noteCount)} />
+                <Stat label={PLACE_DETAIL_STRINGS.postsToday[lang]} value={String(place.recentPostCount)} />
+                <Stat label={PLACE_DETAIL_STRINGS.eventsTonight[lang]} value={String(eventCount)} />
+                <Stat
+                  label={PLACE_DETAIL_STRINGS.crowd[lang]}
+                  value={CROWD_OPTION_LABELS[place.crowd as keyof typeof CROWD_OPTION_LABELS]?.[lang] ?? place.crowd}
+                />
+                <Stat
+                  label={PLACE_DETAIL_STRINGS.budget[lang]}
+                  value={BUDGET_OPTION_LABELS[place.budget as keyof typeof BUDGET_OPTION_LABELS]?.[lang] ?? place.budget}
+                />
+                <Stat label={PLACE_DETAIL_STRINGS.bestTime[lang]} value={place.bestTime} />
+                <Stat label={PLACE_DETAIL_STRINGS.localNotes[lang]} value={String(noteCount)} />
               </div>
               <div className="mt-4 rounded-2xl border border-hp-ink/10 bg-white/60 p-3">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                  Best for
+                  {PLACE_DETAIL_STRINGS.bestFor[lang]}
                 </div>
                 <div className="mt-1 text-[13px] font-semibold text-hp-ink">{place.mood}</div>
               </div>
               <div className="mt-5">
                 <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-hp-muted">
-                  Recent posts
+                  {PLACE_DETAIL_STRINGS.recentPosts[lang]}
                 </h3>
                 <div className="flex flex-col gap-2">
                   {posts.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-hp-ink/10 p-4 text-center text-[12px] text-hp-muted">
-                      No recent posts here yet. Be first.
+                      {PLACE_DETAIL_STRINGS.noRecentPosts[lang]}
                     </div>
                   )}
                   {posts.map((p) => {
@@ -1893,7 +1913,7 @@ function PlaceDetailModal({
                   htmlFor={`place-detail-comment-${place.id}`}
                   className="text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                 >
-                  Quick comment
+                  {PLACE_DETAIL_STRINGS.quickComment[lang]}
                 </label>
                 <div className="mt-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
                   <input
@@ -1902,7 +1922,7 @@ function PlaceDetailModal({
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     autoComplete="off"
-                    placeholder="Add a local note…"
+                    placeholder={PLACE_DETAIL_STRINGS.addLocalNotePlaceholder[lang]}
                     className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && commentText.trim()) {
@@ -1921,7 +1941,7 @@ function PlaceDetailModal({
                     }}
                     className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
                     disabled={!commentText.trim()}
-                    aria-label={`Post comment on ${place.name}`}
+                    aria-label={postCommentOnAriaLabel(lang, place.name)}
                   >
                     <Send size={12} />
                   </button>
@@ -1944,7 +1964,8 @@ function PlaceDetailModal({
                 onClick={() => onSave(place.id)}
                 className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
               >
-                <Bookmark size={13} className="mr-1 inline" /> {saved ? "Saved" : "Save"}
+                <Bookmark size={13} className="mr-1 inline" />{" "}
+                {saved ? PLACE_DETAIL_STRINGS.saved[lang] : PLACE_DETAIL_STRINGS.save[lang]}
               </button>
               <button
                 type="button"
@@ -1954,13 +1975,13 @@ function PlaceDetailModal({
                 }}
                 className="flex-1 rounded-full bg-hp-ink py-3 text-[12px] font-bold text-hp-paper"
               >
-                Map
+                {PLACE_DETAIL_STRINGS.map[lang]}
               </button>
               <a
                 href={openStreetMapUrl(place)}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`Open ${place.name} in OpenStreetMap`}
+                aria-label={modalOpenInOsmAriaLabel(lang, place.name)}
                 className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
               >
                 <ExternalLink size={14} />
@@ -1969,7 +1990,7 @@ function PlaceDetailModal({
                 type="button"
                 onClick={() => onShare(place)}
                 className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                aria-label={`Share ${place.name}`}
+                aria-label={shareAriaLabel(lang, place.name)}
               >
                 <Share2 size={14} />
               </button>
@@ -2021,6 +2042,7 @@ function PostDetailModal({
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
 }) {
+  const { lang } = useLang();
   const [text, setText] = useState("");
   return (
     <AnimatePresence>
@@ -2040,7 +2062,7 @@ function PostDetailModal({
                 type="button"
                 className="absolute inset-0 bg-black/65"
                 onClick={onClose}
-                aria-label="Close post details"
+                aria-label={POST_DETAIL_STRINGS.closePostDetails[lang]}
               />
               <motion.div
                 initial={{ y: "100%" }}
@@ -2049,7 +2071,7 @@ function PostDetailModal({
                 transition={{ type: "spring", damping: 28, stiffness: 240 }}
                 role="dialog"
                 aria-modal="true"
-                aria-label={`Post at ${p.name}`}
+                aria-label={postAtAriaLabel(lang, p.name)}
                 className="hp-fullscreen-modal absolute inset-x-0 bottom-0 flex w-full max-w-full flex-col overflow-hidden bg-hp-paper"
               >
                 <div className="relative">
@@ -2064,7 +2086,7 @@ function PostDetailModal({
                     type="button"
                     onClick={onClose}
                     className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                    aria-label="Close post details"
+                    aria-label={POST_DETAIL_STRINGS.closePostDetails[lang]}
                   >
                     <X size={16} />
                   </button>
@@ -2108,7 +2130,7 @@ function PostDetailModal({
                       type="button"
                       onClick={onLike}
                       className={`inline-flex items-center gap-1 ${liked ? "text-hp-sunset" : ""}`}
-                      aria-label={liked ? "Unlike post" : "Like post"}
+                      aria-label={liked ? PULSE_FEED_STRINGS.unlikePost[lang] : PULSE_FEED_STRINGS.likePost[lang]}
                     >
                       <Heart size={16} fill={liked ? "currentColor" : "none"} /> {likeCount}
                     </button>
@@ -2118,7 +2140,7 @@ function PostDetailModal({
                   </div>
                   <div className="mt-4 border-t border-hp-ink/10 pt-3">
                     <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-                      Comments
+                      {POST_DETAIL_STRINGS.comments[lang]}
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
@@ -2128,7 +2150,7 @@ function PostDetailModal({
                         </div>
                       ))}
                       {comments.length === 0 && (
-                        <div className="text-[12px] text-hp-muted">Be the first to comment.</div>
+                        <div className="text-[12px] text-hp-muted">{POST_DETAIL_STRINGS.beFirstToComment[lang]}</div>
                       )}
                     </div>
                   </div>
@@ -2139,9 +2161,9 @@ function PostDetailModal({
                       value={text}
                       onChange={(e) => setText(e.target.value)}
                       name={`post-comment-${post.id}`}
-                      aria-label="Quick comment on post"
+                      aria-label={POST_DETAIL_STRINGS.quickCommentOnPost[lang]}
                       autoComplete="off"
-                      placeholder="Quick comment…"
+                      placeholder={POST_DETAIL_STRINGS.quickCommentPlaceholder[lang]}
                       className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && text.trim()) {
@@ -2160,7 +2182,7 @@ function PostDetailModal({
                       }}
                       className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
                       disabled={!text.trim()}
-                      aria-label="Post comment"
+                      aria-label={POST_DETAIL_STRINGS.postComment[lang]}
                     >
                       <Send size={12} />
                     </button>
@@ -2174,13 +2196,13 @@ function PostDetailModal({
                       }}
                       className="flex-1 rounded-full bg-hp-ink py-2.5 text-[12px] font-bold text-hp-paper"
                     >
-                      <MapIcon size={13} className="mr-1 inline" /> Open on map
+                      <MapIcon size={13} className="mr-1 inline" /> {POST_DETAIL_STRINGS.openOnMap[lang]}
                     </button>
                     <a
                       href={openStreetMapUrl(p)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={`Open ${p.name} in OpenStreetMap`}
+                      aria-label={modalOpenInOsmAriaLabel(lang, p.name)}
                       className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
                     >
                       <ExternalLink size={14} />
@@ -2189,7 +2211,7 @@ function PostDetailModal({
                       type="button"
                       onClick={onSave}
                       className={`grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 ${saved ? "text-hp-sunset" : "text-hp-ink"}`}
-                      aria-label={saved ? "Unsave post" : "Save post"}
+                      aria-label={saved ? PULSE_FEED_STRINGS.unsavePost[lang] : PULSE_FEED_STRINGS.savePost[lang]}
                     >
                       <Bookmark size={14} fill={saved ? "currentColor" : "none"} />
                     </button>
@@ -2197,7 +2219,7 @@ function PostDetailModal({
                       type="button"
                       onClick={() => onShare(post)}
                       className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                      aria-label="Share post"
+                      aria-label={PULSE_FEED_STRINGS.sharePost[lang]}
                     >
                       <Share2 size={14} />
                     </button>
@@ -2237,6 +2259,7 @@ function RouteArticleModal({
   findPlace: (id: string) => Place | undefined;
   findAuthor: (id: string) => Author;
 }) {
+  const { lang } = useLang();
   const [text, setText] = useState("");
   return (
     <AnimatePresence>
@@ -2254,7 +2277,7 @@ function RouteArticleModal({
                 type="button"
                 className="absolute inset-0 bg-black/65"
                 onClick={onClose}
-                aria-label="Close route article"
+                aria-label={ROUTE_ARTICLE_STRINGS.closeRouteArticle[lang]}
               />
               <motion.div
                 initial={{ y: "100%" }}
@@ -2263,7 +2286,7 @@ function RouteArticleModal({
                 transition={{ type: "spring", damping: 28, stiffness: 240 }}
                 role="dialog"
                 aria-modal="true"
-                aria-label={`Route: ${route.title}`}
+                aria-label={routeAriaLabel(lang, route.title)}
                 className="hp-fullscreen-modal absolute inset-x-0 bottom-0 flex w-full max-w-full flex-col overflow-hidden bg-hp-paper"
               >
                 <div className="relative">
@@ -2278,7 +2301,7 @@ function RouteArticleModal({
                     type="button"
                     onClick={onClose}
                     className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                    aria-label="Close route article"
+                    aria-label={ROUTE_ARTICLE_STRINGS.closeRouteArticle[lang]}
                   >
                     <X size={16} />
                   </button>
@@ -2329,7 +2352,7 @@ function RouteArticleModal({
                   <p className="mt-4 text-[15px] leading-relaxed text-hp-ink">{route.lede}</p>
 
                   <h3 className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-                    Timeline
+                    {ROUTE_ARTICLE_STRINGS.timeline[lang]}
                   </h3>
                   <ol className="relative space-y-3 border-l-2 border-hp-ink/10 pl-4">
                     {route.stops.map((s, i) => {
@@ -2357,13 +2380,13 @@ function RouteArticleModal({
                                 }}
                                 className="inline-flex items-center gap-1 rounded-full border border-hp-ink/15 px-3 py-1 text-[11px] font-semibold text-hp-ink"
                               >
-                                <MapIcon size={11} /> Open on map
+                                <MapIcon size={11} /> {ROUTE_ARTICLE_STRINGS.openOnMap[lang]}
                               </button>
                               <a
                                 href={openStreetMapUrl(p)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                aria-label={`Open ${p.name} in OpenStreetMap`}
+                                aria-label={modalOpenInOsmAriaLabel(lang, p.name)}
                                 className="inline-grid h-7 w-7 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
                               >
                                 <ExternalLink size={11} />
@@ -2389,7 +2412,7 @@ function RouteArticleModal({
                   </div>
                   <div className="mt-4 border-t border-hp-ink/10 pt-3">
                     <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-                      Comments
+                      {ROUTE_ARTICLE_STRINGS.comments[lang]}
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
@@ -2399,7 +2422,7 @@ function RouteArticleModal({
                         </div>
                       ))}
                       {comments.length === 0 && (
-                        <div className="text-[12px] text-hp-muted">No route comments yet.</div>
+                        <div className="text-[12px] text-hp-muted">{ROUTE_ARTICLE_STRINGS.noRouteComments[lang]}</div>
                       )}
                     </div>
                     <div className="mt-3 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
@@ -2407,9 +2430,9 @@ function RouteArticleModal({
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                         name={`route-comment-${route.id}`}
-                        aria-label="Quick comment on route"
+                        aria-label={ROUTE_ARTICLE_STRINGS.quickCommentOnRoute[lang]}
                         autoComplete="off"
-                        placeholder="Add a route note…"
+                        placeholder={ROUTE_ARTICLE_STRINGS.addRouteNotePlaceholder[lang]}
                         className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && text.trim()) {
@@ -2428,7 +2451,7 @@ function RouteArticleModal({
                         }}
                         className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
                         disabled={!text.trim()}
-                        aria-label="Post route comment"
+                        aria-label={ROUTE_ARTICLE_STRINGS.postRouteComment[lang]}
                       >
                         <Send size={12} />
                       </button>
@@ -2441,7 +2464,7 @@ function RouteArticleModal({
                     onClick={() => onMapRoute(route)}
                     className="flex-1 rounded-full bg-hp-ink py-3 text-[12px] font-bold text-hp-paper"
                   >
-                    <MapIcon size={13} className="mr-1 inline" /> Map route
+                    <MapIcon size={13} className="mr-1 inline" /> {ROUTE_ARTICLE_STRINGS.mapRoute[lang]}
                   </button>
                   <button
                     type="button"
@@ -2453,13 +2476,13 @@ function RouteArticleModal({
                       className="mr-1 inline"
                       fill={saved ? "currentColor" : "none"}
                     />{" "}
-                    {saved ? "Saved" : "Save route"}
+                    {saved ? ROUTE_ARTICLE_STRINGS.saved[lang] : ROUTE_ARTICLE_STRINGS.saveRoute[lang]}
                   </button>
                   <button
                     type="button"
                     onClick={onShare}
                     className="grid h-11 w-11 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                    aria-label="Share route"
+                    aria-label={ROUTE_ARTICLE_STRINGS.shareRoute[lang]}
                   >
                     <Share2 size={15} />
                   </button>
