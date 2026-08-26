@@ -114,6 +114,16 @@ import type {
 } from "@/lib/hp/cultural-events-types";
 import { DEFAULT_ORGANIZER_BIO } from "@/lib/hp/cultural-events-types";
 import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
+import { LanguageProvider, useLang } from "@/lib/hp/language-context";
+import {
+  ROUTES_STRINGS,
+  ROUTE_FILTER_LABELS,
+  routesCuratedEyebrow,
+  routesCommunityEyebrow,
+  readRouteAriaLabel,
+  routeStopsLabel,
+  activeRouteLabel,
+} from "@/lib/hp/routes-strings";
 
 type Tab = "map" | "pulse" | "routes" | "meet" | "saved";
 type NavTab = Exclude<Tab, "saved">;
@@ -1153,13 +1163,14 @@ function RouteCard({
   commentCount: number;
   onOpenRoute: (route: RouteItem) => void;
 }) {
+  const { lang } = useLang();
   return (
     <motion.button
       type="button"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={() => onOpenRoute(route)}
-      aria-label={`Read route ${route.title}`}
+      aria-label={readRouteAriaLabel(lang, route.title)}
       className="overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper text-left"
     >
       <div className="relative">
@@ -1214,7 +1225,7 @@ function RouteCard({
             <Wallet size={11} />
             {route.budget}
           </span>
-          <span>{route.stops.length} stops</span>
+          <span>{routeStopsLabel(lang, route.stops.length)}</span>
           <span className="ml-auto inline-flex items-center gap-2">
             <span className="inline-flex items-center gap-0.5">
               <MessageCircle size={11} />
@@ -1227,7 +1238,7 @@ function RouteCard({
           </span>
         </div>
         <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-hp-ink px-4 py-2 text-[12px] font-bold text-hp-paper">
-          Read route
+          {ROUTES_STRINGS.readRoute[lang]}
         </div>
       </div>
     </motion.button>
@@ -1293,6 +1304,7 @@ function RoutesScreen({
   routeComments: Record<string, Comment[]>;
   findAuthor: (id: string) => Author;
 }) {
+  const { lang } = useLang();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<RouteFilter>("All");
   const visibleRoutes = useMemo(
@@ -1312,10 +1324,8 @@ function RoutesScreen({
 
   return (
     <div className="px-4 pb-28 pt-3">
-      <h2 className="mb-1 text-2xl font-black text-hp-ink">Routes</h2>
-      <p className="mb-4 text-[12px] text-hp-muted">
-        Real day moves, written by locals. Steal them.
-      </p>
+      <h2 className="mb-1 text-2xl font-black text-hp-ink">{ROUTES_STRINGS.screenTitle[lang]}</h2>
+      <p className="mb-4 text-[12px] text-hp-muted">{ROUTES_STRINGS.screenSubtitle[lang]}</p>
       <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
         <div className="flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
           <Search size={13} className="text-hp-muted" />
@@ -1323,9 +1333,9 @@ function RoutesScreen({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             name="route-search"
-            aria-label="Search routes"
+            aria-label={ROUTES_STRINGS.searchAriaLabel[lang]}
             autoComplete="off"
-            placeholder="Search routes, budget, area..."
+            placeholder={ROUTES_STRINGS.searchPlaceholder[lang]}
             className="w-full bg-transparent text-[13px] outline-none placeholder:text-hp-muted"
           />
         </div>
@@ -1344,7 +1354,7 @@ function RoutesScreen({
                     : "border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
                 }`}
               >
-                {option}
+                {ROUTE_FILTER_LABELS[option][lang]}
               </button>
             );
           })}
@@ -1352,8 +1362,8 @@ function RoutesScreen({
       </div>
       <div className="flex flex-col gap-6">
         <RouteSection
-          title="What we recommend"
-          eyebrow={`${recommendedRoutes.length} curated`}
+          title={ROUTES_STRINGS.recommendedTitle[lang]}
+          eyebrow={routesCuratedEyebrow(lang, recommendedRoutes.length)}
           routes={recommendedRoutes}
           savedRoutes={savedRoutes}
           routeComments={routeComments}
@@ -1361,8 +1371,8 @@ function RoutesScreen({
           onOpenRoute={onOpenRoute}
         />
         <RouteSection
-          title="Locals recommend"
-          eyebrow={`${localRoutes.length} community`}
+          title={ROUTES_STRINGS.communityTitle[lang]}
+          eyebrow={routesCommunityEyebrow(lang, localRoutes.length)}
           routes={localRoutes}
           savedRoutes={savedRoutes}
           routeComments={routeComments}
@@ -1371,8 +1381,8 @@ function RoutesScreen({
         />
         {visibleRoutes.length === 0 && (
           <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
-            <h3 className="text-[15px] font-bold text-hp-ink">No routes match</h3>
-            <p className="mt-1 text-[12px] text-hp-muted">Try another filter or search term.</p>
+            <h3 className="text-[15px] font-bold text-hp-ink">{ROUTES_STRINGS.emptyTitle[lang]}</h3>
+            <p className="mt-1 text-[12px] text-hp-muted">{ROUTES_STRINGS.emptySubtitle[lang]}</p>
           </div>
         )}
       </div>
@@ -1395,6 +1405,7 @@ function ActiveRouteGuide({
   onNext: () => void;
   onClose: () => void;
 }) {
+  const { lang } = useLang();
   const stop = route.stops[stopIndex] ?? route.stops[0];
   const place = stop ? findPlace(stop.placeId) : null;
   const total = route.stops.length;
@@ -1412,7 +1423,7 @@ function ActiveRouteGuide({
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-[10px] font-bold uppercase text-hp-muted">
-            Active route · stop {stopIndex + 1}/{total}
+            {activeRouteLabel(lang, stopIndex + 1, total)}
           </div>
           <h3 className="truncate text-[14px] font-black leading-tight text-hp-ink">
             {place?.name ?? stop?.title ?? route.title}
@@ -1425,7 +1436,7 @@ function ActiveRouteGuide({
           type="button"
           onClick={onClose}
           className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-          aria-label="Close active route"
+          aria-label={ROUTES_STRINGS.closeActiveRoute[lang]}
         >
           <X size={14} />
         </button>
@@ -1437,7 +1448,7 @@ function ActiveRouteGuide({
             onClick={() => onOpenStop(stop.placeId, stopIndex)}
             className="flex-1 rounded-full border border-hp-ink/15 px-3 py-2 text-[11.5px] font-bold text-hp-ink"
           >
-            Center stop
+            {ROUTES_STRINGS.centerStop[lang]}
           </button>
         )}
         <button
@@ -1445,7 +1456,7 @@ function ActiveRouteGuide({
           onClick={onNext}
           className="flex-1 rounded-full bg-hp-ink px-3 py-2 text-[11.5px] font-bold text-hp-paper"
         >
-          {stopIndex >= total - 1 ? "Restart" : "Next stop"}
+          {stopIndex >= total - 1 ? ROUTES_STRINGS.restart[lang] : ROUTES_STRINGS.nextStop[lang]}
         </button>
       </div>
     </motion.div>
@@ -3681,6 +3692,14 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
 
 /* ============== Main App ============== */
 export function PulseApp() {
+  return (
+    <LanguageProvider>
+      <PulseAppInner />
+    </LanguageProvider>
+  );
+}
+
+function PulseAppInner() {
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
@@ -3694,7 +3713,7 @@ export function PulseApp() {
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [lang, setLang] = useState<"GR" | "EN">("GR");
+  const { lang, setLang } = useLang();
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [likes, setLikes] = useState<Record<string, boolean>>({});

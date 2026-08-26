@@ -87,11 +87,8 @@ export const CULTURAL_EVENT_TYPES = Object.keys(CULTURAL_EVENT_TYPE_META) as Cul
 
 export const DEFAULT_ORGANIZER_BIO = "Cultural events organizer in Ilia.";
 
-export type Lang = "GR" | "EN";
-
-export function tr<T>(lang: Lang, entry: { GR: T; EN: T }): T {
-  return entry[lang];
-}
+export type { Lang } from "./i18n";
+export { tr } from "./i18n";
 
 export const CULTURAL_EVENTS_STRINGS = {
   screenTitle: { GR: "Πολιτιστικές Εκδηλώσεις", EN: "Cultural Events" },
