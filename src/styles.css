@@ -325,6 +325,21 @@
   transform: translate(-50%, -50%) translateZ(0) scale(calc(var(--hp-marker-zoom-scale, 1) + 0.05));
 }
 
+.hp-marker-aura {
+  position: absolute;
+  inset: -0.25rem;
+  z-index: 0;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--hp-sunset) 16%, transparent) 0 78%,
+    color-mix(in srgb, var(--hp-sunset) 10%, transparent) 86%,
+    color-mix(in srgb, var(--hp-sunset) 5%, transparent) 93%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
 .hp-area-marker__ring,
 .hp-area-marker__collage,
 .hp-area-marker__shade,

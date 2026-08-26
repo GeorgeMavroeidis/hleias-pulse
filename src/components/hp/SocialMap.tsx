@@ -488,6 +488,7 @@ function createAreaIcon(
         class="hp-area-marker__shell ${selected ? "is-selected" : ""} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size)}"
       >
+        <span class="hp-marker-aura"></span>
         <span class="hp-area-marker__ring"></span>
         <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
         <span class="hp-area-marker__shade"></span>
@@ -538,6 +539,7 @@ function createChildIcon(
         class="hp-child-marker__shell ${selected ? "is-selected" : ""} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${pulseStatus === "live" ? "is-live" : ""} ${pulseStatus === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size)}"
       >
+        <span class="hp-marker-aura"></span>
         ${hasStories ? '<span class="hp-child-marker__story-ring"></span>' : ""}
         <span class="hp-child-marker__ring"></span>
         <span class="hp-child-marker__media">
@@ -590,6 +592,7 @@ function createActivityClusterIcon(
         class="hp-area-marker__shell hp-area-marker__shell--activity ${node.selected ? "is-selected" : ""} ${status === "live" ? "is-live" : ""} ${status === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size)}"
       >
+        <span class="hp-marker-aura"></span>
         <span class="hp-area-marker__ring"></span>
         <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
         <span class="hp-area-marker__shade"></span>
