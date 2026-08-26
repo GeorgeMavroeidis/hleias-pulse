@@ -22,6 +22,7 @@ import {
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
 import { ImageBox } from "./ImageBox";
+import { useI18n, type AppLanguage } from "@/lib/i18n";
 
 const CATEGORY_ICONS: Record<MeetCategory, LucideIcon> = {
   panigyri: CalendarHeart,
@@ -42,15 +43,20 @@ interface Props {
   onOpenPlace: (placeId: string) => void;
 }
 
-function formatWhen(iso: string): string {
+function formatWhen(iso: string, language: AppLanguage): string {
   const d = new Date(iso);
   const time = format(d, "HH:mm");
-  if (isToday(d)) return `Today · ${time}`;
-  if (isTomorrow(d)) return `Tomorrow · ${time}`;
-  return `${format(d, "EEE d MMM")} · ${time}`;
+  if (isToday(d)) return `${language === "GR" ? "Σήμερα" : "Today"} · ${time}`;
+  if (isTomorrow(d)) return `${language === "GR" ? "Αύριο" : "Tomorrow"} · ${time}`;
+  return `${new Intl.DateTimeFormat(language === "GR" ? "el-GR" : "en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(d)} · ${time}`;
 }
 
 export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: Props) {
+  const { language, t } = useI18n();
   const meta = MEET_CATEGORY_META[event.category];
   const CategoryIcon = CATEGORY_ICONS[event.category];
   const goingDisplay = event.going;
@@ -70,7 +76,9 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
         type="button"
         onClick={() => onOpenPlace(event.placeId)}
         className="relative block w-full text-left"
-        aria-label={`Open ${placeName} on the map`}
+        aria-label={
+          language === "GR" ? `Άνοιγμα ${placeName} στον χάρτη` : `Open ${placeName} on the map`
+        }
       >
         <div className="relative h-32 w-full">
           <ImageBox
@@ -86,7 +94,7 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
             className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-paper shadow"
             style={{ background: meta.tone }}
           >
-            <CategoryIcon size={10} strokeWidth={2.6} /> {meta.label}
+            <CategoryIcon size={10} strokeWidth={2.6} /> {t(meta.label)}
           </span>
           {event.hot && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset px-1.5 py-1 text-[9px] font-black uppercase tracking-wide text-hp-paper shadow">
@@ -118,7 +126,7 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
             </div>
           </div>
           <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-hp-deep">
-            <Clock size={11} /> {formatWhen(event.happensAt)}
+            <Clock size={11} /> {formatWhen(event.happensAt, language)}
           </span>
         </div>
 
@@ -136,11 +144,16 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
             ))}
           </div>
           <span className="text-[11px] font-bold text-hp-ink/80">
-            {goingDisplay} going{event.maybe > 0 ? ` · ${event.maybe} maybe` : ""}
+            {language === "GR" ? `${goingDisplay} συμμετέχουν` : `${goingDisplay} going`}
+            {event.maybe > 0
+              ? language === "GR"
+                ? ` · ${event.maybe} ίσως`
+                : ` · ${event.maybe} maybe`
+              : ""}
           </span>
           {event.capacity && (
             <span className="ml-auto text-[10px] font-bold text-hp-muted">
-              {event.capacity - goingDisplay} spots
+              {event.capacity - goingDisplay} {language === "GR" ? "θέσεις" : "spots"}
             </span>
           )}
         </div>
@@ -167,7 +180,13 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
             }`}
           >
             {isGoing ? <Check size={14} /> : null}
-            {isGoing ? "I'm going" : "I'm in"}
+            {language === "GR"
+              ? isGoing
+                ? "Θα πάω"
+                : "Συμμετέχω"
+              : isGoing
+                ? "I'm going"
+                : "I'm in"}
           </button>
           <button
             type="button"
@@ -177,7 +196,7 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
               isMaybe ? "bg-hp-purple/15 text-hp-purple" : "border border-hp-ink/12 text-hp-ink/70"
             }`}
           >
-            Maybe
+            {language === "GR" ? "Ίσως" : "Maybe"}
           </button>
         </div>
       </div>

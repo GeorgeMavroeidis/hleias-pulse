@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import "leaflet/dist/leaflet.css";
+import { useI18n } from "@/lib/i18n";
 
 type LeafletMap = import("leaflet").Map;
 type LeafletMarker = import("leaflet").Marker;
@@ -15,6 +16,7 @@ export function AdminMapPicker({
   lng: number;
   onChange: (lat: number, lng: number) => void;
 }) {
+  const { t } = useI18n();
   const nodeRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerRef = useRef<LeafletMarker | null>(null);
@@ -75,10 +77,10 @@ export function AdminMapPicker({
       <div
         ref={nodeRef}
         className="h-64 w-full"
-        aria-label="Choose the place position on the map"
+        aria-label={t("Choose the place position on the map")}
       />
       <p className="border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
-        Click the map or drag the pin to set the exact location.
+        {t("Click the map or drag the pin to set the exact location.")}
       </p>
     </div>
   );
