@@ -365,22 +365,24 @@
   border: 2px solid transparent;
   background:
     radial-gradient(
-        circle at 34% 26%,
-        color-mix(in srgb, var(--marker-accent) 82%, var(--hp-paper)) 0%,
-        var(--marker-color) 72%
+        circle at 30% 24%,
+        color-mix(in srgb, var(--marker-accent) 84%, var(--hp-paper)) 0%,
+        color-mix(in srgb, var(--marker-color) 90%, var(--marker-neutral)) 58%,
+        var(--marker-color) 100%
       )
       padding-box,
     conic-gradient(
-        from 215deg,
+        from 220deg,
         var(--marker-color),
-        var(--marker-accent) 42%,
-        var(--marker-color) 78%,
+        var(--marker-accent) 34%,
+        var(--marker-neutral) 56%,
+        var(--marker-color) 79%,
         var(--marker-accent)
       )
       border-box;
   box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--hp-paper) 94%, transparent),
-    0 0.14rem 0.38rem rgba(23, 20, 17, 0.18);
+    0 0 0 1.5px color-mix(in srgb, var(--hp-paper) 96%, transparent),
+    0 0.16rem 0.4rem rgba(16, 36, 61, 0.2);
 }
 
 .hp-marker-pulse {
@@ -390,10 +392,11 @@
   border-radius: 9999px;
   pointer-events: none;
   background: conic-gradient(
-    from 200deg,
+    from 210deg,
     var(--marker-color),
-    var(--marker-accent) 38%,
-    var(--marker-color) 72%,
+    var(--marker-accent) 32%,
+    var(--marker-neutral) 54%,
+    var(--marker-color) 76%,
     var(--marker-accent)
   );
   opacity: var(--hp-map-pulse-opacity);
