@@ -137,6 +137,12 @@ import {
   usingPlaceImageLabel,
   storyPhotoUsingLabel,
 } from "@/lib/hp/composer-strings";
+import {
+  PULSE_FEED_STRINGS,
+  PULSE_FILTER_LABELS,
+  openPostAboutAriaLabel,
+  openPostDetailsAriaLabel,
+} from "@/lib/hp/pulse-strings";
 
 type Tab = "map" | "pulse" | "routes" | "meet" | "saved";
 type NavTab = Exclude<Tab, "saved">;
@@ -944,8 +950,9 @@ function PulseFeed({
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
 }) {
-  const [filter, setFilter] = useState("Now");
-  const filters = ["Now", "Tonight", "Weekend", "Local tips"];
+  const { lang } = useLang();
+  const [filter, setFilter] = useState<keyof typeof PULSE_FILTER_LABELS>("Now");
+  const filters = Object.keys(PULSE_FILTER_LABELS) as (keyof typeof PULSE_FILTER_LABELS)[];
   const visiblePosts = posts.filter((post) => {
     const place = findPlace(post.placeId);
     const author = findPostAuthor(post);
@@ -993,7 +1000,7 @@ function PulseFeed({
             aria-pressed={filter === f}
             className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold ${filter === f ? "bg-hp-ink text-hp-paper" : "border border-hp-ink/10 text-hp-ink/70"}`}
           >
-            {f}
+            {PULSE_FILTER_LABELS[f][lang]}
           </button>
         ))}
       </div>
@@ -1051,7 +1058,7 @@ function PulseFeed({
                   type="button"
                   onClick={() => toggleSavePost(post.id)}
                   className={`p-1 ${sv ? "text-hp-sunset" : "text-hp-ink/40"}`}
-                  aria-label={sv ? "Unsave post" : "Save post"}
+                  aria-label={sv ? PULSE_FEED_STRINGS.unsavePost[lang] : PULSE_FEED_STRINGS.savePost[lang]}
                 >
                   <Bookmark size={16} fill={sv ? "currentColor" : "none"} />
                 </button>
@@ -1061,7 +1068,7 @@ function PulseFeed({
                 type="button"
                 onClick={() => onOpenPost(post)}
                 className="mt-2 block w-full text-left"
-                aria-label={`Open post about ${p.name}`}
+                aria-label={openPostAboutAriaLabel(lang, p.name)}
               >
                 <ImageBox
                   src={post.imageUrl}
@@ -1076,7 +1083,7 @@ function PulseFeed({
                   type="button"
                   onClick={() => onOpenPost(post)}
                   className="block w-full select-none text-left"
-                  aria-label={`Open post details for ${p.name}`}
+                  aria-label={openPostDetailsAriaLabel(lang, p.name)}
                 >
                   <p className="text-[13px] leading-snug text-hp-ink">{post.text}</p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -1092,7 +1099,7 @@ function PulseFeed({
                     type="button"
                     onClick={() => toggleLike(post.id)}
                     className={`inline-flex items-center gap-1 ${liked ? "text-hp-sunset" : ""}`}
-                    aria-label={liked ? "Unlike post" : "Like post"}
+                    aria-label={liked ? PULSE_FEED_STRINGS.unlikePost[lang] : PULSE_FEED_STRINGS.likePost[lang]}
                   >
                     <Heart size={15} fill={liked ? "currentColor" : "none"} /> {lc}
                   </button>
@@ -1100,14 +1107,14 @@ function PulseFeed({
                     type="button"
                     onClick={() => onOpenPost(post)}
                     className="inline-flex items-center gap-1"
-                    aria-label="Open comments"
+                    aria-label={PULSE_FEED_STRINGS.openComments[lang]}
                   >
                     <MessageCircle size={15} /> {commentCount}
                   </button>
                   <button
                     type="button"
                     onClick={() => onShare(post)}
-                    aria-label="Share post"
+                    aria-label={PULSE_FEED_STRINGS.sharePost[lang]}
                     className="inline-flex items-center"
                   >
                     <Share2 size={15} className="text-hp-ink/50" />
@@ -1117,7 +1124,7 @@ function PulseFeed({
                     onClick={() => onOpenMap(p.id)}
                     className="ml-auto inline-flex items-center gap-1 rounded-full border border-hp-ink/10 px-2.5 py-1 text-[11px] font-semibold"
                   >
-                    <MapIcon size={12} /> open on map
+                    <MapIcon size={12} /> {PULSE_FEED_STRINGS.openOnMap[lang]}
                   </button>
                 </div>
               </div>
@@ -4940,7 +4947,7 @@ function PulseAppInner() {
               transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.6 }}
               onClick={() => openComposer("post")}
               className="absolute right-4 bottom-3 z-40 grid h-12 w-12 place-items-center rounded-full bg-hp-sunset text-hp-paper shadow-[0_10px_24px_rgba(224,106,50,0.45)]"
-              aria-label="Create local post"
+              aria-label={PULSE_FEED_STRINGS.createLocalPost[lang]}
             >
               <Plus size={20} />
             </motion.button>
