@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MapPin, Radio, Users, Check, LocateFixed } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -31,6 +32,7 @@ const SLIDES = [
 ];
 
 export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: Props) {
+  const { t } = useI18n();
   const [step, setStep] = useState(0);
   const [picked, setPicked] = useState<string[]>([]);
   const [locRequested, setLocRequested] = useState(false);
@@ -87,10 +89,10 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
                     })()}
                   </span>
                   <h2 className="text-[26px] font-black leading-tight text-hp-ink">
-                    {SLIDES[step].title}
+                    {t(SLIDES[step].title)}
                   </h2>
                   <p className="mt-2 text-[14px] leading-relaxed text-hp-muted">
-                    {SLIDES[step].body}
+                    {t(SLIDES[step].body)}
                   </p>
                 </motion.div>
               )}
@@ -104,10 +106,10 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
                   className="flex w-full max-w-sm flex-col items-center"
                 >
                   <h2 className="text-[24px] font-black leading-tight text-hp-ink">
-                    What's your vibe?
+                    {t("What's your vibe?")}
                   </h2>
                   <p className="mt-1.5 text-[13px] text-hp-muted">
-                    Pick a few — we'll tune your feed.
+                    {t("Pick a few — we'll tune your feed.")}
                   </p>
                   <div className="mt-5 flex flex-wrap justify-center gap-2">
                     {vibeChips.map((v) => {
@@ -129,7 +131,7 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
                       );
                     })}
                     {vibeChips.length === 0 && (
-                      <p className="text-[12px] text-hp-muted">Loading vibes…</p>
+                      <p className="text-[12px] text-hp-muted">{t("Loading vibes…")}</p>
                     )}
                   </div>
 
@@ -146,7 +148,7 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
                     }`}
                   >
                     {locRequested ? <Check size={15} /> : <LocateFixed size={15} />}
-                    {locRequested ? "Location on" : "Enable location"}
+                    {t(locRequested ? "Location on" : "Enable location")}
                   </button>
                 </motion.div>
               )}
@@ -160,14 +162,14 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
               onClick={finish}
               className="text-[12.5px] font-bold text-hp-muted"
             >
-              {isVibes ? "Finish" : "Skip"}
+              {t(isVibes ? "Finish" : "Skip")}
             </button>
             <button
               type="button"
               onClick={() => (isVibes ? finish() : setStep((s) => s + 1))}
               className="rounded-full bg-hp-ink px-6 py-3 text-[13px] font-black text-hp-paper transition active:scale-95"
             >
-              {isVibes ? "Enter ΗΛΕΑ PULSE" : "Continue"}
+              {t(isVibes ? "Enter ΗΛΕΙΑ PULSE" : "Continue")}
             </button>
           </div>
         </motion.div>

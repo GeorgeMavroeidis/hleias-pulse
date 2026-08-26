@@ -19,6 +19,7 @@ import {
   type PlaceStory,
   type PlaceStoryGroup,
 } from "@/lib/hp/place-stories";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   groups: PlaceStoryGroup[];
@@ -106,6 +107,7 @@ function StoryProgressBar({
 
 /* ---------- author chip ---------- */
 function AuthorChip({ story }: { story: PlaceStory }) {
+  const { language, t } = useI18n();
   const color = STORY_AUTHOR_COLOR[story.authorType];
   return (
     <div className="flex items-center gap-2">
@@ -124,11 +126,16 @@ function AuthorChip({ story }: { story: PlaceStory }) {
             className="rounded px-1 py-[1px] text-[8px] font-black uppercase tracking-wider text-white"
             style={{ background: color }}
           >
-            {STORY_AUTHOR_LABEL[story.authorType]}
+            {t(STORY_AUTHOR_LABEL[story.authorType])}
           </span>
         </div>
         <div className="text-[10px] font-semibold text-white/70">
-          {formatStoryTime(story.minutesAgo)} · {STORY_KIND_LABEL[story.kind]}
+          {language === "GR"
+            ? story.minutesAgo <= 1
+              ? "τώρα"
+              : `πριν από ${story.minutesAgo}′`
+            : formatStoryTime(story.minutesAgo)}{" "}
+          · {t(STORY_KIND_LABEL[story.kind])}
         </div>
       </div>
     </div>
@@ -137,6 +144,7 @@ function AuthorChip({ story }: { story: PlaceStory }) {
 
 /* ---------- report chips (crowd / parking / condition) ---------- */
 function ReportChips({ story }: { story: PlaceStory }) {
+  const { t } = useI18n();
   const report = story.report;
   if (!report) return null;
   const chips: { label: string; value: string }[] = [];
@@ -149,7 +157,7 @@ function ReportChips({ story }: { story: PlaceStory }) {
           key={chip.label}
           className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm"
         >
-          {chip.label}: <span className="uppercase">{chip.value}</span>
+          {t(chip.label)}: <span className="uppercase">{t(chip.value)}</span>
         </span>
       ))}
       {report.condition?.map((cond) => (
@@ -176,6 +184,7 @@ function EndCard({
   onOpenMap: () => void;
   onOpenDetails: () => void;
 }) {
+  const { language } = useI18n();
   const tone = toneStyle(group.tone);
   return (
     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 px-8 text-center">
@@ -186,7 +195,7 @@ function EndCard({
       </div>
       <div>
         <p className="text-[12px] font-bold uppercase tracking-wider text-white/55">
-          That's everything from
+          {language === "GR" ? "Αυτά ήταν όλα από" : "That's everything from"}
         </p>
         <h3 className="mt-1 text-2xl font-black text-white">{group.placeName}</h3>
         <p className="text-[12px] text-white/60">{group.area}</p>
@@ -197,21 +206,24 @@ function EndCard({
           onClick={onOpenMap}
           className="inline-flex items-center justify-center gap-2 rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-white shadow-lg"
         >
-          <MapIcon size={15} /> Open {group.placeName} on map
+          <MapIcon size={15} />
+          {language === "GR"
+            ? `Άνοιγμα ${group.placeName} στον χάρτη`
+            : `Open ${group.placeName} on map`}
         </button>
         <button
           type="button"
           onClick={onOpenDetails}
           className="inline-flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-[13px] font-bold text-white"
         >
-          See place details
+          {language === "GR" ? "Προβολή λεπτομερειών" : "See place details"}
         </button>
         <button
           type="button"
           onClick={onReplay}
           className="mt-1 text-[12px] font-semibold text-white/60 underline-offset-4 hover:underline"
         >
-          Replay stories
+          {language === "GR" ? "Επανάληψη stories" : "Replay stories"}
         </button>
       </div>
     </div>
@@ -231,6 +243,7 @@ export function PlaceStoryViewer({
   onToggleSave,
   savedPlaceIds = [],
 }: Props) {
+  const { language, t } = useI18n();
   const reducedMotion = useReducedMotion();
   const [viewerGroups] = useState(() => groups);
   const initialGroup = useMemo(() => {
@@ -487,7 +500,9 @@ export function PlaceStoryViewer({
         transition={{ duration: 0.18 }}
         role="dialog"
         aria-modal="true"
-        aria-label={`Stories from ${group.placeName}`}
+        aria-label={
+          language === "GR" ? `Stories από ${group.placeName}` : `Stories from ${group.placeName}`
+        }
       >
         <div className="hp-story-stage">
           <motion.div
@@ -521,7 +536,7 @@ export function PlaceStoryViewer({
               >
                 <ImageBox
                   src={story.mediaUrl}
-                  alt={`${group.placeName} — ${STORY_KIND_LABEL[story.kind]}`}
+                  alt={`${group.placeName} — ${t(STORY_KIND_LABEL[story.kind])}`}
                   className="absolute inset-0 h-full w-full"
                   rounded="rounded-none"
                   gradientFallback={tone.gradient}
@@ -558,7 +573,7 @@ export function PlaceStoryViewer({
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Close stories"
+                aria-label={t("Close")}
                 className="grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white backdrop-blur-sm"
               >
                 <X size={17} />
@@ -600,13 +615,21 @@ export function PlaceStoryViewer({
                     }}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-white py-2.5 text-[12px] font-extrabold text-hp-ink"
                   >
-                    <MapIcon size={14} /> Map
+                    <MapIcon size={14} /> {t("Map")}
                   </button>
                   {onToggleSave && (
                     <button
                       type="button"
                       onClick={() => onToggleSave(group.placeId)}
-                      aria-label={saved ? "Unsave place" : "Save place"}
+                      aria-label={
+                        language === "GR"
+                          ? saved
+                            ? "Αφαίρεση σημείου"
+                            : "Αποθήκευση σημείου"
+                          : saved
+                            ? "Unsave place"
+                            : "Save place"
+                      }
                       className={`grid h-10 w-10 place-items-center rounded-full border backdrop-blur-sm ${
                         saved
                           ? "border-hp-sunset bg-hp-sunset/20 text-hp-sunset"
@@ -619,21 +642,23 @@ export function PlaceStoryViewer({
                   <button
                     type="button"
                     onClick={() => onShare(story, group)}
-                    aria-label="Share story"
+                    aria-label={language === "GR" ? "Κοινοποίηση story" : "Share story"}
                     className="grid h-10 w-10 place-items-center rounded-full border border-white/30 text-white backdrop-blur-sm"
                   >
                     <Share2 size={15} />
                   </button>
                   <button
                     type="button"
-                    aria-label="Report story"
+                    aria-label={language === "GR" ? "Αναφορά story" : "Report story"}
                     className="grid h-10 w-10 place-items-center rounded-full border border-white/30 text-white backdrop-blur-sm"
                   >
                     <Flag size={15} />
                   </button>
                 </div>
                 <p className="mt-2 text-center text-[9px] font-medium text-white/40">
-                  Tap sides to move · swipe down to close · hold to pause
+                  {language === "GR"
+                    ? "Πάτησε στα πλάγια για αλλαγή · σύρε κάτω για κλείσιμο · κράτησε για παύση"
+                    : "Tap sides to move · swipe down to close · hold to pause"}
                 </p>
               </div>
             )}
