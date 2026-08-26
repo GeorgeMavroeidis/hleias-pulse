@@ -1362,7 +1362,7 @@ export function SocialMap({
         currentMarkerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
         currentMarkerElement.style.setProperty(
           "--hp-marker-pulse-state",
-          visibleForInteraction && zoom < PLACE_FOCUS_ZOOM ? "running" : "paused",
+          visibleForInteraction ? "running" : "paused",
         );
         currentMarkerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
         currentMarkerElement.tabIndex = visibleForInteraction ? 0 : -1;
@@ -1380,7 +1380,7 @@ export function SocialMap({
           markerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
           markerElement.style.setProperty(
             "--hp-marker-pulse-state",
-            visibleForInteraction && zoom < PLACE_FOCUS_ZOOM ? "running" : "paused",
+            visibleForInteraction ? "running" : "paused",
           );
           markerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
           if (interactiveElement.__hpClickHandler) {
@@ -1439,7 +1439,6 @@ export function SocialMap({
     renderNodes,
     resolveImg,
     storyPlaceIds,
-    zoom,
     zoomIntoActivityCluster,
     zoomIntoCluster,
   ]);

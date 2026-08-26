@@ -293,7 +293,27 @@
   transition:
     opacity 90ms linear,
     transform 90ms linear;
+  animation: hp-marker-icon-beat var(--marker-pulse-duration, 4.2s) ease-in-out infinite;
+  animation-delay: var(--marker-pulse-delay, 0s);
+  animation-play-state: var(--hp-marker-pulse-state, running);
   will-change: transform, opacity;
+}
+
+@keyframes hp-marker-icon-beat {
+  0%,
+  32%,
+  100% {
+    scale: 1;
+  }
+  8% {
+    scale: 1.1;
+  }
+  17% {
+    scale: 1.025;
+  }
+  24% {
+    scale: 1.065;
+  }
 }
 
 .hp-area-marker__shell {
@@ -1194,6 +1214,11 @@ h3 {
   .hp-area-marker__avatars,
   .hp-child-marker__avatars {
     transition: none;
+  }
+  .hp-area-marker__shell,
+  .hp-child-marker__shell {
+    animation: none;
+    scale: 1;
   }
   .hp-marker-pulse {
     animation: none;
