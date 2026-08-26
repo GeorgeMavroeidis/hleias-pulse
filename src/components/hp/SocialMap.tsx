@@ -329,16 +329,22 @@ function activityLineForCluster(
   return `${postCount} posts`;
 }
 
-type MarkerPalette = { primary: string; accent: string };
+type MarkerPalette = { primary: string; accent: string; neutral: string };
 
 function tonePalette(tone: AreaTone): MarkerPalette {
-  if (tone === "beach") return { primary: "var(--hp-sea)", accent: "#58d3e8" };
-  if (tone === "culture") return { primary: "var(--hp-deep)", accent: "var(--hp-purple)" };
-  if (tone === "nature") return { primary: "var(--hp-olive)", accent: "#9ab85a" };
-  if (tone === "music" || tone === "village") {
-    return { primary: "var(--hp-purple)", accent: "var(--hp-sunset)" };
+  if (tone === "beach") {
+    return { primary: "#142d46", accent: "#587286", neutral: "#a8aca9" };
   }
-  return { primary: "var(--hp-sunset)", accent: "#f2b35e" };
+  if (tone === "culture") {
+    return { primary: "#10243d", accent: "#cf8738", neutral: "#858b8e" };
+  }
+  if (tone === "nature") {
+    return { primary: "#626c68", accent: "#d1a052", neutral: "#afb1aa" };
+  }
+  if (tone === "music" || tone === "village") {
+    return { primary: "#283a50", accent: "#858b92", neutral: "#da994c" };
+  }
+  return { primary: "#c96e28", accent: "#f0b955", neutral: "#8d9291" };
 }
 
 function typePalette(place: Place): MarkerPalette {
@@ -361,6 +367,7 @@ function pulseStyle(size: number, palette: MarkerPalette, id: string, status: Ar
     `--marker-size:${size}px`,
     `--marker-color:${palette.primary}`,
     `--marker-accent:${palette.accent}`,
+    `--marker-neutral:${palette.neutral}`,
     `--marker-pulse-delay:${delay.toFixed(2)}s`,
     `--marker-pulse-duration:${duration.toFixed(2)}s`,
     `--marker-pulse-strength:${strength}`,
