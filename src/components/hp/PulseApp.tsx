@@ -124,6 +124,19 @@ import {
   routeStopsLabel,
   activeRouteLabel,
 } from "@/lib/hp/routes-strings";
+import {
+  COMPOSER_STRINGS,
+  COMPOSER_MODE_LABELS,
+  POSTING_IDENTITY_LABELS,
+  POSTING_IDENTITY_HELPERS,
+  CROWD_OPTION_LABELS,
+  BUDGET_OPTION_LABELS,
+  PARKING_OPTION_LABELS,
+  STORY_CONDITION_LABELS,
+  PLACE_TYPE_LABELS,
+  usingPlaceImageLabel,
+  storyPhotoUsingLabel,
+} from "@/lib/hp/composer-strings";
 
 type Tab = "map" | "pulse" | "routes" | "meet" | "saved";
 type NavTab = Exclude<Tab, "saved">;
@@ -140,11 +153,7 @@ type CreateStoryInput = {
 };
 type PostingIdentity = Extract<Author["type"], "LOCAL" | "TOURIST" | "GUIDE">;
 
-const POSTING_IDENTITIES: { id: PostingIdentity; label: string; helper: string }[] = [
-  { id: "LOCAL", label: "Local", helper: "I know the area" },
-  { id: "TOURIST", label: "Tourist", helper: "I am visiting" },
-  { id: "GUIDE", label: "Guide", helper: "I can recommend" },
-];
+const POSTING_IDENTITY_IDS: PostingIdentity[] = ["LOCAL", "TOURIST", "GUIDE"];
 const ROUTE_FILTERS = ["All", "Beach", "Nature", "Culture", "No car", "Free"] as const;
 type RouteFilter = (typeof ROUTE_FILTERS)[number];
 
@@ -2485,6 +2494,7 @@ function SearchablePlacePicker({
   query: string;
   setQuery: (query: string) => void;
 }) {
+  const { lang } = useLang();
   const selected = places.find((place) => place.id === value) ?? places[0];
   const results = useMemo(() => {
     const matches = query.trim()
@@ -2503,14 +2513,16 @@ function SearchablePlacePicker({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           name="create-post-place-search"
-          aria-label="Search post location"
+          aria-label={COMPOSER_STRINGS.searchPlaceLocation[lang]}
           autoComplete="off"
-          placeholder="Search location, area, tag..."
+          placeholder={COMPOSER_STRINGS.searchLocationPlaceholder[lang]}
           className="w-full bg-transparent text-[13px] outline-none placeholder:text-hp-muted"
         />
       </div>
       <div className="mb-2 rounded-xl bg-hp-ink/5 px-3 py-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">Selected</div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+          {COMPOSER_STRINGS.selected[lang]}
+        </div>
         <div className="truncate text-[13px] font-bold text-hp-ink">
           {selected.name} <span className="font-semibold text-hp-muted">· {selected.area}</span>
         </div>
@@ -2518,7 +2530,7 @@ function SearchablePlacePicker({
       <div
         className="grid max-h-56 gap-1 overflow-y-auto pr-1"
         role="listbox"
-        aria-label="Locations"
+        aria-label={COMPOSER_STRINGS.locations[lang]}
       >
         {results.map((placeOption) => {
           const selectedOption = placeOption.id === selected.id;
@@ -2547,7 +2559,7 @@ function SearchablePlacePicker({
                     selectedOption ? "text-hp-paper/65" : "text-hp-muted"
                   }`}
                 >
-                  {placeOption.area} · {placeOption.type}
+                  {placeOption.area} · {PLACE_TYPE_LABELS[placeOption.type][lang]}
                 </span>
               </span>
               <span
@@ -2562,7 +2574,7 @@ function SearchablePlacePicker({
         })}
         {results.length === 0 && (
           <div className="rounded-xl border border-dashed border-hp-ink/15 px-3 py-4 text-center text-[12px] text-hp-muted">
-            No location matches that search.
+            {COMPOSER_STRINGS.noLocationMatch[lang]}
           </div>
         )}
       </div>
@@ -2603,6 +2615,7 @@ function CreateComposerModal({
   onStory: (payload: CreateStoryInput) => Promise<void>;
   onEvent: (payload: CreateMeetInput) => Promise<void>;
 }) {
+  const { lang } = useLang();
   const [mode, setMode] = useState<ComposerMode>("post");
   const [text, setText] = useState("");
   const [place, setPlace] = useState(places[0]?.id ?? "");
@@ -2676,8 +2689,8 @@ function CreateComposerModal({
     onRequireAccount();
     setError(
       account.status === "needsProfile"
-        ? "Complete your profile before posting."
-        : "Sign in before posting.",
+        ? COMPOSER_STRINGS.errorCompleteProfile[lang]
+        : COMPOSER_STRINGS.errorSignInBeforePosting[lang],
     );
     return false;
   };
@@ -2695,7 +2708,7 @@ function CreateComposerModal({
       setPlaceQuery("");
     } catch (submitError) {
       console.warn("Could not create post.", submitError);
-      setError("Could not save post. Try again.");
+      setError(COMPOSER_STRINGS.errorSavePost[lang]);
     } finally {
       setSaving(false);
     }
@@ -2707,11 +2720,11 @@ function CreateComposerModal({
     const lat = Number(placeLat);
     const lng = Number(placeLng);
     if (!placeName.trim() || !placeArea.trim() || !placeShort.trim() || !placeImageUrl.trim()) {
-      setError("Fill the place name, area, description, and photo URL.");
+      setError(COMPOSER_STRINGS.errorPlaceFields[lang]);
       return;
     }
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      setError("Use valid latitude and longitude.");
+      setError(COMPOSER_STRINGS.errorLatLng[lang]);
       return;
     }
 
@@ -2744,7 +2757,7 @@ function CreateComposerModal({
       setPlaceBestTime("today");
     } catch (submitError) {
       console.warn("Could not create place.", submitError);
-      setError("Could not save place. Try again.");
+      setError(COMPOSER_STRINGS.errorSavePlace[lang]);
     } finally {
       setSaving(false);
     }
@@ -2782,7 +2795,7 @@ function CreateComposerModal({
         hint: pgError?.hint,
         raw: submitError,
       });
-      setError("Could not save story. Try again.");
+      setError(COMPOSER_STRINGS.errorSaveStory[lang]);
     } finally {
       setSaving(false);
     }
@@ -2794,15 +2807,15 @@ function CreateComposerModal({
     const happensAt = new Date(eventWhen);
     const capacity = eventCapacity.trim() ? Number(eventCapacity) : undefined;
     if (!eventTitle.trim() || !eventDescription.trim() || !place) {
-      setError("Add a title, place, and short description.");
+      setError(COMPOSER_STRINGS.errorEventFields[lang]);
       return;
     }
     if (!Number.isFinite(happensAt.getTime())) {
-      setError("Choose a valid date and time.");
+      setError(COMPOSER_STRINGS.errorEventDate[lang]);
       return;
     }
     if (capacity !== undefined && (!Number.isFinite(capacity) || capacity < 2)) {
-      setError("Capacity must be empty or at least 2.");
+      setError(COMPOSER_STRINGS.errorEventCapacity[lang]);
       return;
     }
 
@@ -2830,7 +2843,7 @@ function CreateComposerModal({
       setEventTags("");
     } catch (submitError) {
       console.warn("Could not create event.", submitError);
-      setError("Could not host this gathering. Try again.");
+      setError(COMPOSER_STRINGS.errorHostGathering[lang]);
     } finally {
       setSaving(false);
     }
@@ -2850,7 +2863,7 @@ function CreateComposerModal({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label="Close post composer"
+            aria-label={COMPOSER_STRINGS.closeComposer[lang]}
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -2859,17 +2872,17 @@ function CreateComposerModal({
             transition={{ type: "spring", damping: 28, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label="Create local post or place"
+            aria-label={COMPOSER_STRINGS.dialogLabel[lang]}
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-black text-hp-ink">Add to ΗΛΕΙΑ PULSE</h3>
+              <h3 className="text-lg font-black text-hp-ink">{COMPOSER_STRINGS.addToApp[lang]}</h3>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-9 w-9 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-                aria-label="Close post composer"
+                aria-label={COMPOSER_STRINGS.closeComposer[lang]}
               >
                 <X size={16} />
               </button>
@@ -2890,7 +2903,7 @@ function CreateComposerModal({
                     mode === option ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
                   }`}
                 >
-                  {option}
+                  {COMPOSER_MODE_LABELS[option][lang]}
                 </button>
               ))}
             </div>
@@ -2911,10 +2924,10 @@ function CreateComposerModal({
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12px] font-black text-hp-ink">
-                      Posting as {profileDisplayName(profile)}
+                      {COMPOSER_STRINGS.postingAs[lang]} {profileDisplayName(profile)}
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      Profile identity will be stored with this contribution
+                      {COMPOSER_STRINGS.identityWillBeStored[lang]}
                     </span>
                   </span>
                 </>
@@ -2925,10 +2938,10 @@ function CreateComposerModal({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[12px] font-black text-hp-ink">
-                      Sign in to post
+                      {COMPOSER_STRINGS.signInToPost[lang]}
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      Saves can be private, public posts need a profile
+                      {COMPOSER_STRINGS.savesCanBePrivate[lang]}
                     </span>
                   </span>
                   <button
@@ -2936,7 +2949,7 @@ function CreateComposerModal({
                     onClick={onRequireAccount}
                     className="rounded-full bg-hp-ink px-3 py-1.5 text-[11px] font-bold text-hp-paper"
                   >
-                    Sign in
+                    {COMPOSER_STRINGS.signIn[lang]}
                   </button>
                 </>
               )}
@@ -2954,11 +2967,13 @@ function CreateComposerModal({
                   <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
                   <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 text-hp-paper">
                     <ImagePlus size={18} />
-                    <span className="text-[12px] font-bold">Using {selectedPlace.name} image</span>
+                    <span className="text-[12px] font-bold">
+                      {usingPlaceImageLabel(lang, selectedPlace.name)}
+                    </span>
                   </div>
                 </div>
                 <label htmlFor="create-post-text" className="sr-only">
-                  Post text
+                  {COMPOSER_STRINGS.postTextLabel[lang]}
                 </label>
                 <textarea
                   id="create-post-text"
@@ -2967,34 +2982,36 @@ function CreateComposerModal({
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   autoComplete="off"
-                  placeholder="What's happening at this place?…"
+                  placeholder={COMPOSER_STRINGS.postTextPlaceholder[lang]}
                   className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                   rows={3}
                 />
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Posting as
+                    {COMPOSER_STRINGS.postingAs[lang]}
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                    {POSTING_IDENTITIES.map((option) => {
-                      const active = identity === option.id;
+                    {POSTING_IDENTITY_IDS.map((option) => {
+                      const active = identity === option;
                       return (
                         <button
-                          key={option.id}
+                          key={option}
                           type="button"
-                          onClick={() => setIdentity(option.id)}
+                          onClick={() => setIdentity(option)}
                           aria-pressed={active}
                           className={`rounded-xl px-2 py-2 text-left transition ${
                             active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                           }`}
                         >
-                          <span className="block text-[11px] font-black">{option.label}</span>
+                          <span className="block text-[11px] font-black">
+                            {POSTING_IDENTITY_LABELS[option][lang]}
+                          </span>
                           <span
                             className={`block truncate text-[9px] font-semibold ${
                               active ? "text-hp-paper/65" : "text-hp-muted"
                             }`}
                           >
-                            {option.helper}
+                            {POSTING_IDENTITY_HELPERS[option][lang]}
                           </span>
                         </button>
                       );
@@ -3003,7 +3020,7 @@ function CreateComposerModal({
                 </div>
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Location
+                    {COMPOSER_STRINGS.location[lang]}
                   </div>
                   <input
                     type="hidden"
@@ -3023,7 +3040,7 @@ function CreateComposerModal({
                 </div>
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Vibe
+                    {COMPOSER_STRINGS.vibe[lang]}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {vibeChips.map((v) => {
@@ -3055,7 +3072,7 @@ function CreateComposerModal({
                   disabled={!text.trim() || saving}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {saving ? "Saving…" : "Post"}
+                  {saving ? COMPOSER_STRINGS.saving[lang] : COMPOSER_STRINGS.post[lang]}
                 </button>
               </form>
             ) : mode === "place" ? (
@@ -3066,7 +3083,7 @@ function CreateComposerModal({
                       htmlFor="create-place-name"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Place name
+                      {COMPOSER_STRINGS.placeName[lang]}
                     </label>
                     <input
                       id="create-place-name"
@@ -3083,7 +3100,7 @@ function CreateComposerModal({
                       htmlFor="create-place-area"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Area
+                      {COMPOSER_STRINGS.area[lang]}
                     </label>
                     <input
                       id="create-place-area"
@@ -3100,7 +3117,7 @@ function CreateComposerModal({
                       htmlFor="create-place-type"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Type
+                      {COMPOSER_STRINGS.type[lang]}
                     </label>
                     <select
                       id="create-place-type"
@@ -3112,7 +3129,7 @@ function CreateComposerModal({
                     >
                       {placeTypeOptions.map((type) => (
                         <option key={type} value={type}>
-                          {type}
+                          {PLACE_TYPE_LABELS[type][lang]}
                         </option>
                       ))}
                     </select>
@@ -3122,7 +3139,7 @@ function CreateComposerModal({
                       htmlFor="create-place-lat"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Lat
+                      {COMPOSER_STRINGS.lat[lang]}
                     </label>
                     <input
                       id="create-place-lat"
@@ -3141,7 +3158,7 @@ function CreateComposerModal({
                       htmlFor="create-place-lng"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Lng
+                      {COMPOSER_STRINGS.lng[lang]}
                     </label>
                     <input
                       id="create-place-lng"
@@ -3160,7 +3177,7 @@ function CreateComposerModal({
                       htmlFor="create-place-image"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Photo URL
+                      {COMPOSER_STRINGS.photoUrl[lang]}
                     </label>
                     <input
                       id="create-place-image"
@@ -3174,7 +3191,7 @@ function CreateComposerModal({
                   </div>
                   <div className="col-span-2">
                     <label htmlFor="create-place-short" className="sr-only">
-                      Description
+                      {COMPOSER_STRINGS.descriptionLabel[lang]}
                     </label>
                     <textarea
                       id="create-place-short"
@@ -3182,7 +3199,7 @@ function CreateComposerModal({
                       data-testid="composer-place-short"
                       value={placeShort}
                       onChange={(e) => setPlaceShort(e.target.value)}
-                      placeholder="What should locals know?…"
+                      placeholder={COMPOSER_STRINGS.descriptionPlaceholder[lang]}
                       className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                       rows={3}
                     />
@@ -3192,7 +3209,7 @@ function CreateComposerModal({
                       htmlFor="create-place-tags"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Tags
+                      {COMPOSER_STRINGS.tags[lang]}
                     </label>
                     <input
                       id="create-place-tags"
@@ -3200,7 +3217,7 @@ function CreateComposerModal({
                       data-testid="composer-place-tags"
                       value={placeTags}
                       onChange={(e) => setPlaceTags(e.target.value)}
-                      placeholder="beach, quiet, sunset"
+                      placeholder={COMPOSER_STRINGS.tagsPlaceholderPlace[lang]}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
@@ -3209,7 +3226,7 @@ function CreateComposerModal({
                       htmlFor="create-place-crowd"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Crowd
+                      {COMPOSER_STRINGS.crowd[lang]}
                     </label>
                     <select
                       id="create-place-crowd"
@@ -3219,9 +3236,9 @@ function CreateComposerModal({
                       onChange={(e) => setPlaceCrowd(e.target.value)}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
                     >
-                      <option value="low">low</option>
-                      <option value="medium">medium</option>
-                      <option value="high">high</option>
+                      <option value="low">{CROWD_OPTION_LABELS.low[lang]}</option>
+                      <option value="medium">{CROWD_OPTION_LABELS.medium[lang]}</option>
+                      <option value="high">{CROWD_OPTION_LABELS.high[lang]}</option>
                     </select>
                   </div>
                   <div>
@@ -3229,7 +3246,7 @@ function CreateComposerModal({
                       htmlFor="create-place-budget"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Budget
+                      {COMPOSER_STRINGS.budget[lang]}
                     </label>
                     <select
                       id="create-place-budget"
@@ -3239,10 +3256,10 @@ function CreateComposerModal({
                       onChange={(e) => setPlaceBudget(e.target.value)}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
                     >
-                      <option value="free">free</option>
-                      <option value="€">€</option>
-                      <option value="€€">€€</option>
-                      <option value="€€€">€€€</option>
+                      <option value="free">{BUDGET_OPTION_LABELS.free[lang]}</option>
+                      <option value="€">{BUDGET_OPTION_LABELS["€"][lang]}</option>
+                      <option value="€€">{BUDGET_OPTION_LABELS["€€"][lang]}</option>
+                      <option value="€€€">{BUDGET_OPTION_LABELS["€€€"][lang]}</option>
                     </select>
                   </div>
                   <div className="col-span-2">
@@ -3250,7 +3267,7 @@ function CreateComposerModal({
                       htmlFor="create-place-best-time"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Best time
+                      {COMPOSER_STRINGS.bestTime[lang]}
                     </label>
                     <input
                       id="create-place-best-time"
@@ -3269,7 +3286,7 @@ function CreateComposerModal({
                   disabled={saving}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {saving ? "Saving…" : "Save place"}
+                  {saving ? COMPOSER_STRINGS.saving[lang] : COMPOSER_STRINGS.savePlace[lang]}
                 </button>
               </form>
             ) : mode === "story" ? (
@@ -3285,17 +3302,14 @@ function CreateComposerModal({
                   <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 text-hp-paper">
                     <ImagePlus size={18} />
                     <span className="text-[12px] font-bold">
-                      Story photo · using {selectedPlace.name} image
+                      {storyPhotoUsingLabel(lang, selectedPlace.name)}
                     </span>
                   </div>
                 </div>
-                <p className="mt-2 text-[11px] text-hp-muted">
-                  Shows full-screen, 9:16. Swap in your own photo later — this previews with the
-                  place image.
-                </p>
+                <p className="mt-2 text-[11px] text-hp-muted">{COMPOSER_STRINGS.storyPreviewHint[lang]}</p>
 
                 <label htmlFor="create-story-caption" className="sr-only">
-                  Story caption
+                  {COMPOSER_STRINGS.storyCaptionLabel[lang]}
                 </label>
                 <textarea
                   id="create-story-caption"
@@ -3304,14 +3318,14 @@ function CreateComposerModal({
                   value={storyCaption}
                   onChange={(e) => setStoryCaption(e.target.value)}
                   autoComplete="off"
-                  placeholder="What's happening here right now?…"
+                  placeholder={COMPOSER_STRINGS.storyCaptionPlaceholder[lang]}
                   className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                   rows={3}
                 />
 
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Type
+                    {COMPOSER_STRINGS.type[lang]}
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                     {(["photo", "report"] as const).map((option) => {
@@ -3327,7 +3341,7 @@ function CreateComposerModal({
                             active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                           }`}
                         >
-                          {option === "report" ? "Live report" : "Photo"}
+                          {option === "report" ? COMPOSER_STRINGS.liveReport[lang] : COMPOSER_STRINGS.photo[lang]}
                         </button>
                       );
                     })}
@@ -3339,7 +3353,7 @@ function CreateComposerModal({
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          Crowd
+                          {COMPOSER_STRINGS.crowd[lang]}
                         </div>
                         <div className="grid grid-cols-3 gap-1">
                           {(["low", "medium", "high"] as const).map((c) => (
@@ -3354,14 +3368,14 @@ function CreateComposerModal({
                                   : "bg-hp-paper text-hp-ink/65"
                               }`}
                             >
-                              {c}
+                              {CROWD_OPTION_LABELS[c][lang]}
                             </button>
                           ))}
                         </div>
                       </div>
                       <div>
                         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          Parking
+                          {COMPOSER_STRINGS.parking[lang]}
                         </div>
                         <div className="grid grid-cols-3 gap-1">
                           {(["easy", "tight", "full"] as const).map((p) => (
@@ -3376,7 +3390,7 @@ function CreateComposerModal({
                                   : "bg-hp-paper text-hp-ink/65"
                               }`}
                             >
-                              {p}
+                              {PARKING_OPTION_LABELS[p][lang]}
                             </button>
                           ))}
                         </div>
@@ -3384,7 +3398,7 @@ function CreateComposerModal({
                     </div>
                     <div className="mt-2">
                       <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                        Condition
+                        {COMPOSER_STRINGS.condition[lang]}
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {STORY_CONDITION_OPTIONS.map((cond) => {
@@ -3405,7 +3419,7 @@ function CreateComposerModal({
                                   : "border border-hp-ink/10 text-hp-ink/70"
                               }`}
                             >
-                              {cond}
+                              {STORY_CONDITION_LABELS[cond][lang]}
                             </button>
                           );
                         })}
@@ -3416,14 +3430,14 @@ function CreateComposerModal({
 
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Visible for
+                    {COMPOSER_STRINGS.visibleFor[lang]}
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                     {(
                       [
                         { h: 6, label: "6h" },
                         { h: 24, label: "24h" },
-                        { h: undefined, label: "Keep tip" },
+                        { h: undefined, label: COMPOSER_STRINGS.keepTip[lang] },
                       ] as const
                     ).map((opt) => {
                       const active = storyVisibility === opt.h;
@@ -3446,7 +3460,7 @@ function CreateComposerModal({
 
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Location
+                    {COMPOSER_STRINGS.location[lang]}
                   </div>
                   <SearchablePlacePicker
                     places={places}
@@ -3464,7 +3478,7 @@ function CreateComposerModal({
                   disabled={!storyCaption.trim()}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  Post story
+                  {COMPOSER_STRINGS.postStory[lang]}
                 </button>
               </form>
             ) : (
@@ -3478,7 +3492,7 @@ function CreateComposerModal({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
                   <div className="absolute bottom-3 left-3 right-3 text-hp-paper">
-                    <div className="text-[10px] font-bold uppercase">Hosting at</div>
+                    <div className="text-[10px] font-bold uppercase">{COMPOSER_STRINGS.hostingAt[lang]}</div>
                     <div className="text-[15px] font-black leading-tight">{selectedPlace.name}</div>
                   </div>
                 </div>
@@ -3489,7 +3503,7 @@ function CreateComposerModal({
                       htmlFor="create-event-title"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Gathering title
+                      {COMPOSER_STRINGS.gatheringTitle[lang]}
                     </label>
                     <input
                       id="create-event-title"
@@ -3497,13 +3511,13 @@ function CreateComposerModal({
                       value={eventTitle}
                       onChange={(e) => setEventTitle(e.target.value)}
                       autoComplete="off"
-                      placeholder="Sunset swim, coffee tips, live music..."
+                      placeholder={COMPOSER_STRINGS.gatheringTitlePlaceholder[lang]}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
                   <div className="col-span-2">
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      Location
+                      {COMPOSER_STRINGS.location[lang]}
                     </div>
                     <SearchablePlacePicker
                       places={places}
@@ -3518,7 +3532,7 @@ function CreateComposerModal({
                       htmlFor="create-event-when"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      When
+                      {COMPOSER_STRINGS.when[lang]}
                     </label>
                     <input
                       id="create-event-when"
@@ -3534,7 +3548,7 @@ function CreateComposerModal({
                       htmlFor="create-event-category"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Type
+                      {COMPOSER_STRINGS.type[lang]}
                     </label>
                     <select
                       id="create-event-category"
@@ -3555,7 +3569,7 @@ function CreateComposerModal({
                       htmlFor="create-event-vibe"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Vibe
+                      {COMPOSER_STRINGS.vibe[lang]}
                     </label>
                     <input
                       id="create-event-vibe"
@@ -3570,7 +3584,7 @@ function CreateComposerModal({
                       htmlFor="create-event-price"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Price
+                      {COMPOSER_STRINGS.price[lang]}
                     </label>
                     <input
                       id="create-event-price"
@@ -3585,7 +3599,7 @@ function CreateComposerModal({
                       htmlFor="create-event-capacity"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Capacity
+                      {COMPOSER_STRINGS.capacity[lang]}
                     </label>
                     <input
                       id="create-event-capacity"
@@ -3595,7 +3609,7 @@ function CreateComposerModal({
                       min={2}
                       value={eventCapacity}
                       onChange={(e) => setEventCapacity(e.target.value)}
-                      placeholder="Optional"
+                      placeholder={COMPOSER_STRINGS.optional[lang]}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
@@ -3604,27 +3618,27 @@ function CreateComposerModal({
                       htmlFor="create-event-tags"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Tags
+                      {COMPOSER_STRINGS.tags[lang]}
                     </label>
                     <input
                       id="create-event-tags"
                       name="create-event-tags"
                       value={eventTags}
                       onChange={(e) => setEventTags(e.target.value)}
-                      placeholder="sunset, local, free"
+                      placeholder={COMPOSER_STRINGS.tagsPlaceholderEvent[lang]}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
                   <div className="col-span-2">
                     <label htmlFor="create-event-description" className="sr-only">
-                      Gathering description
+                      {COMPOSER_STRINGS.gatheringDescriptionLabel[lang]}
                     </label>
                     <textarea
                       id="create-event-description"
                       name="create-event-description"
                       value={eventDescription}
                       onChange={(e) => setEventDescription(e.target.value)}
-                      placeholder="What should people know before they join?"
+                      placeholder={COMPOSER_STRINGS.gatheringDescriptionPlaceholder[lang]}
                       className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                       rows={3}
                     />
@@ -3638,7 +3652,7 @@ function CreateComposerModal({
                   disabled={!eventTitle.trim() || !eventDescription.trim() || saving}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {saving ? "Hosting..." : "Host gathering"}
+                  {saving ? COMPOSER_STRINGS.hosting[lang] : COMPOSER_STRINGS.hostGathering[lang]}
                 </button>
               </form>
             )}
