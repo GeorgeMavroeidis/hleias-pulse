@@ -31,6 +31,7 @@ import {
   ExternalLink,
   LockKeyhole,
   RefreshCw,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -45,15 +46,19 @@ import {
 } from "@/lib/hp-model";
 import {
   addPulseComment,
+  applyToBecomeOrganizer,
   createPulsePlace,
   createPulsePost,
   createPulseMeetEvent,
+  createPulseCulturalEvent,
   createPulseStory,
   emptyPulseData,
+  getMyOrganizerStatus,
   loadPulseData,
   loadPulseUserState,
   markPulseStoriesSeen,
   recordPulseActivityDay,
+  setCulturalEventLike,
   setPostLike,
   setPulseMeetRsvp,
   setSavedItem,
@@ -91,6 +96,9 @@ import {
 import { LiveTicker } from "./LiveTicker";
 import { TrendingHero } from "./TrendingHero";
 import { MeetScreen } from "./MeetScreen";
+import { CulturalEventsScreen } from "./CulturalEventsScreen";
+import { OrganizerEventComposer } from "./OrganizerEventComposer";
+import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet } from "./AuthAccountSheets";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
@@ -103,9 +111,16 @@ import {
   type MeetEvent,
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
+import {
+  DEFAULT_ORGANIZER_BIO,
+  type CreateCulturalEventInput,
+  type CulturalEvent,
+  type OrganizerStatus,
+} from "@/lib/hp/cultural-events-types";
 
 type Tab = "map" | "pulse" | "routes" | "meet" | "saved";
 type NavTab = Exclude<Tab, "saved">;
+type MeetSubTab = "community" | "events";
 type ComposerMode = "post" | "place" | "story" | "event";
 type CreateStoryInput = {
   placeId: string;
@@ -3772,6 +3787,7 @@ export function PulseApp() {
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
+  const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [mapBackStack, setMapBackStack] = useState<MapViewSnapshot[]>([]);
@@ -3785,6 +3801,14 @@ export function PulseApp() {
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [postLikes, setPostLikes] = useState<Record<string, number>>({});
+  const [culturalEventLikes, setCulturalEventLikes] = useState<Record<string, boolean>>({});
+  const [culturalEventLikeCounts, setCulturalEventLikeCounts] = useState<Record<string, number>>(
+    {},
+  );
+  const [culturalEventComments, setCulturalEventComments] = useState<Record<string, Comment[]>>(
+    {},
+  );
+  const [openCulturalEvent, setOpenCulturalEvent] = useState<CulturalEvent | null>(null);
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
   const [savedRoutes, setSavedRoutes] = useState<Record<string, boolean>>({});
   const [rsvpMap, setRsvpMap] = useState<Record<string, RsvpStatus>>({});
@@ -3803,6 +3827,8 @@ export function PulseApp() {
   const [authOpen, setAuthOpen] = useState(false);
   const [account, setAccount] = useState<PulseAccountState>({ status: "loading" });
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+  const [organizerStatus, setOrganizerStatus] = useState<OrganizerStatus | null>(null);
+  const [organizerComposerOpen, setOrganizerComposerOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
   const [activeRouteStopIndex, setActiveRouteStopIndex] = useState(0);
@@ -3816,6 +3842,7 @@ export function PulseApp() {
   const places = pulseData.places;
   const posts = pulseData.posts;
   const events = pulseData.events;
+  const culturalEvents = pulseData.culturalEvents;
   const routes = pulseData.routes;
   const stories = pulseData.stories;
   const vibeChips = pulseData.vibeChips;
@@ -4018,6 +4045,12 @@ export function PulseApp() {
       } else {
         setAdminRole(null);
       }
+      if (nextAccount.status === "ready" || nextAccount.status === "needsProfile") {
+        const nextOrganizerStatus = await getMyOrganizerStatus().catch(() => null);
+        setOrganizerStatus(nextOrganizerStatus);
+      } else {
+        setOrganizerStatus(null);
+      }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
           ? nextAccount.profile
@@ -4035,6 +4068,7 @@ export function PulseApp() {
       const fallback: PulseAccountState = { status: "signedOut" };
       setAccount(fallback);
       setAdminRole(null);
+      setOrganizerStatus(null);
       return fallback;
     }
   };
@@ -4114,6 +4148,7 @@ export function PulseApp() {
       setPulseData(data);
       setPlaceComments(data.placeComments);
       setRouteComments(data.routeComments);
+      setCulturalEventComments(data.culturalEventComments);
       setSelectedPlace((current) =>
         current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
       );
@@ -4153,6 +4188,20 @@ export function PulseApp() {
       ) {
         setLanguage(nextAccount.preferences.language);
       }
+      // Admin/organizer status drives the Admin workspace / Verified organizer
+      // badges; fetch it here too, not only through refreshAccount() on save.
+      if (nextAccount.status === "ready") {
+        const nextAdminRole = await getAdminRole().catch(() => null);
+        if (!ignore) setAdminRole(nextAdminRole);
+      } else {
+        setAdminRole(null);
+      }
+      if (nextAccount.status === "ready" || nextAccount.status === "needsProfile") {
+        const nextOrganizerStatus = await getMyOrganizerStatus().catch(() => null);
+        if (!ignore) setOrganizerStatus(nextOrganizerStatus);
+      } else {
+        setOrganizerStatus(null);
+      }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
           ? nextAccount.profile
@@ -4188,6 +4237,7 @@ export function PulseApp() {
         setSavedPosts(state.savedPosts);
         setSavedRoutes(state.savedRoutes);
         setLikes(state.likedPosts);
+        setCulturalEventLikes(state.likedCulturalEvents);
         setRsvpMap(state.rsvpMap);
         setSeen(new Set(state.seenStoryIds));
         setStreak(state.streak);
@@ -4276,7 +4326,11 @@ export function PulseApp() {
     initialShareHandled.current = true;
     setCreateOpen(false);
 
-    if (isTab(tabParam)) {
+    if (tabParam === "events") {
+      // Legacy deep link from before Cultural Events moved under Meet.
+      setTab("meet");
+      setMeetSubTab("events");
+    } else if (isTab(tabParam)) {
       setTab(tabParam);
     }
 
@@ -4648,7 +4702,93 @@ export function PulseApp() {
     setCreateOpen(false);
     setComposerPin(null);
     setTab("meet");
+    setMeetSubTab("community");
     showToast(t("Gathering hosted"));
+  };
+
+  const applyOrganizer = async () => {
+    if (account.status !== "ready") {
+      requireProfile("post");
+      return;
+    }
+    const displayName = profileDisplayName(account.profile);
+    const status = await applyToBecomeOrganizer(displayName, DEFAULT_ORGANIZER_BIO);
+    setOrganizerStatus(status);
+    showToast(t("Organizer application sent"));
+  };
+
+  const addCulturalEvent = async (input: CreateCulturalEventInput) => {
+    if (organizerStatus?.verificationStatus !== "verified") {
+      throw new Error("Only verified organizers can submit cultural events.");
+    }
+    const event = await createPulseCulturalEvent({
+      ...input,
+      organizerId: organizerStatus.id,
+      organizerName: organizerStatus.displayName,
+    });
+    setPulseData((data) => ({
+      ...data,
+      culturalEvents: [event, ...data.culturalEvents.filter((item) => item.id !== event.id)],
+    }));
+    markContribution();
+    showToast(t("Event submitted for review"));
+  };
+
+  const toggleCulturalEventLike = (id: string) => {
+    if (account.status !== "ready") {
+      requireProfile("like");
+      return;
+    }
+    const nextLiked = !culturalEventLikes[id];
+    setCulturalEventLikes((m) => ({ ...m, [id]: nextLiked }));
+    setCulturalEventLikeCounts((m) => ({
+      ...m,
+      [id]: m[id] ?? culturalEvents.find((e) => e.id === id)?.likesCount ?? 0,
+    }));
+    void setCulturalEventLike(id, nextLiked).catch((error) => {
+      console.warn("Could not persist cultural event like.", error);
+      setCulturalEventLikes((m) => ({ ...m, [id]: !nextLiked }));
+      showToast(t("Could not save"));
+    });
+  };
+
+  const addCulturalEventComment = (id: string, text: string) => {
+    if (account.status !== "ready") {
+      requireProfile("comment");
+      return;
+    }
+    const authorName = profileDisplayName(account.profile);
+    const optimisticComment: Comment = {
+      author: authorName,
+      text,
+      userId: account.userId,
+      profileId: account.profile.id,
+      postingIdentity: account.profile.defaultIdentity,
+      authorKind: "user",
+    };
+    setCulturalEventComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
+    showToast(t("Comment posted"));
+    void addPulseComment({ type: "cultural_event", id }, text, {
+      profileId: account.profile.id,
+      authorName,
+      identity: account.profile.defaultIdentity,
+    })
+      .then((savedComment) => {
+        setCulturalEventComments((m) => ({
+          ...m,
+          [id]: (m[id] ?? []).map((comment) =>
+            comment === optimisticComment ? savedComment : comment,
+          ),
+        }));
+      })
+      .catch((error) => {
+        console.warn("Could not persist cultural event comment.", error);
+        setCulturalEventComments((m) => ({
+          ...m,
+          [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
+        }));
+        showToast(t("Could not post comment"));
+      });
   };
 
   const toggleMeetRsvp = (event: MeetEvent, next: RsvpStatus) => {
@@ -4708,10 +4848,12 @@ export function PulseApp() {
     if (!event) {
       showToast(t("No gathering there yet"));
       setTab("meet");
+      setMeetSubTab("community");
       return;
     }
     toggleMeetRsvp(event, "going");
     setTab("meet");
+    setMeetSubTab("community");
   };
 
   const openComposer = (mode: ComposerMode, pin: { lat: number; lng: number } | null = null) => {
@@ -4936,14 +5078,54 @@ export function PulseApp() {
 
     if (tab === "meet") {
       return (
-        <MeetScreen
-          events={meetEvents}
-          rsvp={rsvpMap}
-          findPlace={findPlace}
-          onToggleRsvp={toggleMeetRsvp}
-          onOpenPlace={jumpToMap}
-          onCreate={() => openComposer("event")}
-        />
+        <div className="flex h-full flex-col">
+          <div className="flex shrink-0 gap-1.5 px-4 pt-3">
+            {(
+              [
+                { id: "community" as MeetSubTab, label: t("Community"), Icon: CalendarHeart },
+                { id: "events" as MeetSubTab, label: t("Events"), Icon: Ticket },
+              ] satisfies { id: MeetSubTab; label: string; Icon: LucideIcon }[]
+            ).map(({ id, label, Icon }) => {
+              const active = meetSubTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setMeetSubTab(id)}
+                  aria-pressed={active}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-2xl border py-2 text-[12.5px] font-bold transition active:scale-[0.98] ${
+                    active
+                      ? "border-hp-ink bg-hp-ink text-hp-paper"
+                      : "border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+                  }`}
+                >
+                  <Icon size={14} strokeWidth={2.6} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="min-h-0 flex-1">
+            {meetSubTab === "community" ? (
+              <MeetScreen
+                events={meetEvents}
+                rsvp={rsvpMap}
+                findPlace={findPlace}
+                onToggleRsvp={toggleMeetRsvp}
+                onOpenPlace={jumpToMap}
+                onCreate={() => openComposer("event")}
+              />
+            ) : (
+              <CulturalEventsScreen
+                events={culturalEvents}
+                lang={language}
+                onOpenDetail={setOpenCulturalEvent}
+                canCreate={organizerStatus?.verificationStatus === "verified"}
+                onCreate={() => setOrganizerComposerOpen(true)}
+              />
+            )}
+          </div>
+        </div>
       );
     }
 
@@ -5101,6 +5283,30 @@ export function PulseApp() {
         onEvent={addMeetEvent}
       />
 
+      <OrganizerEventComposer
+        open={organizerComposerOpen}
+        lang={language}
+        onClose={() => setOrganizerComposerOpen(false)}
+        onSubmit={addCulturalEvent}
+      />
+
+      <CulturalEventDetailModal
+        event={openCulturalEvent}
+        lang={language}
+        onClose={() => setOpenCulturalEvent(null)}
+        onOpenMap={jumpToMap}
+        onLike={() => openCulturalEvent && toggleCulturalEventLike(openCulturalEvent.id)}
+        liked={openCulturalEvent ? !!culturalEventLikes[openCulturalEvent.id] : false}
+        likeCount={
+          openCulturalEvent
+            ? (culturalEventLikeCounts[openCulturalEvent.id] ?? openCulturalEvent.likesCount) +
+              (culturalEventLikes[openCulturalEvent.id] ? 1 : 0)
+            : 0
+        }
+        comments={openCulturalEvent ? (culturalEventComments[openCulturalEvent.id] ?? []) : []}
+        onComment={(text) => openCulturalEvent && addCulturalEventComment(openCulturalEvent.id, text)}
+      />
+
       <AuthSheet
         open={authOpen}
         onClose={() => setAuthOpen(false)}
@@ -5131,6 +5337,12 @@ export function PulseApp() {
         adminRole={adminRole}
         onOpenAdmin={() => {
           window.location.assign("/admin");
+        }}
+        organizerStatus={organizerStatus}
+        onApplyOrganizer={applyOrganizer}
+        onOpenOrganizerComposer={() => {
+          setProfileOpen(false);
+          setOrganizerComposerOpen(true);
         }}
       />
 
