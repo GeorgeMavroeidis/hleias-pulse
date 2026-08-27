@@ -53,7 +53,7 @@ import {
 } from "@/lib/admin-api";
 import { getCurrentPulseAccount, type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
-import { CULTURAL_EVENT_TYPES, CULTURAL_EVENT_TYPE_META } from "@/lib/hp/cultural-events-types";
+import { CULTURAL_EVENT_TYPES, CULTURAL_EVENT_TYPE_META, tr } from "@/lib/hp/cultural-events-types";
 
 type AdminTab =
   | "overview"
@@ -1281,6 +1281,7 @@ function MeetEditor({
 }
 
 function CulturalEventsPanel({ data, onSaved, setNotice }: PanelProps) {
+  const { language } = useI18n();
   const [selected, setSelected] = useState<AdminCulturalEvent | null>(null);
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
@@ -1299,7 +1300,7 @@ function CulturalEventsPanel({ data, onSaved, setNotice }: PanelProps) {
           selectedId={selected?.id}
           onSelect={setSelected}
           title={(item) => item.title}
-          subtitle={(item) => `${item.venue_name} · ${formatDate(item.event_date)}`}
+          subtitle={(item) => `${item.venue_name} · ${formatDate(item.event_date, language)}`}
           image={(item) => item.poster_url}
         />
       </div>
@@ -1328,6 +1329,7 @@ function CulturalEventEditor({
   onSaved: () => Promise<void>;
   setNotice: (notice: Notice) => void;
 }) {
+  const { language, t } = useI18n();
   const [title, setTitle] = useState(event?.title ?? "");
   const [greekTitle, setGreekTitle] = useState(event?.greek_title ?? "");
   const [eventType, setEventType] = useState(event?.event_type ?? CULTURAL_EVENT_TYPES[0]);
@@ -1355,7 +1357,7 @@ function CulturalEventEditor({
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not upload poster.",
+        message: error instanceof Error ? error.message : t("Could not upload poster."),
       });
     } finally {
       setSaving(false);
@@ -1375,7 +1377,9 @@ function CulturalEventEditor({
     ) {
       setNotice({
         tone: "error",
-        message: "Title, venue, area, date, organizer, Greek description, and poster are required.",
+        message: t(
+          "Title, venue, area, date, organizer, Greek description, and poster are required.",
+        ),
       });
       return;
     }
@@ -1404,11 +1408,11 @@ function CulturalEventEditor({
         moderation_status: status,
       });
       await onSaved();
-      setNotice({ tone: "success", message: "Cultural event saved." });
+      setNotice({ tone: "success", message: t("Cultural event saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save cultural event.",
+        message: error instanceof Error ? error.message : t("Could not save cultural event."),
       });
     } finally {
       setSaving(false);
@@ -1419,7 +1423,9 @@ function CulturalEventEditor({
       onSubmit={save}
       className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
     >
-      <h3 className="text-base font-black">{event ? "Edit cultural event" : "New cultural event"}</h3>
+      <h3 className="text-base font-black">
+        {t(event ? "Edit cultural event" : "New cultural event")}
+      </h3>
       <div className="mt-4 grid gap-3">
         <Field label="Title">
           <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -1440,7 +1446,7 @@ function CulturalEventEditor({
             >
               {CULTURAL_EVENT_TYPES.map((type) => (
                 <option key={type} value={type}>
-                  {CULTURAL_EVENT_TYPE_META[type].label.EN}
+                  {tr(language, CULTURAL_EVENT_TYPE_META[type].label)}
                 </option>
               ))}
             </select>
@@ -1472,7 +1478,7 @@ function CulturalEventEditor({
             value={placeId}
             onChange={(e) => setPlaceId(e.target.value)}
           >
-            <option value="">No linked place</option>
+            <option value="">{t("No linked place")}</option>
             {places.map((place) => (
               <option key={place.id} value={place.id}>
                 {place.name}
@@ -1491,7 +1497,7 @@ function CulturalEventEditor({
               if (organizer) setOrganizerName(organizer.display_name);
             }}
           >
-            <option value="">No linked organizer account</option>
+            <option value="">{t("No linked organizer account")}</option>
             {organizers.map((organizer) => (
               <option key={organizer.id} value={organizer.id}>
                 {organizer.display_name} · {organizer.verification_status}
@@ -1538,7 +1544,7 @@ function CulturalEventEditor({
               checked={isPastEvent}
               onChange={(e) => setIsPastEvent(e.target.checked)}
             />
-            Past event
+            {t("Past event")}
           </label>
           <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
             <input
@@ -1546,14 +1552,14 @@ function CulturalEventEditor({
               checked={isOfficial}
               onChange={(e) => setIsOfficial(e.target.checked)}
             />
-            Official event
+            {t("Official event")}
           </label>
         </div>
         <Field label="Visibility">
           <select className={inputClass} value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="published">Published</option>
-            <option value="pending">Pending</option>
-            <option value="hidden">Hidden</option>
+            <option value="published">{t("Published")}</option>
+            <option value="pending">{t("Pending")}</option>
+            <option value="hidden">{t("Hidden")}</option>
           </select>
         </Field>
         <Field label="Poster">
@@ -1586,6 +1592,7 @@ function CulturalEventEditor({
 }
 
 function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
+  const { language, t } = useI18n();
   const organizerUserIds = new Set(data.organizers.map((organizer) => organizer.user_id));
   const [selectedId, setSelectedId] = useState("");
   const [adding, setAdding] = useState(false);
@@ -1597,11 +1604,14 @@ function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
     try {
       await setOrganizerVerification(organizer.id, status);
       await onSaved();
-      setNotice({ tone: "success", message: `Organizer ${status}.` });
+      setNotice({
+        tone: "success",
+        message: t(status === "verified" ? "Organizer verified." : "Organizer rejected."),
+      });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not update organizer.",
+        message: error instanceof Error ? error.message : t("Could not update organizer."),
       });
     }
   };
@@ -1614,11 +1624,11 @@ function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
       await createAdminOrganizer(profile.id, profile.display_name || profile.handle || "Organizer");
       await onSaved();
       setSelectedId("");
-      setNotice({ tone: "success", message: "Organizer added and verified." });
+      setNotice({ tone: "success", message: t("Organizer added and verified.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not add organizer.",
+        message: error instanceof Error ? error.message : t("Could not add organizer."),
       });
     } finally {
       setAdding(false);
@@ -1644,7 +1654,7 @@ function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
                     </div>
                     <p className="mt-1 max-w-2xl text-sm text-slate-600">{organizer.bio}</p>
                     <time className="mt-1 block text-xs text-slate-400">
-                      Applied {formatDate(organizer.created_at)}
+                      {t("Applied")} {formatDate(organizer.created_at, language)}
                     </time>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1667,9 +1677,9 @@ function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
           </div>
         </div>
         <div className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <h3 className="font-black">Add an organizer directly</h3>
+          <h3 className="font-black">{t("Add an organizer directly")}</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Skip the self-service application and verify an existing user right away.
+            {t("Skip the self-service application and verify an existing user right away.")}
           </p>
           <div className="mt-4 grid gap-3">
             <Field label="Profile">
@@ -1678,7 +1688,7 @@ function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
                 value={selectedId}
                 onChange={(event) => setSelectedId(event.target.value)}
               >
-                <option value="">Choose a profile…</option>
+                <option value="">{t("Choose a profile…")}</option>
                 {eligibleProfiles.map((profile) => (
                   <option key={profile.id} value={profile.id}>
                     {profile.display_name || profile.handle} · @{profile.handle}
@@ -1688,8 +1698,9 @@ function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
             </Field>
             {eligibleProfiles.length === 0 && (
               <p className="text-xs text-slate-400">
-                No eligible profiles — a user needs to complete their profile (display name +
-                handle) before they can be added here.
+                {t(
+                  "No eligible profiles — a user needs to complete their profile (display name + handle) before they can be added here.",
+                )}
               </p>
             )}
             <ActionButton onClick={() => void addDirect()} disabled={!selectedId || adding}>
