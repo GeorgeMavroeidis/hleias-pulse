@@ -341,6 +341,22 @@ const EL: Record<string, string> = {
   Cleanup: "Καθαρισμός",
   Food: "Φαγητό",
   Social: "Παρέα",
+  // Cultural events
+  Community: "Κοινότητα",
+  Events: "Εκδηλώσεις",
+  "Organizer application sent": "Η αίτηση διοργανωτή στάλθηκε",
+  "Event submitted for review": "Η εκδήλωση υποβλήθηκε για έλεγχο",
+  "Could not send application.": "Δεν ήταν δυνατή η αποστολή της αίτησης.",
+  "Verified organizer": "Επαληθευμένος διοργανωτής",
+  "Submit a cultural event": "Υπόβαλε μια πολιτιστική εκδήλωση",
+  "Do you organize events?": "Διοργανώνεις εκδηλώσεις;",
+  "Become an organizer to submit theater shows, concerts, and festivals.":
+    "Γίνε διοργανωτής για να υποβάλλεις θεατρικές παραστάσεις, συναυλίες και φεστιβάλ.",
+  "Your previous request was rejected.": "Το προηγούμενο αίτημά σου απορρίφθηκε.",
+  "Your request to become an events organizer is pending approval.":
+    "Το αίτημά σου να γίνεις διοργανωτής εκδηλώσεων είναι σε αναμονή έγκρισης.",
+  "Become an organizer": "Γίνε διοργανωτής",
+  "Submitting…": "Υποβολή…",
 };
 
 function interpolate(message: string, params?: TranslationParams) {
