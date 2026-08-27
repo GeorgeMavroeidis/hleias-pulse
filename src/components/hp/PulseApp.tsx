@@ -2758,6 +2758,18 @@ const placeTypeOptions: Place["type"][] = [
   "sunset",
 ];
 
+// English i18n keys for the place-type <option>s in the create composer.
+const PLACE_TYPE_LABEL_KEYS: Record<Place["type"], string> = {
+  beach: "Beach",
+  culture: "Culture",
+  nature: "Nature",
+  food: "Food",
+  local: "Local spot",
+  village: "Village",
+  night: "Night",
+  sunset: "Sunset",
+};
+
 const STORY_CONDITION_OPTIONS = ["clean", "windy", "busy", "quiet", "event"] as const;
 
 function defaultMeetDateTime() {
@@ -3236,7 +3248,7 @@ function CreateComposerModal({
                     mode === option ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
                   }`}
                 >
-                  {option}
+                  {t(option[0].toUpperCase() + option.slice(1))}
                 </button>
               ))}
             </div>
@@ -3401,7 +3413,7 @@ function CreateComposerModal({
                   disabled={!text.trim() || saving}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {saving ? "Saving…" : "Post"}
+                  {saving ? t("Saving…") : t("Post")}
                 </button>
               </form>
             ) : mode === "place" ? (
@@ -3412,7 +3424,7 @@ function CreateComposerModal({
                       htmlFor="create-place-name"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Place name
+                      {t("Place name")}
                     </label>
                     <input
                       id="create-place-name"
@@ -3429,7 +3441,7 @@ function CreateComposerModal({
                       htmlFor="create-place-area"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Area
+                      {t("Area")}
                     </label>
                     <input
                       id="create-place-area"
@@ -3446,7 +3458,7 @@ function CreateComposerModal({
                       htmlFor="create-place-type"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Type
+                      {t("Type")}
                     </label>
                     <select
                       id="create-place-type"
@@ -3458,7 +3470,7 @@ function CreateComposerModal({
                     >
                       {placeTypeOptions.map((type) => (
                         <option key={type} value={type}>
-                          {type}
+                          {t(PLACE_TYPE_LABEL_KEYS[type])}
                         </option>
                       ))}
                     </select>
@@ -3468,7 +3480,7 @@ function CreateComposerModal({
                       htmlFor="create-place-lat"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Lat
+                      {t("Lat")}
                     </label>
                     <input
                       id="create-place-lat"
@@ -3487,7 +3499,7 @@ function CreateComposerModal({
                       htmlFor="create-place-lng"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Lng
+                      {t("Lng")}
                     </label>
                     <input
                       id="create-place-lng"
@@ -3506,7 +3518,7 @@ function CreateComposerModal({
                       htmlFor="create-place-image"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Photo URL
+                      {t("Photo URL")}
                     </label>
                     <input
                       id="create-place-image"
@@ -3520,7 +3532,7 @@ function CreateComposerModal({
                   </div>
                   <div className="col-span-2">
                     <label htmlFor="create-place-short" className="sr-only">
-                      Description
+                      {t("Description")}
                     </label>
                     <textarea
                       id="create-place-short"
@@ -3538,7 +3550,7 @@ function CreateComposerModal({
                       htmlFor="create-place-tags"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Tags
+                      {t("Tags")}
                     </label>
                     <input
                       id="create-place-tags"
@@ -3546,7 +3558,7 @@ function CreateComposerModal({
                       data-testid="composer-place-tags"
                       value={placeTags}
                       onChange={(e) => setPlaceTags(e.target.value)}
-                      placeholder="beach, quiet, sunset"
+                      placeholder={t("beach, quiet, sunset")}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
@@ -3555,7 +3567,7 @@ function CreateComposerModal({
                       htmlFor="create-place-crowd"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Crowd
+                      {t("Crowd")}
                     </label>
                     <select
                       id="create-place-crowd"
@@ -3565,9 +3577,9 @@ function CreateComposerModal({
                       onChange={(e) => setPlaceCrowd(e.target.value)}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
                     >
-                      <option value="low">low</option>
-                      <option value="medium">medium</option>
-                      <option value="high">high</option>
+                      <option value="low">{t("low")}</option>
+                      <option value="medium">{t("medium")}</option>
+                      <option value="high">{t("high")}</option>
                     </select>
                   </div>
                   <div>
@@ -3575,7 +3587,7 @@ function CreateComposerModal({
                       htmlFor="create-place-budget"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Budget
+                      {t("Budget")}
                     </label>
                     <select
                       id="create-place-budget"
@@ -3585,7 +3597,7 @@ function CreateComposerModal({
                       onChange={(e) => setPlaceBudget(e.target.value)}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
                     >
-                      <option value="free">free</option>
+                      <option value="free">{t("Free")}</option>
                       <option value="€">€</option>
                       <option value="€€">€€</option>
                       <option value="€€€">€€€</option>
@@ -3596,7 +3608,7 @@ function CreateComposerModal({
                       htmlFor="create-place-best-time"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      Best time
+                      {t("Best time")}
                     </label>
                     <input
                       id="create-place-best-time"
@@ -3615,7 +3627,7 @@ function CreateComposerModal({
                   disabled={saving}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {saving ? "Saving…" : "Save place"}
+                  {saving ? t("Saving…") : t("Save place")}
                 </button>
               </form>
             ) : mode === "story" ? (
@@ -3641,7 +3653,7 @@ function CreateComposerModal({
                 </p>
 
                 <label htmlFor="create-story-caption" className="sr-only">
-                  Story caption
+                  {t("Story caption")}
                 </label>
                 <textarea
                   id="create-story-caption"
@@ -3657,7 +3669,7 @@ function CreateComposerModal({
 
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Type
+                    {t("Type")}
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                     {(["photo", "report"] as const).map((option) => {
@@ -3673,7 +3685,7 @@ function CreateComposerModal({
                             active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                           }`}
                         >
-                          {option === "report" ? "Live report" : "Photo"}
+                          {option === "report" ? t("Live report") : t("Photo")}
                         </button>
                       );
                     })}
@@ -3685,7 +3697,7 @@ function CreateComposerModal({
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          Crowd
+                          {t("Crowd")}
                         </div>
                         <div className="grid grid-cols-3 gap-1">
                           {(["low", "medium", "high"] as const).map((c) => (
@@ -3700,14 +3712,14 @@ function CreateComposerModal({
                                   : "bg-hp-paper text-hp-ink/65"
                               }`}
                             >
-                              {c}
+                              {t(c)}
                             </button>
                           ))}
                         </div>
                       </div>
                       <div>
                         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          Parking
+                          {t("Parking")}
                         </div>
                         <div className="grid grid-cols-3 gap-1">
                           {(["easy", "tight", "full"] as const).map((p) => (
@@ -3722,7 +3734,7 @@ function CreateComposerModal({
                                   : "bg-hp-paper text-hp-ink/65"
                               }`}
                             >
-                              {p}
+                              {t(p)}
                             </button>
                           ))}
                         </div>
@@ -3730,7 +3742,7 @@ function CreateComposerModal({
                     </div>
                     <div className="mt-2">
                       <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                        Condition
+                        {t("Condition")}
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {STORY_CONDITION_OPTIONS.map((cond) => {
@@ -3751,7 +3763,7 @@ function CreateComposerModal({
                                   : "border border-hp-ink/10 text-hp-ink/70"
                               }`}
                             >
-                              {cond}
+                              {t(cond[0].toUpperCase() + cond.slice(1))}
                             </button>
                           );
                         })}
@@ -3762,7 +3774,7 @@ function CreateComposerModal({
 
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Visible for
+                    {t("Visible for")}
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                     {(
@@ -3792,7 +3804,7 @@ function CreateComposerModal({
 
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Location
+                    {t("Location")}
                   </div>
                   <SearchablePlacePicker
                     places={places}
@@ -3957,7 +3969,7 @@ function CreateComposerModal({
                       name="create-event-tags"
                       value={eventTags}
                       onChange={(e) => setEventTags(e.target.value)}
-                      placeholder="sunset, local, free"
+                      placeholder={t("sunset, local, free")}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
@@ -3984,7 +3996,7 @@ function CreateComposerModal({
                   disabled={!eventTitle.trim() || !eventDescription.trim() || saving}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {saving ? "Hosting..." : "Host gathering"}
+                  {saving ? t("Hosting…") : t("Host gathering")}
                 </button>
               </form>
             )}

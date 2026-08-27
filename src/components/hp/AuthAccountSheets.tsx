@@ -269,7 +269,7 @@ export function AuthSheet({
                       onChange={(event) => setDisplayName(event.target.value)}
                       autoComplete="name"
                       className={fieldClass()}
-                      placeholder="Theo from Pyrgos"
+                      placeholder={t("Theo from Pyrgos")}
                     />
                   </Field>
                   <Field label={t("Handle")}>
@@ -756,7 +756,7 @@ export function AccountSheet({
                       value={homeArea}
                       onChange={(event) => setHomeArea(event.target.value)}
                       autoComplete="address-level2"
-                      placeholder="Pyrgos, Katakolo, Ancient Olympia..."
+                      placeholder={t("Pyrgos, Katakolo, Ancient Olympia…")}
                       className={fieldClass()}
                     />
                   </Field>
@@ -767,7 +767,7 @@ export function AccountSheet({
                       onChange={(event) => setBio(event.target.value)}
                       rows={3}
                       maxLength={240}
-                      placeholder="One line about your Ilia taste."
+                      placeholder={t("One line about your Ilia taste.")}
                       className={`${fieldClass()} resize-none`}
                     />
                   </Field>
