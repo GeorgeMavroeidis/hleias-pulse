@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { ImageBox } from "./ImageBox";
 import { toneStyle, type PlaceStoryGroup } from "@/lib/hp/place-stories";
-import { useI18n } from "@/lib/i18n";
 
 interface Props {
   groups: PlaceStoryGroup[];
@@ -13,14 +12,13 @@ interface Props {
  * its tone (sea/olive/purple/sunset) and dims once every story has been seen.
  */
 export function PlaceStoryRail({ groups, onOpen }: Props) {
-  const { language } = useI18n();
   if (groups.length === 0) return null;
 
   return (
     <div
       className="hp-no-scrollbar -mx-4 mb-4 flex gap-3 overflow-x-auto px-4"
       role="list"
-      aria-label={language === "GR" ? "Stories ανά σημείο" : "Place stories"}
+      aria-label="Place stories"
     >
       {groups.map((group) => {
         const tone = toneStyle(group.hasUnseen ? group.tone : "muted");
@@ -32,11 +30,7 @@ export function PlaceStoryRail({ groups, onOpen }: Props) {
             role="listitem"
             whileTap={{ scale: 0.93 }}
             onClick={() => onOpen(group.placeId)}
-            aria-label={
-              language === "GR"
-                ? `Άνοιγμα ${group.count} stories για ${group.placeName}`
-                : `Open ${group.count} stor${group.count === 1 ? "y" : "ies"} for ${group.placeName}`
-            }
+            aria-label={`Open ${group.count} stor${group.count === 1 ? "y" : "ies"} for ${group.placeName}`}
             className="hp-story-bubble flex w-[4.25rem] shrink-0 flex-col items-center gap-1 text-center"
           >
             <div className="hp-story-bubble__ring" style={{ background: tone.gradient }}>

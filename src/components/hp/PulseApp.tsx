@@ -30,7 +30,6 @@ import {
   Send,
   ExternalLink,
   LockKeyhole,
-  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -65,12 +64,10 @@ import {
   getCurrentPulseAccount,
   profileAvatarUrl,
   profileDisplayName,
-  savePulseLanguage,
   subscribeToPulseAuth,
   type PulseAccountProfile,
   type PulseAccountState,
 } from "@/lib/hp-auth";
-import { useI18n } from "@/lib/i18n";
 import { getAdminRole, type AdminRole } from "@/lib/admin-api";
 import { ImageBox } from "./ImageBox";
 import {
@@ -300,7 +297,8 @@ function Toast({ msg }: { msg: string | null }) {
 interface TopBarProps {
   query: string;
   setQuery: (query: string) => void;
-  onToggleLanguage: () => void;
+  lang: "GR" | "EN";
+  setLang: Dispatch<SetStateAction<"GR" | "EN">>;
   showSearch: boolean;
   setShowSearch: Dispatch<SetStateAction<boolean>>;
   account: PulseAccountState;
@@ -311,14 +309,14 @@ interface TopBarProps {
 function TopBar({
   query,
   setQuery,
-  onToggleLanguage,
+  lang,
+  setLang,
   showSearch,
   setShowSearch,
   account,
   onOpenAccount,
   onOpenAuth,
 }: TopBarProps) {
-  const { language, t } = useI18n();
   return (
     <div className="relative z-30 border-b border-hp-ink/10 bg-hp-paper/95 backdrop-blur">
       <div className="flex items-center justify-between px-4 pt-2.5">
@@ -341,24 +339,24 @@ function TopBar({
             type="button"
             onClick={() => setShowSearch((s) => !s)}
             className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
-            aria-label={t(showSearch ? "Close search" : "Open search")}
+            aria-label={showSearch ? "Close search" : "Open search"}
             aria-expanded={showSearch}
           >
             <Search size={16} />
           </button>
           <button
             type="button"
-            onClick={onToggleLanguage}
+            onClick={() => setLang((current) => (current === "GR" ? "EN" : "GR"))}
             className="rounded-full border border-hp-ink/10 px-2.5 py-1.5 text-[11px] font-bold tracking-wider text-hp-ink/80"
-            aria-label={t("Toggle language")}
+            aria-label="Toggle language"
           >
-            {language === "GR" ? "GR / en" : "gr / EN"}
+            {lang === "GR" ? "GR / en" : "gr / EN"}
           </button>
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
       <div className="px-4 pb-1.5 pt-0.5">
-        <p className="text-[12px] text-hp-muted">{t("Local spots, routes, and tips.")}</p>
+        <p className="text-[12px] text-hp-muted">Local spots, routes, and tips.</p>
       </div>
       <AnimatePresence>
         {showSearch && (
@@ -372,14 +370,12 @@ function TopBar({
               <Search size={14} className="text-hp-muted" />
               <input
                 name="hp-search"
-                aria-label={t("Search ΗΛΕΙΑ PULSE")}
+                aria-label="Search ΗΛΕΙΑ PULSE"
                 autoComplete="off"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={
-                  language === "GR"
-                    ? "παραλία, πανηγύρι, ηλιοβασίλεμα…"
-                    : "beach, panigyri, sunset…"
+                  lang === "GR" ? "παραλία, πανηγύρι, sunset…" : "beach, panigyri, sunset…"
                 }
                 className="w-full bg-transparent text-sm outline-none placeholder:text-hp-muted"
               />
@@ -466,7 +462,6 @@ function MapBottomSheet({
   onSharePlace: (place: Place) => void;
   savedPlaceIds: string[];
 }) {
-  const { t } = useI18n();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
   const isSelectedCollapsed = Boolean(cluster) && height <= peek + 8;
   const isExpanded = Boolean(cluster) && height >= full - 24;
@@ -594,7 +589,7 @@ function MapBottomSheet({
                 key={s.label}
                 type="button"
                 onClick={() => onSetSnap(s.h)}
-                aria-label={t("Set sheet to {position}", { position: t(s.label) })}
+                aria-label={`Set sheet to ${s.label}`}
                 className={`h-1 w-6 rounded-full transition ${Math.abs(height - s.h) < 4 ? "bg-hp-ink" : "bg-hp-ink/15"}`}
               />
             ))}
@@ -633,14 +628,13 @@ function MapBottomSheet({
 }
 
 function TonightPulseContent() {
-  const { t } = useI18n();
   return (
     <div>
       <div>
         <div className="mb-2">
-          <h3 className="text-[16px] font-black text-hp-ink">{t("Tonight's pulse")}</h3>
+          <h3 className="text-[16px] font-black text-hp-ink">Tonight's pulse</h3>
         </div>
-        <p className="text-[12px] text-hp-muted">{t("Tap a bubble to see what's happening.")}</p>
+        <p className="text-[12px] text-hp-muted">Tap a bubble to see what's happening.</p>
       </div>
     </div>
   );
@@ -669,7 +663,6 @@ function AreaSheetContent({
   onSharePlace: (place: Place) => void;
   onOpenDetails: (p: Place) => void;
 }) {
-  const { language, t } = useI18n();
   const placeIds = new Set(cluster.places.map((place) => place.id));
   const isPlaceSheet = Boolean(selectedPlace && placeIds.has(selectedPlace.id));
   const areaStoryGroups = storyGroups.filter((group) => placeIds.has(group.placeId));
@@ -701,18 +694,16 @@ function AreaSheetContent({
             </div>
             <h3 className="mt-1 text-[16px] font-black text-hp-ink">{cluster.name}</h3>
             <p className="text-[11px] text-hp-muted">
-              {language === "GR"
-                ? `${cluster.places.length} σημεία σε αυτή την περιοχή`
-                : `${cluster.places.length} clustered places in this area`}
+              {cluster.places.length} clustered places in this area
             </p>
             <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
               <span className="inline-flex items-center gap-0.5">
                 <Radio size={11} />
-                {cluster.postCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
+                {cluster.postCount} posts
               </span>
               <span className="inline-flex items-center gap-0.5">
                 <Clock size={11} />
-                {cluster.eventCount} {language === "GR" ? "εκδηλώσεις" : "events"}
+                {cluster.eventCount} events
               </span>
             </div>
           </div>
@@ -720,7 +711,7 @@ function AreaSheetContent({
 
         <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-            {language === "GR" ? "Σημεία της περιοχής" : "Clustered elements"}
+            Clustered elements
           </div>
           <div className="flex flex-wrap gap-1.5">
             {cluster.places.map((place) => (
@@ -738,7 +729,7 @@ function AreaSheetContent({
           <div className="mt-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                {language === "GR" ? `Stories από ${cluster.name}` : `Stories from ${cluster.name}`}
+                Stories from {cluster.name}
               </span>
               <span className="text-[10px] font-semibold text-hp-muted">
                 {areaStoryGroups.length}
@@ -752,11 +743,7 @@ function AreaSheetContent({
                     key={group.placeId}
                     type="button"
                     onClick={() => onOpenStory(group.placeId)}
-                    aria-label={
-                      language === "GR"
-                        ? `Άνοιγμα stories για ${group.placeName}`
-                        : `Open stories for ${group.placeName}`
-                    }
+                    aria-label={`Open stories for ${group.placeName}`}
                     className="flex w-14 shrink-0 flex-col items-center gap-1"
                   >
                     <div className="rounded-full p-[2px]" style={{ background: tone.gradient }}>
@@ -817,11 +804,11 @@ function AreaSheetContent({
           <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
             <span className="inline-flex items-center gap-0.5">
               <Radio size={11} />
-              {focusPlace.recentPostCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
+              {focusPlace.recentPostCount} posts
             </span>
             <span className="inline-flex items-center gap-0.5">
               <Clock size={11} />
-              {placeEvents.length} {language === "GR" ? "εκδηλώσεις" : "events"}
+              {placeEvents.length} events
             </span>
           </div>
         </div>
@@ -852,20 +839,20 @@ function AreaSheetContent({
           onClick={() => onSavePlace(focusPlace.id)}
           className={`flex-1 whitespace-nowrap rounded-full border py-2 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
         >
-          <Bookmark size={13} className="mr-1 inline" /> {t(saved ? "Saved" : "Save")}
+          <Bookmark size={13} className="mr-1 inline" /> {saved ? "Saved" : "Save"}
         </button>
         <button
           type="button"
           onClick={() => onOpenDetails(focusPlace)}
           className="flex-1 whitespace-nowrap rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper"
         >
-          {language === "GR" ? "Λεπτομέρειες" : "Details"}
+          Details
         </button>
         <a
           href={openStreetMapUrl(focusPlace)}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={t("Open {place} in OpenStreetMap", { place: focusPlace.name })}
+          aria-label={`Open ${focusPlace.name} in OpenStreetMap`}
           className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
         >
           <ExternalLink size={13} />
@@ -873,7 +860,7 @@ function AreaSheetContent({
         <button
           type="button"
           onClick={() => onSharePlace(focusPlace)}
-          aria-label={t("Share {place}", { place: focusPlace.name })}
+          aria-label={`Share ${focusPlace.name}`}
           className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
         >
           <Share2 size={13} />
@@ -923,7 +910,6 @@ function PulseFeed({
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
 }) {
-  const { t } = useI18n();
   const [filter, setFilter] = useState("Now");
   const filters = ["Now", "Tonight", "Weekend", "Local tips"];
   const visiblePosts = posts.filter((post) => {
@@ -973,7 +959,7 @@ function PulseFeed({
             aria-pressed={filter === f}
             className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold ${filter === f ? "bg-hp-ink text-hp-paper" : "border border-hp-ink/10 text-hp-ink/70"}`}
           >
-            {t(f)}
+            {f}
           </button>
         ))}
       </div>
@@ -988,11 +974,6 @@ function PulseFeed({
       )}
 
       <div className="flex flex-col gap-3">
-        {visiblePosts.length === 0 && (
-          <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-white/45 px-5 py-10 text-center text-[13px] text-hp-muted">
-            {t("No posts match this filter yet.")}
-          </div>
-        )}
         {visiblePosts.map((post) => {
           const p = findPlace(post.placeId);
           const a = findPostAuthor(post);
@@ -1036,7 +1017,7 @@ function PulseFeed({
                   type="button"
                   onClick={() => toggleSavePost(post.id)}
                   className={`p-1 ${sv ? "text-hp-sunset" : "text-hp-ink/40"}`}
-                  aria-label={t(sv ? "Unsave post" : "Save post")}
+                  aria-label={sv ? "Unsave post" : "Save post"}
                 >
                   <Bookmark size={16} fill={sv ? "currentColor" : "none"} />
                 </button>
@@ -1077,7 +1058,7 @@ function PulseFeed({
                     type="button"
                     onClick={() => toggleLike(post.id)}
                     className={`inline-flex items-center gap-1 ${liked ? "text-hp-sunset" : ""}`}
-                    aria-label={t(liked ? "Unlike post" : "Like post")}
+                    aria-label={liked ? "Unlike post" : "Like post"}
                   >
                     <Heart size={15} fill={liked ? "currentColor" : "none"} /> {lc}
                   </button>
@@ -1085,14 +1066,14 @@ function PulseFeed({
                     type="button"
                     onClick={() => onOpenPost(post)}
                     className="inline-flex items-center gap-1"
-                    aria-label={t("Open comments")}
+                    aria-label="Open comments"
                   >
                     <MessageCircle size={15} /> {commentCount}
                   </button>
                   <button
                     type="button"
                     onClick={() => onShare(post)}
-                    aria-label={t("Share post")}
+                    aria-label="Share post"
                     className="inline-flex items-center"
                   >
                     <Share2 size={15} className="text-hp-ink/50" />
@@ -1102,7 +1083,7 @@ function PulseFeed({
                     onClick={() => onOpenMap(p.id)}
                     className="ml-auto inline-flex items-center gap-1 rounded-full border border-hp-ink/10 px-2.5 py-1 text-[11px] font-semibold"
                   >
-                    <MapIcon size={12} /> {t("open on map")}
+                    <MapIcon size={12} /> open on map
                   </button>
                 </div>
               </div>
@@ -1297,7 +1278,6 @@ function RoutesScreen({
   routeComments: Record<string, Comment[]>;
   findAuthor: (id: string) => Author;
 }) {
-  const { language, t } = useI18n();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<RouteFilter>("All");
   const visibleRoutes = useMemo(
@@ -1317,9 +1297,9 @@ function RoutesScreen({
 
   return (
     <div className="px-4 pb-28 pt-3">
-      <h2 className="mb-1 text-2xl font-black text-hp-ink">{t("Routes")}</h2>
+      <h2 className="mb-1 text-2xl font-black text-hp-ink">Routes</h2>
       <p className="mb-4 text-[12px] text-hp-muted">
-        {t("Curated local routes with practical stops.")}
+        Real day moves, written by locals. Steal them.
       </p>
       <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
         <div className="flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
@@ -1328,9 +1308,9 @@ function RoutesScreen({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             name="route-search"
-            aria-label={t("Search routes")}
+            aria-label="Search routes"
             autoComplete="off"
-            placeholder={t("Search routes, budget, area...")}
+            placeholder="Search routes, budget, area..."
             className="w-full bg-transparent text-[13px] outline-none placeholder:text-hp-muted"
           />
         </div>
@@ -1349,7 +1329,7 @@ function RoutesScreen({
                     : "border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
                 }`}
               >
-                {t(option)}
+                {option}
               </button>
             );
           })}
@@ -1357,12 +1337,8 @@ function RoutesScreen({
       </div>
       <div className="flex flex-col gap-6">
         <RouteSection
-          title={language === "GR" ? "Οι προτάσεις μας" : "What we recommend"}
-          eyebrow={
-            language === "GR"
-              ? `${recommendedRoutes.length} επιλεγμένες`
-              : `${recommendedRoutes.length} curated`
-          }
+          title="What we recommend"
+          eyebrow={`${recommendedRoutes.length} curated`}
           routes={recommendedRoutes}
           savedRoutes={savedRoutes}
           routeComments={routeComments}
@@ -1370,12 +1346,8 @@ function RoutesScreen({
           onOpenRoute={onOpenRoute}
         />
         <RouteSection
-          title={language === "GR" ? "Προτείνουν οι ντόπιοι" : "Locals recommend"}
-          eyebrow={
-            language === "GR"
-              ? `${localRoutes.length} από την κοινότητα`
-              : `${localRoutes.length} community`
-          }
+          title="Locals recommend"
+          eyebrow={`${localRoutes.length} community`}
           routes={localRoutes}
           savedRoutes={savedRoutes}
           routeComments={routeComments}
@@ -1384,10 +1356,8 @@ function RoutesScreen({
         />
         {visibleRoutes.length === 0 && (
           <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
-            <h3 className="text-[15px] font-bold text-hp-ink">{t("No routes match")}</h3>
-            <p className="mt-1 text-[12px] text-hp-muted">
-              {t("Try another filter or search term.")}
-            </p>
+            <h3 className="text-[15px] font-bold text-hp-ink">No routes match</h3>
+            <p className="mt-1 text-[12px] text-hp-muted">Try another filter or search term.</p>
           </div>
         )}
       </div>
@@ -1410,7 +1380,6 @@ function ActiveRouteGuide({
   onNext: () => void;
   onClose: () => void;
 }) {
-  const { language, t } = useI18n();
   const stop = route.stops[stopIndex] ?? route.stops[0];
   const place = stop ? findPlace(stop.placeId) : null;
   const total = route.stops.length;
@@ -1428,8 +1397,7 @@ function ActiveRouteGuide({
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-[10px] font-bold uppercase text-hp-muted">
-            {language === "GR" ? "Ενεργή διαδρομή · στάση" : "Active route · stop"} {stopIndex + 1}/
-            {total}
+            Active route · stop {stopIndex + 1}/{total}
           </div>
           <h3 className="truncate text-[14px] font-black leading-tight text-hp-ink">
             {place?.name ?? stop?.title ?? route.title}
@@ -1442,7 +1410,7 @@ function ActiveRouteGuide({
           type="button"
           onClick={onClose}
           className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-          aria-label={t("Close")}
+          aria-label="Close active route"
         >
           <X size={14} />
         </button>
@@ -1454,7 +1422,7 @@ function ActiveRouteGuide({
             onClick={() => onOpenStop(stop.placeId, stopIndex)}
             className="flex-1 rounded-full border border-hp-ink/15 px-3 py-2 text-[11.5px] font-bold text-hp-ink"
           >
-            {language === "GR" ? "Κέντρο στη στάση" : "Center stop"}
+            Center stop
           </button>
         )}
         <button
@@ -1462,13 +1430,7 @@ function ActiveRouteGuide({
           onClick={onNext}
           className="flex-1 rounded-full bg-hp-ink px-3 py-2 text-[11.5px] font-bold text-hp-paper"
         >
-          {language === "GR"
-            ? stopIndex >= total - 1
-              ? "Από την αρχή"
-              : "Επόμενη στάση"
-            : stopIndex >= total - 1
-              ? "Restart"
-              : "Next stop"}
+          {stopIndex >= total - 1 ? "Restart" : "Next stop"}
         </button>
       </div>
     </motion.div>
@@ -1509,23 +1471,22 @@ function SavedScreen({
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
 }) {
-  const { language, t } = useI18n();
   const savedPlaces = places.filter((p) => savedPlaceIds.includes(p.id));
   const savedPostsList = posts.filter((p) => savedPostIds.includes(p.id));
   const savedRoutesList = routes.filter((r) => savedRouteIds.includes(r.id));
   const total = savedPlaces.length + savedPostsList.length + savedRoutesList.length;
   return (
     <div className="px-4 pb-28 pt-3">
-      <h2 className="mb-1 text-2xl font-black text-hp-ink">{t("Saved")}</h2>
-      <p className="mb-4 text-[12px] text-hp-muted">{t("Your private little list.")}</p>
+      <h2 className="mb-1 text-2xl font-black text-hp-ink">Saved</h2>
+      <p className="mb-4 text-[12px] text-hp-muted">Your private little list.</p>
       {total === 0 ? (
         <div className="mt-12 rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-hp-sunset/10 text-hp-sunset">
             <Bookmark size={20} />
           </div>
-          <h3 className="text-[15px] font-bold text-hp-ink">{t("Nothing saved yet")}</h3>
+          <h3 className="text-[15px] font-bold text-hp-ink">Nothing saved yet</h3>
           <p className="mt-1 text-[12px] text-hp-muted">
-            {t("Save places, posts, and routes to find them here.")}
+            Save beaches, events, and weird local tips here.
           </p>
         </div>
       ) : (
@@ -1542,7 +1503,7 @@ function SavedScreen({
                       type="button"
                       onClick={() => onOpenPlace(p)}
                       className="block w-full text-left"
-                      aria-label={t("Open saved place {place}", { place: p.name })}
+                      aria-label={`Open saved place ${p.name}`}
                     >
                       <ImageBox
                         src={p.imageUrl}
@@ -1568,7 +1529,7 @@ function SavedScreen({
                       onClick={() => onUnsavePlace(p.id)}
                       className="mx-2 mb-2 rounded-full border border-hp-ink/10 px-2 py-1 text-[10px] font-bold text-hp-ink/70"
                     >
-                      {t("Unsave")}
+                      Unsave
                     </button>
                   </div>
                 ))}
@@ -1592,7 +1553,7 @@ function SavedScreen({
                         type="button"
                         onClick={() => onOpenPost(post)}
                         className="flex min-w-0 flex-1 gap-3 text-left"
-                        aria-label={t("Open saved post at {place}", { place: place.name })}
+                        aria-label={`Open saved post at ${place.name}`}
                       >
                         <ImageBox
                           src={post.imageUrl}
@@ -1614,7 +1575,7 @@ function SavedScreen({
                         onClick={() => onUnsavePost(post.id)}
                         className="self-start rounded-full border border-hp-ink/10 px-2 py-1 text-[10px] font-bold text-hp-ink/70"
                       >
-                        {t("Unsave")}
+                        Unsave
                       </button>
                     </div>
                   );
@@ -1635,7 +1596,7 @@ function SavedScreen({
                       type="button"
                       onClick={() => onOpenRoute(route)}
                       className="flex min-w-0 flex-1 gap-3 text-left"
-                      aria-label={t("Open saved route {route}", { route: route.title })}
+                      aria-label={`Open saved route ${route.title}`}
                     >
                       <ImageBox
                         src={route.imageUrl}
@@ -1658,7 +1619,7 @@ function SavedScreen({
                       onClick={() => onUnsaveRoute(route.id)}
                       className="self-start rounded-full border border-hp-ink/10 px-2 py-1 text-[10px] font-bold text-hp-ink/70"
                     >
-                      {t("Unsave")}
+                      Unsave
                     </button>
                   </div>
                 ))}
@@ -1672,12 +1633,9 @@ function SavedScreen({
 }
 
 function SavedSection({ title, children }: { title: string; children: ReactNode }) {
-  const { t } = useI18n();
   return (
     <section>
-      <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-        {t(title)}
-      </h3>
+      <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">{title}</h3>
       {children}
     </section>
   );
@@ -1716,7 +1674,6 @@ function PlaceDetailModal({
   onOpenStory: (placeId: string) => void;
 }) {
   const [commentText, setCommentText] = useState("");
-  const { language, t } = useI18n();
   const eventCount = place ? events.filter((event) => event.placeId === place.id).length : 0;
   const noteCount = place ? place.commentCount + comments.length : 0;
   const placeStories = place
@@ -1736,7 +1693,7 @@ function PlaceDetailModal({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label={t("Close")}
+            aria-label="Close place details"
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -1760,7 +1717,7 @@ function PlaceDetailModal({
                 type="button"
                 onClick={onClose}
                 className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                aria-label={t("Close")}
+                aria-label="Close place details"
               >
                 <X size={16} />
               </button>
@@ -1797,7 +1754,7 @@ function PlaceDetailModal({
                       key={story.id}
                       type="button"
                       onClick={() => onOpenStory(place.id)}
-                      aria-label={t("Open stories from {place}", { place: place.name })}
+                      aria-label={`Open ${place.name} stories`}
                       className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-xl border border-hp-ink/10"
                     >
                       <ImageBox
@@ -1883,7 +1840,7 @@ function PlaceDetailModal({
                   htmlFor={`place-detail-comment-${place.id}`}
                   className="text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                 >
-                  {language === "GR" ? "Γρήγορο σχόλιο" : "Quick comment"}
+                  Quick comment
                 </label>
                 <div className="mt-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
                   <input
@@ -1892,7 +1849,7 @@ function PlaceDetailModal({
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     autoComplete="off"
-                    placeholder={t("Add a local note…")}
+                    placeholder="Add a local note…"
                     className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && commentText.trim()) {
@@ -1950,7 +1907,7 @@ function PlaceDetailModal({
                 href={openStreetMapUrl(place)}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
+                aria-label={`Open ${place.name} in OpenStreetMap`}
                 className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
               >
                 <ExternalLink size={14} />
@@ -1959,7 +1916,7 @@ function PlaceDetailModal({
                 type="button"
                 onClick={() => onShare(place)}
                 className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                aria-label={t("Share {place}", { place: place.name })}
+                aria-label={`Share ${place.name}`}
               >
                 <Share2 size={14} />
               </button>
@@ -2012,7 +1969,6 @@ function PostDetailModal({
   findPostAuthor: (post: Post) => Author;
 }) {
   const [text, setText] = useState("");
-  const { language, t } = useI18n();
   return (
     <AnimatePresence>
       {post &&
@@ -2031,7 +1987,7 @@ function PostDetailModal({
                 type="button"
                 className="absolute inset-0 bg-black/65"
                 onClick={onClose}
-                aria-label={t("Close")}
+                aria-label="Close post details"
               />
               <motion.div
                 initial={{ y: "100%" }}
@@ -2055,7 +2011,7 @@ function PostDetailModal({
                     type="button"
                     onClick={onClose}
                     className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                    aria-label={t("Close")}
+                    aria-label="Close post details"
                   >
                     <X size={16} />
                   </button>
@@ -2099,7 +2055,7 @@ function PostDetailModal({
                       type="button"
                       onClick={onLike}
                       className={`inline-flex items-center gap-1 ${liked ? "text-hp-sunset" : ""}`}
-                      aria-label={t(liked ? "Unlike post" : "Like post")}
+                      aria-label={liked ? "Unlike post" : "Like post"}
                     >
                       <Heart size={16} fill={liked ? "currentColor" : "none"} /> {likeCount}
                     </button>
@@ -2109,7 +2065,7 @@ function PostDetailModal({
                   </div>
                   <div className="mt-4 border-t border-hp-ink/10 pt-3">
                     <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Comments")}
+                      Comments
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
@@ -2119,11 +2075,7 @@ function PostDetailModal({
                         </div>
                       ))}
                       {comments.length === 0 && (
-                        <div className="text-[12px] text-hp-muted">
-                          {language === "GR"
-                            ? "Γίνε ο πρώτος που σχολιάζει."
-                            : "Be the first to comment."}
-                        </div>
+                        <div className="text-[12px] text-hp-muted">Be the first to comment.</div>
                       )}
                     </div>
                   </div>
@@ -2134,9 +2086,9 @@ function PostDetailModal({
                       value={text}
                       onChange={(e) => setText(e.target.value)}
                       name={`post-comment-${post.id}`}
-                      aria-label={t("Quick comment on post")}
+                      aria-label="Quick comment on post"
                       autoComplete="off"
-                      placeholder={t("Quick comment…")}
+                      placeholder="Quick comment…"
                       className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && text.trim()) {
@@ -2155,7 +2107,7 @@ function PostDetailModal({
                       }}
                       className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
                       disabled={!text.trim()}
-                      aria-label={t("Post comment")}
+                      aria-label="Post comment"
                     >
                       <Send size={12} />
                     </button>
@@ -2175,7 +2127,7 @@ function PostDetailModal({
                       href={openStreetMapUrl(p)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={t("Open {place} in OpenStreetMap", { place: p.name })}
+                      aria-label={`Open ${p.name} in OpenStreetMap`}
                       className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
                     >
                       <ExternalLink size={14} />
@@ -2184,7 +2136,7 @@ function PostDetailModal({
                       type="button"
                       onClick={onSave}
                       className={`grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 ${saved ? "text-hp-sunset" : "text-hp-ink"}`}
-                      aria-label={t(saved ? "Unsave post" : "Save post")}
+                      aria-label={saved ? "Unsave post" : "Save post"}
                     >
                       <Bookmark size={14} fill={saved ? "currentColor" : "none"} />
                     </button>
@@ -2192,7 +2144,7 @@ function PostDetailModal({
                       type="button"
                       onClick={() => onShare(post)}
                       className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                      aria-label={t("Share post")}
+                      aria-label="Share post"
                     >
                       <Share2 size={14} />
                     </button>
@@ -2233,7 +2185,6 @@ function RouteArticleModal({
   findAuthor: (id: string) => Author;
 }) {
   const [text, setText] = useState("");
-  const { language, t } = useI18n();
   return (
     <AnimatePresence>
       {route &&
@@ -2250,7 +2201,7 @@ function RouteArticleModal({
                 type="button"
                 className="absolute inset-0 bg-black/65"
                 onClick={onClose}
-                aria-label={t("Close")}
+                aria-label="Close route article"
               />
               <motion.div
                 initial={{ y: "100%" }}
@@ -2274,7 +2225,7 @@ function RouteArticleModal({
                     type="button"
                     onClick={onClose}
                     className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                    aria-label={t("Close")}
+                    aria-label="Close route article"
                   >
                     <X size={16} />
                   </button>
@@ -2359,7 +2310,7 @@ function RouteArticleModal({
                                 href={openStreetMapUrl(p)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                aria-label={t("Open {place} in OpenStreetMap", { place: p.name })}
+                                aria-label={`Open ${p.name} in OpenStreetMap`}
                                 className="inline-grid h-7 w-7 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
                               >
                                 <ExternalLink size={11} />
@@ -2385,7 +2336,7 @@ function RouteArticleModal({
                   </div>
                   <div className="mt-4 border-t border-hp-ink/10 pt-3">
                     <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Comments")}
+                      Comments
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
@@ -2395,11 +2346,7 @@ function RouteArticleModal({
                         </div>
                       ))}
                       {comments.length === 0 && (
-                        <div className="text-[12px] text-hp-muted">
-                          {language === "GR"
-                            ? "Δεν υπάρχουν σχόλια ακόμη."
-                            : "No route comments yet."}
-                        </div>
+                        <div className="text-[12px] text-hp-muted">No route comments yet.</div>
                       )}
                     </div>
                     <div className="mt-3 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
@@ -2407,13 +2354,9 @@ function RouteArticleModal({
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                         name={`route-comment-${route.id}`}
-                        aria-label={t("Quick comment on route")}
+                        aria-label="Quick comment on route"
                         autoComplete="off"
-                        placeholder={
-                          language === "GR"
-                            ? "Πρόσθεσε σημείωση για τη διαδρομή…"
-                            : "Add a route note…"
-                        }
+                        placeholder="Add a route note…"
                         className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && text.trim()) {
@@ -2432,7 +2375,7 @@ function RouteArticleModal({
                         }}
                         className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
                         disabled={!text.trim()}
-                        aria-label={t("Post route comment")}
+                        aria-label="Post route comment"
                       >
                         <Send size={12} />
                       </button>
@@ -2463,7 +2406,7 @@ function RouteArticleModal({
                     type="button"
                     onClick={onShare}
                     className="grid h-11 w-11 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                    aria-label={t("Share route")}
+                    aria-label="Share route"
                   >
                     <Share2 size={15} />
                   </button>
@@ -2516,7 +2459,6 @@ function SearchablePlacePicker({
   query: string;
   setQuery: (query: string) => void;
 }) {
-  const { language } = useI18n();
   const selected = places.find((place) => place.id === value) ?? places[0];
   const results = useMemo(() => {
     const matches = query.trim()
@@ -2535,20 +2477,14 @@ function SearchablePlacePicker({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           name="create-post-place-search"
-          aria-label={language === "GR" ? "Αναζήτηση τοποθεσίας" : "Search post location"}
+          aria-label="Search post location"
           autoComplete="off"
-          placeholder={
-            language === "GR"
-              ? "Αναζήτησε τοποθεσία, περιοχή ή tag…"
-              : "Search location, area, tag..."
-          }
+          placeholder="Search location, area, tag..."
           className="w-full bg-transparent text-[13px] outline-none placeholder:text-hp-muted"
         />
       </div>
       <div className="mb-2 rounded-xl bg-hp-ink/5 px-3 py-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-          {language === "GR" ? "Επιλεγμένο" : "Selected"}
-        </div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">Selected</div>
         <div className="truncate text-[13px] font-bold text-hp-ink">
           {selected.name} <span className="font-semibold text-hp-muted">· {selected.area}</span>
         </div>
@@ -2556,7 +2492,7 @@ function SearchablePlacePicker({
       <div
         className="grid max-h-56 gap-1 overflow-y-auto pr-1"
         role="listbox"
-        aria-label={language === "GR" ? "Τοποθεσίες" : "Locations"}
+        aria-label="Locations"
       >
         {results.map((placeOption) => {
           const selectedOption = placeOption.id === selected.id;
@@ -2600,7 +2536,7 @@ function SearchablePlacePicker({
         })}
         {results.length === 0 && (
           <div className="rounded-xl border border-dashed border-hp-ink/15 px-3 py-4 text-center text-[12px] text-hp-muted">
-            {language === "GR" ? "Δεν βρέθηκε τοποθεσία." : "No location matches that search."}
+            No location matches that search.
           </div>
         )}
       </div>
@@ -2641,7 +2577,6 @@ function CreateComposerModal({
   onStory: (payload: CreateStoryInput) => Promise<void>;
   onEvent: (payload: CreateMeetInput) => Promise<void>;
 }) {
-  const { language, t } = useI18n();
   const [mode, setMode] = useState<ComposerMode>("post");
   const [text, setText] = useState("");
   const [place, setPlace] = useState(places[0]?.id ?? "");
@@ -2715,12 +2650,8 @@ function CreateComposerModal({
     onRequireAccount();
     setError(
       account.status === "needsProfile"
-        ? language === "GR"
-          ? "Ολοκλήρωσε το προφίλ σου πριν δημοσιεύσεις."
-          : "Complete your profile before posting."
-        : language === "GR"
-          ? "Συνδέσου πριν δημοσιεύσεις."
-          : "Sign in before posting.",
+        ? "Complete your profile before posting."
+        : "Sign in before posting.",
     );
     return false;
   };
@@ -2738,11 +2669,7 @@ function CreateComposerModal({
       setPlaceQuery("");
     } catch (submitError) {
       console.warn("Could not create post.", submitError);
-      setError(
-        language === "GR"
-          ? "Δεν ήταν δυνατή η αποθήκευση. Δοκίμασε ξανά."
-          : "Could not save post. Try again.",
-      );
+      setError("Could not save post. Try again.");
     } finally {
       setSaving(false);
     }
@@ -2754,19 +2681,11 @@ function CreateComposerModal({
     const lat = Number(placeLat);
     const lng = Number(placeLng);
     if (!placeName.trim() || !placeArea.trim() || !placeShort.trim() || !placeImageUrl.trim()) {
-      setError(
-        language === "GR"
-          ? "Συμπλήρωσε όνομα, περιοχή, περιγραφή και URL φωτογραφίας."
-          : "Fill the place name, area, description, and photo URL.",
-      );
+      setError("Fill the place name, area, description, and photo URL.");
       return;
     }
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      setError(
-        language === "GR"
-          ? "Χρησιμοποίησε έγκυρο γεωγραφικό πλάτος και μήκος."
-          : "Use valid latitude and longitude.",
-      );
+      setError("Use valid latitude and longitude.");
       return;
     }
 
@@ -2799,11 +2718,7 @@ function CreateComposerModal({
       setPlaceBestTime("today");
     } catch (submitError) {
       console.warn("Could not create place.", submitError);
-      setError(
-        language === "GR"
-          ? "Δεν ήταν δυνατή η αποθήκευση του σημείου."
-          : "Could not save place. Try again.",
-      );
+      setError("Could not save place. Try again.");
     } finally {
       setSaving(false);
     }
@@ -2841,11 +2756,7 @@ function CreateComposerModal({
         hint: pgError?.hint,
         raw: submitError,
       });
-      setError(
-        language === "GR"
-          ? "Δεν ήταν δυνατή η αποθήκευση του story."
-          : "Could not save story. Try again.",
-      );
+      setError("Could not save story. Try again.");
     } finally {
       setSaving(false);
     }
@@ -2857,25 +2768,15 @@ function CreateComposerModal({
     const happensAt = new Date(eventWhen);
     const capacity = eventCapacity.trim() ? Number(eventCapacity) : undefined;
     if (!eventTitle.trim() || !eventDescription.trim() || !place) {
-      setError(
-        language === "GR"
-          ? "Πρόσθεσε τίτλο, σημείο και σύντομη περιγραφή."
-          : "Add a title, place, and short description.",
-      );
+      setError("Add a title, place, and short description.");
       return;
     }
     if (!Number.isFinite(happensAt.getTime())) {
-      setError(
-        language === "GR" ? "Επίλεξε έγκυρη ημερομηνία και ώρα." : "Choose a valid date and time.",
-      );
+      setError("Choose a valid date and time.");
       return;
     }
     if (capacity !== undefined && (!Number.isFinite(capacity) || capacity < 2)) {
-      setError(
-        language === "GR"
-          ? "Η χωρητικότητα πρέπει να είναι κενή ή τουλάχιστον 2."
-          : "Capacity must be empty or at least 2.",
-      );
+      setError("Capacity must be empty or at least 2.");
       return;
     }
 
@@ -2923,7 +2824,7 @@ function CreateComposerModal({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label={t("Close")}
+            aria-label="Close post composer"
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -2932,19 +2833,17 @@ function CreateComposerModal({
             transition={{ type: "spring", damping: 28, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label={
-              language === "GR" ? "Δημιουργία περιεχομένου" : "Create local post or place"
-            }
+            aria-label="Create local post or place"
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-black text-hp-ink">{t("Add to ΗΛΕΙΑ PULSE")}</h3>
+              <h3 className="text-lg font-black text-hp-ink">Add to ΗΛΕΙΑ PULSE</h3>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-9 w-9 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-                aria-label={t("Close")}
+                aria-label="Close post composer"
               >
                 <X size={16} />
               </button>
@@ -3042,7 +2941,7 @@ function CreateComposerModal({
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   autoComplete="off"
-                  placeholder={t("What's happening at this place?…")}
+                  placeholder="What's happening at this place?…"
                   className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                   rows={3}
                 />
@@ -3257,7 +3156,7 @@ function CreateComposerModal({
                       data-testid="composer-place-short"
                       value={placeShort}
                       onChange={(e) => setPlaceShort(e.target.value)}
-                      placeholder={t("What should locals know?…")}
+                      placeholder="What should locals know?…"
                       className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                       rows={3}
                     />
@@ -3379,7 +3278,7 @@ function CreateComposerModal({
                   value={storyCaption}
                   onChange={(e) => setStoryCaption(e.target.value)}
                   autoComplete="off"
-                  placeholder={t("What's happening here right now?…")}
+                  placeholder="What's happening here right now?…"
                   className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                   rows={3}
                 />
@@ -3498,7 +3397,7 @@ function CreateComposerModal({
                       [
                         { h: 6, label: "6h" },
                         { h: 24, label: "24h" },
-                        { h: undefined, label: t("Keep tip") },
+                        { h: undefined, label: "Keep tip" },
                       ] as const
                     ).map((opt) => {
                       const active = storyVisibility === opt.h;
@@ -3539,7 +3438,7 @@ function CreateComposerModal({
                   disabled={!storyCaption.trim()}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {t("Post story")}
+                  Post story
                 </button>
               </form>
             ) : (
@@ -3553,7 +3452,7 @@ function CreateComposerModal({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
                   <div className="absolute bottom-3 left-3 right-3 text-hp-paper">
-                    <div className="text-[10px] font-bold uppercase">{t("Hosting at")}</div>
+                    <div className="text-[10px] font-bold uppercase">Hosting at</div>
                     <div className="text-[15px] font-black leading-tight">{selectedPlace.name}</div>
                   </div>
                 </div>
@@ -3564,7 +3463,7 @@ function CreateComposerModal({
                       htmlFor="create-event-title"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {t("Gathering title")}
+                      Gathering title
                     </label>
                     <input
                       id="create-event-title"
@@ -3572,13 +3471,13 @@ function CreateComposerModal({
                       value={eventTitle}
                       onChange={(e) => setEventTitle(e.target.value)}
                       autoComplete="off"
-                      placeholder={t("Sunset swim, coffee tips, live music...")}
+                      placeholder="Sunset swim, coffee tips, live music..."
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
                   <div className="col-span-2">
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Location")}
+                      Location
                     </div>
                     <SearchablePlacePicker
                       places={places}
@@ -3593,7 +3492,7 @@ function CreateComposerModal({
                       htmlFor="create-event-when"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {t("When")}
+                      When
                     </label>
                     <input
                       id="create-event-when"
@@ -3609,7 +3508,7 @@ function CreateComposerModal({
                       htmlFor="create-event-category"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {t("Type")}
+                      Type
                     </label>
                     <select
                       id="create-event-category"
@@ -3620,7 +3519,7 @@ function CreateComposerModal({
                     >
                       {MEET_CATEGORIES.map((category) => (
                         <option key={category} value={category}>
-                          {t(MEET_CATEGORY_META[category].label)}
+                          {MEET_CATEGORY_META[category].label}
                         </option>
                       ))}
                     </select>
@@ -3630,7 +3529,7 @@ function CreateComposerModal({
                       htmlFor="create-event-vibe"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {t("Vibe")}
+                      Vibe
                     </label>
                     <input
                       id="create-event-vibe"
@@ -3645,7 +3544,7 @@ function CreateComposerModal({
                       htmlFor="create-event-price"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {t("Price")}
+                      Price
                     </label>
                     <input
                       id="create-event-price"
@@ -3660,7 +3559,7 @@ function CreateComposerModal({
                       htmlFor="create-event-capacity"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {t("Capacity")}
+                      Capacity
                     </label>
                     <input
                       id="create-event-capacity"
@@ -3670,7 +3569,7 @@ function CreateComposerModal({
                       min={2}
                       value={eventCapacity}
                       onChange={(e) => setEventCapacity(e.target.value)}
-                      placeholder={t("Optional")}
+                      placeholder="Optional"
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
@@ -3679,7 +3578,7 @@ function CreateComposerModal({
                       htmlFor="create-event-tags"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {t("Tags")}
+                      Tags
                     </label>
                     <input
                       id="create-event-tags"
@@ -3692,14 +3591,14 @@ function CreateComposerModal({
                   </div>
                   <div className="col-span-2">
                     <label htmlFor="create-event-description" className="sr-only">
-                      {t("Gathering description")}
+                      Gathering description
                     </label>
                     <textarea
                       id="create-event-description"
                       name="create-event-description"
                       value={eventDescription}
                       onChange={(e) => setEventDescription(e.target.value)}
-                      placeholder={t("What should people know before they join?")}
+                      placeholder="What should people know before they join?"
                       className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                       rows={3}
                     />
@@ -3726,7 +3625,6 @@ function CreateComposerModal({
 
 /* ============== Bottom Nav ============== */
 function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
-  const { t } = useI18n();
   return (
     <div className="relative z-50 shrink-0 border-t border-hp-ink/10 bg-hp-paper px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_28px_rgba(23,20,17,0.08)]">
       <div
@@ -3756,7 +3654,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
                 <Icon size={16} />
               </motion.span>
               <span className={`text-[10px] font-bold ${on ? "text-hp-ink" : "text-hp-ink/50"}`}>
-                {t(label)}
+                {label}
               </span>
             </button>
           );
@@ -3768,7 +3666,6 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
 
 /* ============== Main App ============== */
 export function PulseApp() {
-  const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
@@ -3781,6 +3678,7 @@ export function PulseApp() {
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [lang, setLang] = useState<"GR" | "EN">("GR");
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
@@ -4039,25 +3937,15 @@ export function PulseApp() {
     }
   };
 
-  const toggleAppLanguage = () => {
-    const next = language === "GR" ? "EN" : "GR";
-    setLanguage(next);
-    if (account.status === "ready" || account.status === "needsProfile") {
-      void savePulseLanguage(account.userId, next).catch((error) => {
-        console.warn("Could not save language preference.", error);
-      });
-    }
-  };
-
   const requireProfile = (action = "post") => {
     if (account.status === "ready") return true;
     if (account.status === "needsProfile") {
       setProfileOpen(true);
-      showToast(t("Complete your profile first"));
+      showToast("Complete your profile first");
       return false;
     }
     setAuthOpen(true);
-    showToast(language === "GR" ? "Συνδέσου για να συνεχίσεις" : `Sign in to ${action}`);
+    showToast(`Sign in to ${action}`);
     return false;
   };
 
@@ -4065,11 +3953,11 @@ export function PulseApp() {
     void sharePulseTarget(target)
       .then((result) => {
         if (result === "cancelled") return;
-        showToast(t(result === "shared" ? "Share opened" : "Link copied"));
+        showToast(result === "shared" ? "Share opened" : "Link copied");
       })
       .catch((error) => {
         console.warn("Could not share item.", error);
-        showToast(t("Could not share link"));
+        showToast("Could not share link");
       });
   };
 
@@ -4107,36 +3995,44 @@ export function PulseApp() {
       text: truncateShareText(story.caption),
     });
 
-  const refreshPulseData = useCallback(async () => {
-    try {
-      setDataStatus("loading");
-      const data = await loadPulseData();
-      setPulseData(data);
-      setPlaceComments(data.placeComments);
-      setRouteComments(data.routeComments);
-      setSelectedPlace((current) =>
-        current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
-      );
-      setOpenPlace((current) =>
-        current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
-      );
-      setOpenPost((current) =>
-        current ? (data.posts.find((p) => p.id === current.id) ?? null) : null,
-      );
-      setOpenRoute((current) =>
-        current ? (data.routes.find((r) => r.id === current.id) ?? null) : null,
-      );
-      setDataStatus("ready");
-    } catch (error) {
-      console.warn("Could not load Supabase pulse data.", error);
-      setPulseData(emptyPulseData);
-      setDataStatus("error");
-    }
-  }, []);
-
   useEffect(() => {
-    void refreshPulseData();
-  }, [refreshPulseData]);
+    let ignore = false;
+
+    async function loadData() {
+      try {
+        setDataStatus("loading");
+        const data = await loadPulseData();
+        if (ignore) return;
+        setPulseData(data);
+        setPlaceComments(data.placeComments);
+        setRouteComments(data.routeComments);
+        setSelectedPlace((current) =>
+          current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
+        );
+        setOpenPlace((current) =>
+          current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
+        );
+        setOpenPost((current) =>
+          current ? (data.posts.find((p) => p.id === current.id) ?? null) : null,
+        );
+        setOpenRoute((current) =>
+          current ? (data.routes.find((r) => r.id === current.id) ?? null) : null,
+        );
+        setDataStatus("ready");
+      } catch (error) {
+        console.warn("Could not load Supabase pulse data.", error);
+        if (!ignore) {
+          setPulseData(emptyPulseData);
+          setDataStatus("error");
+        }
+      }
+    }
+
+    void loadData();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -4147,12 +4043,6 @@ export function PulseApp() {
       });
       if (ignore) return;
       setAccount(nextAccount);
-      if (
-        (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
-        nextAccount.preferences?.language
-      ) {
-        setLanguage(nextAccount.preferences.language);
-      }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
           ? nextAccount.profile
@@ -4175,7 +4065,7 @@ export function PulseApp() {
       ignore = true;
       unsubscribe();
     };
-  }, [setLanguage]);
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -4345,11 +4235,11 @@ export function PulseApp() {
     const wasSaved = savedIds.includes(id);
     const nextSaved = !wasSaved;
     setSavedIds((arr) => (wasSaved ? arr.filter((x) => x !== id) : [...arr, id]));
-    showToast(t(wasSaved ? "Removed from saved" : "Saved"));
+    showToast(wasSaved ? "Removed from saved" : "Saved");
     void setSavedItem({ type: "place", id }, nextSaved).catch((error) => {
       console.warn("Could not persist place save.", error);
       setSavedIds((arr) => (wasSaved ? [...arr, id] : arr.filter((x) => x !== id)));
-      showToast(t("Could not save"));
+      showToast("Could not save");
     });
   };
   const toggleLike = (id: string) => {
@@ -4359,9 +4249,7 @@ export function PulseApp() {
     void setPostLike(id, nextLiked).catch((error) => {
       console.warn("Could not persist post like.", error);
       setLikes((m) => ({ ...m, [id]: !nextLiked }));
-      showToast(
-        language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση του like" : "Could not save like",
-      );
+      showToast("Could not save like");
     });
   };
   const addPlaceComment = (id: string, text: string) => {
@@ -4379,7 +4267,7 @@ export function PulseApp() {
       authorKind: "user",
     };
     setPlaceComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast(t("Comment posted"));
+    showToast("Comment posted");
     void addPulseComment({ type: "place", id }, text, {
       profileId: account.profile.id,
       authorName,
@@ -4399,7 +4287,7 @@ export function PulseApp() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast(t("Could not post comment"));
+        showToast("Could not post comment");
       });
   };
   const addPostComment = (id: string, text: string) => {
@@ -4417,7 +4305,7 @@ export function PulseApp() {
       authorKind: "user",
     };
     setPostComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast(t("Comment posted"));
+    showToast("Comment posted");
     void addPulseComment({ type: "post", id }, text, {
       profileId: account.profile.id,
       authorName,
@@ -4437,49 +4325,29 @@ export function PulseApp() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast(t("Could not post comment"));
+        showToast("Could not post comment");
       });
   };
   const toggleSavePost = (id: string) => {
     const wasSaved = !!savedPosts[id];
     const nextSaved = !wasSaved;
     setSavedPosts((m) => ({ ...m, [id]: nextSaved }));
-    showToast(
-      language === "GR"
-        ? wasSaved
-          ? "Η δημοσίευση αφαιρέθηκε"
-          : "Η δημοσίευση αποθηκεύτηκε"
-        : wasSaved
-          ? "Removed post"
-          : "Saved post",
-    );
+    showToast(wasSaved ? "Removed post" : "Saved post");
     void setSavedItem({ type: "post", id }, nextSaved).catch((error) => {
       console.warn("Could not persist post save.", error);
       setSavedPosts((m) => ({ ...m, [id]: wasSaved }));
-      showToast(
-        language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση της δημοσίευσης" : "Could not save post",
-      );
+      showToast("Could not save post");
     });
   };
   const toggleSaveRoute = (id: string) => {
     const wasSaved = !!savedRoutes[id];
     const nextSaved = !wasSaved;
     setSavedRoutes((m) => ({ ...m, [id]: nextSaved }));
-    showToast(
-      language === "GR"
-        ? wasSaved
-          ? "Η διαδρομή αφαιρέθηκε"
-          : "Η διαδρομή αποθηκεύτηκε"
-        : wasSaved
-          ? "Removed route"
-          : "Saved route",
-    );
+    showToast(wasSaved ? "Removed route" : "Saved route");
     void setSavedItem({ type: "route", id }, nextSaved).catch((error) => {
       console.warn("Could not persist route save.", error);
       setSavedRoutes((m) => ({ ...m, [id]: wasSaved }));
-      showToast(
-        language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση της διαδρομής" : "Could not save route",
-      );
+      showToast("Could not save route");
     });
   };
   const addRouteComment = (id: string, text: string) => {
@@ -4497,7 +4365,7 @@ export function PulseApp() {
       authorKind: "user",
     };
     setRouteComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast(t("Comment posted"));
+    showToast("Comment posted");
     void addPulseComment({ type: "route", id }, text, {
       profileId: account.profile.id,
       authorName,
@@ -4517,7 +4385,7 @@ export function PulseApp() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast(t("Could not post comment"));
+        showToast("Could not post comment");
       });
   };
   const addLocalPost = async ({
@@ -4550,7 +4418,7 @@ export function PulseApp() {
     setComposerPin(null);
     setTab("pulse");
     markContribution();
-    showToast(t("Post saved"));
+    showToast("Post saved");
   };
   const addLocalPlace = async (input: CreatePulsePlaceInput) => {
     if (account.status !== "ready") {
@@ -4576,7 +4444,7 @@ export function PulseApp() {
     setComposerPin(null);
     setTab("map");
     markContribution();
-    showToast(t("Place saved"));
+    showToast("Place saved");
   };
   const addLocalStory = async (input: CreateStoryInput) => {
     if (account.status !== "ready") {
@@ -4614,7 +4482,7 @@ export function PulseApp() {
     setComposerPin(null);
     setStoryViewer({ placeId: input.placeId, storyId: story.id });
     markContribution();
-    showToast(t("Story added"));
+    showToast("Story added");
   };
 
   const addMeetEvent = async (input: CreateMeetInput) => {
@@ -4648,7 +4516,7 @@ export function PulseApp() {
     setCreateOpen(false);
     setComposerPin(null);
     setTab("meet");
-    showToast(t("Gathering hosted"));
+    showToast("Gathering hosted");
   };
 
   const toggleMeetRsvp = (event: MeetEvent, next: RsvpStatus) => {
@@ -4666,7 +4534,7 @@ export function PulseApp() {
       return copy;
     });
     if (!clearing) markContribution();
-    showToast(t(clearing ? "RSVP removed" : next === "going" ? "You are in" : "Marked maybe"));
+    showToast(clearing ? "RSVP removed" : next === "going" ? "You are in" : "Marked maybe");
 
     setPulseData((data) => ({
       ...data,
@@ -4699,14 +4567,14 @@ export function PulseApp() {
         ...data,
         meetEvents: data.meetEvents.map((item) => (item.id === event.id ? event : item)),
       }));
-      showToast(t("Could not save RSVP"));
+      showToast("Could not save RSVP");
     });
   };
 
   const markTrendingGoing = (place: Place) => {
     const event = meetEvents.find((item) => item.placeId === place.id);
     if (!event) {
-      showToast(t("No gathering there yet"));
+      showToast("No gathering there yet");
       setTab("meet");
       return;
     }
@@ -4729,7 +4597,7 @@ export function PulseApp() {
     setTab("map");
     const firstPlace = findPlace(route.stops[0]?.placeId ?? "");
     if (firstPlace) selectPlacePreview(firstPlace, false);
-    showToast(t("Route opened on map"));
+    showToast("Route opened on map");
   };
 
   const centerRouteStop = (placeId: string, index: number) => {
@@ -4756,12 +4624,12 @@ export function PulseApp() {
 
   const requestLocationFromOnboarding = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      showToast(t("Location is not available"));
+      showToast("Location is not available");
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      () => showToast(t("Location enabled")),
-      () => showToast(t("Location skipped")),
+      () => showToast("Location enabled"),
+      () => showToast("Location skipped"),
       { enableHighAccuracy: true, maximumAge: 60_000, timeout: 8000 },
     );
   };
@@ -4841,7 +4709,7 @@ export function PulseApp() {
             routePath={activeRoutePath}
             onMapLongPress={(lat, lng) => {
               openComposer("place", { lat, lng });
-              showToast(t("Drop a new spot"));
+              showToast("Drop a new spot");
             }}
           />
           <AnimatePresence>
@@ -4911,7 +4779,7 @@ export function PulseApp() {
               transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.6 }}
               onClick={() => openComposer("post")}
               className="absolute right-4 bottom-3 z-40 grid h-12 w-12 place-items-center rounded-full bg-hp-sunset text-hp-paper shadow-[0_10px_24px_rgba(224,106,50,0.45)]"
-              aria-label={t("Create local post")}
+              aria-label="Create local post"
             >
               <Plus size={20} />
             </motion.button>
@@ -4980,7 +4848,8 @@ export function PulseApp() {
         <TopBar
           query={query}
           setQuery={setQuery}
-          onToggleLanguage={toggleAppLanguage}
+          lang={lang}
+          setLang={setLang}
           showSearch={showSearch}
           setShowSearch={setShowSearch}
           account={account}
@@ -4991,24 +4860,8 @@ export function PulseApp() {
 
         <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
           {dataStatus !== "ready" && (
-            <div
-              role={dataStatus === "error" ? "alert" : "status"}
-              aria-live="polite"
-              className="absolute inset-x-4 top-4 z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur"
-            >
-              <span>
-                {t(dataStatus === "loading" ? "Loading pulse data…" : "Could not load pulse data.")}
-              </span>
-              {dataStatus === "error" && (
-                <button
-                  type="button"
-                  onClick={() => void refreshPulseData()}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-hp-ink px-3 py-2 text-[11px] font-black text-hp-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hp-sunset"
-                >
-                  <RefreshCw size={13} />
-                  {t("Try again")}
-                </button>
-              )}
+            <div className="absolute inset-x-4 top-4 z-[60] rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur">
+              {dataStatus === "loading" ? "Loading pulse data…" : "Could not load pulse data."}
             </div>
           )}
           <AnimatePresence mode="wait" initial={false}>

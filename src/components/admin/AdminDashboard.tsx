@@ -1,4 +1,4 @@
-import { Children, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -44,7 +44,6 @@ import {
   uploadContentMedia,
 } from "@/lib/admin-api";
 import { getCurrentPulseAccount, type PulseAccountState } from "@/lib/hp-auth";
-import { useI18n } from "@/lib/i18n";
 
 type AdminTab = "overview" | "places" | "stories" | "meet" | "routes" | "moderation" | "team";
 type Notice = { tone: "success" | "error"; message: string } | null;
@@ -105,16 +104,14 @@ function placeCoordinates(lat: number, lng: number) {
   };
 }
 
-function formatDate(value: string | null | undefined, language: "GR" | "EN" = "GR") {
+function formatDate(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(language === "GR" ? "el-GR" : "en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat("el-GR", { dateStyle: "medium", timeStyle: "short" }).format(
+    new Date(value),
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const { t } = useI18n();
   const palette =
     status === "published"
       ? "bg-emerald-50 text-emerald-700 ring-emerald-600/15"
@@ -125,17 +122,15 @@ function StatusBadge({ status }: { status: string }) {
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ring-1 ${palette}`}
     >
-      {t(status[0].toUpperCase() + status.slice(1))}
+      {status}
     </span>
   );
 }
 
 function EmptyState({ children }: { children: React.ReactNode }) {
-  const { t } = useI18n();
-
   return (
     <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm text-slate-500">
-      {typeof children === "string" ? t(children) : children}
+      {children}
     </div>
   );
 }
@@ -149,12 +144,11 @@ function SectionHeader({
   detail: string;
   action?: React.ReactNode;
 }) {
-  const { t } = useI18n();
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h2 className="text-xl font-black tracking-tight text-slate-950">{t(title)}</h2>
-        <p className="mt-1 text-sm text-slate-500">{t(detail)}</p>
+        <h2 className="text-xl font-black tracking-tight text-slate-950">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{detail}</p>
       </div>
       {action}
     </div>
@@ -166,7 +160,6 @@ function ActionButton({
   tone = "default",
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "default" | "muted" | "danger" }) {
-  const { t } = useI18n();
   const classes =
     tone === "danger"
       ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
@@ -179,17 +172,12 @@ function ActionButton({
       className={`inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${classes}`}
       {...props}
     >
-      {Children.map(children, (child) => {
-        if (typeof child !== "string") return child;
-        const label = child.trim();
-        return label ? child.replace(label, t(label)) : child;
-      })}
+      {children}
     </button>
   );
 }
 
 export function AdminDashboard() {
-  const { language, toggleLanguage, t } = useI18n();
   const [account, setAccount] = useState<PulseAccountState>({ status: "loading" });
   const [role, setRole] = useState<AdminRole | null>(null);
   const [data, setData] = useState<AdminData>(EMPTY_ADMIN_DATA);
@@ -247,7 +235,7 @@ export function AdminDashboard() {
             <span>
               <span className="block text-sm font-black tracking-tight">ΗΛΕΙΑ PULSE</span>
               <span className="block text-[11px] font-semibold text-slate-400">
-                {t("Admin workspace")}
+                Admin workspace
               </span>
             </span>
           </a>
@@ -272,14 +260,14 @@ export function AdminDashboard() {
                   className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition lg:w-full ${active ? "bg-white text-slate-950" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
                 >
                   <Icon size={17} />
-                  {t(item.label)}
+                  {item.label}
                 </button>
               );
             })}
           </nav>
           <div className="mt-8 hidden rounded-xl border border-white/10 bg-white/5 p-3 lg:block">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-              {language === "GR" ? "Συνδεδεμένος ως" : "Signed in as"}
+              Signed in as
             </div>
             <div className="mt-1 truncate text-sm font-bold">
               {account.profile.displayName || account.email}
@@ -290,17 +278,10 @@ export function AdminDashboard() {
 
         <section className="min-w-0 px-4 py-6 sm:px-7 lg:px-10">
           <header className="mb-7 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold text-slate-500">
-              {language === "GR" ? "Διαχείριση περιεχομένου" : "Content operations"}
-            </div>
-            <div className="flex items-center gap-2">
-              <ActionButton tone="muted" onClick={toggleLanguage} aria-label={t("Toggle language")}>
-                {language === "GR" ? "GR / en" : "gr / EN"}
-              </ActionButton>
-              <ActionButton tone="muted" onClick={() => void load()}>
-                <RefreshCw size={15} /> {language === "GR" ? "Ανανέωση" : "Refresh"}
-              </ActionButton>
-            </div>
+            <div className="text-sm font-semibold text-slate-500">Content operations</div>
+            <ActionButton tone="muted" onClick={() => void load()}>
+              <RefreshCw size={15} /> Refresh
+            </ActionButton>
           </header>
           {notice && (
             <div
@@ -337,31 +318,27 @@ export function AdminDashboard() {
 }
 
 function AdminLoading() {
-  const { t } = useI18n();
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-slate-100 text-sm font-bold text-slate-500">
-      {t("Loading admin workspace…")}
+      Loading admin workspace…
     </main>
   );
 }
 
 function AdminSignIn() {
-  const { language, t } = useI18n();
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-slate-100 p-5">
       <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
         <ShieldCheck className="mx-auto h-10 w-10 text-orange-500" />
-        <h1 className="mt-4 text-2xl font-black text-slate-950">{t("Sign in first")}</h1>
+        <h1 className="mt-4 text-2xl font-black text-slate-950">Sign in first</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          {language === "GR"
-            ? "Ο χώρος διαχείρισης είναι διαθέσιμος μόνο σε εγκεκριμένα μέλη της ομάδας."
-            : "The admin workspace is available only to an approved, signed-in team member."}
+          The admin workspace is available only to an approved, signed-in team member.
         </p>
         <a
           href="/"
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white"
         >
-          <ArrowLeft size={16} /> {language === "GR" ? "Μετάβαση στην εφαρμογή" : "Go to the app"}
+          <ArrowLeft size={16} /> Go to the app
         </a>
       </div>
     </main>
@@ -369,22 +346,20 @@ function AdminSignIn() {
 }
 
 function AdminDenied() {
-  const { language, t } = useI18n();
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-slate-100 p-5">
       <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
         <CircleAlert className="mx-auto h-10 w-10 text-amber-500" />
-        <h1 className="mt-4 text-2xl font-black text-slate-950">{t("No admin access")}</h1>
+        <h1 className="mt-4 text-2xl font-black text-slate-950">No admin access</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          {language === "GR"
-            ? "Ο λογαριασμός σου είναι συνδεδεμένος, αλλά δεν ανήκει ακόμη στην ομάδα διαχείρισης."
-            : "Your account is signed in, but it is not a member of the admin team yet. Ask an Owner to add your profile."}
+          Your account is signed in, but it is not a member of the admin team yet. Ask an Owner to
+          add your profile.
         </p>
         <a
           href="/"
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white"
         >
-          <ArrowLeft size={16} /> {language === "GR" ? "Πίσω στην εφαρμογή" : "Back to the app"}
+          <ArrowLeft size={16} /> Back to the app
         </a>
       </div>
     </main>
@@ -392,7 +367,6 @@ function AdminDenied() {
 }
 
 function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeration: () => void }) {
-  const { language, t } = useI18n();
   const pending = [data.places, data.posts, data.comments, data.stories, data.meetEvents]
     .flat()
     .filter((item) => item.moderation_status === "pending").length;
@@ -416,7 +390,7 @@ function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeratio
         detail="A clear view of your local content operations."
         action={
           <ActionButton onClick={onOpenModeration}>
-            <ShieldCheck size={16} /> {language === "GR" ? "Έλεγχος ουράς" : "Review queue"}
+            <ShieldCheck size={16} /> Review queue
           </ActionButton>
         }
       />
@@ -424,13 +398,13 @@ function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeratio
         {metrics.map((metric) => (
           <div key={metric.label} className={`rounded-2xl p-5 ${metric.tone}`}>
             <div className="text-3xl font-black">{metric.value}</div>
-            <div className="mt-1 text-sm font-bold">{t(metric.label)}</div>
+            <div className="mt-1 text-sm font-bold">{metric.label}</div>
           </div>
         ))}
       </div>
       <div className="mt-7 grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
         <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <h3 className="text-base font-black">{t("Recent admin activity")}</h3>
+          <h3 className="text-base font-black">Recent admin activity</h3>
           <div className="mt-4 divide-y divide-slate-100">
             {data.auditLogs.length ? (
               data.auditLogs.slice(0, 8).map((log) => (
@@ -448,39 +422,29 @@ function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeratio
                     </span>
                   </span>
                   <time className="shrink-0 text-xs text-slate-400">
-                    {formatDate(log.created_at, language)}
+                    {formatDate(log.created_at)}
                   </time>
                 </div>
               ))
             ) : (
-              <EmptyState>
-                {language === "GR"
-                  ? "Οι ενέργειες των διαχειριστών θα εμφανίζονται εδώ."
-                  : "Actions taken by admins will appear here."}
-              </EmptyState>
+              <EmptyState>Actions taken by admins will appear here.</EmptyState>
             )}
           </div>
         </div>
         <div className="rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
-          <h3 className="text-base font-black">{t("Safe publishing workflow")}</h3>
+          <h3 className="text-base font-black">Safe publishing workflow</h3>
           <ol className="mt-4 space-y-3 text-sm text-slate-300">
             <li className="flex gap-3">
-              <span className="font-black text-orange-400">01</span>{" "}
-              {language === "GR"
-                ? "Το περιεχόμενο χρηστών μπαίνει στην ουρά ελέγχου."
-                : "User content enters the pending queue."}
+              <span className="font-black text-orange-400">01</span> User content enters the pending
+              queue.
             </li>
             <li className="flex gap-3">
-              <span className="font-black text-orange-400">02</span>{" "}
-              {language === "GR"
-                ? "Ένας moderator ελέγχει στοιχεία και εικόνες."
-                : "A moderator verifies the details and media."}
+              <span className="font-black text-orange-400">02</span> A moderator verifies the
+              details and media.
             </li>
             <li className="flex gap-3">
-              <span className="font-black text-orange-400">03</span>{" "}
-              {language === "GR"
-                ? "Η δημοσίευση το εμφανίζει στο app, ενώ η απόκρυψη το διατηρεί ανακτήσιμο."
-                : "Publish makes it visible in the public app; Hide keeps it recoverable."}
+              <span className="font-black text-orange-400">03</span> Publish makes it visible in the
+              public app; Hide keeps it recoverable.
             </li>
           </ol>
         </div>
@@ -558,7 +522,6 @@ function PlaceEditor({
   onSaved: () => Promise<void>;
   setNotice: (notice: Notice) => void;
 }) {
-  const { t } = useI18n();
   const [name, setName] = useState(place?.name ?? "");
   const [greekName, setGreekName] = useState(place?.greek_name ?? "");
   const [area, setArea] = useState(place?.area ?? "");
@@ -639,7 +602,7 @@ function PlaceEditor({
       onSubmit={save}
       className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
     >
-      <h3 className="text-base font-black">{t(place ? "Edit place" : "New place")}</h3>
+      <h3 className="text-base font-black">{place ? "Edit place" : "New place"}</h3>
       <div className="mt-4 grid gap-3">
         <Field label="Name">
           <input
@@ -744,9 +707,9 @@ function PlaceEditor({
               value={status}
               onChange={(event) => setStatus(event.target.value)}
             >
-              <option value="published">{t("Published")}</option>
-              <option value="pending">{t("Pending")}</option>
-              <option value="hidden">{t("Hidden")}</option>
+              <option value="published">Published</option>
+              <option value="pending">Pending</option>
+              <option value="hidden">Hidden</option>
             </select>
           </Field>
         </div>
@@ -804,7 +767,6 @@ function PlaceEditor({
 }
 
 function StoriesPanel({ data, onSaved, setNotice }: PanelProps) {
-  const { language } = useI18n();
   const [selected, setSelected] = useState<AdminStory | null>(null);
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -823,7 +785,7 @@ function StoriesPanel({ data, onSaved, setNotice }: PanelProps) {
           selectedId={selected?.id}
           onSelect={setSelected}
           title={(item) => item.label}
-          subtitle={(item) => `${item.kind} · ${formatDate(item.created_at, language)}`}
+          subtitle={(item) => `${item.kind} · ${formatDate(item.created_at)}`}
           image={(item) => item.media_url}
         />
       </div>
@@ -849,7 +811,6 @@ function StoryEditor({
   onSaved: () => Promise<void>;
   setNotice: (notice: Notice) => void;
 }) {
-  const { t } = useI18n();
   const [placeId, setPlaceId] = useState(story?.place_id ?? places[0]?.id ?? "");
   const [label, setLabel] = useState(story?.label ?? "");
   const [caption, setCaption] = useState(story?.caption ?? "");
@@ -912,7 +873,7 @@ function StoryEditor({
       onSubmit={save}
       className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
     >
-      <h3 className="text-base font-black">{t(story ? "Edit story" : "New story")}</h3>
+      <h3 className="text-base font-black">{story ? "Edit story" : "New story"}</h3>
       <div className="mt-4 grid gap-3">
         <Field label="Place">
           <select
@@ -985,9 +946,9 @@ function StoryEditor({
             value={status}
             onChange={(event) => setStatus(event.target.value)}
           >
-            <option value="published">{t("Published")}</option>
-            <option value="pending">{t("Pending")}</option>
-            <option value="hidden">{t("Hidden")}</option>
+            <option value="published">Published</option>
+            <option value="pending">Pending</option>
+            <option value="hidden">Hidden</option>
           </select>
         </Field>
         <Field label="Image">
@@ -1020,7 +981,6 @@ function StoryEditor({
 }
 
 function MeetPanel({ data, onSaved, setNotice }: PanelProps) {
-  const { language } = useI18n();
   const [selected, setSelected] = useState<AdminMeetEvent | null>(null);
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -1039,7 +999,7 @@ function MeetPanel({ data, onSaved, setNotice }: PanelProps) {
           selectedId={selected?.id}
           onSelect={setSelected}
           title={(item) => item.title}
-          subtitle={(item) => formatDate(item.starts_at, language)}
+          subtitle={(item) => formatDate(item.starts_at)}
           image={(item) => item.cover_url}
         />
       </div>
@@ -1065,7 +1025,6 @@ function MeetEditor({
   onSaved: () => Promise<void>;
   setNotice: (notice: Notice) => void;
 }) {
-  const { t } = useI18n();
   const [placeId, setPlaceId] = useState(event?.place_id ?? places[0]?.id ?? "");
   const [title, setTitle] = useState(event?.title ?? "");
   const [startsAt, setStartsAt] = useState(event?.starts_at ? event.starts_at.slice(0, 16) : "");
@@ -1139,7 +1098,7 @@ function MeetEditor({
       onSubmit={save}
       className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
     >
-      <h3 className="text-base font-black">{t(event ? "Edit Meet event" : "New Meet event")}</h3>
+      <h3 className="text-base font-black">{event ? "Edit Meet event" : "New Meet event"}</h3>
       <div className="mt-4 grid gap-3">
         <Field label="Place">
           <select
@@ -1194,9 +1153,9 @@ function MeetEditor({
         </Field>
         <Field label="Visibility">
           <select className={inputClass} value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="published">{t("Published")}</option>
-            <option value="pending">{t("Pending")}</option>
-            <option value="hidden">{t("Hidden")}</option>
+            <option value="published">Published</option>
+            <option value="pending">Pending</option>
+            <option value="hidden">Hidden</option>
           </select>
         </Field>
         <Field label="Cover image">
@@ -1276,7 +1235,6 @@ function RouteEditor({
   onSaved: () => Promise<void>;
   setNotice: (notice: Notice) => void;
 }) {
-  const { t } = useI18n();
   const [title, setTitle] = useState(route?.title ?? "");
   const [lede, setLede] = useState(route?.lede ?? "");
   const [duration, setDuration] = useState(route?.duration ?? "");
@@ -1358,7 +1316,7 @@ function RouteEditor({
       onSubmit={save}
       className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
     >
-      <h3 className="text-base font-black">{t(route ? "Edit route" : "New route")}</h3>
+      <h3 className="text-base font-black">{route ? "Edit route" : "New route"}</h3>
       <div className="mt-4 grid gap-3">
         <Field label="Title">
           <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -1414,7 +1372,7 @@ function RouteEditor({
         </Field>
         <div className="border-t border-slate-100 pt-4">
           <div className="flex items-center justify-between">
-            <span className={labelClass}>{t("Stops")}</span>
+            <span className={labelClass}>Stops</span>
             <ActionButton tone="muted" onClick={addStop}>
               Add stop
             </ActionButton>
@@ -1437,7 +1395,7 @@ function RouteEditor({
                 <div className="mt-2 grid gap-2">
                   <input
                     className={inputClass}
-                    placeholder={t("Time")}
+                    placeholder="Time"
                     value={stop.display_time}
                     onChange={(e) =>
                       setStops((items) =>
@@ -1466,7 +1424,7 @@ function RouteEditor({
                   </select>
                   <input
                     className={inputClass}
-                    placeholder={t("Stop title")}
+                    placeholder="Stop title"
                     value={stop.title}
                     onChange={(e) =>
                       setStops((items) =>
@@ -1478,7 +1436,7 @@ function RouteEditor({
                   />
                   <textarea
                     className={inputClass}
-                    placeholder={t("Description")}
+                    placeholder="Description"
                     value={stop.body}
                     onChange={(e) =>
                       setStops((items) =>
@@ -1502,7 +1460,6 @@ function RouteEditor({
 }
 
 function ModerationPanel({ data, canEdit, onSaved, setNotice }: PanelProps & { canEdit: boolean }) {
-  const { language, t } = useI18n();
   const [filter, setFilter] = useState("pending");
   const [page, setPage] = useState(0);
   const content = useMemo<ModerationItem[]>(
@@ -1558,12 +1515,7 @@ function ModerationPanel({ data, canEdit, onSaved, setNotice }: PanelProps & { c
   const pageItems = content.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
   const act = async (item: ModerationItem, status: "published" | "hidden") => {
     const action = status === "hidden" ? "Hide" : "Publish";
-    const itemType = t(item.type.replace("_", " "));
-    const confirmation =
-      language === "GR"
-        ? `${t(action)} για ${itemType};`
-        : `${action} this ${item.type.replace("_", " ")}?`;
-    if (!window.confirm(confirmation)) return;
+    if (!window.confirm(`${action} this ${item.type.replace("_", " ")}?`)) return;
     try {
       await moderateContent(item.type, item.id, status);
       await onSaved();
@@ -1592,7 +1544,7 @@ function ModerationPanel({ data, canEdit, onSaved, setNotice }: PanelProps & { c
             }}
             className={`rounded-full px-3 py-1.5 text-sm font-bold ${filter === item ? "bg-slate-950 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"}`}
           >
-            {t(item[0].toUpperCase() + item.slice(1))}
+            {item}
           </button>
         ))}
       </div>
@@ -1617,10 +1569,7 @@ function ModerationPanel({ data, canEdit, onSaved, setNotice }: PanelProps & { c
       {content.length > PAGE_SIZE && (
         <div className="mt-4 flex items-center justify-between">
           <span className="text-sm text-slate-500">
-            {t("Page {page} of {pages}", {
-              page: page + 1,
-              pages: Math.ceil(content.length / PAGE_SIZE),
-            })}
+            Page {page + 1} of {Math.ceil(content.length / PAGE_SIZE)}
           </span>
           <div className="flex gap-2">
             <ActionButton
@@ -1657,7 +1606,6 @@ function ModerationRow({
   onEdited: () => Promise<void>;
   setNotice: (notice: Notice) => void;
 }) {
-  const { language, t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.detail);
   const saveText = async () => {
@@ -1679,7 +1627,7 @@ function ModerationRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-xs font-black uppercase tracking-wider text-slate-400">
-            {t(item.type.replace("_", " "))}
+            {item.type.replace("_", " ")}
           </span>
           <StatusBadge status={item.status} />
         </div>
@@ -1696,9 +1644,7 @@ function ModerationRow({
         ) : (
           <p className="mt-1 max-w-3xl text-sm text-slate-600">{item.detail}</p>
         )}
-        <time className="mt-2 block text-xs text-slate-400">
-          {formatDate(item.createdAt, language)}
-        </time>
+        <time className="mt-2 block text-xs text-slate-400">{formatDate(item.createdAt)}</time>
       </div>
       <div className="flex items-start gap-2">
         {canEdit && (item.type === "post" || item.type === "comment") && (
@@ -1708,7 +1654,7 @@ function ModerationRow({
         )}
         {item.status !== "published" && (
           <ActionButton onClick={() => onAction(item, "published")}>
-            <Check size={15} /> {t("Publish")}
+            <Check size={15} /> Publish
           </ActionButton>
         )}
         {item.status !== "hidden" && (
@@ -1722,7 +1668,6 @@ function ModerationRow({
 }
 
 function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
-  const { t } = useI18n();
   const memberIds = new Set(data.members.map((member) => member.user_id));
   const [selectedId, setSelectedId] = useState("");
   const [selectedRole, setSelectedRole] = useState<AdminRole>("editor");
@@ -1764,11 +1709,11 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                         {profile?.display_name || profile?.handle || member.user_id}
                       </div>
                       <div className="truncate text-xs text-slate-500">
-                        @{profile?.handle || t("profile incomplete")}
+                        @{profile?.handle || "profile incomplete"}
                       </div>
                     </div>
                     <select
-                      aria-label={t("Member role")}
+                      aria-label="Member role"
                       className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm font-bold"
                       value={member.role}
                       onChange={(event) =>
@@ -1784,15 +1729,13 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                       }
                     >
                       {["owner", "editor", "moderator"].map((role) => (
-                        <option key={role} value={role}>
-                          {t(role[0].toUpperCase() + role.slice(1))}
-                        </option>
+                        <option key={role}>{role}</option>
                       ))}
                     </select>
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm(t("Remove this admin member?")))
+                        if (window.confirm("Remove this admin member?"))
                           void removeAdminMember(member.user_id)
                             .then(onSaved)
                             .catch((error) =>
@@ -1806,7 +1749,7 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                             );
                       }}
                       className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                      aria-label={t("Remove member")}
+                      aria-label="Remove member"
                     >
                       <X size={16} />
                     </button>
@@ -1814,14 +1757,16 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                 );
               })
             ) : (
-              <EmptyState>{t("No team members yet.")}</EmptyState>
+              <EmptyState>
+                No team members yet. The first Owner is added from the Supabase setup step.
+              </EmptyState>
             )}
           </div>
         </div>
         <div className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <h3 className="font-black">{t("Add an existing user")}</h3>
+          <h3 className="font-black">Add an existing user</h3>
           <p className="mt-1 text-sm text-slate-500">
-            {t("A user must have signed in and completed a profile once before appearing here.")}
+            A user must have signed in and completed a profile once before appearing here.
           </p>
           <div className="mt-4 grid gap-3">
             <Field label="Profile">
@@ -1830,7 +1775,7 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                 value={selectedId}
                 onChange={(event) => setSelectedId(event.target.value)}
               >
-                <option value="">{t("Choose a profile…")}</option>
+                <option value="">Choose a profile…</option>
                 {profiles
                   .filter((profile) => !memberIds.has(profile.id))
                   .map((profile) => (
@@ -1846,13 +1791,13 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                 value={selectedRole}
                 onChange={(event) => setSelectedRole(event.target.value as AdminRole)}
               >
-                <option value="owner">{t("Owner")}</option>
-                <option value="editor">{t("Editor")}</option>
-                <option value="moderator">{t("Moderator")}</option>
+                <option value="owner">Owner</option>
+                <option value="editor">Editor</option>
+                <option value="moderator">Moderator</option>
               </select>
             </Field>
             <ActionButton onClick={() => void add()} disabled={!selectedId}>
-              {t("Add to team")}
+              Add to team
             </ActionButton>
           </div>
         </div>
@@ -1918,21 +1863,19 @@ function SearchInput({
   onChange: (value: string) => void;
   placeholder: string;
 }) {
-  const { t } = useI18n();
   return (
     <input
       value={value}
       onChange={(event) => onChange(event.target.value)}
       className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-orange-500"
-      placeholder={t(placeholder)}
+      placeholder={placeholder}
     />
   );
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  const { t } = useI18n();
   return (
     <label className="block">
-      <span className={labelClass}>{t(label)}</span>
+      <span className={labelClass}>{label}</span>
       {children}
     </label>
   );

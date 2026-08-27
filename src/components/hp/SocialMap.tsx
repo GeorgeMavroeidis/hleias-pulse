@@ -4,7 +4,6 @@ import Supercluster from "supercluster";
 import "leaflet/dist/leaflet.css";
 import { type EventItem, type Place } from "@/lib/hp-model";
 import { useImageUrls } from "@/lib/hp/image-cache";
-import { useI18n } from "@/lib/i18n";
 
 type LeafletModule = typeof import("leaflet");
 type LeafletMap = import("leaflet").Map;
@@ -801,7 +800,6 @@ export function SocialMap({
   routePath = null,
   onMapLongPress,
 }: Props) {
-  const { t } = useI18n();
   const mapNodeRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const leafletRef = useRef<LeafletModule | null>(null);
@@ -1565,12 +1563,12 @@ export function SocialMap({
 
   return (
     <div className="hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper">
-      <div ref={mapNodeRef} className="h-full w-full" aria-label={t("Interactive map of Ilia")} />
+      <div ref={mapNodeRef} className="h-full w-full" aria-label="Interactive map of Ilia" />
 
       {!mapReady && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-hp-paper/70">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-hp-ink/15 border-t-hp-sunset">
-            <span className="sr-only">{t("Loading map")}</span>
+            <span className="sr-only">Loading map</span>
           </div>
         </div>
       )}
@@ -1580,7 +1578,7 @@ export function SocialMap({
           type="button"
           onClick={onBack}
           className="absolute left-3 top-14 z-20 grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur transition active:scale-95"
-          aria-label={t("Back to previous map view")}
+          aria-label="Back to previous map view"
         >
           <ChevronLeft size={18} strokeWidth={2.6} />
         </button>
@@ -1594,7 +1592,7 @@ export function SocialMap({
       {clusters.length > 0 && (
         <div
           className={`hp-no-scrollbar absolute ${canGoBack ? "left-16" : "left-3"} right-16 top-14 z-20 flex gap-2 overflow-x-auto pb-2`}
-          aria-label={t("Top map areas")}
+          aria-label="Top map areas"
         >
           {clusters
             .filter((cluster) => cluster.places.length > 1)
@@ -1630,7 +1628,7 @@ export function SocialMap({
           onClick={() => mapRef.current?.zoomIn()}
           disabled={!mapReady || zoom >= MAX_ZOOM}
           className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Zoom in map")}
+          aria-label="Zoom in map"
         >
           <Plus size={16} />
         </button>
@@ -1639,7 +1637,7 @@ export function SocialMap({
           onClick={zoomOut}
           disabled={!mapReady || zoom <= MIN_ZOOM}
           className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Zoom out map")}
+          aria-label="Zoom out map"
         >
           <Minus size={16} />
         </button>
@@ -1648,7 +1646,7 @@ export function SocialMap({
           onClick={locateUser}
           disabled={!mapReady}
           className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Find my location")}
+          aria-label="Find my location"
         >
           <Crosshair size={16} />
         </button>
@@ -1657,7 +1655,7 @@ export function SocialMap({
           onClick={resetToOverview}
           disabled={!mapReady}
           className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Show Ilia overview")}
+          aria-label="Show Ilia overview"
         >
           <MapPinned size={16} />
         </button>

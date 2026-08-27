@@ -21,7 +21,6 @@ import {
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
 import { EventCard } from "./EventCard";
-import { useI18n } from "@/lib/i18n";
 
 type Filter = "all" | "mine" | MeetCategory;
 
@@ -53,7 +52,6 @@ export function MeetScreen({
   onOpenPlace,
   onCreate,
 }: Props) {
-  const { t } = useI18n();
   const [filter, setFilter] = useState<Filter>("all");
 
   const filtered = useMemo(() => {
@@ -71,11 +69,11 @@ export function MeetScreen({
   const mineCount = events.filter((e) => rsvp[e.id]).length;
 
   const chips: { id: Filter; label: string; Icon?: LucideIcon }[] = [
-    { id: "all", label: t("All") },
-    { id: "mine", label: mineCount > 0 ? `${t("Mine")} · ${mineCount}` : t("Mine") },
+    { id: "all", label: "All" },
+    { id: "mine", label: mineCount > 0 ? `Mine · ${mineCount}` : "Mine" },
     ...MEET_CATEGORIES.map((c) => ({
       id: c as Filter,
-      label: t(MEET_CATEGORY_META[c].label),
+      label: MEET_CATEGORY_META[c].label,
       Icon: CATEGORY_ICONS[c],
     })),
   ];
@@ -88,9 +86,9 @@ export function MeetScreen({
             <CalendarHeart size={18} />
           </span>
           <div>
-            <h2 className="text-2xl font-black leading-none text-hp-ink">{t("Meet")}</h2>
+            <h2 className="text-2xl font-black leading-none text-hp-ink">Meet</h2>
             <p className="mt-0.5 text-[11.5px] text-hp-muted">
-              {t("Gatherings & plans — say you're in.")}
+              Gatherings & plans — say you&apos;re in.
             </p>
           </div>
         </div>
@@ -125,12 +123,12 @@ export function MeetScreen({
               <Sparkles size={20} />
             </div>
             <h3 className="text-[15px] font-bold text-hp-ink">
-              {t(filter === "mine" ? "Nothing planned yet" : "No gatherings here")}
+              {filter === "mine" ? "Nothing planned yet" : "No gatherings here"}
             </h3>
             <p className="mx-auto mt-1 max-w-[16rem] text-[12px] text-hp-muted">
               {filter === "mine"
-                ? t("RSVP to something, or host your own — a swim, a coffee, a panigyri.")
-                : t("Be the first to host something in this vibe.")}
+                ? "RSVP to something, or host your own — a swim, a coffee, a panigyri."
+                : "Be the first to host something in this vibe."}
             </p>
           </div>
         ) : (
@@ -159,10 +157,10 @@ export function MeetScreen({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         onClick={onCreate}
         className="absolute right-4 bottom-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-hp-sunset px-4 py-3 text-hp-paper shadow-[0_12px_28px_rgba(224,106,50,0.45)]"
-        aria-label={t("Host a gathering")}
+        aria-label="Host a gathering"
       >
         <Plus size={18} strokeWidth={2.6} />
-        <span className="text-[13px] font-black">{t("Host")}</span>
+        <span className="text-[13px] font-black">Host</span>
       </motion.button>
     </div>
   );

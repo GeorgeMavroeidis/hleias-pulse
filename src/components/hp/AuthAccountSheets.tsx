@@ -12,7 +12,6 @@ import {
   X,
 } from "lucide-react";
 import type { AdminRole } from "@/lib/admin-api";
-import { useI18n } from "@/lib/i18n";
 import {
   normalizeHandle,
   profileAvatarUrl,
@@ -64,7 +63,7 @@ function fieldClass() {
 function authErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "Authentication failed.";
   return /confirm|confirmation|verify|verification/i.test(message)
-    ? "This account needs email verification before it can sign in."
+    ? "Authentication did not start. Try signing in again."
     : message;
 }
 
@@ -77,7 +76,6 @@ export function AccountBubble({
   onOpenAccount: () => void;
   onOpenAuth: () => void;
 }) {
-  const { t } = useI18n();
   const profile = accountProfile(account);
   const avatarUrl = profileAvatarUrl(profile);
   const needsProfile = account.status === "needsProfile";
@@ -89,7 +87,7 @@ export function AccountBubble({
       type="button"
       onClick={signedIn ? onOpenAccount : onOpenAuth}
       className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
-      aria-label={t(signedIn ? "Account settings" : "Sign in")}
+      aria-label={signedIn ? "Open account settings" : "Sign in"}
     >
       {avatarUrl ? (
         <img src={avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -118,7 +116,6 @@ export function AuthSheet({
   onClose: () => void;
   onAuthenticated: () => Promise<void>;
 }) {
-  const { t } = useI18n();
   const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -152,11 +149,11 @@ export function AuthSheet({
 
       const normalizedHandle = normalizeHandle(handle);
       if (displayName.trim().length < 2) {
-        setError(t("Use a display name with at least 2 characters."));
+        setError("Use a display name with at least 2 characters.");
         return;
       }
       if (normalizedHandle.length < 3) {
-        setError(t("Use a handle with at least 3 letters, numbers, dots, or underscores."));
+        setError("Use a handle with at least 3 letters, numbers, dots, or underscores.");
         return;
       }
 
@@ -168,8 +165,14 @@ export function AuthSheet({
       });
 
       if (result.status === "needsConfirmation") {
-        setMessage(t("Account created. Check your email to confirm it, then sign in."));
-        setMode("signIn");
+        try {
+          await signInWithPassword(email, password);
+          await onAuthenticated();
+          onClose();
+        } catch (signInError) {
+          console.warn("Could not start session after signup.", signInError);
+          setError("Account created, but automatic sign-in failed. Try signing in.");
+        }
         return;
       }
 
@@ -184,7 +187,7 @@ export function AuthSheet({
       onClose();
     } catch (submitError) {
       console.warn("Could not authenticate.", submitError);
-      setError(t(authErrorMessage(submitError)));
+      setError(authErrorMessage(submitError));
     } finally {
       setSaving(false);
     }
@@ -203,7 +206,7 @@ export function AuthSheet({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label={t("Close")}
+            aria-label="Close authentication"
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -212,24 +215,24 @@ export function AuthSheet({
             transition={{ type: "spring", damping: 30, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label={t(mode === "signIn" ? "Sign in" : "Create account")}
+            aria-label={mode === "signIn" ? "Sign in" : "Create account"}
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-black text-hp-ink">
-                  {t(mode === "signIn" ? "Sign in" : "Create profile")}
+                  {mode === "signIn" ? "Sign in" : "Create profile"}
                 </h3>
                 <p className="mt-0.5 text-[11px] text-hp-muted">
-                  {t("Posts and comments will use this identity.")}
+                  Posts and comments will use this identity.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-9 w-9 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-                aria-label={t("Close")}
+                aria-label="Close authentication"
               >
                 <X size={16} />
               </button>
@@ -237,8 +240,8 @@ export function AuthSheet({
 
             <div className="mb-3 grid grid-cols-2 rounded-full border border-hp-ink/10 bg-white/50 p-1">
               {[
-                { id: "signIn" as const, label: t("Sign in") },
-                { id: "signUp" as const, label: t("New") },
+                { id: "signIn" as const, label: "Sign in" },
+                { id: "signUp" as const, label: "New" },
               ].map((option) => (
                 <button
                   key={option.id}
@@ -261,7 +264,7 @@ export function AuthSheet({
             <form onSubmit={submit} className="space-y-3">
               {mode === "signUp" && (
                 <>
-                  <Field label={t("Display name")}>
+                  <Field label="Display name">
                     <input
                       value={displayName}
                       onChange={(event) => setDisplayName(event.target.value)}
@@ -270,7 +273,7 @@ export function AuthSheet({
                       placeholder="Theo from Pyrgos"
                     />
                   </Field>
-                  <Field label={t("Handle")}>
+                  <Field label="Handle">
                     <input
                       value={handle}
                       onChange={(event) => setHandle(normalizeHandle(event.target.value))}
@@ -281,7 +284,7 @@ export function AuthSheet({
                   </Field>
                   <div>
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Default identity")}
+                      Default identity
                     </div>
                     <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                       {PROFILE_IDENTITIES.map((option) => {
@@ -296,13 +299,13 @@ export function AuthSheet({
                               active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                             }`}
                           >
-                            <span className="block text-[11px] font-black">{t(option.label)}</span>
+                            <span className="block text-[11px] font-black">{option.label}</span>
                             <span
                               className={`block truncate text-[9px] font-semibold ${
                                 active ? "text-hp-paper/65" : "text-hp-muted"
                               }`}
                             >
-                              {t(option.helper)}
+                              {option.helper}
                             </span>
                           </button>
                         );
@@ -312,7 +315,7 @@ export function AuthSheet({
                 </>
               )}
 
-              <Field label={t("Email")}>
+              <Field label="Email">
                 <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
                   <Mail size={14} className="text-hp-muted" />
                   <input
@@ -326,7 +329,7 @@ export function AuthSheet({
                   />
                 </div>
               </Field>
-              <Field label={t("Password")}>
+              <Field label="Password">
                 <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
                   <LockKeyhole size={14} className="text-hp-muted" />
                   <input
@@ -335,7 +338,7 @@ export function AuthSheet({
                     onChange={(event) => setPassword(event.target.value)}
                     autoComplete={mode === "signIn" ? "current-password" : "new-password"}
                     className="w-full bg-transparent text-[13px] text-hp-ink outline-none placeholder:text-hp-muted"
-                    placeholder={t("Minimum 6 characters")}
+                    placeholder="Minimum 6 characters"
                     minLength={6}
                     required
                   />
@@ -354,7 +357,7 @@ export function AuthSheet({
                 disabled={saving}
                 className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
               >
-                {saving ? t("Working...") : t(mode === "signIn" ? "Sign in" : "Create account")}
+                {saving ? "Working..." : mode === "signIn" ? "Sign in" : "Create account"}
               </button>
             </form>
           </motion.div>
@@ -390,7 +393,6 @@ export function AccountSheet({
   adminRole: AdminRole | null;
   onOpenAdmin: () => void;
 }) {
-  const { t } = useI18n();
   const profile = accountProfile(account);
   const userId = accountUserId(account);
   const email = accountEmail(account);
@@ -425,11 +427,11 @@ export function AccountSheet({
     if (!userId) return;
     const normalizedHandle = normalizeHandle(handle);
     if (displayName.trim().length < 2) {
-      setError(t("Use a display name with at least 2 characters."));
+      setError("Use a display name with at least 2 characters.");
       return;
     }
     if (normalizedHandle.length < 3) {
-      setError(t("Use a handle with at least 3 letters, numbers, dots, or underscores."));
+      setError("Use a handle with at least 3 letters, numbers, dots, or underscores.");
       return;
     }
 
@@ -449,7 +451,7 @@ export function AccountSheet({
         avatarUrl: avatar?.avatarUrl,
       });
       await onSaved();
-      setMessage(t("Profile saved."));
+      setMessage("Profile saved.");
       setAvatarFile(null);
       setAvatarPreview(null);
     } catch (submitError) {
@@ -490,7 +492,7 @@ export function AccountSheet({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label={t("Close")}
+            aria-label="Close account settings"
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -499,24 +501,24 @@ export function AccountSheet({
             transition={{ type: "spring", damping: 30, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label={t("Account settings")}
+            aria-label="Account settings"
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-bg p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-black text-hp-ink">
-                  {t(account.status === "needsProfile" ? "Complete profile" : "Account settings")}
+                  {account.status === "needsProfile" ? "Complete profile" : "Account"}
                 </h3>
                 <p className="mt-0.5 text-[11px] text-hp-muted">
-                  {t("Your visible identity across posts and comments.")}
+                  Your visible identity across posts and comments.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-9 w-9 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-                aria-label={t("Close")}
+                aria-label="Close account settings"
               >
                 <X size={16} />
               </button>
@@ -527,9 +529,7 @@ export function AccountSheet({
                 <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-hp-sunset text-hp-paper">
                   <UserCircle2 size={24} />
                 </div>
-                <h4 className="text-[15px] font-black text-hp-ink">
-                  {t("Sign in to create a profile")}
-                </h4>
+                <h4 className="text-[15px] font-black text-hp-ink">Sign in to create a profile</h4>
                 <p className="mt-1 text-[12px] text-hp-muted">
                   Saved items can stay private, but posting needs a real profile.
                 </p>
@@ -541,7 +541,7 @@ export function AccountSheet({
                   }}
                   className="mt-4 w-full rounded-full bg-hp-ink py-3 text-[13px] font-bold text-hp-paper"
                 >
-                  {t("Sign in")}
+                  Sign in
                 </button>
               </div>
             ) : (
@@ -551,7 +551,7 @@ export function AccountSheet({
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border border-hp-ink/10 bg-hp-ink text-hp-paper"
-                    aria-label={t("Upload profile image")}
+                    aria-label="Upload profile image"
                   >
                     {avatarUrl ? (
                       <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -574,7 +574,7 @@ export function AccountSheet({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[13px] font-black text-hp-ink">
-                          {t("Admin workspace")}
+                          Admin workspace
                         </span>
                         <span className="block text-[11px] text-hp-muted">
                           Open team tools · {adminRole}
@@ -613,7 +613,7 @@ export function AccountSheet({
 
                 <form onSubmit={submit} className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
-                    <Field label={t("Display name")}>
+                    <Field label="Display name">
                       <input
                         value={displayName}
                         onChange={(event) => setDisplayName(event.target.value)}
@@ -621,7 +621,7 @@ export function AccountSheet({
                         className={fieldClass()}
                       />
                     </Field>
-                    <Field label={t("Handle")}>
+                    <Field label="Handle">
                       <input
                         value={handle}
                         onChange={(event) => setHandle(normalizeHandle(event.target.value))}
@@ -633,7 +633,7 @@ export function AccountSheet({
 
                   <div>
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Default identity")}
+                      Posting identity
                     </div>
                     <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                       {PROFILE_IDENTITIES.map((option) => {
@@ -648,13 +648,13 @@ export function AccountSheet({
                               active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                             }`}
                           >
-                            <span className="block text-[11px] font-black">{t(option.label)}</span>
+                            <span className="block text-[11px] font-black">{option.label}</span>
                             <span
                               className={`block truncate text-[9px] font-semibold ${
                                 active ? "text-hp-paper/65" : "text-hp-muted"
                               }`}
                             >
-                              {t(option.helper)}
+                              {option.helper}
                             </span>
                           </button>
                         );
@@ -662,7 +662,7 @@ export function AccountSheet({
                     </div>
                   </div>
 
-                  <Field label={t("Home area")}>
+                  <Field label="Home area">
                     <input
                       value={homeArea}
                       onChange={(event) => setHomeArea(event.target.value)}
@@ -672,7 +672,7 @@ export function AccountSheet({
                     />
                   </Field>
 
-                  <Field label={t("Bio")}>
+                  <Field label="Bio">
                     <textarea
                       value={bio}
                       onChange={(event) => setBio(event.target.value)}
@@ -698,7 +698,7 @@ export function AccountSheet({
                           {stat.n}
                         </div>
                         <div className="mt-1 text-[9.5px] font-bold uppercase tracking-wide text-hp-muted">
-                          {t(stat.l)}
+                          {stat.l}
                         </div>
                       </div>
                     ))}
@@ -713,7 +713,7 @@ export function AccountSheet({
                       <Save size={16} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-black text-hp-ink">{t("Saved")}</span>
+                      <span className="block text-[13px] font-black text-hp-ink">Saved</span>
                       <span className="block text-[11px] text-hp-muted">
                         {saved.placeCount} places · {saved.postCount} posts · {saved.routeCount}{" "}
                         routes
@@ -734,14 +734,14 @@ export function AccountSheet({
                       disabled={saving}
                       className="rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                     >
-                      {saving ? t("Working...") : t("Save profile")}
+                      {saving ? "Saving..." : "Save profile"}
                     </button>
                     <button
                       type="button"
                       onClick={signOut}
                       disabled={saving}
                       className="grid h-11 w-11 place-items-center rounded-full border border-hp-ink/15 text-hp-ink disabled:opacity-45"
-                      aria-label={t("Sign out")}
+                      aria-label="Sign out"
                     >
                       <LogOut size={15} />
                     </button>

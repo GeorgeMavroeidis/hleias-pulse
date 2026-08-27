@@ -245,17 +245,6 @@ export async function savePulseProfile(userId: string, input: SavePulseProfileIn
   return mapProfile(result.data);
 }
 
-export async function savePulseLanguage(userId: string, language: "GR" | "EN") {
-  const result = await supabase.from("user_preferences").upsert(
-    {
-      user_id: userId,
-      language,
-    },
-    { onConflict: "user_id" },
-  );
-  if (result.error) throw result.error;
-}
-
 export async function uploadPulseAvatar(userId: string, file: File) {
   const extension =
     file.name
