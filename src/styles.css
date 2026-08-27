@@ -250,6 +250,9 @@
   --hp-map-dot-opacity: 0.35;
   --hp-map-solo-scale: 0.32;
   --hp-map-copy-offset: 0.2rem;
+  --hp-map-pulse-moving-peak: 1.12;
+  --hp-map-pulse-hot-peak: 1.22;
+  --hp-map-pulse-live-peak: 1.3;
 }
 
 .hp-area-marker,
@@ -326,18 +329,108 @@
 }
 
 .hp-marker-aura {
+  --hp-pulse-core-alpha: 0.16;
+  --hp-pulse-mid-alpha: 0.1;
+  --hp-pulse-edge-alpha: 0.05;
   position: absolute;
   inset: -0.25rem;
   z-index: 0;
   border-radius: 9999px;
   background: radial-gradient(
     circle,
-    color-mix(in srgb, var(--hp-sunset) 16%, transparent) 0 78%,
-    color-mix(in srgb, var(--hp-sunset) 10%, transparent) 86%,
-    color-mix(in srgb, var(--hp-sunset) 5%, transparent) 93%,
+    rgb(224 106 50 / var(--hp-pulse-core-alpha)) 0 78%,
+    rgb(224 106 50 / var(--hp-pulse-mid-alpha)) 86%,
+    rgb(224 106 50 / var(--hp-pulse-edge-alpha)) 93%,
     transparent 100%
   );
+  transform: scale(1);
+  transform-origin: center;
   pointer-events: none;
+}
+
+.is-pulse-moving .hp-marker-aura,
+.is-pulse-hot .hp-marker-aura,
+.is-pulse-live .hp-marker-aura {
+  animation-delay: var(--hp-pulse-delay, 0s);
+  animation-iteration-count: infinite;
+  animation-play-state: var(--hp-marker-motion-state, running);
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.is-pulse-moving .hp-marker-aura {
+  --hp-pulse-core-alpha: 0.2;
+  --hp-pulse-mid-alpha: 0.11;
+  --hp-pulse-edge-alpha: 0.055;
+  --hp-pulse-peak: var(--hp-map-pulse-moving-peak);
+  animation-name: hp-marker-aura-pulse;
+  animation-duration: 5.4s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.is-pulse-hot .hp-marker-aura {
+  --hp-pulse-core-alpha: 0.26;
+  --hp-pulse-mid-alpha: 0.145;
+  --hp-pulse-edge-alpha: 0.07;
+  --hp-pulse-peak: var(--hp-map-pulse-hot-peak);
+  animation-name: hp-marker-aura-pulse;
+  animation-duration: 3.6s;
+  animation-timing-function: cubic-bezier(0.34, 0, 0.2, 1);
+}
+
+.is-pulse-live .hp-marker-aura {
+  --hp-pulse-core-alpha: 0.34;
+  --hp-pulse-mid-alpha: 0.18;
+  --hp-pulse-edge-alpha: 0.09;
+  --hp-pulse-peak: var(--hp-map-pulse-live-peak);
+  animation-name: hp-marker-aura-double-pulse;
+  animation-duration: 2.4s;
+  animation-timing-function: ease-out;
+}
+
+.hp-pulse-paused .hp-marker-aura {
+  animation-play-state: paused !important;
+}
+
+@keyframes hp-marker-aura-pulse {
+  0%,
+  100% {
+    opacity: 0.58;
+    transform: scale(1);
+  }
+  46% {
+    opacity: 1;
+    transform: scale(var(--hp-pulse-peak));
+  }
+  72% {
+    opacity: 0.68;
+    transform: scale(1.025);
+  }
+}
+
+@keyframes hp-marker-aura-double-pulse {
+  0%,
+  100% {
+    opacity: 0.58;
+    transform: scale(1);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(var(--hp-pulse-peak));
+  }
+  21% {
+    opacity: 0.68;
+    transform: scale(1.035);
+  }
+  31% {
+    opacity: 0.94;
+    transform: scale(var(--hp-pulse-peak));
+  }
+  46%,
+  82% {
+    opacity: 0.58;
+    transform: scale(1);
+  }
 }
 
 .hp-area-marker__ring,
@@ -728,6 +821,15 @@ select:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .is-pulse-moving .hp-marker-aura,
+  .is-pulse-hot .hp-marker-aura,
+  .is-pulse-live .hp-marker-aura {
+    animation: none;
+    opacity: 1;
+    transform: scale(1);
+    will-change: auto;
+  }
+
   *,
   *::before,
   *::after {
