@@ -1189,7 +1189,9 @@ function TouristStartHere({
   );
 
   return (
-    <div className="px-4 pb-28 pt-3">
+    // Bottom padding stays small: this block is always followed by a divider and
+    // the live PulseFeed (which carries its own pb-28) in the same scroll area.
+    <div className="px-4 pb-4 pt-3">
       <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
         {t("Welcome to Ilia")}
       </div>
@@ -5187,41 +5189,57 @@ export function PulseApp() {
     if (tab === "pulse") {
       const showTouristStartHere =
         readyProfile(account)?.defaultIdentity === "TOURIST";
+      const pulseFeed = (
+        <PulseFeed
+          posts={filteredPosts}
+          storyGroups={placeStoryGroups}
+          activityTicks={activityTicks}
+          trendingPlace={trendingPlace}
+          onOpenStory={(placeId) => setStoryViewer({ placeId })}
+          likes={likes}
+          postLikes={postLikes}
+          toggleLike={toggleLike}
+          savedPosts={savedPosts}
+          toggleSavePost={toggleSavePost}
+          commentsByPost={postComments}
+          onOpenPost={setOpenPost}
+          onOpenMap={jumpToMap}
+          onShare={sharePost}
+          onTrendingGoing={markTrendingGoing}
+          findPlace={findPlace}
+          findAuthor={findAuthor}
+          findPostAuthor={findPostAuthor}
+        />
+      );
       return (
         <div className="relative h-full">
           <div className="h-full overflow-y-auto">
             {showTouristStartHere ? (
-              <TouristStartHere
-                places={places}
-                routes={routes}
-                findAuthor={findAuthor}
-                onOpenPlace={setOpenPlace}
-                onOpenRoute={setOpenRoute}
-              />
+              <>
+                {/* Tourists see the curated "Start here" deck AND, below a clear
+                    divider, the same live feed everyone else gets. */}
+                <TouristStartHere
+                  places={places}
+                  routes={routes}
+                  findAuthor={findAuthor}
+                  onOpenPlace={setOpenPlace}
+                  onOpenRoute={setOpenRoute}
+                />
+                <div className="mx-4 mt-2 border-t border-hp-ink/10 pt-5">
+                  <h2 className="text-2xl font-black text-hp-ink">
+                    {t("Live around Ilia")}
+                  </h2>
+                  <p className="text-[12px] text-hp-muted">
+                    {t("Stories, trending spots and fresh posts from the community.")}
+                  </p>
+                </div>
+                {pulseFeed}
+              </>
             ) : (
-              <PulseFeed
-                posts={filteredPosts}
-                storyGroups={placeStoryGroups}
-                activityTicks={activityTicks}
-                trendingPlace={trendingPlace}
-                onOpenStory={(placeId) => setStoryViewer({ placeId })}
-                likes={likes}
-                postLikes={postLikes}
-                toggleLike={toggleLike}
-                savedPosts={savedPosts}
-                toggleSavePost={toggleSavePost}
-                commentsByPost={postComments}
-                onOpenPost={setOpenPost}
-                onOpenMap={jumpToMap}
-                onShare={sharePost}
-                onTrendingGoing={markTrendingGoing}
-                findPlace={findPlace}
-                findAuthor={findAuthor}
-                findPostAuthor={findPostAuthor}
-              />
+              pulseFeed
             )}
           </div>
-          {places.length > 0 && !showTouristStartHere && (
+          {places.length > 0 && (
             <motion.button
               type="button"
               whileTap={{ scale: 0.92 }}

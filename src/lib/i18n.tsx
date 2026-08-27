@@ -366,6 +366,9 @@ const EL: Record<string, string> = {
   "Routes for visitors": "Διαδρομές για επισκέπτες",
   "Open {place}": "Άνοιγμα {place}",
   "Nothing to show yet": "Δεν υπάρχει κάτι να δείξουμε ακόμη",
+  "Live around Ilia": "Ζωντανά στην Ηλεία",
+  "Stories, trending spots and fresh posts from the community.":
+    "Stories, δημοφιλή σημεία και νέες δημοσιεύσεις από την κοινότητα.",
 };
 
 function interpolate(message: string, params?: TranslationParams) {
