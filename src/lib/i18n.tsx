@@ -320,6 +320,11 @@ const EL: Record<string, string> = {
   "Could not save team role.": "Δεν ήταν δυνατή η αποθήκευση του ρόλου.",
   "Could not change role.": "Δεν ήταν δυνατή η αλλαγή του ρόλου.",
   "Could not remove member.": "Δεν ήταν δυνατή η αφαίρεση του μέλους.",
+  // Admin: internal enum <option> labels (story kind)
+  "Beach status": "Κατάσταση παραλίας",
+  "Business status": "Κατάσταση επιχείρησης",
+  "Editor note": "Σημείωση σύνταξης",
+  "Route teaser": "Προαναγγελία διαδρομής",
   Name: "Όνομα",
   "Greek name": "Ελληνικό όνομα",
   Area: "Περιοχή",

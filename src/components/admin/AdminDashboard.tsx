@@ -92,6 +92,29 @@ const TABS: Array<{ id: AdminTab; label: string; icon: typeof LayoutDashboard }>
   { id: "team", label: "Team", icon: Users },
 ];
 
+// Human-readable i18n keys for the internal enum <option>s in the editors.
+// Place-type keys mirror the composer's PLACE_TYPE_LABEL_KEYS (PulseApp.tsx) so a
+// place type reads the same in the admin editor and the public composer.
+const PLACE_TYPE_LABEL_KEYS: Record<string, string> = {
+  beach: "Beach",
+  culture: "Culture",
+  food: "Food",
+  local: "Local spot",
+  nature: "Nature",
+  night: "Night",
+  sunset: "Sunset",
+  village: "Village",
+};
+const STORY_KIND_LABEL_KEYS: Record<string, string> = {
+  report: "Report",
+  photo: "Photo",
+  beach_status: "Beach status",
+  business_status: "Business status",
+  editor_note: "Editor note",
+  event: "Event",
+  route_tease: "Route teaser",
+};
+
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof Error) return error.message;
   if (error && typeof error === "object" && "message" in error) {
@@ -723,7 +746,9 @@ function PlaceEditor({
             >
               {["beach", "culture", "food", "local", "nature", "night", "sunset", "village"].map(
                 (item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item} value={item}>
+                    {t(PLACE_TYPE_LABEL_KEYS[item] ?? item)}
+                  </option>
                 ),
               )}
             </select>
@@ -1010,7 +1035,9 @@ function StoryEditor({
                 "event",
                 "route_tease",
               ].map((item) => (
-                <option key={item}>{item}</option>
+                <option key={item} value={item}>
+                  {t(STORY_KIND_LABEL_KEYS[item] ?? item)}
+                </option>
               ))}
             </select>
           </Field>
@@ -1500,7 +1527,11 @@ function CulturalEventEditor({
             <option value="">{t("No linked organizer account")}</option>
             {organizers.map((organizer) => (
               <option key={organizer.id} value={organizer.id}>
-                {organizer.display_name} · {organizer.verification_status}
+                {organizer.display_name} ·{" "}
+                {t(
+                  organizer.verification_status[0].toUpperCase() +
+                    organizer.verification_status.slice(1),
+                )}
               </option>
             ))}
           </select>
