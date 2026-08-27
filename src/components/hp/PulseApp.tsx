@@ -168,40 +168,6 @@ const isTab = (value: string | null): value is Tab =>
   value === "meet" ||
   value === "saved";
 
-// URL params that trigger the deep-link handling effect; when any is present the
-// initial tab is left to that effect rather than the cached-identity hint.
-const DEEP_LINK_PARAMS = ["tab", "place", "post", "route", "story", "area"];
-
-// Last resolved account identity, cached synchronously so a returning Tourist can
-// open straight on the Routes tab (which carries the "Must-see today" deck)
-// without waiting for the async account fetch — that wait is what caused a
-// visible Map→Routes flash. Mirrors the initialLanguage() pattern in i18n.tsx.
-const LAST_IDENTITY_STORAGE_KEY = "ilia-pulse-last-identity";
-
-function initialTab(): Tab {
-  if (typeof window === "undefined") return "map";
-  // A deep link owns the initial tab (handled by its own effect) — don't fight it.
-  const params = new URLSearchParams(window.location.search);
-  if (DEEP_LINK_PARAMS.some((key) => params.has(key))) return "map";
-  const hint = window.localStorage.getItem(LAST_IDENTITY_STORAGE_KEY);
-  return hint === "TOURIST" ? "routes" : "map";
-}
-
-// Keep the cached identity hint in sync with the real account state. Called on
-// every account resolution (initial load, auth changes, profile save).
-function persistIdentityHint(account: PulseAccountState) {
-  if (typeof window === "undefined") return;
-  if (account.status === "ready") {
-    window.localStorage.setItem(LAST_IDENTITY_STORAGE_KEY, account.profile.defaultIdentity);
-  } else if (
-    account.status === "signedOut" ||
-    account.status === "anonymous" ||
-    account.status === "needsProfile"
-  ) {
-    window.localStorage.removeItem(LAST_IDENTITY_STORAGE_KEY);
-  }
-}
-
 const truncateShareText = (text: string) =>
   text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;
 
@@ -3916,11 +3882,7 @@ export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [tab, setTab] = useState<Tab>(initialTab);
-  // The synchronous initialTab() guess (from the cached identity hint); the
-  // account-load effect reconciles it with the real identity, but only if the
-  // user hasn't navigated away from it in the meantime.
-  const initialTabRef = useRef(tab);
+  const [tab, setTab] = useState<Tab>("map");
   const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
@@ -3964,11 +3926,13 @@ export function PulseApp() {
   const [organizerStatus, setOrganizerStatus] = useState<OrganizerStatus | null>(null);
   const [organizerComposerOpen, setOrganizerComposerOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  // Tourist-only "Must-see today" overlay on the Map tab. Starts open on every
+  // page load (a "welcome" moment); the X dismisses it for the session only.
+  const [showStartHere, setShowStartHere] = useState(true);
   const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
   const [activeRouteStopIndex, setActiveRouteStopIndex] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const initialShareHandled = useRef(false);
-  const initialTabReconciled = useRef(false);
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const [storyViewer, setStoryViewer] = useState<{ placeId: string; storyId?: string } | null>(
     null,
@@ -4174,7 +4138,6 @@ export function PulseApp() {
     try {
       const nextAccount = await getCurrentPulseAccount();
       setAccount(nextAccount);
-      persistIdentityHint(nextAccount);
       if (nextAccount.status === "ready") {
         const nextAdminRole = await getAdminRole().catch(() => null);
         setAdminRole(nextAdminRole);
@@ -4203,7 +4166,6 @@ export function PulseApp() {
       console.warn("Could not load account state.", error);
       const fallback: PulseAccountState = { status: "signedOut" };
       setAccount(fallback);
-      persistIdentityHint(fallback);
       setAdminRole(null);
       setOrganizerStatus(null);
       return fallback;
@@ -4319,27 +4281,11 @@ export function PulseApp() {
       });
       if (ignore) return;
       setAccount(nextAccount);
-      persistIdentityHint(nextAccount);
       if (
         (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
         nextAccount.preferences?.language
       ) {
         setLanguage(nextAccount.preferences.language);
-      }
-      // First account resolution: reconcile the tab with the real identity. The
-      // synchronous initialTab() already guessed from the cached identity hint;
-      // here we fix that guess when the hint was stale or absent — Tourists to
-      // the Routes tab (it carries the "Must-see today" deck), everyone else to
-      // Map. A share/deep link, or the user navigating during the load, wins.
-      if (!initialTabReconciled.current && nextAccount.status === "ready") {
-        initialTabReconciled.current = true;
-        const params = new URLSearchParams(window.location.search);
-        const hasDeepLink = DEEP_LINK_PARAMS.some((key) => params.has(key));
-        if (!hasDeepLink && !initialShareHandled.current) {
-          const desiredTab: Tab =
-            nextAccount.profile.defaultIdentity === "TOURIST" ? "routes" : "map";
-          setTab((current) => (current === initialTabRef.current ? desiredTab : current));
-        }
       }
       // Admin/organizer status drives the Admin workspace / Verified organizer
       // badges; fetch it here too, not only through refreshAccount() on save.
@@ -5167,6 +5113,37 @@ export function PulseApp() {
             onSharePlace={sharePlace}
             savedPlaceIds={savedIds}
           />
+          {/* Tourist-only orientation: the "Must-see today" deck floats over the
+              live map. The map underneath stays fully loaded; the X just hides
+              this for the session. */}
+          <AnimatePresence>
+            {showStartHere && readyProfile(account)?.defaultIdentity === "TOURIST" && (
+              <motion.div
+                key="tourist-start-here"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 14 }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                role="region"
+                aria-label={t("Must-see today")}
+                className="absolute inset-x-3 top-3 z-[50] flex max-h-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper/97 shadow-[0_20px_50px_rgba(23,20,17,0.22)] backdrop-blur"
+              >
+                <div className="flex justify-end px-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowStartHere(false)}
+                    aria-label={t("Close")}
+                    className="grid h-8 w-8 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+                  <MustSeeTodayDeck places={places} onOpenPlace={setOpenPlace} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       );
     }
