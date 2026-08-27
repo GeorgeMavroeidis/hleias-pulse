@@ -7,14 +7,7 @@ import type { Place } from "../hp-model";
  */
 
 export type MeetCategory =
-  | "panigyri"
-  | "beach"
-  | "music"
-  | "sunset"
-  | "sport"
-  | "cleanup"
-  | "food"
-  | "social";
+  "panigyri" | "beach" | "music" | "sunset" | "sport" | "cleanup" | "food" | "social";
 
 export type RsvpStatus = "going" | "maybe";
 

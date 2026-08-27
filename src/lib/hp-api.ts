@@ -185,9 +185,7 @@ const MEET_EVENT_RETURN_COLUMNS =
   "id,place_id,user_id,profile_id,title,host_name,host_avatar_url,host_type,starts_at,duration_min,category,vibe,price,capacity,description,cover_url,tags,going_count,maybe_count,hot,attendee_avatar_urls";
 
 type SavedTarget =
-  | { type: "place"; id: string }
-  | { type: "post"; id: string }
-  | { type: "route"; id: string };
+  { type: "place"; id: string } | { type: "post"; id: string } | { type: "route"; id: string };
 
 type CommentTarget = SavedTarget;
 
@@ -782,15 +780,17 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
     savedPosts:
       (savedResult.data as SavedItemRow[] | null)
         ?.filter((item) => item.target_type === "post" && item.post_id)
-        .reduce<
-          Record<string, boolean>
-        >((items, item) => ({ ...items, [item.post_id as string]: true }), {}) ?? {},
+        .reduce<Record<string, boolean>>(
+          (items, item) => ({ ...items, [item.post_id as string]: true }),
+          {},
+        ) ?? {},
     savedRoutes:
       (savedResult.data as SavedItemRow[] | null)
         ?.filter((item) => item.target_type === "route" && item.route_id)
-        .reduce<
-          Record<string, boolean>
-        >((items, item) => ({ ...items, [item.route_id as string]: true }), {}) ?? {},
+        .reduce<Record<string, boolean>>(
+          (items, item) => ({ ...items, [item.route_id as string]: true }),
+          {},
+        ) ?? {},
     likedPosts:
       (likesResult.data as PostLikeRow[] | null)?.reduce<Record<string, boolean>>(
         (items, item) => ({ ...items, [item.post_id]: true }),
