@@ -362,6 +362,16 @@ const EL: Record<string, string> = {
   "A quick first look for visitors — the spots to begin with.":
     "Μια πρώτη ματιά για επισκέπτες — τα σημεία για να ξεκινήσεις.",
   "Open {place}": "Άνοιγμα {place}",
+  // Local "Έχεις πάει;" exploration card (top of the Pulse feed)
+  "Have you been?": "Έχεις πάει;",
+  "Discover north-west and mountain Ilia — the corners with the fewest spots.":
+    "Ανακάλυψε τη ΒΔ και ορεινή Ηλεία — τις γωνιές με τα λιγότερα σημεία.",
+  "{covered}/{total} places": "{covered}/{total} μέρη",
+  "Discovery progress": "Πρόοδος εξερεύνησης",
+  "You've been everywhere on this list. Respect.":
+    "Τα έχεις δει όλα στη λίστα. Respect.",
+  "Five new places — you're really exploring now.":
+    "Πέντε νέα μέρη — τώρα μάλιστα εξερευνείς!",
 };
 
 function interpolate(message: string, params?: TranslationParams) {

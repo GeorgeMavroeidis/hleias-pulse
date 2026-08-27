@@ -1218,6 +1218,147 @@ function MustSeeTodayDeck({
   );
 }
 
+/* ============== "Έχεις πάει;" — Local exploration card (Pulse feed) ============== */
+// The north-west peninsula (Kyllini, Chlemoutsi/Arkoudi, Loutra) and mountain
+// Ilia (Foloi, Nemouta, Andritsaina, Bassae) hold far fewer spots than the
+// Amaliada–Pyrgos–Olympia / coastal core. This is the union of those
+// underrepresented SocialMap clusters — the set we nudge Locals to go cover.
+// Hand-maintained here (same spirit as TEMP_FEATURED_PLACE_IDS); if a real
+// region field lands on `places` later, derive this from it instead.
+const DISCOVERY_PLACE_IDS = [
+  // Kyllini
+  "kyllini-beach",
+  "kyllini-harbor",
+  "kyllini-old-beach",
+  // Chlemoutsi & Arkoudi
+  "chlemoutsi",
+  "chlemoutsi-sea-view",
+  "loutra-kyllinis",
+  "arkoudi-beach",
+  // Pineios plain
+  "vartholomio",
+  "gastouni",
+  // Foloi forest
+  "foloi-forest",
+  "foloi-deep",
+  // Nemouta
+  "nemouta-waterfalls",
+  "nemouta-village",
+  // Andritsaina
+  "andritsaina",
+  "andritsaina-streets",
+  // Bassae
+  "bassae-temple",
+  "bassae-inside",
+];
+
+// v1 milestone: a single fixed nudge, no badges / no persisted achievements.
+// Only fires as a toast when the user *crosses* it during a session.
+const DISCOVERY_MILESTONE = 5;
+
+// Local-only, top of the Pulse feed. "Covered" = the user has at least one own
+// post at that place (posts-as-visited proxy — no check-in table in v1).
+function LocalDiscoveryCard({
+  places,
+  coveredIds,
+  onOpenPlace,
+  onMilestone,
+}: {
+  places: Place[];
+  coveredIds: string[];
+  onOpenPlace: (place: Place) => void;
+  onMilestone: () => void;
+}) {
+  const { t } = useI18n();
+  const total = DISCOVERY_PLACE_IDS.length;
+  const covered = coveredIds.length;
+
+  const uncoveredPlaces = useMemo(() => {
+    const coveredSet = new Set(coveredIds);
+    return DISCOVERY_PLACE_IDS.filter((id) => !coveredSet.has(id))
+      .map((id) => places.find((place) => place.id === id))
+      .filter((place): place is Place => Boolean(place));
+  }, [coveredIds, places]);
+
+  // Celebrate crossing the milestone within the session — never on mount if the
+  // user is already past it, and never more than once.
+  const startedBelowMilestone = useRef(covered < DISCOVERY_MILESTONE);
+  const celebrated = useRef(false);
+  useEffect(() => {
+    if (covered >= DISCOVERY_MILESTONE && startedBelowMilestone.current && !celebrated.current) {
+      celebrated.current = true;
+      onMilestone();
+    }
+  }, [covered, onMilestone]);
+
+  if (places.length === 0) return null;
+
+  const pct = total > 0 ? Math.round((covered / total) * 100) : 0;
+
+  return (
+    <section className="mb-1 flex flex-col gap-3 border-b border-hp-ink/10 pb-4">
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+          {t("{covered}/{total} places", { covered, total })}
+        </div>
+        <h3 className="text-[17px] font-black text-hp-ink">{t("Have you been?")}</h3>
+        <p className="text-[12px] text-hp-muted">
+          {t("Discover north-west and mountain Ilia — the corners with the fewest spots.")}
+        </p>
+      </div>
+
+      <div
+        className="h-2 w-full overflow-hidden rounded-full bg-hp-ink/10"
+        role="progressbar"
+        aria-valuenow={covered}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-label={t("Discovery progress")}
+      >
+        <div
+          className="h-full rounded-full bg-hp-sunset transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      {uncoveredPlaces.length > 0 ? (
+        <div className="hp-no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4">
+          {uncoveredPlaces.map((place) => (
+            <button
+              key={place.id}
+              type="button"
+              onClick={() => onOpenPlace(place)}
+              aria-label={t("Open {place}", { place: place.name })}
+              className="w-36 shrink-0 overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
+            >
+              <ImageBox
+                src={place.imageUrl}
+                alt={place.name}
+                className="h-24 w-full"
+                rounded="rounded-none"
+              />
+              <div className="p-2">
+                <div
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: typeColor[place.type] }}
+                >
+                  {place.type}
+                </div>
+                <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">{place.name}</div>
+                <div className="line-clamp-1 text-[10px] text-hp-muted">{place.area}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-2xl border border-dashed border-hp-ink/15 bg-hp-paper/60 px-4 py-3 text-center text-[12px] font-semibold text-hp-ink">
+          {t("You've been everywhere on this list. Respect.")}
+        </p>
+      )}
+    </section>
+  );
+}
+
 /* ============== Routes Screen ============== */
 function routeMatchesQuery(route: RouteItem, author: Author, query: string) {
   if (!query.trim()) return true;
@@ -4399,12 +4540,16 @@ export function PulseApp() {
     const ownedPosts = accountProfileId
       ? allPosts.filter((post) => post.profileId === accountProfileId)
       : [];
+    // Posts-as-visited proxy: a discovery place counts as "covered" once the
+    // user has posted there at least once.
+    const ownedPlaceIds = new Set(ownedPosts.map((post) => post.placeId));
 
     return {
       posts: ownedPosts.length,
       tips: ownedPosts.filter((post) => post.kind === "tip").length,
       rsvps: account.status === "ready" ? Object.keys(rsvpMap).length : 0,
       routesSaved: account.status === "ready" ? savedRouteIds.length : 0,
+      discoveryExploredIds: DISCOVERY_PLACE_IDS.filter((id) => ownedPlaceIds.has(id)),
     };
   }, [account.status, accountProfileId, allPosts, rsvpMap, savedRouteIds.length]);
 
@@ -5152,6 +5297,16 @@ export function PulseApp() {
       return (
         <div className="relative h-full">
           <div className="h-full overflow-y-auto">
+            {readyProfile(account)?.defaultIdentity === "LOCAL" && (
+              <div className="px-4 pt-3">
+                <LocalDiscoveryCard
+                  places={places}
+                  coveredIds={profileStats.discoveryExploredIds}
+                  onOpenPlace={setOpenPlace}
+                  onMilestone={() => showToast(t("Five new places — you're really exploring now."))}
+                />
+              </div>
+            )}
             <PulseFeed
               posts={filteredPosts}
               storyGroups={placeStoryGroups}
