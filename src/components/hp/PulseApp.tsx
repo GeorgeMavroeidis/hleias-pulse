@@ -94,10 +94,7 @@ import { MeetScreen } from "./MeetScreen";
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet } from "./AuthAccountSheets";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
-import {
-  buildPulseActivitySnapshot,
-  type PulseActivitySnapshot,
-} from "@/lib/hp/pulse-activity";
+import { buildPulseActivitySnapshot, type PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
 import { type StreakState } from "@/lib/hp/meet-store";
 import {
   MEET_CATEGORIES,
@@ -4154,11 +4151,7 @@ export function PulseApp() {
   }, [refreshPulseData]);
 
   const refreshActivitySnapshot = useCallback(async () => {
-    if (
-      typeof document === "undefined" ||
-      document.hidden ||
-      activityRefreshInFlightRef.current
-    ) {
+    if (typeof document === "undefined" || document.hidden || activityRefreshInFlightRef.current) {
       return;
     }
 
