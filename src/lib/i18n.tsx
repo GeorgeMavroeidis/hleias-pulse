@@ -341,6 +341,12 @@ const EL: Record<string, string> = {
   Cleanup: "Καθαρισμός",
   Food: "Φαγητό",
   Social: "Παρέα",
+  // Quick-win coverage: account sheet, saved section, story rail
+  Posts: "Δημοσιεύσεις",
+  Live: "Ζωντανά",
+  "Upload profile image": "Μεταφόρτωση εικόνας προφίλ",
+  "Your visible identity across posts and comments.":
+    "Η ορατή ταυτότητά σου σε δημοσιεύσεις και σχόλια.",
   // Cultural events
   Community: "Κοινότητα",
   Events: "Εκδηλώσεις",

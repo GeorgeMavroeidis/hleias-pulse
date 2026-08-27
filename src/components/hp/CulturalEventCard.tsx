@@ -67,7 +67,7 @@ export function CulturalEventCard({ event, lang, onOpenDetail }: Props) {
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") onOpenDetail(event);
       }}
-      aria-label={`Open ${title}`}
+      aria-label={`${tr(lang, s.openCard)} ${title}`}
     >
       <div className="relative block w-full text-left">
         <div className="relative h-36 w-full">

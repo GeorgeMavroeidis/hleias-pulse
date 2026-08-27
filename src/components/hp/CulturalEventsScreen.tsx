@@ -129,7 +129,7 @@ export function CulturalEventsScreen({ events, lang, onOpenDetail, canCreate, on
           animate={{ opacity: 1, scale: 1, y: 0 }}
           onClick={onCreate}
           className="absolute right-4 bottom-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-hp-sunset px-4 py-3 text-hp-paper shadow-[0_12px_28px_rgba(224,106,50,0.45)]"
-          aria-label="Add a cultural event"
+          aria-label={tr(lang, s.addEventAria)}
         >
           <Plus size={18} strokeWidth={2.6} />
           <span className="text-[13px] font-black">{tr(lang, s.addEvent)}</span>

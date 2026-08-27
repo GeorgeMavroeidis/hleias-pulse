@@ -60,7 +60,7 @@ export function OrganizerEventComposer({ open, lang, onClose, onSubmit }: Props)
       setSaving(true);
       setPosterUrl(await uploadCulturalEventPoster(file));
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Could not upload poster.");
+      setError(uploadError instanceof Error ? uploadError.message : tr(lang, s.posterUploadError));
     } finally {
       setSaving(false);
     }
@@ -77,7 +77,7 @@ export function OrganizerEventComposer({ open, lang, onClose, onSubmit }: Props)
       !descriptionEl.trim() ||
       !posterUrl.trim()
     ) {
-      setError("Title, venue, area, date, Greek description, and poster are required.");
+      setError(tr(lang, s.formIncomplete));
       return;
     }
     setSaving(true);
@@ -96,8 +96,8 @@ export function OrganizerEventComposer({ open, lang, onClose, onSubmit }: Props)
         ticketUrl: ticketUrl.trim() || undefined,
       });
       onClose();
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Could not submit the event.");
+    } catch (submitErr) {
+      setError(submitErr instanceof Error ? submitErr.message : tr(lang, s.submitError));
     } finally {
       setSaving(false);
     }
@@ -213,7 +213,7 @@ export function OrganizerEventComposer({ open, lang, onClose, onSubmit }: Props)
               <div className="flex items-center gap-2">
                 <input
                   className={fieldClass()}
-                  placeholder="Poster URL"
+                  placeholder={tr(lang, s.posterUrlField)}
                   value={posterUrl}
                   onChange={(e) => setPosterUrl(e.target.value)}
                 />

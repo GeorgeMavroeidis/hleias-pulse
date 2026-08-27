@@ -163,7 +163,7 @@ export function CulturalEventDetailModal({
                       type="button"
                       onClick={onLike}
                       className={`inline-flex items-center gap-1 ${liked ? "text-hp-sunset" : ""}`}
-                      aria-label={liked ? "Unlike" : "Like"}
+                      aria-label={liked ? tr(lang, s.unlike) : tr(lang, s.like)}
                     >
                       <Heart size={16} fill={liked ? "currentColor" : "none"} /> {likeCount}
                     </button>
@@ -217,7 +217,7 @@ export function CulturalEventDetailModal({
                       }}
                       className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
                       disabled={!text.trim()}
-                      aria-label="Post comment"
+                      aria-label={tr(lang, s.postComment)}
                     >
                       <Send size={12} />
                     </button>

@@ -132,4 +132,22 @@ export const CULTURAL_EVENTS_STRINGS = {
   ticketUrlField: { GR: "Ticket URL (προαιρετικό)", EN: "Ticket URL (optional)" },
   submitForReview: { GR: "Υποβολή για έγκριση", EN: "Submit for review" },
   submitting: { GR: "Υποβολή…", EN: "Submitting…" },
+  posterUrlField: { GR: "URL αφίσας", EN: "Poster URL" },
+  posterUploadError: {
+    GR: "Δεν ήταν δυνατή η μεταφόρτωση της αφίσας.",
+    EN: "Could not upload poster.",
+  },
+  formIncomplete: {
+    GR: "Τίτλος, χώρος, περιοχή, ημερομηνία, ελληνική περιγραφή και αφίσα είναι υποχρεωτικά.",
+    EN: "Title, venue, area, date, Greek description, and poster are required.",
+  },
+  submitError: {
+    GR: "Δεν ήταν δυνατή η υποβολή της εκδήλωσης.",
+    EN: "Could not submit the event.",
+  },
+  addEventAria: { GR: "Προσθήκη πολιτιστικής εκδήλωσης", EN: "Add a cultural event" },
+  openCard: { GR: "Άνοιγμα", EN: "Open" },
+  like: { GR: "Μου αρέσει", EN: "Like" },
+  unlike: { GR: "Αφαίρεση μου αρέσει", EN: "Unlike" },
+  postComment: { GR: "Δημοσίευση σχολίου", EN: "Post comment" },
 } as const satisfies Record<string, { GR: string; EN: string }>;
