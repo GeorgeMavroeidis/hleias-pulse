@@ -532,7 +532,7 @@ export type Database = {
           id: string;
           profile_id: string | null;
           updated_at: string;
-          user_id: string;
+          user_id: string | null;
           verification_status: string;
         };
         Insert: {
@@ -542,7 +542,7 @@ export type Database = {
           id?: string;
           profile_id?: string | null;
           updated_at?: string;
-          user_id: string;
+          user_id?: string | null;
           verification_status?: string;
         };
         Update: {
@@ -552,7 +552,7 @@ export type Database = {
           id?: string;
           profile_id?: string | null;
           updated_at?: string;
-          user_id?: string;
+          user_id?: string | null;
           verification_status?: string;
         };
         Relationships: [
