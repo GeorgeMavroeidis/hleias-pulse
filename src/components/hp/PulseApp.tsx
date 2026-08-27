@@ -168,6 +168,40 @@ const isTab = (value: string | null): value is Tab =>
   value === "meet" ||
   value === "saved";
 
+// URL params that trigger the deep-link handling effect; when any is present the
+// initial tab is left to that effect rather than the cached-identity hint.
+const DEEP_LINK_PARAMS = ["tab", "place", "post", "route", "story", "area"];
+
+// Last resolved account identity, cached synchronously so a returning Tourist can
+// open straight on the Routes tab (which carries the "Must-see today" deck)
+// without waiting for the async account fetch — that wait is what caused a
+// visible Map→Routes flash. Mirrors the initialLanguage() pattern in i18n.tsx.
+const LAST_IDENTITY_STORAGE_KEY = "ilia-pulse-last-identity";
+
+function initialTab(): Tab {
+  if (typeof window === "undefined") return "map";
+  // A deep link owns the initial tab (handled by its own effect) — don't fight it.
+  const params = new URLSearchParams(window.location.search);
+  if (DEEP_LINK_PARAMS.some((key) => params.has(key))) return "map";
+  const hint = window.localStorage.getItem(LAST_IDENTITY_STORAGE_KEY);
+  return hint === "TOURIST" ? "routes" : "map";
+}
+
+// Keep the cached identity hint in sync with the real account state. Called on
+// every account resolution (initial load, auth changes, profile save).
+function persistIdentityHint(account: PulseAccountState) {
+  if (typeof window === "undefined") return;
+  if (account.status === "ready") {
+    window.localStorage.setItem(LAST_IDENTITY_STORAGE_KEY, account.profile.defaultIdentity);
+  } else if (
+    account.status === "signedOut" ||
+    account.status === "anonymous" ||
+    account.status === "needsProfile"
+  ) {
+    window.localStorage.removeItem(LAST_IDENTITY_STORAGE_KEY);
+  }
+}
+
 const truncateShareText = (text: string) =>
   text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;
 
@@ -1164,9 +1198,7 @@ function MustSeeTodayDeck({
     ).filter((place): place is Place => Boolean(place));
     const pinnedIds = new Set(pinned.map((place) => place.id));
 
-    const live = places.filter(
-      (place) => place.status === "popular" || place.status === "busy",
-    );
+    const live = places.filter((place) => place.status === "popular" || place.status === "busy");
     const pool = live.length >= DECK_SIZE ? live : places;
     const ranked = [...pool]
       .filter((place) => !pinnedIds.has(place.id))
@@ -3884,7 +3916,11 @@ export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [tab, setTab] = useState<Tab>("map");
+  const [tab, setTab] = useState<Tab>(initialTab);
+  // The synchronous initialTab() guess (from the cached identity hint); the
+  // account-load effect reconciles it with the real identity, but only if the
+  // user hasn't navigated away from it in the meantime.
+  const initialTabRef = useRef(tab);
   const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
@@ -3932,7 +3968,7 @@ export function PulseApp() {
   const [activeRouteStopIndex, setActiveRouteStopIndex] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const initialShareHandled = useRef(false);
-  const touristHomeApplied = useRef(false);
+  const initialTabReconciled = useRef(false);
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const [storyViewer, setStoryViewer] = useState<{ placeId: string; storyId?: string } | null>(
     null,
@@ -4138,6 +4174,7 @@ export function PulseApp() {
     try {
       const nextAccount = await getCurrentPulseAccount();
       setAccount(nextAccount);
+      persistIdentityHint(nextAccount);
       if (nextAccount.status === "ready") {
         const nextAdminRole = await getAdminRole().catch(() => null);
         setAdminRole(nextAdminRole);
@@ -4166,6 +4203,7 @@ export function PulseApp() {
       console.warn("Could not load account state.", error);
       const fallback: PulseAccountState = { status: "signedOut" };
       setAccount(fallback);
+      persistIdentityHint(fallback);
       setAdminRole(null);
       setOrganizerStatus(null);
       return fallback;
@@ -4281,33 +4319,26 @@ export function PulseApp() {
       });
       if (ignore) return;
       setAccount(nextAccount);
+      persistIdentityHint(nextAccount);
       if (
         (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
         nextAccount.preferences?.language
       ) {
         setLanguage(nextAccount.preferences.language);
       }
-      // Tourists land on the Routes tab (which carries the "Must-see today"
-      // orientation deck) instead of the Map, once, on first account resolution —
-      // unless a share/deep link already picked a tab. Every other identity (and
-      // every account state without an identity) keeps the default Map tab.
-      if (
-        !touristHomeApplied.current &&
-        nextAccount.status === "ready" &&
-        nextAccount.profile.defaultIdentity === "TOURIST"
-      ) {
-        touristHomeApplied.current = true;
-        const params =
-          typeof window === "undefined"
-            ? null
-            : new URLSearchParams(window.location.search);
-        const hasDeepLink =
-          !!params &&
-          ["tab", "place", "post", "route", "story", "area"].some((key) =>
-            params.has(key),
-          );
+      // First account resolution: reconcile the tab with the real identity. The
+      // synchronous initialTab() already guessed from the cached identity hint;
+      // here we fix that guess when the hint was stale or absent — Tourists to
+      // the Routes tab (it carries the "Must-see today" deck), everyone else to
+      // Map. A share/deep link, or the user navigating during the load, wins.
+      if (!initialTabReconciled.current && nextAccount.status === "ready") {
+        initialTabReconciled.current = true;
+        const params = new URLSearchParams(window.location.search);
+        const hasDeepLink = DEEP_LINK_PARAMS.some((key) => params.has(key));
         if (!hasDeepLink && !initialShareHandled.current) {
-          setTab("routes");
+          const desiredTab: Tab =
+            nextAccount.profile.defaultIdentity === "TOURIST" ? "routes" : "map";
+          setTab((current) => (current === initialTabRef.current ? desiredTab : current));
         }
       }
       // Admin/organizer status drives the Admin workspace / Verified organizer
