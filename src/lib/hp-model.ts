@@ -1,5 +1,12 @@
 export type PlaceType =
-  "beach" | "culture" | "nature" | "food" | "local" | "village" | "night" | "sunset";
+  | "beach"
+  | "culture"
+  | "nature"
+  | "food"
+  | "local"
+  | "village"
+  | "night"
+  | "sunset";
 
 export type PlaceStatus = "quiet" | "active" | "popular" | "busy";
 
