@@ -4145,36 +4145,18 @@ function PulseAppInner() {
   }, []);
 
   useEffect(() => {
-    let ignore = false;
-    const loadAccount = async () => {
-      const nextAccount = await getCurrentPulseAccount().catch((error) => {
-        console.warn("Could not load account state.", error);
-        return { status: "signedOut" } as PulseAccountState;
-      });
-      if (ignore) return;
-      setAccount(nextAccount);
-      const profile =
-        nextAccount.status === "ready" || nextAccount.status === "needsProfile"
-          ? nextAccount.profile
-          : null;
-      if (profile) {
-        const summary = profileSummaryFromAccount(profile);
-        setPulseData((data) => ({
-          ...data,
-          profiles: [summary, ...data.profiles.filter((item) => item.id !== summary.id)],
-        }));
-      }
-    };
-
-    void loadAccount();
+    // refreshAccount() loads the account AND the admin/organizer status; loading
+    // only the account here left the Owner/Verified-organizer badges empty until
+    // the next save. Reuse the same path on mount and on every auth change.
+    void refreshAccount();
     const unsubscribe = subscribeToPulseAuth(() => {
-      void loadAccount();
+      void refreshAccount();
     });
 
     return () => {
-      ignore = true;
       unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
