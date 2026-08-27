@@ -1129,6 +1129,125 @@ function PulseFeed({
   );
 }
 
+/* ============== Tourist "Start here" ============== */
+function TouristStartHere({
+  places,
+  routes,
+  findAuthor,
+  onOpenPlace,
+  onOpenRoute,
+}: {
+  places: Place[];
+  routes: RouteItem[];
+  findAuthor: (id: string) => Author;
+  onOpenPlace: (place: Place) => void;
+  onOpenRoute: (route: RouteItem) => void;
+}) {
+  const { language, t } = useI18n();
+
+  // "Must-see today": the lively spots (popular/busy), strongest first. Falls back
+  // to a plain hotness ranking only if fewer than 5 places are flagged live.
+  const mustSee = useMemo(() => {
+    const live = places.filter(
+      (place) => place.status === "popular" || place.status === "busy",
+    );
+    const pool = live.length >= 5 ? live : places;
+    return [...pool].sort((a, b) => b.hotness - a.hotness).slice(0, 5);
+  }, [places]);
+
+  // Same "curated" filter the Routes screen uses: editor-authored routes only.
+  const visitorRoutes = useMemo(
+    () =>
+      routes
+        .filter((route) => findAuthor(route.authorId).type.includes("EDITOR"))
+        .sort((a, b) => b.saves - a.saves)
+        .slice(0, 3),
+    [findAuthor, routes],
+  );
+
+  return (
+    <div className="px-4 pb-28 pt-3">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+        {t("Welcome to Ilia")}
+      </div>
+      <h2 className="mb-1 text-2xl font-black text-hp-ink">{t("Start here")}</h2>
+      <p className="mb-5 text-[12px] text-hp-muted">
+        {t("A quick first look for visitors — the spots and routes to begin with.")}
+      </p>
+
+      {mustSee.length > 0 && (
+        <section className="mb-6 flex flex-col gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+              {language === "GR" ? `${mustSee.length} επιλογές` : `${mustSee.length} picks`}
+            </div>
+            <h3 className="text-[17px] font-black text-hp-ink">{t("Must-see today")}</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {mustSee.map((place) => (
+              <button
+                key={place.id}
+                type="button"
+                onClick={() => onOpenPlace(place)}
+                aria-label={t("Open {place}", { place: place.name })}
+                className="overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
+              >
+                <ImageBox
+                  src={place.imageUrl}
+                  alt={place.name}
+                  className="h-28 w-full"
+                  rounded="rounded-none"
+                />
+                <div className="p-2">
+                  <div
+                    className="text-[10px] font-bold uppercase tracking-wider"
+                    style={{ color: typeColor[place.type] }}
+                  >
+                    {place.type}
+                  </div>
+                  <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">
+                    {place.name}
+                  </div>
+                  <div className="text-[10px] text-hp-muted">{place.area}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {visitorRoutes.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+              {language === "GR"
+                ? `${visitorRoutes.length} επιλεγμένες`
+                : `${visitorRoutes.length} curated`}
+            </div>
+            <h3 className="text-[17px] font-black text-hp-ink">{t("Routes for visitors")}</h3>
+          </div>
+          {visitorRoutes.map((route) => (
+            <RouteCard
+              key={route.id}
+              route={route}
+              author={findAuthor(route.authorId)}
+              saved={false}
+              commentCount={route.commentCount}
+              onOpenRoute={onOpenRoute}
+            />
+          ))}
+        </section>
+      )}
+
+      {mustSee.length === 0 && visitorRoutes.length === 0 && (
+        <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
+          <h3 className="text-[15px] font-bold text-hp-ink">{t("Nothing to show yet")}</h3>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ============== Routes Screen ============== */
 function routeMatchesQuery(route: RouteItem, author: Author, query: string) {
   if (!query.trim()) return true;
@@ -3834,6 +3953,7 @@ export function PulseApp() {
   const [activeRouteStopIndex, setActiveRouteStopIndex] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const initialShareHandled = useRef(false);
+  const touristHomeApplied = useRef(false);
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const [storyViewer, setStoryViewer] = useState<{ placeId: string; storyId?: string } | null>(
     null,
@@ -4187,6 +4307,29 @@ export function PulseApp() {
         nextAccount.preferences?.language
       ) {
         setLanguage(nextAccount.preferences.language);
+      }
+      // Tourists land on the "Start here" home (Pulse tab) instead of the Map,
+      // once, on first account resolution — unless a share/deep link already
+      // picked a tab. Every other identity (and every account state without an
+      // identity) keeps the default Map tab untouched.
+      if (
+        !touristHomeApplied.current &&
+        nextAccount.status === "ready" &&
+        nextAccount.profile.defaultIdentity === "TOURIST"
+      ) {
+        touristHomeApplied.current = true;
+        const params =
+          typeof window === "undefined"
+            ? null
+            : new URLSearchParams(window.location.search);
+        const hasDeepLink =
+          !!params &&
+          ["tab", "place", "post", "route", "story", "area"].some((key) =>
+            params.has(key),
+          );
+        if (!hasDeepLink && !initialShareHandled.current) {
+          setTab("pulse");
+        }
       }
       // Admin/organizer status drives the Admin workspace / Verified organizer
       // badges; fetch it here too, not only through refreshAccount() on save.
@@ -5019,29 +5162,41 @@ export function PulseApp() {
     }
 
     if (tab === "pulse") {
+      const showTouristStartHere =
+        readyProfile(account)?.defaultIdentity === "TOURIST";
       return (
         <div className="relative h-full">
           <div className="h-full overflow-y-auto">
-            <PulseFeed
-              posts={filteredPosts}
-              storyGroups={placeStoryGroups}
-              activityTicks={activityTicks}
-              trendingPlace={trendingPlace}
-              onOpenStory={(placeId) => setStoryViewer({ placeId })}
-              likes={likes}
-              postLikes={postLikes}
-              toggleLike={toggleLike}
-              savedPosts={savedPosts}
-              toggleSavePost={toggleSavePost}
-              commentsByPost={postComments}
-              onOpenPost={setOpenPost}
-              onOpenMap={jumpToMap}
-              onShare={sharePost}
-              onTrendingGoing={markTrendingGoing}
-              findPlace={findPlace}
-              findAuthor={findAuthor}
-              findPostAuthor={findPostAuthor}
-            />
+            {showTouristStartHere ? (
+              <TouristStartHere
+                places={places}
+                routes={routes}
+                findAuthor={findAuthor}
+                onOpenPlace={setOpenPlace}
+                onOpenRoute={setOpenRoute}
+              />
+            ) : (
+              <PulseFeed
+                posts={filteredPosts}
+                storyGroups={placeStoryGroups}
+                activityTicks={activityTicks}
+                trendingPlace={trendingPlace}
+                onOpenStory={(placeId) => setStoryViewer({ placeId })}
+                likes={likes}
+                postLikes={postLikes}
+                toggleLike={toggleLike}
+                savedPosts={savedPosts}
+                toggleSavePost={toggleSavePost}
+                commentsByPost={postComments}
+                onOpenPost={setOpenPost}
+                onOpenMap={jumpToMap}
+                onShare={sharePost}
+                onTrendingGoing={markTrendingGoing}
+                findPlace={findPlace}
+                findAuthor={findAuthor}
+                findPostAuthor={findPostAuthor}
+              />
+            )}
           </div>
           {places.length > 0 && (
             <motion.button

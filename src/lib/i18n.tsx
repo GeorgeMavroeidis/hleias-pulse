@@ -357,6 +357,15 @@ const EL: Record<string, string> = {
     "Το αίτημά σου να γίνεις διοργανωτής εκδηλώσεων είναι σε αναμονή έγκρισης.",
   "Become an organizer": "Γίνε διοργανωτής",
   "Submitting…": "Υποβολή…",
+  // Tourist "Start here" home
+  "Welcome to Ilia": "Καλώς ήρθες στην Ηλεία",
+  "Start here": "Ξεκίνα από εδώ",
+  "A quick first look for visitors — the spots and routes to begin with.":
+    "Μια πρώτη ματιά για επισκέπτες — τα σημεία και οι διαδρομές για να ξεκινήσεις.",
+  "Must-see today": "Πρέπει να δεις σήμερα",
+  "Routes for visitors": "Διαδρομές για επισκέπτες",
+  "Open {place}": "Άνοιγμα {place}",
+  "Nothing to show yet": "Δεν υπάρχει κάτι να δείξουμε ακόμη",
 };
 
 function interpolate(message: string, params?: TranslationParams) {
