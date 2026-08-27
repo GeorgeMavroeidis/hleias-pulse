@@ -4008,10 +4008,16 @@ export function PulseApp() {
       });
   };
 
-  const refreshAccount = async () => {
+  const refreshAccount = useCallback(async () => {
     try {
       const nextAccount = await getCurrentPulseAccount();
       setAccount(nextAccount);
+      if (
+        (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
+        nextAccount.preferences?.language
+      ) {
+        setLanguage(nextAccount.preferences.language);
+      }
       if (nextAccount.status === "ready") {
         const nextAdminRole = await getAdminRole().catch(() => null);
         setAdminRole(nextAdminRole);
@@ -4037,7 +4043,7 @@ export function PulseApp() {
       setAdminRole(null);
       return fallback;
     }
-  };
+  }, [setLanguage]);
 
   const toggleAppLanguage = () => {
     const next = language === "GR" ? "EN" : "GR";
@@ -4139,43 +4145,15 @@ export function PulseApp() {
   }, [refreshPulseData]);
 
   useEffect(() => {
-    let ignore = false;
-    const loadAccount = async () => {
-      const nextAccount = await getCurrentPulseAccount().catch((error) => {
-        console.warn("Could not load account state.", error);
-        return { status: "signedOut" } as PulseAccountState;
-      });
-      if (ignore) return;
-      setAccount(nextAccount);
-      if (
-        (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
-        nextAccount.preferences?.language
-      ) {
-        setLanguage(nextAccount.preferences.language);
-      }
-      const profile =
-        nextAccount.status === "ready" || nextAccount.status === "needsProfile"
-          ? nextAccount.profile
-          : null;
-      if (profile) {
-        const summary = profileSummaryFromAccount(profile);
-        setPulseData((data) => ({
-          ...data,
-          profiles: [summary, ...data.profiles.filter((item) => item.id !== summary.id)],
-        }));
-      }
-    };
-
-    void loadAccount();
+    void refreshAccount();
     const unsubscribe = subscribeToPulseAuth(() => {
-      void loadAccount();
+      void refreshAccount();
     });
 
     return () => {
-      ignore = true;
       unsubscribe();
     };
-  }, [setLanguage]);
+  }, [refreshAccount]);
 
   useEffect(() => {
     let ignore = false;
