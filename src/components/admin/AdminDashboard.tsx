@@ -248,7 +248,7 @@ export function AdminDashboard() {
       console.error("Could not load admin data.", error);
       setNotice({
         tone: "error",
-        message: describeError(error, "Could not load admin data."),
+        message: describeError(error, t("Could not load admin data.")),
       });
     } finally {
       setLoading(false);
@@ -632,11 +632,11 @@ function PlaceEditor({
     try {
       setSaving(true);
       setImageUrl(await uploadContentMedia(file, "places"));
-      setNotice({ tone: "success", message: "Image uploaded. Save the place to attach it." });
+      setNotice({ tone: "success", message: t("Image uploaded. Save the place to attach it.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not upload image.",
+        message: error instanceof Error ? error.message : t("Could not upload image."),
       });
     } finally {
       setSaving(false);
@@ -645,7 +645,7 @@ function PlaceEditor({
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!name.trim() || !area.trim() || !short.trim() || !imageUrl.trim()) {
-      setNotice({ tone: "error", message: "Name, area, description, and image are required." });
+      setNotice({ tone: "error", message: t("Name, area, description, and image are required.") });
       return;
     }
     try {
@@ -676,11 +676,11 @@ function PlaceEditor({
         created_by_identity: "LOCAL",
       });
       await onSaved();
-      setNotice({ tone: "success", message: "Place saved." });
+      setNotice({ tone: "success", message: t("Place saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save place.",
+        message: error instanceof Error ? error.message : t("Could not save place."),
       });
     } finally {
       setSaving(false);
@@ -831,7 +831,7 @@ function PlaceEditor({
               className={inputClass}
               value={imageUrl}
               onChange={(event) => setImageUrl(event.target.value)}
-              placeholder="Image URL"
+              placeholder={t("Image URL")}
             />
             <label className="shrink-0 cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700">
               <ImagePlus size={16} />
@@ -845,7 +845,7 @@ function PlaceEditor({
           </div>
         </Field>
         {imageUrl && (
-          <img className="h-28 w-full rounded-lg object-cover" src={imageUrl} alt="Preview" />
+          <img className="h-28 w-full rounded-lg object-cover" src={imageUrl} alt={t("Preview")} />
         )}
         <ActionButton type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save place"}
@@ -919,7 +919,7 @@ function StoryEditor({
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not upload image.",
+        message: error instanceof Error ? error.message : t("Could not upload image."),
       });
     } finally {
       setSaving(false);
@@ -928,7 +928,7 @@ function StoryEditor({
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!placeId || !label.trim() || !mediaUrl.trim())
-      return setNotice({ tone: "error", message: "Place, label, and image are required." });
+      return setNotice({ tone: "error", message: t("Place, label, and image are required.") });
     try {
       setSaving(true);
       await saveAdminStory({
@@ -949,11 +949,11 @@ function StoryEditor({
         moderation_status: status,
       });
       await onSaved();
-      setNotice({ tone: "success", message: "Story saved." });
+      setNotice({ tone: "success", message: t("Story saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save story.",
+        message: error instanceof Error ? error.message : t("Could not save story."),
       });
     } finally {
       setSaving(false);
@@ -1061,7 +1061,7 @@ function StoryEditor({
           </div>
         </Field>
         {mediaUrl && (
-          <img className="h-28 w-full rounded-lg object-cover" src={mediaUrl} alt="Preview" />
+          <img className="h-28 w-full rounded-lg object-cover" src={mediaUrl} alt={t("Preview")} />
         )}
         <ActionButton type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save story"}
@@ -1136,7 +1136,7 @@ function MeetEditor({
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not upload image.",
+        message: error instanceof Error ? error.message : t("Could not upload image."),
       });
     } finally {
       setSaving(false);
@@ -1147,7 +1147,7 @@ function MeetEditor({
     if (!placeId || !title.trim() || !startsAt || !description.trim() || !coverUrl.trim())
       return setNotice({
         tone: "error",
-        message: "Place, title, time, description, and image are required.",
+        message: t("Place, title, time, description, and image are required."),
       });
     try {
       setSaving(true);
@@ -1176,11 +1176,11 @@ function MeetEditor({
         moderation_status: status,
       });
       await onSaved();
-      setNotice({ tone: "success", message: "Meet event saved." });
+      setNotice({ tone: "success", message: t("Meet event saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save event.",
+        message: error instanceof Error ? error.message : t("Could not save event."),
       });
     } finally {
       setSaving(false);
@@ -1270,7 +1270,7 @@ function MeetEditor({
           </div>
         </Field>
         {coverUrl && (
-          <img className="h-28 w-full rounded-lg object-cover" src={coverUrl} alt="Preview" />
+          <img className="h-28 w-full rounded-lg object-cover" src={coverUrl} alt={t("Preview")} />
         )}
         <ActionButton type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save event"}
@@ -1581,7 +1581,7 @@ function CulturalEventEditor({
           </div>
         </Field>
         {posterUrl && (
-          <img className="h-28 w-full rounded-lg object-cover" src={posterUrl} alt="Preview" />
+          <img className="h-28 w-full rounded-lg object-cover" src={posterUrl} alt={t("Preview")} />
         )}
         <ActionButton type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save event"}
@@ -1782,7 +1782,7 @@ function RouteEditor({
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not upload image.",
+        message: error instanceof Error ? error.message : t("Could not upload image."),
       });
     } finally {
       setSaving(false);
@@ -1805,7 +1805,7 @@ function RouteEditor({
     if (!title.trim() || !lede.trim() || !duration.trim() || !imageUrl.trim())
       return setNotice({
         tone: "error",
-        message: "Title, summary, duration, and image are required.",
+        message: t("Title, summary, duration, and image are required."),
       });
     const routeId = route?.id ?? `route-${slug(title)}-${Date.now()}`;
     try {
@@ -1828,11 +1828,11 @@ function RouteEditor({
         stops.map((stop, position) => ({ ...stop, route_id: routeId, position })),
       );
       await onSaved();
-      setNotice({ tone: "success", message: "Route and stops saved." });
+      setNotice({ tone: "success", message: t("Route and stops saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save route.",
+        message: error instanceof Error ? error.message : t("Could not save route."),
       });
     } finally {
       setSaving(false);
@@ -1908,7 +1908,9 @@ function RouteEditor({
             {stops.map((stop, index) => (
               <div key={index} className="rounded-xl border border-slate-200 p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-slate-500">Stop {index + 1}</span>
+                  <span className="text-xs font-black text-slate-500">
+                    {t("Stop {n}", { n: index + 1 })}
+                  </span>
                   <button
                     type="button"
                     onClick={() =>
@@ -2060,11 +2062,16 @@ function ModerationPanel({ data, canEdit, onSaved, setNotice }: PanelProps & { c
     try {
       await moderateContent(item.type, item.id, status);
       await onSaved();
-      setNotice({ tone: "success", message: `${item.type.replace("_", " ")} ${status}.` });
+      setNotice({
+        tone: "success",
+        message: t(status === "published" ? "{item} published." : "{item} hidden.", {
+          item: t(item.type.replace("_", " ")),
+        }),
+      });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not update moderation status.",
+        message: error instanceof Error ? error.message : t("Could not update moderation status."),
       });
     }
   };
@@ -2159,11 +2166,11 @@ function ModerationRow({
       if (item.type === "comment") await editAdminComment(item.id, text);
       await onEdited();
       setEditing(false);
-      setNotice({ tone: "success", message: "Content text updated." });
+      setNotice({ tone: "success", message: t("Content text updated.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not update content text.",
+        message: error instanceof Error ? error.message : t("Could not update content text."),
       });
     }
   };
@@ -2226,11 +2233,11 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
       await setAdminMember(selectedId, selectedRole);
       await onSaved();
       setSelectedId("");
-      setNotice({ tone: "success", message: "Team role saved." });
+      setNotice({ tone: "success", message: t("Team role saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save team role.",
+        message: error instanceof Error ? error.message : t("Could not save team role."),
       });
     }
   };
@@ -2271,7 +2278,7 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                             setNotice({
                               tone: "error",
                               message:
-                                error instanceof Error ? error.message : "Could not change role.",
+                                error instanceof Error ? error.message : t("Could not change role."),
                             }),
                           )
                       }
@@ -2294,7 +2301,7 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                                 message:
                                   error instanceof Error
                                     ? error.message
-                                    : "Could not remove member.",
+                                    : t("Could not remove member."),
                               }),
                             );
                       }}
