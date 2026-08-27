@@ -62,10 +62,13 @@ import {
   type PulseProfileSummary,
 } from "@/lib/hp-api";
 import {
+  clearPasswordRecoveryUrl,
   getCurrentPulseAccount,
+  hasPasswordRecoveryUrl,
   profileAvatarUrl,
   profileDisplayName,
   savePulseLanguage,
+  signOutPulseAccount,
   subscribeToPulseAuth,
   type PulseAccountProfile,
   type PulseAccountState,
@@ -92,7 +95,7 @@ import { LiveTicker } from "./LiveTicker";
 import { TrendingHero } from "./TrendingHero";
 import { MeetScreen } from "./MeetScreen";
 import { OnboardingGate } from "./OnboardingGate";
-import { AccountBubble, AccountSheet, AuthSheet } from "./AuthAccountSheets";
+import { AccountBubble, AccountSheet, AuthSheet, PasswordRecoverySheet } from "./AuthAccountSheets";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { buildPulseActivitySnapshot, type PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
 import { type StreakState } from "@/lib/hp/meet-store";
@@ -3803,6 +3806,7 @@ export function PulseApp() {
   const [composerPin, setComposerPin] = useState<{ lat: number; lng: number } | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
   const [account, setAccount] = useState<PulseAccountState>({ status: "loading" });
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -4186,8 +4190,17 @@ export function PulseApp() {
   }, [refreshActivitySnapshot]);
 
   useEffect(() => {
+    if (hasPasswordRecoveryUrl()) setPasswordRecoveryOpen(true);
+  }, []);
+
+  useEffect(() => {
     void refreshAccount();
-    const unsubscribe = subscribeToPulseAuth(() => {
+    const unsubscribe = subscribeToPulseAuth((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setAuthOpen(false);
+        setProfileOpen(false);
+        setPasswordRecoveryOpen(true);
+      }
       void refreshAccount();
     });
 
@@ -5127,6 +5140,25 @@ export function PulseApp() {
         onAuthenticated={async () => {
           const nextAccount = await refreshAccount();
           if (nextAccount.status === "needsProfile") setProfileOpen(true);
+        }}
+      />
+
+      <PasswordRecoverySheet
+        open={passwordRecoveryOpen}
+        onComplete={async () => {
+          clearPasswordRecoveryUrl();
+          setPasswordRecoveryOpen(false);
+          await refreshAccount();
+          showToast(t("Your password has been updated."));
+        }}
+        onCancel={async () => {
+          await signOutPulseAccount().catch((error) => {
+            console.warn("Could not close the password recovery session.", error);
+          });
+          clearPasswordRecoveryUrl();
+          setPasswordRecoveryOpen(false);
+          await refreshAccount();
+          setAuthOpen(true);
         }}
       />
 

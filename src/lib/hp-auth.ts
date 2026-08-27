@@ -1,3 +1,4 @@
+import type { AuthChangeEvent } from "@supabase/supabase-js";
 import type { Author } from "./hp-model";
 import { supabase } from "./supabase/client";
 import type { Database } from "./supabase/database.types";
@@ -171,9 +172,9 @@ export async function getCurrentPulseAccount(): Promise<PulseAccountState> {
   };
 }
 
-export function subscribeToPulseAuth(onChange: () => void) {
-  const { data } = supabase.auth.onAuthStateChange(() => {
-    onChange();
+export function subscribeToPulseAuth(onChange: (event: AuthChangeEvent) => void) {
+  const { data } = supabase.auth.onAuthStateChange((event) => {
+    onChange(event);
   });
   return () => data.subscription.unsubscribe();
 }
@@ -185,6 +186,39 @@ export async function signInWithPassword(email: string, password: string) {
   });
   if (result.error) throw result.error;
   return result.data;
+}
+
+export async function requestPulsePasswordReset(email: string) {
+  const redirectTo =
+    typeof window === "undefined"
+      ? undefined
+      : new URL("/?password-reset=1", window.location.origin).toString();
+  const result = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+  if (result.error) throw result.error;
+}
+
+export async function updatePulsePassword(password: string) {
+  const result = await supabase.auth.updateUser({ password });
+  if (result.error) throw result.error;
+  return result.data.user;
+}
+
+export function hasPasswordRecoveryUrl() {
+  if (typeof window === "undefined") return false;
+  const url = new URL(window.location.href);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  return url.searchParams.get("password-reset") === "1" || hash.get("type") === "recovery";
+}
+
+export function clearPasswordRecoveryUrl() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete("password-reset");
+
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  if (hash.get("type") === "recovery" || hash.has("access_token")) url.hash = "";
+
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 export async function signUpWithPassword({
