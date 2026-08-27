@@ -1130,6 +1130,14 @@ function PulseFeed({
 }
 
 /* ============== Tourist "Start here" ============== */
+// TEMP stopgap until a real `places.featured` flag exists (phase 2). Hotness
+// ranking alone buries Ancient Olympia — the region's headline site — at rank ~9
+// behind a wall of beaches, so it is pinned to the front of the "Must-see today"
+// deck by hand. REPLACE this list with a `places.featured` column set from the
+// admin panel once phase 2 is built; this is not meant to be permanent
+// architecture. See HANDOFF.md > Known Limitations.
+const TEMP_FEATURED_PLACE_IDS = ["ancient-olympia"];
+
 function TouristStartHere({
   places,
   routes,
@@ -1145,19 +1153,29 @@ function TouristStartHere({
 }) {
   const { language, t } = useI18n();
 
-  // "Must-see today": the lively spots (popular/busy), strongest first. Falls back
-  // to a plain hotness ranking only if fewer than 6 places are flagged live.
-  // Top 6 (not 5) so Ancient Olympia — the region's headline site, currently
-  // hotness 7 / popular / rank #6 — makes the deck with today's seed data.
-  // NOTE (possible phase 2): this hotness-driven pick is the immediate fix, not
-  // the final one. A `places.featured` flag set from the admin panel would give
-  // stable editorial control over this deck if we want it later.
+  // "Must-see today": TEMP_FEATURED_PLACE_IDS pinned to the front (in list order),
+  // then the remaining slots up to 6 filled by the normal ranking — lively spots
+  // (status popular/busy), strongest hotness first, skipping anything already
+  // pinned so it never shows twice. Falls back to a plain hotness ranking of all
+  // places only if fewer than 6 are flagged live.
+  // TODO(phase 2): drop TEMP_FEATURED_PLACE_IDS once `places.featured` exists and
+  // source the pinned set from that column instead.
   const mustSee = useMemo(() => {
+    const DECK_SIZE = 6;
+    const pinned = TEMP_FEATURED_PLACE_IDS.map((id) =>
+      places.find((place) => place.id === id),
+    ).filter((place): place is Place => Boolean(place));
+    const pinnedIds = new Set(pinned.map((place) => place.id));
+
     const live = places.filter(
       (place) => place.status === "popular" || place.status === "busy",
     );
-    const pool = live.length >= 6 ? live : places;
-    return [...pool].sort((a, b) => b.hotness - a.hotness).slice(0, 6);
+    const pool = live.length >= DECK_SIZE ? live : places;
+    const ranked = [...pool]
+      .filter((place) => !pinnedIds.has(place.id))
+      .sort((a, b) => b.hotness - a.hotness);
+
+    return [...pinned, ...ranked].slice(0, DECK_SIZE);
   }, [places]);
 
   // Same "curated" filter the Routes screen uses: editor-authored routes only.
