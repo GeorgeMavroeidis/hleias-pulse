@@ -293,7 +293,7 @@ Lint state:
 - Cloudflare drag-and-drop deploy serves the static frontend only.
 - OpenStreetMap tiles load from the public OSM tile server.
 - Seed images should be reviewed for licensing/source strategy before public production launch.
-- The Tourist "Start here" home ("Must-see today" deck) pins Ancient Olympia via a hardcoded `TEMP_FEATURED_PLACE_IDS` list in `src/components/hp/PulseApp.tsx` because the hotness ranking alone buries it. This is a temporary stopgap — replace it with a real `places.featured` column set from the admin panel (phase 2) and delete the constant.
+- The Tourist "Must-see today" deck (top of the Routes tab, shown only for `defaultIdentity === "TOURIST"`) pins Ancient Olympia via a hardcoded `TEMP_FEATURED_PLACE_IDS` list in `src/components/hp/PulseApp.tsx` because the hotness ranking alone buries it. This is a temporary stopgap — replace it with a real `places.featured` column set from the admin panel (phase 2) and delete the constant.
 
 ## Guardrails For Future Work
 

@@ -1129,7 +1129,7 @@ function PulseFeed({
   );
 }
 
-/* ============== Tourist "Start here" ============== */
+/* ============== "Must-see today" deck (Tourist orientation, Routes tab) ============== */
 // TEMP stopgap until a real `places.featured` flag exists (phase 2). Hotness
 // ranking alone buries Ancient Olympia — the region's headline site — at rank ~9
 // behind a wall of beaches, so it is pinned to the front of the "Must-see today"
@@ -1138,18 +1138,15 @@ function PulseFeed({
 // architecture. See HANDOFF.md > Known Limitations.
 const TEMP_FEATURED_PLACE_IDS = ["ancient-olympia"];
 
-function TouristStartHere({
+// Shown only to Tourist identities, at the top of the Routes tab. Places only —
+// route recommendations are already covered by the Routes tab's own "What we
+// recommend" (curated) section, so this deck deliberately does not repeat them.
+function MustSeeTodayDeck({
   places,
-  routes,
-  findAuthor,
   onOpenPlace,
-  onOpenRoute,
 }: {
   places: Place[];
-  routes: RouteItem[];
-  findAuthor: (id: string) => Author;
   onOpenPlace: (place: Place) => void;
-  onOpenRoute: (route: RouteItem) => void;
 }) {
   const { language, t } = useI18n();
 
@@ -1178,98 +1175,48 @@ function TouristStartHere({
     return [...pinned, ...ranked].slice(0, DECK_SIZE);
   }, [places]);
 
-  // Same "curated" filter the Routes screen uses: editor-authored routes only.
-  const visitorRoutes = useMemo(
-    () =>
-      routes
-        .filter((route) => findAuthor(route.authorId).type.includes("EDITOR"))
-        .sort((a, b) => b.saves - a.saves)
-        .slice(0, 3),
-    [findAuthor, routes],
-  );
+  if (mustSee.length === 0) return null;
 
   return (
-    // Bottom padding stays small: this block is always followed by a divider and
-    // the live PulseFeed (which carries its own pb-28) in the same scroll area.
-    <div className="px-4 pb-4 pt-3">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-        {t("Welcome to Ilia")}
-      </div>
-      <h2 className="mb-1 text-2xl font-black text-hp-ink">{t("Start here")}</h2>
-      <p className="mb-5 text-[12px] text-hp-muted">
-        {t("A quick first look for visitors — the spots and routes to begin with.")}
-      </p>
-
-      {mustSee.length > 0 && (
-        <section className="mb-6 flex flex-col gap-3">
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-              {language === "GR" ? `${mustSee.length} επιλογές` : `${mustSee.length} picks`}
-            </div>
-            <h3 className="text-[17px] font-black text-hp-ink">{t("Must-see today")}</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {mustSee.map((place) => (
-              <button
-                key={place.id}
-                type="button"
-                onClick={() => onOpenPlace(place)}
-                aria-label={t("Open {place}", { place: place.name })}
-                className="overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
-              >
-                <ImageBox
-                  src={place.imageUrl}
-                  alt={place.name}
-                  className="h-28 w-full"
-                  rounded="rounded-none"
-                />
-                <div className="p-2">
-                  <div
-                    className="text-[10px] font-bold uppercase tracking-wider"
-                    style={{ color: typeColor[place.type] }}
-                  >
-                    {place.type}
-                  </div>
-                  <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">
-                    {place.name}
-                  </div>
-                  <div className="text-[10px] text-hp-muted">{place.area}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {visitorRoutes.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-              {language === "GR"
-                ? `${visitorRoutes.length} επιλεγμένες`
-                : `${visitorRoutes.length} curated`}
-            </div>
-            <h3 className="text-[17px] font-black text-hp-ink">{t("Routes for visitors")}</h3>
-          </div>
-          {visitorRoutes.map((route) => (
-            <RouteCard
-              key={route.id}
-              route={route}
-              author={findAuthor(route.authorId)}
-              saved={false}
-              commentCount={route.commentCount}
-              onOpenRoute={onOpenRoute}
-            />
-          ))}
-        </section>
-      )}
-
-      {mustSee.length === 0 && visitorRoutes.length === 0 && (
-        <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
-          <h3 className="text-[15px] font-bold text-hp-ink">{t("Nothing to show yet")}</h3>
+    <section className="mb-6 flex flex-col gap-3">
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+          {language === "GR" ? `${mustSee.length} επιλογές` : `${mustSee.length} picks`}
         </div>
-      )}
-    </div>
+        <h3 className="text-[17px] font-black text-hp-ink">{t("Must-see today")}</h3>
+        <p className="text-[12px] text-hp-muted">
+          {t("A quick first look for visitors — the spots to begin with.")}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {mustSee.map((place) => (
+          <button
+            key={place.id}
+            type="button"
+            onClick={() => onOpenPlace(place)}
+            aria-label={t("Open {place}", { place: place.name })}
+            className="overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
+          >
+            <ImageBox
+              src={place.imageUrl}
+              alt={place.name}
+              className="h-28 w-full"
+              rounded="rounded-none"
+            />
+            <div className="p-2">
+              <div
+                className="text-[10px] font-bold uppercase tracking-wider"
+                style={{ color: typeColor[place.type] }}
+              >
+                {place.type}
+              </div>
+              <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">{place.name}</div>
+              <div className="text-[10px] text-hp-muted">{place.area}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1449,12 +1396,18 @@ function RoutesScreen({
   savedRoutes,
   routeComments,
   findAuthor,
+  showMustSee,
+  places,
+  onOpenPlace,
 }: {
   routes: RouteItem[];
   onOpenRoute: (r: RouteItem) => void;
   savedRoutes: Record<string, boolean>;
   routeComments: Record<string, Comment[]>;
   findAuthor: (id: string) => Author;
+  showMustSee: boolean;
+  places: Place[];
+  onOpenPlace: (place: Place) => void;
 }) {
   const { language, t } = useI18n();
   const [query, setQuery] = useState("");
@@ -1480,6 +1433,7 @@ function RoutesScreen({
       <p className="mb-4 text-[12px] text-hp-muted">
         {t("Curated local routes with practical stops.")}
       </p>
+      {showMustSee && <MustSeeTodayDeck places={places} onOpenPlace={onOpenPlace} />}
       <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
         <div className="flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
           <Search size={13} className="text-hp-muted" />
@@ -4333,10 +4287,10 @@ export function PulseApp() {
       ) {
         setLanguage(nextAccount.preferences.language);
       }
-      // Tourists land on the "Start here" home (Pulse tab) instead of the Map,
-      // once, on first account resolution — unless a share/deep link already
-      // picked a tab. Every other identity (and every account state without an
-      // identity) keeps the default Map tab untouched.
+      // Tourists land on the Routes tab (which carries the "Must-see today"
+      // orientation deck) instead of the Map, once, on first account resolution —
+      // unless a share/deep link already picked a tab. Every other identity (and
+      // every account state without an identity) keeps the default Map tab.
       if (
         !touristHomeApplied.current &&
         nextAccount.status === "ready" &&
@@ -4353,7 +4307,7 @@ export function PulseApp() {
             params.has(key),
           );
         if (!hasDeepLink && !initialShareHandled.current) {
-          setTab("pulse");
+          setTab("routes");
         }
       }
       // Admin/organizer status drives the Admin workspace / Verified organizer
@@ -5187,57 +5141,29 @@ export function PulseApp() {
     }
 
     if (tab === "pulse") {
-      const showTouristStartHere =
-        readyProfile(account)?.defaultIdentity === "TOURIST";
-      const pulseFeed = (
-        <PulseFeed
-          posts={filteredPosts}
-          storyGroups={placeStoryGroups}
-          activityTicks={activityTicks}
-          trendingPlace={trendingPlace}
-          onOpenStory={(placeId) => setStoryViewer({ placeId })}
-          likes={likes}
-          postLikes={postLikes}
-          toggleLike={toggleLike}
-          savedPosts={savedPosts}
-          toggleSavePost={toggleSavePost}
-          commentsByPost={postComments}
-          onOpenPost={setOpenPost}
-          onOpenMap={jumpToMap}
-          onShare={sharePost}
-          onTrendingGoing={markTrendingGoing}
-          findPlace={findPlace}
-          findAuthor={findAuthor}
-          findPostAuthor={findPostAuthor}
-        />
-      );
       return (
         <div className="relative h-full">
           <div className="h-full overflow-y-auto">
-            {showTouristStartHere ? (
-              <>
-                {/* Tourists see the curated "Start here" deck AND, below a clear
-                    divider, the same live feed everyone else gets. */}
-                <TouristStartHere
-                  places={places}
-                  routes={routes}
-                  findAuthor={findAuthor}
-                  onOpenPlace={setOpenPlace}
-                  onOpenRoute={setOpenRoute}
-                />
-                <div className="mx-4 mt-2 border-t border-hp-ink/10 pt-5">
-                  <h2 className="text-2xl font-black text-hp-ink">
-                    {t("Live around Ilia")}
-                  </h2>
-                  <p className="text-[12px] text-hp-muted">
-                    {t("Stories, trending spots and fresh posts from the community.")}
-                  </p>
-                </div>
-                {pulseFeed}
-              </>
-            ) : (
-              pulseFeed
-            )}
+            <PulseFeed
+              posts={filteredPosts}
+              storyGroups={placeStoryGroups}
+              activityTicks={activityTicks}
+              trendingPlace={trendingPlace}
+              onOpenStory={(placeId) => setStoryViewer({ placeId })}
+              likes={likes}
+              postLikes={postLikes}
+              toggleLike={toggleLike}
+              savedPosts={savedPosts}
+              toggleSavePost={toggleSavePost}
+              commentsByPost={postComments}
+              onOpenPost={setOpenPost}
+              onOpenMap={jumpToMap}
+              onShare={sharePost}
+              onTrendingGoing={markTrendingGoing}
+              findPlace={findPlace}
+              findAuthor={findAuthor}
+              findPostAuthor={findPostAuthor}
+            />
           </div>
           {places.length > 0 && (
             <motion.button
@@ -5267,6 +5193,9 @@ export function PulseApp() {
             savedRoutes={savedRoutes}
             routeComments={routeComments}
             findAuthor={findAuthor}
+            showMustSee={readyProfile(account)?.defaultIdentity === "TOURIST"}
+            places={places}
+            onOpenPlace={setOpenPlace}
           />
         </div>
       );
