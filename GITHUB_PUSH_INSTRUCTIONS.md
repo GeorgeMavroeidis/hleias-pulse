@@ -1,130 +1,88 @@
-# GitHub Push Instructions
+# GitHub Collaboration Instructions
 
-Use this checklist when pushing ΗΛΕΙΑ PULSE changes to GitHub.
+Use this checklist when changing ΗΛΕΙΑ PULSE.
 
 ## Repository
 
-GitHub repo:
+GitHub repository:
+
+```text
+GeorgeMavroeidis/hleias-pulse
+```
+
+Expected HTTPS remote:
+
+```text
+https://github.com/GeorgeMavroeidis/hleias-pulse.git
+```
+
+Check it with `git remote -v`. Do not change the remote unless the repository owner explicitly
+requests it.
+
+## Branch Rules
+
+- Never commit, push, merge, or make direct changes on `main`.
+- Never modify or merge `margaris-main` directly.
+- George's integration branch is `mavroeidis-main`.
+- Start every code task from an updated `mavroeidis-main` and create a descriptive
+  `codex/...` branch.
+- Push only the feature branch and merge it through a pull request.
+- Never force-push a shared branch.
 
 ```sh
-netizenofnetizens/ILIAS-PULSE
+git fetch origin
+git switch mavroeidis-main
+git pull --ff-only origin mavroeidis-main
+git switch -c codex/<descriptive-feature-name>
 ```
 
-Expected remote:
-
-```sh
-git@github.com-pulsegreece:netizenofnetizens/ILIAS-PULSE.git
-```
-
-Check it:
-
-```sh
-git remote -v
-```
-
-If it is wrong, set it:
-
-```sh
-git remote set-url origin git@github.com-pulsegreece:netizenofnetizens/ILIAS-PULSE.git
-```
-
-## Required Git Identity
-
-Commits for this repo should use the PULSEGREECE identity.
-
-Set it locally inside the repo:
-
-```sh
-git config user.name "PULSEGREECE"
-git config user.email "pulsegreece@users.noreply.github.com"
-```
-
-Verify:
-
-```sh
-git config user.name
-git config user.email
-```
-
-## SSH Setup
-
-Do not commit SSH keys. Only the public key belongs in GitHub account settings.
-
-Expected SSH host alias:
-
-```sshconfig
-Host github.com-pulsegreece
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/id_ed25519_pulsegreece
-  IdentitiesOnly yes
-```
-
-Test the key:
-
-```sh
-ssh -T github.com-pulsegreece
-```
-
-GitHub should say authentication succeeded. It may also say shell access is not provided; that part is normal.
-
-## Before Pushing
-
-Always check what changed:
+## Before Committing
 
 ```sh
 git status --short
 git diff --stat
-```
-
-Run the production build:
-
-```sh
+npm run lint
 npm run build
 ```
 
-For Cloudflare Worker/static asset deployment sanity:
+Review and stage only intentional files:
 
 ```sh
-npx wrangler deploy --dry-run
+git add <intentional-files>
+git diff --cached
 ```
+
+Do not stage `src/routeTree.gen.ts` when its only change is an unexplained line-ending rewrite.
 
 ## Commit And Push
 
-Stage only intentional files:
-
-```sh
-git add <files>
-```
-
-Commit:
+Create small, clear commits, then push only the feature branch:
 
 ```sh
 git commit -m "Short clear message"
+git push -u origin codex/<descriptive-feature-name>
 ```
 
-Push:
+Open a pull request targeting `mavroeidis-main`, then share the feature branch and PR link.
 
-```sh
-git push origin main
-```
+## Deployment And Database Safety
+
+- Do not run a production deployment without George's explicit approval.
+- Before adding, changing, or applying a Supabase migration, get George's explicit approval.
+- Never commit `.env` files, passwords, Supabase service-role keys, API tokens, private SSH keys,
+  or Cloudflare secrets.
+- If `package.json` changes, commit the matching `package-lock.json`.
+- Do not use `git reset --hard` or `git checkout -- .` to discard work.
+- If a push fails, check authentication and `git remote -v` before changing code.
 
 ## Cloudflare Build Settings
 
-Use these settings in Cloudflare Workers & Pages:
+Use these settings only for an approved deployment:
 
-```sh
+```text
 Build command: npm run build
 Deploy command: npx wrangler deploy
 Root directory: /
 ```
 
-Do not use Bun for this repo's Cloudflare build unless the lockfile and Cloudflare settings are intentionally changed together.
-
-## Safety Rules
-
-- Never commit `.env`, `.env.local`, private SSH keys, API tokens, or Cloudflare secrets.
-- Do not use `git reset --hard` or `git checkout -- .` unless you are intentionally deleting local work.
-- If `package.json` changes, commit the matching `package-lock.json`.
-- If Cloudflare fails during install, confirm it is using `npm run build`, not `bun run build`.
-- If a push fails, run `ssh -T github.com-pulsegreece` and check the remote URL before changing code.
+Do not use Bun unless the lockfile and Cloudflare settings are intentionally changed together.
