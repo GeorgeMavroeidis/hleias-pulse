@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { format, isToday, isTomorrow } from "date-fns";
-import { el } from "date-fns/locale";
 import {
   CalendarHeart,
   Check,
@@ -23,17 +22,7 @@ import {
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
 import { ImageBox } from "./ImageBox";
-import { useLang } from "@/lib/hp/language-context";
-import type { Lang } from "@/lib/hp/i18n";
-import {
-  MEET_CATEGORY_LABELS,
-  EVENT_CARD_STRINGS,
-  HOST_TYPE_LABELS,
-  openOnMapAriaLabel,
-  goingButtonLabel,
-  goingMaybeSummary,
-  spotsLeftLabel,
-} from "@/lib/hp/meet-strings";
+import { useI18n, type AppLanguage } from "@/lib/i18n";
 
 const CATEGORY_ICONS: Record<MeetCategory, LucideIcon> = {
   panigyri: CalendarHeart,
@@ -54,17 +43,20 @@ interface Props {
   onOpenPlace: (placeId: string) => void;
 }
 
-function formatWhen(lang: Lang, iso: string): string {
+function formatWhen(iso: string, language: AppLanguage): string {
   const d = new Date(iso);
-  const options = lang === "GR" ? { locale: el } : undefined;
-  const time = format(d, "HH:mm", options);
-  if (isToday(d)) return `${EVENT_CARD_STRINGS.today[lang]} · ${time}`;
-  if (isTomorrow(d)) return `${EVENT_CARD_STRINGS.tomorrow[lang]} · ${time}`;
-  return `${format(d, "EEE d MMM", options)} · ${time}`;
+  const time = format(d, "HH:mm");
+  if (isToday(d)) return `${language === "GR" ? "Σήμερα" : "Today"} · ${time}`;
+  if (isTomorrow(d)) return `${language === "GR" ? "Αύριο" : "Tomorrow"} · ${time}`;
+  return `${new Intl.DateTimeFormat(language === "GR" ? "el-GR" : "en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(d)} · ${time}`;
 }
 
 export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: Props) {
-  const { lang } = useLang();
+  const { language, t } = useI18n();
   const meta = MEET_CATEGORY_META[event.category];
   const CategoryIcon = CATEGORY_ICONS[event.category];
   const goingDisplay = event.going;
@@ -84,7 +76,9 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
         type="button"
         onClick={() => onOpenPlace(event.placeId)}
         className="relative block w-full text-left"
-        aria-label={openOnMapAriaLabel(lang, placeName)}
+        aria-label={
+          language === "GR" ? `Άνοιγμα ${placeName} στον χάρτη` : `Open ${placeName} on the map`
+        }
       >
         <div className="relative h-32 w-full">
           <ImageBox
@@ -100,11 +94,11 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
             className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-paper shadow"
             style={{ background: meta.tone }}
           >
-            <CategoryIcon size={10} strokeWidth={2.6} /> {MEET_CATEGORY_LABELS[event.category][lang]}
+            <CategoryIcon size={10} strokeWidth={2.6} /> {t(meta.label)}
           </span>
           {event.hot && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset px-1.5 py-1 text-[9px] font-black uppercase tracking-wide text-hp-paper shadow">
-              <Flame size={9} /> {EVENT_CARD_STRINGS.hot[lang]}
+              <Flame size={9} /> Hot
             </span>
           )}
         </div>
@@ -128,11 +122,11 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
           <div className="min-w-0 flex-1">
             <div className="truncate text-[11.5px] font-bold text-hp-ink">
               {event.hostName}{" "}
-              <span className="font-semibold text-hp-muted">· {HOST_TYPE_LABELS[event.hostType][lang]}</span>
+              <span className="font-semibold text-hp-muted">· {event.hostType.toLowerCase()}</span>
             </div>
           </div>
           <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-hp-deep">
-            <Clock size={11} /> {formatWhen(lang, event.happensAt)}
+            <Clock size={11} /> {formatWhen(event.happensAt, language)}
           </span>
         </div>
 
@@ -150,11 +144,16 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
             ))}
           </div>
           <span className="text-[11px] font-bold text-hp-ink/80">
-            {goingMaybeSummary(lang, goingDisplay, event.maybe)}
+            {language === "GR" ? `${goingDisplay} συμμετέχουν` : `${goingDisplay} going`}
+            {event.maybe > 0
+              ? language === "GR"
+                ? ` · ${event.maybe} ίσως`
+                : ` · ${event.maybe} maybe`
+              : ""}
           </span>
           {event.capacity && (
             <span className="ml-auto text-[10px] font-bold text-hp-muted">
-              {spotsLeftLabel(lang, event.capacity - goingDisplay)}
+              {event.capacity - goingDisplay} {language === "GR" ? "θέσεις" : "spots"}
             </span>
           )}
         </div>
@@ -181,7 +180,13 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
             }`}
           >
             {isGoing ? <Check size={14} /> : null}
-            {goingButtonLabel(lang, isGoing)}
+            {language === "GR"
+              ? isGoing
+                ? "Θα πάω"
+                : "Συμμετέχω"
+              : isGoing
+                ? "I'm going"
+                : "I'm in"}
           </button>
           <button
             type="button"
@@ -191,7 +196,7 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
               isMaybe ? "bg-hp-purple/15 text-hp-purple" : "border border-hp-ink/12 text-hp-ink/70"
             }`}
           >
-            {EVENT_CARD_STRINGS.maybe[lang]}
+            {language === "GR" ? "Ίσως" : "Maybe"}
           </button>
         </div>
       </div>

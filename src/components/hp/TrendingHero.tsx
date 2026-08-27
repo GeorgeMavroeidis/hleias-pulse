@@ -2,14 +2,7 @@ import { motion } from "framer-motion";
 import { Flame, MapPin, Users } from "lucide-react";
 import type { Place } from "@/lib/hp-model";
 import { ImageBox } from "./ImageBox";
-import { useLang } from "@/lib/hp/language-context";
-import {
-  TRENDING_STATUS_LABELS,
-  trendingNowAriaLabel,
-  trendingTonightBadge,
-  hereRecentlyLabel,
-  IM_GOING,
-} from "@/lib/hp/pulse-strings";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   place: Place;
@@ -18,13 +11,20 @@ interface Props {
   onGoing: (place: Place) => void;
 }
 
+const STATUS_LABEL: Record<Place["status"], string> = {
+  quiet: "Quiet",
+  active: "Warming up",
+  popular: "Busy",
+  busy: "Packed",
+};
+
 /**
  * Big "trending tonight" hero above the feed. Bridges Map ↔ Feed ↔ Meet: tapping
  * the card opens the place; "I'm going" writes an RSVP. The crowd gauge + stacked
  * avatars are the social-proof engine.
  */
 export function TrendingHero({ place, index, onOpen, onGoing }: Props) {
-  const { lang } = useLang();
+  const { t } = useI18n();
   const isHot = place.status === "busy" || place.status === "popular";
   const gauge = Math.min(1, place.hotness / 10);
 
@@ -38,7 +38,7 @@ export function TrendingHero({ place, index, onOpen, onGoing }: Props) {
       <button
         type="button"
         onClick={() => onOpen(place)}
-        aria-label={trendingNowAriaLabel(lang, place.name)}
+        aria-label={t("Trending now: {place}. Open details.", { place: place.name })}
         className="relative block h-52 w-full text-left"
       >
         <ImageBox
@@ -53,7 +53,7 @@ export function TrendingHero({ place, index, onOpen, onGoing }: Props) {
         {/* Hot badge */}
         <div className="absolute left-3 top-3 flex items-center gap-1.5">
           <span className="inline-flex items-center gap-1 rounded-full bg-hp-sunset px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-hp-paper shadow-lg">
-            <Flame size={11} /> {trendingTonightBadge(lang, index + 1)}
+            <Flame size={11} /> #{index + 1} {t("tonight")}
           </span>
         </div>
 
@@ -66,7 +66,7 @@ export function TrendingHero({ place, index, onOpen, onGoing }: Props) {
               style={{ width: `${Math.round(gauge * 100)}%` }}
             />
           </span>
-          <span>{TRENDING_STATUS_LABELS[place.status][lang]}</span>
+          <span>{t(STATUS_LABEL[place.status])}</span>
         </div>
 
         {/* Title block */}
@@ -93,7 +93,9 @@ export function TrendingHero({ place, index, onOpen, onGoing }: Props) {
               ))}
             </div>
             <span className="text-[11px] font-bold text-hp-paper/90">
-              {hereRecentlyLabel(lang, place.recentPostCount + place.commentCount)}
+              {t("{count} here recently", {
+                count: place.recentPostCount + place.commentCount,
+              })}
             </span>
           </div>
         </div>
@@ -117,7 +119,7 @@ export function TrendingHero({ place, index, onOpen, onGoing }: Props) {
           }}
           className="ml-auto inline-flex items-center gap-1 rounded-full bg-hp-ink px-3.5 py-2 text-[12px] font-bold text-hp-paper transition active:scale-95 max-[360px]:mr-12"
         >
-          {IM_GOING[lang]}
+          {t("I'm going")}
         </button>
       </div>
     </motion.article>

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { AdminRole } from "@/lib/admin-api";
 import type { OrganizerStatus } from "@/lib/hp/cultural-events-types";
+import { useI18n } from "@/lib/i18n";
 import {
   normalizeHandle,
   profileAvatarUrl,
@@ -28,24 +29,11 @@ import {
   type PulseAccountProfile,
   type PulseAccountState,
 } from "@/lib/hp-auth";
-import { useLang } from "@/lib/hp/language-context";
-import type { Lang } from "@/lib/hp/i18n";
-import {
-  ACCOUNT_BUBBLE_STRINGS,
-  PROFILE_IDENTITY_LABELS,
-  PROFILE_IDENTITY_HELPERS,
-  ACCOUNT_IDENTITY_LABELS,
-  AUTH_SHEET_STRINGS,
-  ORGANIZER_SECTION_STRINGS,
-  openTeamToolsLabel,
-  ACCOUNT_SHEET_STRINGS,
-  savedSummaryLabel,
-} from "@/lib/hp/account-strings";
 
-const PROFILE_IDENTITY_IDS: Extract<AccountIdentity, "LOCAL" | "TOURIST" | "GUIDE">[] = [
-  "LOCAL",
-  "TOURIST",
-  "GUIDE",
+const PROFILE_IDENTITIES: { id: AccountIdentity; label: string; helper: string }[] = [
+  { id: "LOCAL", label: "Local", helper: "Area signal" },
+  { id: "TOURIST", label: "Tourist", helper: "Visitor view" },
+  { id: "GUIDE", label: "Guide", helper: "Recs and routes" },
 ];
 
 function accountProfile(account: PulseAccountState) {
@@ -75,10 +63,10 @@ function fieldClass() {
   return "w-full rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none placeholder:text-hp-muted";
 }
 
-function authErrorMessage(lang: Lang, error: unknown) {
-  const message = error instanceof Error ? error.message : AUTH_SHEET_STRINGS.errorAuthFailed[lang];
+function authErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "Authentication failed.";
   return /confirm|confirmation|verify|verification/i.test(message)
-    ? AUTH_SHEET_STRINGS.errorAuthDidNotStart[lang]
+    ? "This account needs email verification before it can sign in."
     : message;
 }
 
@@ -91,7 +79,7 @@ export function AccountBubble({
   onOpenAccount: () => void;
   onOpenAuth: () => void;
 }) {
-  const { lang } = useLang();
+  const { t } = useI18n();
   const profile = accountProfile(account);
   const avatarUrl = profileAvatarUrl(profile);
   const needsProfile = account.status === "needsProfile";
@@ -103,7 +91,7 @@ export function AccountBubble({
       type="button"
       onClick={signedIn ? onOpenAccount : onOpenAuth}
       className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
-      aria-label={signedIn ? ACCOUNT_BUBBLE_STRINGS.openAccountSettings[lang] : ACCOUNT_BUBBLE_STRINGS.signIn[lang]}
+      aria-label={t(signedIn ? "Account settings" : "Sign in")}
     >
       {avatarUrl ? (
         <img src={avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -132,7 +120,7 @@ export function AuthSheet({
   onClose: () => void;
   onAuthenticated: () => Promise<void>;
 }) {
-  const { lang } = useLang();
+  const { t } = useI18n();
   const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -166,11 +154,11 @@ export function AuthSheet({
 
       const normalizedHandle = normalizeHandle(handle);
       if (displayName.trim().length < 2) {
-        setError(AUTH_SHEET_STRINGS.errorDisplayNameLength[lang]);
+        setError(t("Use a display name with at least 2 characters."));
         return;
       }
       if (normalizedHandle.length < 3) {
-        setError(AUTH_SHEET_STRINGS.errorHandleLength[lang]);
+        setError(t("Use a handle with at least 3 letters, numbers, dots, or underscores."));
         return;
       }
 
@@ -182,14 +170,8 @@ export function AuthSheet({
       });
 
       if (result.status === "needsConfirmation") {
-        try {
-          await signInWithPassword(email, password);
-          await onAuthenticated();
-          onClose();
-        } catch (signInError) {
-          console.warn("Could not start session after signup.", signInError);
-          setError(AUTH_SHEET_STRINGS.errorAutoSignInFailed[lang]);
-        }
+        setMessage(t("Account created. Check your email to confirm it, then sign in."));
+        setMode("signIn");
         return;
       }
 
@@ -204,7 +186,7 @@ export function AuthSheet({
       onClose();
     } catch (submitError) {
       console.warn("Could not authenticate.", submitError);
-      setError(authErrorMessage(lang, submitError));
+      setError(t(authErrorMessage(submitError)));
     } finally {
       setSaving(false);
     }
@@ -223,7 +205,7 @@ export function AuthSheet({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label={AUTH_SHEET_STRINGS.closeAuthentication[lang]}
+            aria-label={t("Close")}
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -232,22 +214,24 @@ export function AuthSheet({
             transition={{ type: "spring", damping: 30, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label={mode === "signIn" ? AUTH_SHEET_STRINGS.signInTitle[lang] : AUTH_SHEET_STRINGS.createAccount[lang]}
+            aria-label={t(mode === "signIn" ? "Sign in" : "Create account")}
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-black text-hp-ink">
-                  {mode === "signIn" ? AUTH_SHEET_STRINGS.signInTitle[lang] : AUTH_SHEET_STRINGS.createProfileTitle[lang]}
+                  {t(mode === "signIn" ? "Sign in" : "Create profile")}
                 </h3>
-                <p className="mt-0.5 text-[11px] text-hp-muted">{AUTH_SHEET_STRINGS.subtitle[lang]}</p>
+                <p className="mt-0.5 text-[11px] text-hp-muted">
+                  {t("Posts and comments will use this identity.")}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-9 w-9 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-                aria-label={AUTH_SHEET_STRINGS.closeAuthentication[lang]}
+                aria-label={t("Close")}
               >
                 <X size={16} />
               </button>
@@ -255,8 +239,8 @@ export function AuthSheet({
 
             <div className="mb-3 grid grid-cols-2 rounded-full border border-hp-ink/10 bg-white/50 p-1">
               {[
-                { id: "signIn" as const, label: AUTH_SHEET_STRINGS.signInTab[lang] },
-                { id: "signUp" as const, label: AUTH_SHEET_STRINGS.newTab[lang] },
+                { id: "signIn" as const, label: t("Sign in") },
+                { id: "signUp" as const, label: t("New") },
               ].map((option) => (
                 <button
                   key={option.id}
@@ -279,48 +263,48 @@ export function AuthSheet({
             <form onSubmit={submit} className="space-y-3">
               {mode === "signUp" && (
                 <>
-                  <Field label={AUTH_SHEET_STRINGS.displayName[lang]}>
+                  <Field label={t("Display name")}>
                     <input
                       value={displayName}
                       onChange={(event) => setDisplayName(event.target.value)}
                       autoComplete="name"
                       className={fieldClass()}
-                      placeholder={AUTH_SHEET_STRINGS.displayNamePlaceholder[lang]}
+                      placeholder="Theo from Pyrgos"
                     />
                   </Field>
-                  <Field label={AUTH_SHEET_STRINGS.handle[lang]}>
+                  <Field label={t("Handle")}>
                     <input
                       value={handle}
                       onChange={(event) => setHandle(normalizeHandle(event.target.value))}
                       autoComplete="username"
                       className={fieldClass()}
-                      placeholder={AUTH_SHEET_STRINGS.handlePlaceholder[lang]}
+                      placeholder="ilia.local"
                     />
                   </Field>
                   <div>
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {AUTH_SHEET_STRINGS.defaultIdentity[lang]}
+                      {t("Default identity")}
                     </div>
                     <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                      {PROFILE_IDENTITY_IDS.map((option) => {
-                        const active = identity === option;
+                      {PROFILE_IDENTITIES.map((option) => {
+                        const active = identity === option.id;
                         return (
                           <button
-                            key={option}
+                            key={option.id}
                             type="button"
-                            onClick={() => setIdentity(option)}
+                            onClick={() => setIdentity(option.id)}
                             aria-pressed={active}
                             className={`rounded-xl px-2 py-2 text-left transition ${
                               active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                             }`}
                           >
-                            <span className="block text-[11px] font-black">{PROFILE_IDENTITY_LABELS[option][lang]}</span>
+                            <span className="block text-[11px] font-black">{t(option.label)}</span>
                             <span
                               className={`block truncate text-[9px] font-semibold ${
                                 active ? "text-hp-paper/65" : "text-hp-muted"
                               }`}
                             >
-                              {PROFILE_IDENTITY_HELPERS[option][lang]}
+                              {t(option.helper)}
                             </span>
                           </button>
                         );
@@ -330,7 +314,7 @@ export function AuthSheet({
                 </>
               )}
 
-              <Field label={AUTH_SHEET_STRINGS.email[lang]}>
+              <Field label={t("Email")}>
                 <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
                   <Mail size={14} className="text-hp-muted" />
                   <input
@@ -339,12 +323,12 @@ export function AuthSheet({
                     onChange={(event) => setEmail(event.target.value)}
                     autoComplete="email"
                     className="w-full bg-transparent text-[13px] text-hp-ink outline-none placeholder:text-hp-muted"
-                    placeholder={AUTH_SHEET_STRINGS.emailPlaceholder[lang]}
+                    placeholder="you@example.com"
                     required
                   />
                 </div>
               </Field>
-              <Field label={AUTH_SHEET_STRINGS.password[lang]}>
+              <Field label={t("Password")}>
                 <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
                   <LockKeyhole size={14} className="text-hp-muted" />
                   <input
@@ -353,7 +337,7 @@ export function AuthSheet({
                     onChange={(event) => setPassword(event.target.value)}
                     autoComplete={mode === "signIn" ? "current-password" : "new-password"}
                     className="w-full bg-transparent text-[13px] text-hp-ink outline-none placeholder:text-hp-muted"
-                    placeholder={AUTH_SHEET_STRINGS.passwordPlaceholder[lang]}
+                    placeholder={t("Minimum 6 characters")}
                     minLength={6}
                     required
                   />
@@ -372,7 +356,7 @@ export function AuthSheet({
                 disabled={saving}
                 className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
               >
-                {saving ? AUTH_SHEET_STRINGS.working[lang] : mode === "signIn" ? AUTH_SHEET_STRINGS.signInTitle[lang] : AUTH_SHEET_STRINGS.createAccount[lang]}
+                {saving ? t("Working...") : t(mode === "signIn" ? "Sign in" : "Create account")}
               </button>
             </form>
           </motion.div>
@@ -391,7 +375,7 @@ function OrganizerSection({
   onApply: () => Promise<void>;
   onOpenComposer: () => void;
 }) {
-  const { lang } = useLang();
+  const { t } = useI18n();
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -401,11 +385,7 @@ function OrganizerSection({
     try {
       await onApply();
     } catch (applyError) {
-      setError(
-        applyError instanceof Error
-          ? applyError.message
-          : ORGANIZER_SECTION_STRINGS.errorSendApplication[lang],
-      );
+      setError(applyError instanceof Error ? applyError.message : t("Could not send application."));
     } finally {
       setApplying(false);
     }
@@ -422,8 +402,8 @@ function OrganizerSection({
           <Ticket size={16} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[13px] font-black text-hp-ink">{ORGANIZER_SECTION_STRINGS.verifiedOrganizer[lang]}</span>
-          <span className="block text-[11px] text-hp-muted">{ORGANIZER_SECTION_STRINGS.submitCulturalEvent[lang]}</span>
+          <span className="block text-[13px] font-black text-hp-ink">{t("Verified organizer")}</span>
+          <span className="block text-[11px] text-hp-muted">{t("Submit a cultural event")}</span>
         </span>
       </button>
     );
@@ -432,18 +412,20 @@ function OrganizerSection({
   if (status?.verificationStatus === "pending") {
     return (
       <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-[12px] font-semibold text-hp-muted">
-        {ORGANIZER_SECTION_STRINGS.pendingApproval[lang]}
+        {t("Your request to become an events organizer is pending approval.")}
       </div>
     );
   }
 
   return (
     <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
-      <div className="text-[13px] font-black text-hp-ink">{ORGANIZER_SECTION_STRINGS.promptTitle[lang]}</div>
-      <p className="mt-0.5 text-[11px] text-hp-muted">{ORGANIZER_SECTION_STRINGS.promptBody[lang]}</p>
+      <div className="text-[13px] font-black text-hp-ink">{t("Do you organize events?")}</div>
+      <p className="mt-0.5 text-[11px] text-hp-muted">
+        {t("Become an organizer to submit theater shows, concerts, and festivals.")}
+      </p>
       {status?.verificationStatus === "rejected" && (
         <p className="mt-1 text-[11px] font-semibold text-red-600">
-          {ORGANIZER_SECTION_STRINGS.rejected[lang]}
+          {t("Your previous request was rejected.")}
         </p>
       )}
       {error && <p className="mt-1 text-[11px] font-semibold text-red-600">{error}</p>}
@@ -453,7 +435,7 @@ function OrganizerSection({
         disabled={applying}
         className="mt-2 w-full rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper disabled:opacity-60"
       >
-        {applying ? ORGANIZER_SECTION_STRINGS.submitting[lang] : ORGANIZER_SECTION_STRINGS.becomeOrganizer[lang]}
+        {applying ? t("Submitting…") : t("Become an organizer")}
       </button>
     </div>
   );
@@ -491,7 +473,7 @@ export function AccountSheet({
   onApplyOrganizer: () => Promise<void>;
   onOpenOrganizerComposer: () => void;
 }) {
-  const { lang } = useLang();
+  const { t } = useI18n();
   const profile = accountProfile(account);
   const userId = accountUserId(account);
   const email = accountEmail(account);
@@ -526,11 +508,11 @@ export function AccountSheet({
     if (!userId) return;
     const normalizedHandle = normalizeHandle(handle);
     if (displayName.trim().length < 2) {
-      setError(ACCOUNT_SHEET_STRINGS.errorDisplayNameLength[lang]);
+      setError(t("Use a display name with at least 2 characters."));
       return;
     }
     if (normalizedHandle.length < 3) {
-      setError(ACCOUNT_SHEET_STRINGS.errorHandleLength[lang]);
+      setError(t("Use a handle with at least 3 letters, numbers, dots, or underscores."));
       return;
     }
 
@@ -550,12 +532,12 @@ export function AccountSheet({
         avatarUrl: avatar?.avatarUrl,
       });
       await onSaved();
-      setMessage(ACCOUNT_SHEET_STRINGS.profileSaved[lang]);
+      setMessage(t("Profile saved."));
       setAvatarFile(null);
       setAvatarPreview(null);
     } catch (submitError) {
       console.warn("Could not save profile.", submitError);
-      setError(submitError instanceof Error ? submitError.message : ACCOUNT_SHEET_STRINGS.errorSaveProfile[lang]);
+      setError(submitError instanceof Error ? submitError.message : "Could not save profile.");
     } finally {
       setSaving(false);
     }
@@ -570,7 +552,7 @@ export function AccountSheet({
       onClose();
     } catch (signOutError) {
       console.warn("Could not sign out.", signOutError);
-      setError(signOutError instanceof Error ? signOutError.message : ACCOUNT_SHEET_STRINGS.errorSignOut[lang]);
+      setError(signOutError instanceof Error ? signOutError.message : "Could not sign out.");
     } finally {
       setSaving(false);
     }
@@ -591,7 +573,7 @@ export function AccountSheet({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label={ACCOUNT_SHEET_STRINGS.closeAccountSettings[lang]}
+            aria-label={t("Close")}
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -600,22 +582,24 @@ export function AccountSheet({
             transition={{ type: "spring", damping: 30, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label={ACCOUNT_SHEET_STRINGS.accountSettingsDialog[lang]}
+            aria-label={t("Account settings")}
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-bg p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-black text-hp-ink">
-                  {account.status === "needsProfile" ? ACCOUNT_SHEET_STRINGS.completeProfile[lang] : ACCOUNT_SHEET_STRINGS.account[lang]}
+                  {t(account.status === "needsProfile" ? "Complete profile" : "Account settings")}
                 </h3>
-                <p className="mt-0.5 text-[11px] text-hp-muted">{ACCOUNT_SHEET_STRINGS.subtitle[lang]}</p>
+                <p className="mt-0.5 text-[11px] text-hp-muted">
+                  {t("Your visible identity across posts and comments.")}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-9 w-9 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-                aria-label={ACCOUNT_SHEET_STRINGS.closeAccountSettings[lang]}
+                aria-label={t("Close")}
               >
                 <X size={16} />
               </button>
@@ -626,8 +610,12 @@ export function AccountSheet({
                 <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-hp-sunset text-hp-paper">
                   <UserCircle2 size={24} />
                 </div>
-                <h4 className="text-[15px] font-black text-hp-ink">{ACCOUNT_SHEET_STRINGS.signInToCreateProfile[lang]}</h4>
-                <p className="mt-1 text-[12px] text-hp-muted">{ACCOUNT_SHEET_STRINGS.savedCanStayPrivate[lang]}</p>
+                <h4 className="text-[15px] font-black text-hp-ink">
+                  {t("Sign in to create a profile")}
+                </h4>
+                <p className="mt-1 text-[12px] text-hp-muted">
+                  Saved items can stay private, but posting needs a real profile.
+                </p>
                 <button
                   type="button"
                   onClick={() => {
@@ -636,7 +624,7 @@ export function AccountSheet({
                   }}
                   className="mt-4 w-full rounded-full bg-hp-ink py-3 text-[13px] font-bold text-hp-paper"
                 >
-                  {ACCOUNT_SHEET_STRINGS.signIn[lang]}
+                  {t("Sign in")}
                 </button>
               </div>
             ) : (
@@ -646,7 +634,7 @@ export function AccountSheet({
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border border-hp-ink/10 bg-hp-ink text-hp-paper"
-                    aria-label={ACCOUNT_SHEET_STRINGS.uploadProfileImage[lang]}
+                    aria-label={t("Upload profile image")}
                   >
                     {avatarUrl ? (
                       <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -669,10 +657,10 @@ export function AccountSheet({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[13px] font-black text-hp-ink">
-                          {ACCOUNT_SHEET_STRINGS.adminWorkspace[lang]}
+                          {t("Admin workspace")}
                         </span>
                         <span className="block text-[11px] text-hp-muted">
-                          {openTeamToolsLabel(lang, adminRole)}
+                          Open team tools · {adminRole}
                         </span>
                       </span>
                     </button>
@@ -698,10 +686,10 @@ export function AccountSheet({
                       )}
                     </div>
                     <div className="truncate text-[11.5px] font-bold text-hp-muted">
-                      {email ?? ACCOUNT_SHEET_STRINGS.signedIn[lang]}
+                      {email ?? "Signed in"}
                     </div>
                     <div className="mt-1 inline-flex rounded-full bg-hp-sunset/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-hp-sunset">
-                      {ACCOUNT_IDENTITY_LABELS[identity][lang]}
+                      {identity}
                     </div>
                   </div>
                 </div>
@@ -714,7 +702,7 @@ export function AccountSheet({
 
                 <form onSubmit={submit} className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
-                    <Field label={AUTH_SHEET_STRINGS.displayName[lang]}>
+                    <Field label={t("Display name")}>
                       <input
                         value={displayName}
                         onChange={(event) => setDisplayName(event.target.value)}
@@ -722,7 +710,7 @@ export function AccountSheet({
                         className={fieldClass()}
                       />
                     </Field>
-                    <Field label={AUTH_SHEET_STRINGS.handle[lang]}>
+                    <Field label={t("Handle")}>
                       <input
                         value={handle}
                         onChange={(event) => setHandle(normalizeHandle(event.target.value))}
@@ -734,28 +722,28 @@ export function AccountSheet({
 
                   <div>
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {ACCOUNT_SHEET_STRINGS.postingIdentity[lang]}
+                      {t("Default identity")}
                     </div>
                     <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                      {PROFILE_IDENTITY_IDS.map((option) => {
-                        const active = identity === option;
+                      {PROFILE_IDENTITIES.map((option) => {
+                        const active = identity === option.id;
                         return (
                           <button
-                            key={option}
+                            key={option.id}
                             type="button"
-                            onClick={() => setIdentity(option)}
+                            onClick={() => setIdentity(option.id)}
                             aria-pressed={active}
                             className={`rounded-xl px-2 py-2 text-left transition ${
                               active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                             }`}
                           >
-                            <span className="block text-[11px] font-black">{PROFILE_IDENTITY_LABELS[option][lang]}</span>
+                            <span className="block text-[11px] font-black">{t(option.label)}</span>
                             <span
                               className={`block truncate text-[9px] font-semibold ${
                                 active ? "text-hp-paper/65" : "text-hp-muted"
                               }`}
                             >
-                              {PROFILE_IDENTITY_HELPERS[option][lang]}
+                              {t(option.helper)}
                             </span>
                           </button>
                         );
@@ -763,33 +751,33 @@ export function AccountSheet({
                     </div>
                   </div>
 
-                  <Field label={ACCOUNT_SHEET_STRINGS.homeArea[lang]}>
+                  <Field label={t("Home area")}>
                     <input
                       value={homeArea}
                       onChange={(event) => setHomeArea(event.target.value)}
                       autoComplete="address-level2"
-                      placeholder={ACCOUNT_SHEET_STRINGS.homeAreaPlaceholder[lang]}
+                      placeholder="Pyrgos, Katakolo, Ancient Olympia..."
                       className={fieldClass()}
                     />
                   </Field>
 
-                  <Field label={ACCOUNT_SHEET_STRINGS.bio[lang]}>
+                  <Field label={t("Bio")}>
                     <textarea
                       value={bio}
                       onChange={(event) => setBio(event.target.value)}
                       rows={3}
                       maxLength={240}
-                      placeholder={ACCOUNT_SHEET_STRINGS.bioPlaceholder[lang]}
+                      placeholder="One line about your Ilia taste."
                       className={`${fieldClass()} resize-none`}
                     />
                   </Field>
 
                   <div className="grid grid-cols-4 gap-2">
                     {[
-                      { n: stats.posts, l: ACCOUNT_SHEET_STRINGS.posts[lang] },
-                      { n: stats.tips, l: ACCOUNT_SHEET_STRINGS.tips[lang] },
-                      { n: stats.rsvps, l: ACCOUNT_SHEET_STRINGS.going[lang] },
-                      { n: stats.routesSaved, l: ACCOUNT_SHEET_STRINGS.routes[lang] },
+                      { n: stats.posts, l: "Posts" },
+                      { n: stats.tips, l: "Tips" },
+                      { n: stats.rsvps, l: "Going" },
+                      { n: stats.routesSaved, l: "Routes" },
                     ].map((stat) => (
                       <div
                         key={stat.l}
@@ -799,7 +787,7 @@ export function AccountSheet({
                           {stat.n}
                         </div>
                         <div className="mt-1 text-[9.5px] font-bold uppercase tracking-wide text-hp-muted">
-                          {stat.l}
+                          {t(stat.l)}
                         </div>
                       </div>
                     ))}
@@ -814,9 +802,10 @@ export function AccountSheet({
                       <Save size={16} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-black text-hp-ink">{ACCOUNT_SHEET_STRINGS.saved[lang]}</span>
+                      <span className="block text-[13px] font-black text-hp-ink">{t("Saved")}</span>
                       <span className="block text-[11px] text-hp-muted">
-                        {savedSummaryLabel(lang, saved.placeCount, saved.postCount, saved.routeCount)}
+                        {saved.placeCount} places · {saved.postCount} posts · {saved.routeCount}{" "}
+                        routes
                       </span>
                     </span>
                   </button>
@@ -834,14 +823,14 @@ export function AccountSheet({
                       disabled={saving}
                       className="rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                     >
-                      {saving ? ACCOUNT_SHEET_STRINGS.saving[lang] : ACCOUNT_SHEET_STRINGS.saveProfile[lang]}
+                      {saving ? t("Working...") : t("Save profile")}
                     </button>
                     <button
                       type="button"
                       onClick={signOut}
                       disabled={saving}
                       className="grid h-11 w-11 place-items-center rounded-full border border-hp-ink/15 text-hp-ink disabled:opacity-45"
-                      aria-label={ACCOUNT_SHEET_STRINGS.signOut[lang]}
+                      aria-label={t("Sign out")}
                     >
                       <LogOut size={15} />
                     </button>

@@ -30,6 +30,7 @@ import {
   Send,
   ExternalLink,
   LockKeyhole,
+  RefreshCw,
   Ticket,
   type LucideIcon,
 } from "lucide-react";
@@ -69,10 +70,12 @@ import {
   getCurrentPulseAccount,
   profileAvatarUrl,
   profileDisplayName,
+  savePulseLanguage,
   subscribeToPulseAuth,
   type PulseAccountProfile,
   type PulseAccountState,
 } from "@/lib/hp-auth";
+import { useI18n } from "@/lib/i18n";
 import { getAdminRole, type AdminRole } from "@/lib/admin-api";
 import { ImageBox } from "./ImageBox";
 import {
@@ -95,6 +98,7 @@ import { TrendingHero } from "./TrendingHero";
 import { MeetScreen } from "./MeetScreen";
 import { CulturalEventsScreen } from "./CulturalEventsScreen";
 import { OrganizerEventComposer } from "./OrganizerEventComposer";
+import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet } from "./AuthAccountSheets";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
@@ -107,67 +111,12 @@ import {
   type MeetEvent,
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
-import type {
-  CreateCulturalEventInput,
-  CulturalEvent,
-  OrganizerStatus,
+import {
+  DEFAULT_ORGANIZER_BIO,
+  type CreateCulturalEventInput,
+  type CulturalEvent,
+  type OrganizerStatus,
 } from "@/lib/hp/cultural-events-types";
-import { DEFAULT_ORGANIZER_BIO } from "@/lib/hp/cultural-events-types";
-import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
-import { LanguageProvider, useLang } from "@/lib/hp/language-context";
-import {
-  ROUTES_STRINGS,
-  ROUTE_FILTER_LABELS,
-  routesCuratedEyebrow,
-  routesCommunityEyebrow,
-  readRouteAriaLabel,
-  routeStopsLabel,
-  activeRouteLabel,
-} from "@/lib/hp/routes-strings";
-import { NAV_TAB_LABELS, MEET_SUB_TAB_LABELS, TOP_BAR_STRINGS } from "@/lib/hp/nav-strings";
-import {
-  MAP_BOTTOM_SHEET_STRINGS,
-  setSheetAriaLabel,
-  clusteredPlacesCountLabel,
-  storiesFromAreaLabel,
-  openStoriesForPlaceAriaLabel,
-  postsCountLabel,
-  eventsCountLabel,
-  openInOpenStreetMapAriaLabel,
-  sharePlaceAriaLabel,
-} from "@/lib/hp/map-strings";
-import {
-  PLACE_DETAIL_STRINGS,
-  placeDetailsAriaLabel,
-  placeStoriesCountLabel,
-  openPlaceStoriesAriaLabel,
-  postCommentOnAriaLabel,
-  POST_DETAIL_STRINGS,
-  postAtAriaLabel,
-  ROUTE_ARTICLE_STRINGS,
-  routeAriaLabel,
-  openInOpenStreetMapAriaLabel as modalOpenInOsmAriaLabel,
-  shareAriaLabel,
-} from "@/lib/hp/modal-strings";
-import {
-  COMPOSER_STRINGS,
-  COMPOSER_MODE_LABELS,
-  POSTING_IDENTITY_LABELS,
-  POSTING_IDENTITY_HELPERS,
-  CROWD_OPTION_LABELS,
-  BUDGET_OPTION_LABELS,
-  PARKING_OPTION_LABELS,
-  STORY_CONDITION_LABELS,
-  PLACE_TYPE_LABELS,
-  usingPlaceImageLabel,
-  storyPhotoUsingLabel,
-} from "@/lib/hp/composer-strings";
-import {
-  PULSE_FEED_STRINGS,
-  PULSE_FILTER_LABELS,
-  openPostAboutAriaLabel,
-  openPostDetailsAriaLabel,
-} from "@/lib/hp/pulse-strings";
 
 type Tab = "map" | "pulse" | "routes" | "meet" | "saved";
 type NavTab = Exclude<Tab, "saved">;
@@ -184,15 +133,19 @@ type CreateStoryInput = {
 };
 type PostingIdentity = Extract<Author["type"], "LOCAL" | "TOURIST" | "GUIDE">;
 
-const POSTING_IDENTITY_IDS: PostingIdentity[] = ["LOCAL", "TOURIST", "GUIDE"];
+const POSTING_IDENTITIES: { id: PostingIdentity; label: string; helper: string }[] = [
+  { id: "LOCAL", label: "Local", helper: "I know the area" },
+  { id: "TOURIST", label: "Tourist", helper: "I am visiting" },
+  { id: "GUIDE", label: "Guide", helper: "I can recommend" },
+];
 const ROUTE_FILTERS = ["All", "Beach", "Nature", "Culture", "No car", "Free"] as const;
 type RouteFilter = (typeof ROUTE_FILTERS)[number];
 
-const TAB_ITEMS: { id: NavTab; Icon: LucideIcon }[] = [
-  { id: "map", Icon: MapIcon },
-  { id: "pulse", Icon: Radio },
-  { id: "routes", Icon: RouteIcon },
-  { id: "meet", Icon: CalendarHeart },
+const TAB_ITEMS: { id: NavTab; label: string; Icon: LucideIcon }[] = [
+  { id: "map", label: "Map", Icon: MapIcon },
+  { id: "pulse", label: "Pulse", Icon: Radio },
+  { id: "routes", label: "Routes", Icon: RouteIcon },
+  { id: "meet", label: "Meet", Icon: CalendarHeart },
 ];
 type ShareTarget = {
   type: "app" | "place" | "post" | "route" | "story";
@@ -362,6 +315,7 @@ function Toast({ msg }: { msg: string | null }) {
 interface TopBarProps {
   query: string;
   setQuery: (query: string) => void;
+  onToggleLanguage: () => void;
   showSearch: boolean;
   setShowSearch: Dispatch<SetStateAction<boolean>>;
   account: PulseAccountState;
@@ -372,13 +326,14 @@ interface TopBarProps {
 function TopBar({
   query,
   setQuery,
+  onToggleLanguage,
   showSearch,
   setShowSearch,
   account,
   onOpenAccount,
   onOpenAuth,
 }: TopBarProps) {
-  const { lang, setLang } = useLang();
+  const { language, t } = useI18n();
   return (
     <div className="relative z-30 border-b border-hp-ink/10 bg-hp-paper/95 backdrop-blur">
       <div className="flex items-center justify-between px-4 pt-2.5">
@@ -401,24 +356,24 @@ function TopBar({
             type="button"
             onClick={() => setShowSearch((s) => !s)}
             className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
-            aria-label={showSearch ? TOP_BAR_STRINGS.closeSearch[lang] : TOP_BAR_STRINGS.openSearch[lang]}
+            aria-label={t(showSearch ? "Close search" : "Open search")}
             aria-expanded={showSearch}
           >
             <Search size={16} />
           </button>
           <button
             type="button"
-            onClick={() => setLang((current) => (current === "GR" ? "EN" : "GR"))}
+            onClick={onToggleLanguage}
             className="rounded-full border border-hp-ink/10 px-2.5 py-1.5 text-[11px] font-bold tracking-wider text-hp-ink/80"
-            aria-label={TOP_BAR_STRINGS.toggleLanguage[lang]}
+            aria-label={t("Toggle language")}
           >
-            {lang === "GR" ? "GR / en" : "gr / EN"}
+            {language === "GR" ? "GR / en" : "gr / EN"}
           </button>
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
       <div className="px-4 pb-1.5 pt-0.5">
-        <p className="text-[12px] text-hp-muted">{TOP_BAR_STRINGS.tagline[lang]}</p>
+        <p className="text-[12px] text-hp-muted">{t("Local spots, routes, and tips.")}</p>
       </div>
       <AnimatePresence>
         {showSearch && (
@@ -432,11 +387,15 @@ function TopBar({
               <Search size={14} className="text-hp-muted" />
               <input
                 name="hp-search"
-                aria-label={TOP_BAR_STRINGS.searchAppAriaLabel[lang]}
+                aria-label={t("Search ΗΛΕΙΑ PULSE")}
                 autoComplete="off"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={TOP_BAR_STRINGS.searchPlaceholder[lang]}
+                placeholder={
+                  language === "GR"
+                    ? "παραλία, πανηγύρι, ηλιοβασίλεμα…"
+                    : "beach, panigyri, sunset…"
+                }
                 className="w-full bg-transparent text-sm outline-none placeholder:text-hp-muted"
               />
             </div>
@@ -522,7 +481,7 @@ function MapBottomSheet({
   onSharePlace: (place: Place) => void;
   savedPlaceIds: string[];
 }) {
-  const { lang } = useLang();
+  const { t } = useI18n();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
   const isSelectedCollapsed = Boolean(cluster) && height <= peek + 8;
   const isExpanded = Boolean(cluster) && height >= full - 24;
@@ -642,15 +601,15 @@ function MapBottomSheet({
         {cluster && !isSelectedCollapsed && (
           <div className="flex justify-center gap-2 pt-2">
             {[
-              { h: peek, label: "collapsed" as const },
-              { h: half, label: "preview" as const },
-              { h: full, label: "full" as const },
+              { h: peek, label: "collapsed" },
+              { h: half, label: "preview" },
+              { h: full, label: "full" },
             ].map((s) => (
               <button
                 key={s.label}
                 type="button"
                 onClick={() => onSetSnap(s.h)}
-                aria-label={setSheetAriaLabel(lang, s.label)}
+                aria-label={t("Set sheet to {position}", { position: t(s.label) })}
                 className={`h-1 w-6 rounded-full transition ${Math.abs(height - s.h) < 4 ? "bg-hp-ink" : "bg-hp-ink/15"}`}
               />
             ))}
@@ -689,14 +648,14 @@ function MapBottomSheet({
 }
 
 function TonightPulseContent() {
-  const { lang } = useLang();
+  const { t } = useI18n();
   return (
     <div>
       <div>
         <div className="mb-2">
-          <h3 className="text-[16px] font-black text-hp-ink">{MAP_BOTTOM_SHEET_STRINGS.tonightsPulse[lang]}</h3>
+          <h3 className="text-[16px] font-black text-hp-ink">{t("Tonight's pulse")}</h3>
         </div>
-        <p className="text-[12px] text-hp-muted">{MAP_BOTTOM_SHEET_STRINGS.tapBubbleHint[lang]}</p>
+        <p className="text-[12px] text-hp-muted">{t("Tap a bubble to see what's happening.")}</p>
       </div>
     </div>
   );
@@ -725,7 +684,7 @@ function AreaSheetContent({
   onSharePlace: (place: Place) => void;
   onOpenDetails: (p: Place) => void;
 }) {
-  const { lang } = useLang();
+  const { language, t } = useI18n();
   const placeIds = new Set(cluster.places.map((place) => place.id));
   const isPlaceSheet = Boolean(selectedPlace && placeIds.has(selectedPlace.id));
   const areaStoryGroups = storyGroups.filter((group) => placeIds.has(group.placeId));
@@ -757,16 +716,18 @@ function AreaSheetContent({
             </div>
             <h3 className="mt-1 text-[16px] font-black text-hp-ink">{cluster.name}</h3>
             <p className="text-[11px] text-hp-muted">
-              {clusteredPlacesCountLabel(lang, cluster.places.length)}
+              {language === "GR"
+                ? `${cluster.places.length} σημεία σε αυτή την περιοχή`
+                : `${cluster.places.length} clustered places in this area`}
             </p>
             <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
               <span className="inline-flex items-center gap-0.5">
                 <Radio size={11} />
-                {postsCountLabel(lang, cluster.postCount)}
+                {cluster.postCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
               </span>
               <span className="inline-flex items-center gap-0.5">
                 <Clock size={11} />
-                {eventsCountLabel(lang, cluster.eventCount)}
+                {cluster.eventCount} {language === "GR" ? "εκδηλώσεις" : "events"}
               </span>
             </div>
           </div>
@@ -774,7 +735,7 @@ function AreaSheetContent({
 
         <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-            {MAP_BOTTOM_SHEET_STRINGS.clusteredElements[lang]}
+            {language === "GR" ? "Σημεία της περιοχής" : "Clustered elements"}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {cluster.places.map((place) => (
@@ -792,7 +753,7 @@ function AreaSheetContent({
           <div className="mt-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                {storiesFromAreaLabel(lang, cluster.name)}
+                {language === "GR" ? `Stories από ${cluster.name}` : `Stories from ${cluster.name}`}
               </span>
               <span className="text-[10px] font-semibold text-hp-muted">
                 {areaStoryGroups.length}
@@ -806,7 +767,11 @@ function AreaSheetContent({
                     key={group.placeId}
                     type="button"
                     onClick={() => onOpenStory(group.placeId)}
-                    aria-label={openStoriesForPlaceAriaLabel(lang, group.placeName)}
+                    aria-label={
+                      language === "GR"
+                        ? `Άνοιγμα stories για ${group.placeName}`
+                        : `Open stories for ${group.placeName}`
+                    }
                     className="flex w-14 shrink-0 flex-col items-center gap-1"
                   >
                     <div className="rounded-full p-[2px]" style={{ background: tone.gradient }}>
@@ -857,7 +822,7 @@ function AreaSheetContent({
               style={{ background: typeColor[focusPlace.type] }}
             />
             <span>
-              {PLACE_TYPE_LABELS[focusPlace.type][lang]} · {focusPlace.bestTime}
+              {focusPlace.type} · {focusPlace.bestTime}
             </span>
           </div>
           <h3 className="mt-1 text-[16px] font-black text-hp-ink">{focusPlace.name}</h3>
@@ -867,11 +832,11 @@ function AreaSheetContent({
           <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
             <span className="inline-flex items-center gap-0.5">
               <Radio size={11} />
-              {postsCountLabel(lang, focusPlace.recentPostCount)}
+              {focusPlace.recentPostCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
             </span>
             <span className="inline-flex items-center gap-0.5">
               <Clock size={11} />
-              {eventsCountLabel(lang, placeEvents.length)}
+              {placeEvents.length} {language === "GR" ? "εκδηλώσεις" : "events"}
             </span>
           </div>
         </div>
@@ -902,21 +867,20 @@ function AreaSheetContent({
           onClick={() => onSavePlace(focusPlace.id)}
           className={`flex-1 whitespace-nowrap rounded-full border py-2 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
         >
-          <Bookmark size={13} className="mr-1 inline" />{" "}
-          {saved ? MAP_BOTTOM_SHEET_STRINGS.saved[lang] : MAP_BOTTOM_SHEET_STRINGS.save[lang]}
+          <Bookmark size={13} className="mr-1 inline" /> {t(saved ? "Saved" : "Save")}
         </button>
         <button
           type="button"
           onClick={() => onOpenDetails(focusPlace)}
           className="flex-1 whitespace-nowrap rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper"
         >
-          {MAP_BOTTOM_SHEET_STRINGS.details[lang]}
+          {language === "GR" ? "Λεπτομέρειες" : "Details"}
         </button>
         <a
           href={openStreetMapUrl(focusPlace)}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={openInOpenStreetMapAriaLabel(lang, focusPlace.name)}
+          aria-label={t("Open {place} in OpenStreetMap", { place: focusPlace.name })}
           className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
         >
           <ExternalLink size={13} />
@@ -924,7 +888,7 @@ function AreaSheetContent({
         <button
           type="button"
           onClick={() => onSharePlace(focusPlace)}
-          aria-label={sharePlaceAriaLabel(lang, focusPlace.name)}
+          aria-label={t("Share {place}", { place: focusPlace.name })}
           className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
         >
           <Share2 size={13} />
@@ -974,9 +938,9 @@ function PulseFeed({
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
 }) {
-  const { lang } = useLang();
-  const [filter, setFilter] = useState<keyof typeof PULSE_FILTER_LABELS>("Now");
-  const filters = Object.keys(PULSE_FILTER_LABELS) as (keyof typeof PULSE_FILTER_LABELS)[];
+  const { t } = useI18n();
+  const [filter, setFilter] = useState("Now");
+  const filters = ["Now", "Tonight", "Weekend", "Local tips"];
   const visiblePosts = posts.filter((post) => {
     const place = findPlace(post.placeId);
     const author = findPostAuthor(post);
@@ -1024,7 +988,7 @@ function PulseFeed({
             aria-pressed={filter === f}
             className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold ${filter === f ? "bg-hp-ink text-hp-paper" : "border border-hp-ink/10 text-hp-ink/70"}`}
           >
-            {PULSE_FILTER_LABELS[f][lang]}
+            {t(f)}
           </button>
         ))}
       </div>
@@ -1039,6 +1003,11 @@ function PulseFeed({
       )}
 
       <div className="flex flex-col gap-3">
+        {visiblePosts.length === 0 && (
+          <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-white/45 px-5 py-10 text-center text-[13px] text-hp-muted">
+            {t("No posts match this filter yet.")}
+          </div>
+        )}
         {visiblePosts.map((post) => {
           const p = findPlace(post.placeId);
           const a = findPostAuthor(post);
@@ -1082,7 +1051,7 @@ function PulseFeed({
                   type="button"
                   onClick={() => toggleSavePost(post.id)}
                   className={`p-1 ${sv ? "text-hp-sunset" : "text-hp-ink/40"}`}
-                  aria-label={sv ? PULSE_FEED_STRINGS.unsavePost[lang] : PULSE_FEED_STRINGS.savePost[lang]}
+                  aria-label={t(sv ? "Unsave post" : "Save post")}
                 >
                   <Bookmark size={16} fill={sv ? "currentColor" : "none"} />
                 </button>
@@ -1092,7 +1061,7 @@ function PulseFeed({
                 type="button"
                 onClick={() => onOpenPost(post)}
                 className="mt-2 block w-full text-left"
-                aria-label={openPostAboutAriaLabel(lang, p.name)}
+                aria-label={`Open post about ${p.name}`}
               >
                 <ImageBox
                   src={post.imageUrl}
@@ -1107,7 +1076,7 @@ function PulseFeed({
                   type="button"
                   onClick={() => onOpenPost(post)}
                   className="block w-full select-none text-left"
-                  aria-label={openPostDetailsAriaLabel(lang, p.name)}
+                  aria-label={`Open post details for ${p.name}`}
                 >
                   <p className="text-[13px] leading-snug text-hp-ink">{post.text}</p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -1123,7 +1092,7 @@ function PulseFeed({
                     type="button"
                     onClick={() => toggleLike(post.id)}
                     className={`inline-flex items-center gap-1 ${liked ? "text-hp-sunset" : ""}`}
-                    aria-label={liked ? PULSE_FEED_STRINGS.unlikePost[lang] : PULSE_FEED_STRINGS.likePost[lang]}
+                    aria-label={t(liked ? "Unlike post" : "Like post")}
                   >
                     <Heart size={15} fill={liked ? "currentColor" : "none"} /> {lc}
                   </button>
@@ -1131,14 +1100,14 @@ function PulseFeed({
                     type="button"
                     onClick={() => onOpenPost(post)}
                     className="inline-flex items-center gap-1"
-                    aria-label={PULSE_FEED_STRINGS.openComments[lang]}
+                    aria-label={t("Open comments")}
                   >
                     <MessageCircle size={15} /> {commentCount}
                   </button>
                   <button
                     type="button"
                     onClick={() => onShare(post)}
-                    aria-label={PULSE_FEED_STRINGS.sharePost[lang]}
+                    aria-label={t("Share post")}
                     className="inline-flex items-center"
                   >
                     <Share2 size={15} className="text-hp-ink/50" />
@@ -1148,7 +1117,7 @@ function PulseFeed({
                     onClick={() => onOpenMap(p.id)}
                     className="ml-auto inline-flex items-center gap-1 rounded-full border border-hp-ink/10 px-2.5 py-1 text-[11px] font-semibold"
                   >
-                    <MapIcon size={12} /> {PULSE_FEED_STRINGS.openOnMap[lang]}
+                    <MapIcon size={12} /> {t("open on map")}
                   </button>
                 </div>
               </div>
@@ -1203,14 +1172,13 @@ function RouteCard({
   commentCount: number;
   onOpenRoute: (route: RouteItem) => void;
 }) {
-  const { lang } = useLang();
   return (
     <motion.button
       type="button"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={() => onOpenRoute(route)}
-      aria-label={readRouteAriaLabel(lang, route.title)}
+      aria-label={`Read route ${route.title}`}
       className="overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper text-left"
     >
       <div className="relative">
@@ -1265,7 +1233,7 @@ function RouteCard({
             <Wallet size={11} />
             {route.budget}
           </span>
-          <span>{routeStopsLabel(lang, route.stops.length)}</span>
+          <span>{route.stops.length} stops</span>
           <span className="ml-auto inline-flex items-center gap-2">
             <span className="inline-flex items-center gap-0.5">
               <MessageCircle size={11} />
@@ -1278,7 +1246,7 @@ function RouteCard({
           </span>
         </div>
         <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-hp-ink px-4 py-2 text-[12px] font-bold text-hp-paper">
-          {ROUTES_STRINGS.readRoute[lang]}
+          Read route
         </div>
       </div>
     </motion.button>
@@ -1344,7 +1312,7 @@ function RoutesScreen({
   routeComments: Record<string, Comment[]>;
   findAuthor: (id: string) => Author;
 }) {
-  const { lang } = useLang();
+  const { language, t } = useI18n();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<RouteFilter>("All");
   const visibleRoutes = useMemo(
@@ -1364,8 +1332,10 @@ function RoutesScreen({
 
   return (
     <div className="px-4 pb-28 pt-3">
-      <h2 className="mb-1 text-2xl font-black text-hp-ink">{ROUTES_STRINGS.screenTitle[lang]}</h2>
-      <p className="mb-4 text-[12px] text-hp-muted">{ROUTES_STRINGS.screenSubtitle[lang]}</p>
+      <h2 className="mb-1 text-2xl font-black text-hp-ink">{t("Routes")}</h2>
+      <p className="mb-4 text-[12px] text-hp-muted">
+        {t("Curated local routes with practical stops.")}
+      </p>
       <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
         <div className="flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
           <Search size={13} className="text-hp-muted" />
@@ -1373,9 +1343,9 @@ function RoutesScreen({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             name="route-search"
-            aria-label={ROUTES_STRINGS.searchAriaLabel[lang]}
+            aria-label={t("Search routes")}
             autoComplete="off"
-            placeholder={ROUTES_STRINGS.searchPlaceholder[lang]}
+            placeholder={t("Search routes, budget, area...")}
             className="w-full bg-transparent text-[13px] outline-none placeholder:text-hp-muted"
           />
         </div>
@@ -1394,7 +1364,7 @@ function RoutesScreen({
                     : "border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
                 }`}
               >
-                {ROUTE_FILTER_LABELS[option][lang]}
+                {t(option)}
               </button>
             );
           })}
@@ -1402,8 +1372,12 @@ function RoutesScreen({
       </div>
       <div className="flex flex-col gap-6">
         <RouteSection
-          title={ROUTES_STRINGS.recommendedTitle[lang]}
-          eyebrow={routesCuratedEyebrow(lang, recommendedRoutes.length)}
+          title={language === "GR" ? "Οι προτάσεις μας" : "What we recommend"}
+          eyebrow={
+            language === "GR"
+              ? `${recommendedRoutes.length} επιλεγμένες`
+              : `${recommendedRoutes.length} curated`
+          }
           routes={recommendedRoutes}
           savedRoutes={savedRoutes}
           routeComments={routeComments}
@@ -1411,8 +1385,12 @@ function RoutesScreen({
           onOpenRoute={onOpenRoute}
         />
         <RouteSection
-          title={ROUTES_STRINGS.communityTitle[lang]}
-          eyebrow={routesCommunityEyebrow(lang, localRoutes.length)}
+          title={language === "GR" ? "Προτείνουν οι ντόπιοι" : "Locals recommend"}
+          eyebrow={
+            language === "GR"
+              ? `${localRoutes.length} από την κοινότητα`
+              : `${localRoutes.length} community`
+          }
           routes={localRoutes}
           savedRoutes={savedRoutes}
           routeComments={routeComments}
@@ -1421,8 +1399,10 @@ function RoutesScreen({
         />
         {visibleRoutes.length === 0 && (
           <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
-            <h3 className="text-[15px] font-bold text-hp-ink">{ROUTES_STRINGS.emptyTitle[lang]}</h3>
-            <p className="mt-1 text-[12px] text-hp-muted">{ROUTES_STRINGS.emptySubtitle[lang]}</p>
+            <h3 className="text-[15px] font-bold text-hp-ink">{t("No routes match")}</h3>
+            <p className="mt-1 text-[12px] text-hp-muted">
+              {t("Try another filter or search term.")}
+            </p>
           </div>
         )}
       </div>
@@ -1445,7 +1425,7 @@ function ActiveRouteGuide({
   onNext: () => void;
   onClose: () => void;
 }) {
-  const { lang } = useLang();
+  const { language, t } = useI18n();
   const stop = route.stops[stopIndex] ?? route.stops[0];
   const place = stop ? findPlace(stop.placeId) : null;
   const total = route.stops.length;
@@ -1463,7 +1443,8 @@ function ActiveRouteGuide({
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-[10px] font-bold uppercase text-hp-muted">
-            {activeRouteLabel(lang, stopIndex + 1, total)}
+            {language === "GR" ? "Ενεργή διαδρομή · στάση" : "Active route · stop"} {stopIndex + 1}/
+            {total}
           </div>
           <h3 className="truncate text-[14px] font-black leading-tight text-hp-ink">
             {place?.name ?? stop?.title ?? route.title}
@@ -1476,7 +1457,7 @@ function ActiveRouteGuide({
           type="button"
           onClick={onClose}
           className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-          aria-label={ROUTES_STRINGS.closeActiveRoute[lang]}
+          aria-label={t("Close")}
         >
           <X size={14} />
         </button>
@@ -1488,7 +1469,7 @@ function ActiveRouteGuide({
             onClick={() => onOpenStop(stop.placeId, stopIndex)}
             className="flex-1 rounded-full border border-hp-ink/15 px-3 py-2 text-[11.5px] font-bold text-hp-ink"
           >
-            {ROUTES_STRINGS.centerStop[lang]}
+            {language === "GR" ? "Κέντρο στη στάση" : "Center stop"}
           </button>
         )}
         <button
@@ -1496,7 +1477,13 @@ function ActiveRouteGuide({
           onClick={onNext}
           className="flex-1 rounded-full bg-hp-ink px-3 py-2 text-[11.5px] font-bold text-hp-paper"
         >
-          {stopIndex >= total - 1 ? ROUTES_STRINGS.restart[lang] : ROUTES_STRINGS.nextStop[lang]}
+          {language === "GR"
+            ? stopIndex >= total - 1
+              ? "Από την αρχή"
+              : "Επόμενη στάση"
+            : stopIndex >= total - 1
+              ? "Restart"
+              : "Next stop"}
         </button>
       </div>
     </motion.div>
@@ -1537,22 +1524,23 @@ function SavedScreen({
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
 }) {
+  const { language, t } = useI18n();
   const savedPlaces = places.filter((p) => savedPlaceIds.includes(p.id));
   const savedPostsList = posts.filter((p) => savedPostIds.includes(p.id));
   const savedRoutesList = routes.filter((r) => savedRouteIds.includes(r.id));
   const total = savedPlaces.length + savedPostsList.length + savedRoutesList.length;
   return (
     <div className="px-4 pb-28 pt-3">
-      <h2 className="mb-1 text-2xl font-black text-hp-ink">Saved</h2>
-      <p className="mb-4 text-[12px] text-hp-muted">Your private little list.</p>
+      <h2 className="mb-1 text-2xl font-black text-hp-ink">{t("Saved")}</h2>
+      <p className="mb-4 text-[12px] text-hp-muted">{t("Your private little list.")}</p>
       {total === 0 ? (
         <div className="mt-12 rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-hp-sunset/10 text-hp-sunset">
             <Bookmark size={20} />
           </div>
-          <h3 className="text-[15px] font-bold text-hp-ink">Nothing saved yet</h3>
+          <h3 className="text-[15px] font-bold text-hp-ink">{t("Nothing saved yet")}</h3>
           <p className="mt-1 text-[12px] text-hp-muted">
-            Save beaches, events, and weird local tips here.
+            {t("Save places, posts, and routes to find them here.")}
           </p>
         </div>
       ) : (
@@ -1569,7 +1557,7 @@ function SavedScreen({
                       type="button"
                       onClick={() => onOpenPlace(p)}
                       className="block w-full text-left"
-                      aria-label={`Open saved place ${p.name}`}
+                      aria-label={t("Open saved place {place}", { place: p.name })}
                     >
                       <ImageBox
                         src={p.imageUrl}
@@ -1595,7 +1583,7 @@ function SavedScreen({
                       onClick={() => onUnsavePlace(p.id)}
                       className="mx-2 mb-2 rounded-full border border-hp-ink/10 px-2 py-1 text-[10px] font-bold text-hp-ink/70"
                     >
-                      Unsave
+                      {t("Unsave")}
                     </button>
                   </div>
                 ))}
@@ -1619,7 +1607,7 @@ function SavedScreen({
                         type="button"
                         onClick={() => onOpenPost(post)}
                         className="flex min-w-0 flex-1 gap-3 text-left"
-                        aria-label={`Open saved post at ${place.name}`}
+                        aria-label={t("Open saved post at {place}", { place: place.name })}
                       >
                         <ImageBox
                           src={post.imageUrl}
@@ -1641,7 +1629,7 @@ function SavedScreen({
                         onClick={() => onUnsavePost(post.id)}
                         className="self-start rounded-full border border-hp-ink/10 px-2 py-1 text-[10px] font-bold text-hp-ink/70"
                       >
-                        Unsave
+                        {t("Unsave")}
                       </button>
                     </div>
                   );
@@ -1662,7 +1650,7 @@ function SavedScreen({
                       type="button"
                       onClick={() => onOpenRoute(route)}
                       className="flex min-w-0 flex-1 gap-3 text-left"
-                      aria-label={`Open saved route ${route.title}`}
+                      aria-label={t("Open saved route {route}", { route: route.title })}
                     >
                       <ImageBox
                         src={route.imageUrl}
@@ -1685,7 +1673,7 @@ function SavedScreen({
                       onClick={() => onUnsaveRoute(route.id)}
                       className="self-start rounded-full border border-hp-ink/10 px-2 py-1 text-[10px] font-bold text-hp-ink/70"
                     >
-                      Unsave
+                      {t("Unsave")}
                     </button>
                   </div>
                 ))}
@@ -1699,9 +1687,12 @@ function SavedScreen({
 }
 
 function SavedSection({ title, children }: { title: string; children: ReactNode }) {
+  const { t } = useI18n();
   return (
     <section>
-      <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">{title}</h3>
+      <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
+        {t(title)}
+      </h3>
       {children}
     </section>
   );
@@ -1739,8 +1730,8 @@ function PlaceDetailModal({
   storyGroups: PlaceStoryGroup[];
   onOpenStory: (placeId: string) => void;
 }) {
-  const { lang } = useLang();
   const [commentText, setCommentText] = useState("");
+  const { language, t } = useI18n();
   const eventCount = place ? events.filter((event) => event.placeId === place.id).length : 0;
   const noteCount = place ? place.commentCount + comments.length : 0;
   const placeStories = place
@@ -1760,7 +1751,7 @@ function PlaceDetailModal({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label={PLACE_DETAIL_STRINGS.closePlaceDetails[lang]}
+            aria-label={t("Close")}
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -1769,7 +1760,7 @@ function PlaceDetailModal({
             transition={{ type: "spring", damping: 28, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label={placeDetailsAriaLabel(lang, place.name)}
+            aria-label={`${place.name} details`}
             className="hp-place-detail-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper"
           >
             <div className="relative">
@@ -1784,7 +1775,7 @@ function PlaceDetailModal({
                 type="button"
                 onClick={onClose}
                 className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                aria-label={PLACE_DETAIL_STRINGS.closePlaceDetails[lang]}
+                aria-label={t("Close")}
               >
                 <X size={16} />
               </button>
@@ -1793,7 +1784,7 @@ function PlaceDetailModal({
                   className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
                   style={{ background: typeColor[place.type] }}
                 >
-                  {PLACE_TYPE_LABELS[place.type][lang]}
+                  {place.type}
                 </span>
                 <h2 className="mt-2 text-2xl font-black">{place.name}</h2>
                 <p className="text-[12px] opacity-85">
@@ -1805,14 +1796,14 @@ function PlaceDetailModal({
               <div className="border-b border-hp-ink/10 px-4 py-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {placeStoriesCountLabel(lang, placeStories.length)}
+                    Place stories · {placeStories.length}
                   </span>
                   <button
                     type="button"
                     onClick={() => onOpenStory(place.id)}
                     className="text-[10px] font-bold text-hp-sunset"
                   >
-                    {PLACE_DETAIL_STRINGS.playAll[lang]}
+                    Play all
                   </button>
                 </div>
                 <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
@@ -1821,7 +1812,7 @@ function PlaceDetailModal({
                       key={story.id}
                       type="button"
                       onClick={() => onOpenStory(place.id)}
-                      aria-label={openPlaceStoriesAriaLabel(lang, place.name)}
+                      aria-label={t("Open stories from {place}", { place: place.name })}
                       className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-xl border border-hp-ink/10"
                     >
                       <ImageBox
@@ -1848,33 +1839,27 @@ function PlaceDetailModal({
                 ))}
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <Stat label={PLACE_DETAIL_STRINGS.postsToday[lang]} value={String(place.recentPostCount)} />
-                <Stat label={PLACE_DETAIL_STRINGS.eventsTonight[lang]} value={String(eventCount)} />
-                <Stat
-                  label={PLACE_DETAIL_STRINGS.crowd[lang]}
-                  value={CROWD_OPTION_LABELS[place.crowd as keyof typeof CROWD_OPTION_LABELS]?.[lang] ?? place.crowd}
-                />
-                <Stat
-                  label={PLACE_DETAIL_STRINGS.budget[lang]}
-                  value={BUDGET_OPTION_LABELS[place.budget as keyof typeof BUDGET_OPTION_LABELS]?.[lang] ?? place.budget}
-                />
-                <Stat label={PLACE_DETAIL_STRINGS.bestTime[lang]} value={place.bestTime} />
-                <Stat label={PLACE_DETAIL_STRINGS.localNotes[lang]} value={String(noteCount)} />
+                <Stat label="posts today" value={String(place.recentPostCount)} />
+                <Stat label="events tonight" value={String(eventCount)} />
+                <Stat label="crowd" value={place.crowd} />
+                <Stat label="budget" value={place.budget} />
+                <Stat label="best time" value={place.bestTime} />
+                <Stat label="local notes" value={String(noteCount)} />
               </div>
               <div className="mt-4 rounded-2xl border border-hp-ink/10 bg-white/60 p-3">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                  {PLACE_DETAIL_STRINGS.bestFor[lang]}
+                  Best for
                 </div>
                 <div className="mt-1 text-[13px] font-semibold text-hp-ink">{place.mood}</div>
               </div>
               <div className="mt-5">
                 <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-hp-muted">
-                  {PLACE_DETAIL_STRINGS.recentPosts[lang]}
+                  Recent posts
                 </h3>
                 <div className="flex flex-col gap-2">
                   {posts.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-hp-ink/10 p-4 text-center text-[12px] text-hp-muted">
-                      {PLACE_DETAIL_STRINGS.noRecentPosts[lang]}
+                      No recent posts here yet. Be first.
                     </div>
                   )}
                   {posts.map((p) => {
@@ -1913,7 +1898,7 @@ function PlaceDetailModal({
                   htmlFor={`place-detail-comment-${place.id}`}
                   className="text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                 >
-                  {PLACE_DETAIL_STRINGS.quickComment[lang]}
+                  {language === "GR" ? "Γρήγορο σχόλιο" : "Quick comment"}
                 </label>
                 <div className="mt-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
                   <input
@@ -1922,7 +1907,7 @@ function PlaceDetailModal({
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     autoComplete="off"
-                    placeholder={PLACE_DETAIL_STRINGS.addLocalNotePlaceholder[lang]}
+                    placeholder={t("Add a local note…")}
                     className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && commentText.trim()) {
@@ -1941,7 +1926,7 @@ function PlaceDetailModal({
                     }}
                     className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
                     disabled={!commentText.trim()}
-                    aria-label={postCommentOnAriaLabel(lang, place.name)}
+                    aria-label={`Post comment on ${place.name}`}
                   >
                     <Send size={12} />
                   </button>
@@ -1964,8 +1949,7 @@ function PlaceDetailModal({
                 onClick={() => onSave(place.id)}
                 className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
               >
-                <Bookmark size={13} className="mr-1 inline" />{" "}
-                {saved ? PLACE_DETAIL_STRINGS.saved[lang] : PLACE_DETAIL_STRINGS.save[lang]}
+                <Bookmark size={13} className="mr-1 inline" /> {saved ? "Saved" : "Save"}
               </button>
               <button
                 type="button"
@@ -1975,13 +1959,13 @@ function PlaceDetailModal({
                 }}
                 className="flex-1 rounded-full bg-hp-ink py-3 text-[12px] font-bold text-hp-paper"
               >
-                {PLACE_DETAIL_STRINGS.map[lang]}
+                Map
               </button>
               <a
                 href={openStreetMapUrl(place)}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={modalOpenInOsmAriaLabel(lang, place.name)}
+                aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
                 className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
               >
                 <ExternalLink size={14} />
@@ -1990,7 +1974,7 @@ function PlaceDetailModal({
                 type="button"
                 onClick={() => onShare(place)}
                 className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                aria-label={shareAriaLabel(lang, place.name)}
+                aria-label={t("Share {place}", { place: place.name })}
               >
                 <Share2 size={14} />
               </button>
@@ -2042,8 +2026,8 @@ function PostDetailModal({
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
 }) {
-  const { lang } = useLang();
   const [text, setText] = useState("");
+  const { language, t } = useI18n();
   return (
     <AnimatePresence>
       {post &&
@@ -2062,7 +2046,7 @@ function PostDetailModal({
                 type="button"
                 className="absolute inset-0 bg-black/65"
                 onClick={onClose}
-                aria-label={POST_DETAIL_STRINGS.closePostDetails[lang]}
+                aria-label={t("Close")}
               />
               <motion.div
                 initial={{ y: "100%" }}
@@ -2071,7 +2055,7 @@ function PostDetailModal({
                 transition={{ type: "spring", damping: 28, stiffness: 240 }}
                 role="dialog"
                 aria-modal="true"
-                aria-label={postAtAriaLabel(lang, p.name)}
+                aria-label={`Post at ${p.name}`}
                 className="hp-fullscreen-modal absolute inset-x-0 bottom-0 flex w-full max-w-full flex-col overflow-hidden bg-hp-paper"
               >
                 <div className="relative">
@@ -2086,7 +2070,7 @@ function PostDetailModal({
                     type="button"
                     onClick={onClose}
                     className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                    aria-label={POST_DETAIL_STRINGS.closePostDetails[lang]}
+                    aria-label={t("Close")}
                   >
                     <X size={16} />
                   </button>
@@ -2130,7 +2114,7 @@ function PostDetailModal({
                       type="button"
                       onClick={onLike}
                       className={`inline-flex items-center gap-1 ${liked ? "text-hp-sunset" : ""}`}
-                      aria-label={liked ? PULSE_FEED_STRINGS.unlikePost[lang] : PULSE_FEED_STRINGS.likePost[lang]}
+                      aria-label={t(liked ? "Unlike post" : "Like post")}
                     >
                       <Heart size={16} fill={liked ? "currentColor" : "none"} /> {likeCount}
                     </button>
@@ -2140,7 +2124,7 @@ function PostDetailModal({
                   </div>
                   <div className="mt-4 border-t border-hp-ink/10 pt-3">
                     <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-                      {POST_DETAIL_STRINGS.comments[lang]}
+                      {t("Comments")}
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
@@ -2150,7 +2134,11 @@ function PostDetailModal({
                         </div>
                       ))}
                       {comments.length === 0 && (
-                        <div className="text-[12px] text-hp-muted">{POST_DETAIL_STRINGS.beFirstToComment[lang]}</div>
+                        <div className="text-[12px] text-hp-muted">
+                          {language === "GR"
+                            ? "Γίνε ο πρώτος που σχολιάζει."
+                            : "Be the first to comment."}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -2161,9 +2149,9 @@ function PostDetailModal({
                       value={text}
                       onChange={(e) => setText(e.target.value)}
                       name={`post-comment-${post.id}`}
-                      aria-label={POST_DETAIL_STRINGS.quickCommentOnPost[lang]}
+                      aria-label={t("Quick comment on post")}
                       autoComplete="off"
-                      placeholder={POST_DETAIL_STRINGS.quickCommentPlaceholder[lang]}
+                      placeholder={t("Quick comment…")}
                       className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && text.trim()) {
@@ -2182,7 +2170,7 @@ function PostDetailModal({
                       }}
                       className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
                       disabled={!text.trim()}
-                      aria-label={POST_DETAIL_STRINGS.postComment[lang]}
+                      aria-label={t("Post comment")}
                     >
                       <Send size={12} />
                     </button>
@@ -2196,13 +2184,13 @@ function PostDetailModal({
                       }}
                       className="flex-1 rounded-full bg-hp-ink py-2.5 text-[12px] font-bold text-hp-paper"
                     >
-                      <MapIcon size={13} className="mr-1 inline" /> {POST_DETAIL_STRINGS.openOnMap[lang]}
+                      <MapIcon size={13} className="mr-1 inline" /> Open on map
                     </button>
                     <a
                       href={openStreetMapUrl(p)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={modalOpenInOsmAriaLabel(lang, p.name)}
+                      aria-label={t("Open {place} in OpenStreetMap", { place: p.name })}
                       className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
                     >
                       <ExternalLink size={14} />
@@ -2211,7 +2199,7 @@ function PostDetailModal({
                       type="button"
                       onClick={onSave}
                       className={`grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 ${saved ? "text-hp-sunset" : "text-hp-ink"}`}
-                      aria-label={saved ? PULSE_FEED_STRINGS.unsavePost[lang] : PULSE_FEED_STRINGS.savePost[lang]}
+                      aria-label={t(saved ? "Unsave post" : "Save post")}
                     >
                       <Bookmark size={14} fill={saved ? "currentColor" : "none"} />
                     </button>
@@ -2219,7 +2207,7 @@ function PostDetailModal({
                       type="button"
                       onClick={() => onShare(post)}
                       className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                      aria-label={PULSE_FEED_STRINGS.sharePost[lang]}
+                      aria-label={t("Share post")}
                     >
                       <Share2 size={14} />
                     </button>
@@ -2259,8 +2247,8 @@ function RouteArticleModal({
   findPlace: (id: string) => Place | undefined;
   findAuthor: (id: string) => Author;
 }) {
-  const { lang } = useLang();
   const [text, setText] = useState("");
+  const { language, t } = useI18n();
   return (
     <AnimatePresence>
       {route &&
@@ -2277,7 +2265,7 @@ function RouteArticleModal({
                 type="button"
                 className="absolute inset-0 bg-black/65"
                 onClick={onClose}
-                aria-label={ROUTE_ARTICLE_STRINGS.closeRouteArticle[lang]}
+                aria-label={t("Close")}
               />
               <motion.div
                 initial={{ y: "100%" }}
@@ -2286,7 +2274,7 @@ function RouteArticleModal({
                 transition={{ type: "spring", damping: 28, stiffness: 240 }}
                 role="dialog"
                 aria-modal="true"
-                aria-label={routeAriaLabel(lang, route.title)}
+                aria-label={`Route: ${route.title}`}
                 className="hp-fullscreen-modal absolute inset-x-0 bottom-0 flex w-full max-w-full flex-col overflow-hidden bg-hp-paper"
               >
                 <div className="relative">
@@ -2301,7 +2289,7 @@ function RouteArticleModal({
                     type="button"
                     onClick={onClose}
                     className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                    aria-label={ROUTE_ARTICLE_STRINGS.closeRouteArticle[lang]}
+                    aria-label={t("Close")}
                   >
                     <X size={16} />
                   </button>
@@ -2352,7 +2340,7 @@ function RouteArticleModal({
                   <p className="mt-4 text-[15px] leading-relaxed text-hp-ink">{route.lede}</p>
 
                   <h3 className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-                    {ROUTE_ARTICLE_STRINGS.timeline[lang]}
+                    Timeline
                   </h3>
                   <ol className="relative space-y-3 border-l-2 border-hp-ink/10 pl-4">
                     {route.stops.map((s, i) => {
@@ -2380,13 +2368,13 @@ function RouteArticleModal({
                                 }}
                                 className="inline-flex items-center gap-1 rounded-full border border-hp-ink/15 px-3 py-1 text-[11px] font-semibold text-hp-ink"
                               >
-                                <MapIcon size={11} /> {ROUTE_ARTICLE_STRINGS.openOnMap[lang]}
+                                <MapIcon size={11} /> Open on map
                               </button>
                               <a
                                 href={openStreetMapUrl(p)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                aria-label={modalOpenInOsmAriaLabel(lang, p.name)}
+                                aria-label={t("Open {place} in OpenStreetMap", { place: p.name })}
                                 className="inline-grid h-7 w-7 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
                               >
                                 <ExternalLink size={11} />
@@ -2412,7 +2400,7 @@ function RouteArticleModal({
                   </div>
                   <div className="mt-4 border-t border-hp-ink/10 pt-3">
                     <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-                      {ROUTE_ARTICLE_STRINGS.comments[lang]}
+                      {t("Comments")}
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
@@ -2422,7 +2410,11 @@ function RouteArticleModal({
                         </div>
                       ))}
                       {comments.length === 0 && (
-                        <div className="text-[12px] text-hp-muted">{ROUTE_ARTICLE_STRINGS.noRouteComments[lang]}</div>
+                        <div className="text-[12px] text-hp-muted">
+                          {language === "GR"
+                            ? "Δεν υπάρχουν σχόλια ακόμη."
+                            : "No route comments yet."}
+                        </div>
                       )}
                     </div>
                     <div className="mt-3 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
@@ -2430,9 +2422,13 @@ function RouteArticleModal({
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                         name={`route-comment-${route.id}`}
-                        aria-label={ROUTE_ARTICLE_STRINGS.quickCommentOnRoute[lang]}
+                        aria-label={t("Quick comment on route")}
                         autoComplete="off"
-                        placeholder={ROUTE_ARTICLE_STRINGS.addRouteNotePlaceholder[lang]}
+                        placeholder={
+                          language === "GR"
+                            ? "Πρόσθεσε σημείωση για τη διαδρομή…"
+                            : "Add a route note…"
+                        }
                         className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && text.trim()) {
@@ -2451,7 +2447,7 @@ function RouteArticleModal({
                         }}
                         className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
                         disabled={!text.trim()}
-                        aria-label={ROUTE_ARTICLE_STRINGS.postRouteComment[lang]}
+                        aria-label={t("Post route comment")}
                       >
                         <Send size={12} />
                       </button>
@@ -2464,7 +2460,7 @@ function RouteArticleModal({
                     onClick={() => onMapRoute(route)}
                     className="flex-1 rounded-full bg-hp-ink py-3 text-[12px] font-bold text-hp-paper"
                   >
-                    <MapIcon size={13} className="mr-1 inline" /> {ROUTE_ARTICLE_STRINGS.mapRoute[lang]}
+                    <MapIcon size={13} className="mr-1 inline" /> Map route
                   </button>
                   <button
                     type="button"
@@ -2476,13 +2472,13 @@ function RouteArticleModal({
                       className="mr-1 inline"
                       fill={saved ? "currentColor" : "none"}
                     />{" "}
-                    {saved ? ROUTE_ARTICLE_STRINGS.saved[lang] : ROUTE_ARTICLE_STRINGS.saveRoute[lang]}
+                    {saved ? "Saved" : "Save route"}
                   </button>
                   <button
                     type="button"
                     onClick={onShare}
                     className="grid h-11 w-11 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                    aria-label={ROUTE_ARTICLE_STRINGS.shareRoute[lang]}
+                    aria-label={t("Share route")}
                   >
                     <Share2 size={15} />
                   </button>
@@ -2535,7 +2531,7 @@ function SearchablePlacePicker({
   query: string;
   setQuery: (query: string) => void;
 }) {
-  const { lang } = useLang();
+  const { language } = useI18n();
   const selected = places.find((place) => place.id === value) ?? places[0];
   const results = useMemo(() => {
     const matches = query.trim()
@@ -2554,15 +2550,19 @@ function SearchablePlacePicker({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           name="create-post-place-search"
-          aria-label={COMPOSER_STRINGS.searchPlaceLocation[lang]}
+          aria-label={language === "GR" ? "Αναζήτηση τοποθεσίας" : "Search post location"}
           autoComplete="off"
-          placeholder={COMPOSER_STRINGS.searchLocationPlaceholder[lang]}
+          placeholder={
+            language === "GR"
+              ? "Αναζήτησε τοποθεσία, περιοχή ή tag…"
+              : "Search location, area, tag..."
+          }
           className="w-full bg-transparent text-[13px] outline-none placeholder:text-hp-muted"
         />
       </div>
       <div className="mb-2 rounded-xl bg-hp-ink/5 px-3 py-2">
         <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-          {COMPOSER_STRINGS.selected[lang]}
+          {language === "GR" ? "Επιλεγμένο" : "Selected"}
         </div>
         <div className="truncate text-[13px] font-bold text-hp-ink">
           {selected.name} <span className="font-semibold text-hp-muted">· {selected.area}</span>
@@ -2571,7 +2571,7 @@ function SearchablePlacePicker({
       <div
         className="grid max-h-56 gap-1 overflow-y-auto pr-1"
         role="listbox"
-        aria-label={COMPOSER_STRINGS.locations[lang]}
+        aria-label={language === "GR" ? "Τοποθεσίες" : "Locations"}
       >
         {results.map((placeOption) => {
           const selectedOption = placeOption.id === selected.id;
@@ -2600,7 +2600,7 @@ function SearchablePlacePicker({
                     selectedOption ? "text-hp-paper/65" : "text-hp-muted"
                   }`}
                 >
-                  {placeOption.area} · {PLACE_TYPE_LABELS[placeOption.type][lang]}
+                  {placeOption.area} · {placeOption.type}
                 </span>
               </span>
               <span
@@ -2615,7 +2615,7 @@ function SearchablePlacePicker({
         })}
         {results.length === 0 && (
           <div className="rounded-xl border border-dashed border-hp-ink/15 px-3 py-4 text-center text-[12px] text-hp-muted">
-            {COMPOSER_STRINGS.noLocationMatch[lang]}
+            {language === "GR" ? "Δεν βρέθηκε τοποθεσία." : "No location matches that search."}
           </div>
         )}
       </div>
@@ -2656,7 +2656,7 @@ function CreateComposerModal({
   onStory: (payload: CreateStoryInput) => Promise<void>;
   onEvent: (payload: CreateMeetInput) => Promise<void>;
 }) {
-  const { lang } = useLang();
+  const { language, t } = useI18n();
   const [mode, setMode] = useState<ComposerMode>("post");
   const [text, setText] = useState("");
   const [place, setPlace] = useState(places[0]?.id ?? "");
@@ -2730,8 +2730,12 @@ function CreateComposerModal({
     onRequireAccount();
     setError(
       account.status === "needsProfile"
-        ? COMPOSER_STRINGS.errorCompleteProfile[lang]
-        : COMPOSER_STRINGS.errorSignInBeforePosting[lang],
+        ? language === "GR"
+          ? "Ολοκλήρωσε το προφίλ σου πριν δημοσιεύσεις."
+          : "Complete your profile before posting."
+        : language === "GR"
+          ? "Συνδέσου πριν δημοσιεύσεις."
+          : "Sign in before posting.",
     );
     return false;
   };
@@ -2749,7 +2753,11 @@ function CreateComposerModal({
       setPlaceQuery("");
     } catch (submitError) {
       console.warn("Could not create post.", submitError);
-      setError(COMPOSER_STRINGS.errorSavePost[lang]);
+      setError(
+        language === "GR"
+          ? "Δεν ήταν δυνατή η αποθήκευση. Δοκίμασε ξανά."
+          : "Could not save post. Try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -2761,11 +2769,19 @@ function CreateComposerModal({
     const lat = Number(placeLat);
     const lng = Number(placeLng);
     if (!placeName.trim() || !placeArea.trim() || !placeShort.trim() || !placeImageUrl.trim()) {
-      setError(COMPOSER_STRINGS.errorPlaceFields[lang]);
+      setError(
+        language === "GR"
+          ? "Συμπλήρωσε όνομα, περιοχή, περιγραφή και URL φωτογραφίας."
+          : "Fill the place name, area, description, and photo URL.",
+      );
       return;
     }
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      setError(COMPOSER_STRINGS.errorLatLng[lang]);
+      setError(
+        language === "GR"
+          ? "Χρησιμοποίησε έγκυρο γεωγραφικό πλάτος και μήκος."
+          : "Use valid latitude and longitude.",
+      );
       return;
     }
 
@@ -2798,7 +2814,11 @@ function CreateComposerModal({
       setPlaceBestTime("today");
     } catch (submitError) {
       console.warn("Could not create place.", submitError);
-      setError(COMPOSER_STRINGS.errorSavePlace[lang]);
+      setError(
+        language === "GR"
+          ? "Δεν ήταν δυνατή η αποθήκευση του σημείου."
+          : "Could not save place. Try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -2836,7 +2856,11 @@ function CreateComposerModal({
         hint: pgError?.hint,
         raw: submitError,
       });
-      setError(COMPOSER_STRINGS.errorSaveStory[lang]);
+      setError(
+        language === "GR"
+          ? "Δεν ήταν δυνατή η αποθήκευση του story."
+          : "Could not save story. Try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -2848,15 +2872,25 @@ function CreateComposerModal({
     const happensAt = new Date(eventWhen);
     const capacity = eventCapacity.trim() ? Number(eventCapacity) : undefined;
     if (!eventTitle.trim() || !eventDescription.trim() || !place) {
-      setError(COMPOSER_STRINGS.errorEventFields[lang]);
+      setError(
+        language === "GR"
+          ? "Πρόσθεσε τίτλο, σημείο και σύντομη περιγραφή."
+          : "Add a title, place, and short description.",
+      );
       return;
     }
     if (!Number.isFinite(happensAt.getTime())) {
-      setError(COMPOSER_STRINGS.errorEventDate[lang]);
+      setError(
+        language === "GR" ? "Επίλεξε έγκυρη ημερομηνία και ώρα." : "Choose a valid date and time.",
+      );
       return;
     }
     if (capacity !== undefined && (!Number.isFinite(capacity) || capacity < 2)) {
-      setError(COMPOSER_STRINGS.errorEventCapacity[lang]);
+      setError(
+        language === "GR"
+          ? "Η χωρητικότητα πρέπει να είναι κενή ή τουλάχιστον 2."
+          : "Capacity must be empty or at least 2.",
+      );
       return;
     }
 
@@ -2884,7 +2918,7 @@ function CreateComposerModal({
       setEventTags("");
     } catch (submitError) {
       console.warn("Could not create event.", submitError);
-      setError(COMPOSER_STRINGS.errorHostGathering[lang]);
+      setError("Could not host this gathering. Try again.");
     } finally {
       setSaving(false);
     }
@@ -2904,7 +2938,7 @@ function CreateComposerModal({
             type="button"
             className="absolute inset-0 bg-black/55"
             onClick={onClose}
-            aria-label={COMPOSER_STRINGS.closeComposer[lang]}
+            aria-label={t("Close")}
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -2913,17 +2947,19 @@ function CreateComposerModal({
             transition={{ type: "spring", damping: 28, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label={COMPOSER_STRINGS.dialogLabel[lang]}
+            aria-label={
+              language === "GR" ? "Δημιουργία περιεχομένου" : "Create local post or place"
+            }
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-black text-hp-ink">{COMPOSER_STRINGS.addToApp[lang]}</h3>
+              <h3 className="text-lg font-black text-hp-ink">{t("Add to ΗΛΕΙΑ PULSE")}</h3>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-9 w-9 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
-                aria-label={COMPOSER_STRINGS.closeComposer[lang]}
+                aria-label={t("Close")}
               >
                 <X size={16} />
               </button>
@@ -2944,7 +2980,7 @@ function CreateComposerModal({
                     mode === option ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
                   }`}
                 >
-                  {COMPOSER_MODE_LABELS[option][lang]}
+                  {option}
                 </button>
               ))}
             </div>
@@ -2965,10 +3001,10 @@ function CreateComposerModal({
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12px] font-black text-hp-ink">
-                      {COMPOSER_STRINGS.postingAs[lang]} {profileDisplayName(profile)}
+                      Posting as {profileDisplayName(profile)}
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {COMPOSER_STRINGS.identityWillBeStored[lang]}
+                      Profile identity will be stored with this contribution
                     </span>
                   </span>
                 </>
@@ -2979,10 +3015,10 @@ function CreateComposerModal({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[12px] font-black text-hp-ink">
-                      {COMPOSER_STRINGS.signInToPost[lang]}
+                      Sign in to post
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {COMPOSER_STRINGS.savesCanBePrivate[lang]}
+                      Saves can be private, public posts need a profile
                     </span>
                   </span>
                   <button
@@ -2990,7 +3026,7 @@ function CreateComposerModal({
                     onClick={onRequireAccount}
                     className="rounded-full bg-hp-ink px-3 py-1.5 text-[11px] font-bold text-hp-paper"
                   >
-                    {COMPOSER_STRINGS.signIn[lang]}
+                    Sign in
                   </button>
                 </>
               )}
@@ -3008,13 +3044,11 @@ function CreateComposerModal({
                   <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
                   <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 text-hp-paper">
                     <ImagePlus size={18} />
-                    <span className="text-[12px] font-bold">
-                      {usingPlaceImageLabel(lang, selectedPlace.name)}
-                    </span>
+                    <span className="text-[12px] font-bold">Using {selectedPlace.name} image</span>
                   </div>
                 </div>
                 <label htmlFor="create-post-text" className="sr-only">
-                  {COMPOSER_STRINGS.postTextLabel[lang]}
+                  Post text
                 </label>
                 <textarea
                   id="create-post-text"
@@ -3023,36 +3057,34 @@ function CreateComposerModal({
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   autoComplete="off"
-                  placeholder={COMPOSER_STRINGS.postTextPlaceholder[lang]}
+                  placeholder={t("What's happening at this place?…")}
                   className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                   rows={3}
                 />
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {COMPOSER_STRINGS.postingAs[lang]}
+                    Posting as
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                    {POSTING_IDENTITY_IDS.map((option) => {
-                      const active = identity === option;
+                    {POSTING_IDENTITIES.map((option) => {
+                      const active = identity === option.id;
                       return (
                         <button
-                          key={option}
+                          key={option.id}
                           type="button"
-                          onClick={() => setIdentity(option)}
+                          onClick={() => setIdentity(option.id)}
                           aria-pressed={active}
                           className={`rounded-xl px-2 py-2 text-left transition ${
                             active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                           }`}
                         >
-                          <span className="block text-[11px] font-black">
-                            {POSTING_IDENTITY_LABELS[option][lang]}
-                          </span>
+                          <span className="block text-[11px] font-black">{option.label}</span>
                           <span
                             className={`block truncate text-[9px] font-semibold ${
                               active ? "text-hp-paper/65" : "text-hp-muted"
                             }`}
                           >
-                            {POSTING_IDENTITY_HELPERS[option][lang]}
+                            {option.helper}
                           </span>
                         </button>
                       );
@@ -3061,7 +3093,7 @@ function CreateComposerModal({
                 </div>
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {COMPOSER_STRINGS.location[lang]}
+                    Location
                   </div>
                   <input
                     type="hidden"
@@ -3081,7 +3113,7 @@ function CreateComposerModal({
                 </div>
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {COMPOSER_STRINGS.vibe[lang]}
+                    Vibe
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {vibeChips.map((v) => {
@@ -3113,7 +3145,7 @@ function CreateComposerModal({
                   disabled={!text.trim() || saving}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {saving ? COMPOSER_STRINGS.saving[lang] : COMPOSER_STRINGS.post[lang]}
+                  {saving ? "Saving…" : "Post"}
                 </button>
               </form>
             ) : mode === "place" ? (
@@ -3124,7 +3156,7 @@ function CreateComposerModal({
                       htmlFor="create-place-name"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.placeName[lang]}
+                      Place name
                     </label>
                     <input
                       id="create-place-name"
@@ -3141,7 +3173,7 @@ function CreateComposerModal({
                       htmlFor="create-place-area"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.area[lang]}
+                      Area
                     </label>
                     <input
                       id="create-place-area"
@@ -3158,7 +3190,7 @@ function CreateComposerModal({
                       htmlFor="create-place-type"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.type[lang]}
+                      Type
                     </label>
                     <select
                       id="create-place-type"
@@ -3170,7 +3202,7 @@ function CreateComposerModal({
                     >
                       {placeTypeOptions.map((type) => (
                         <option key={type} value={type}>
-                          {PLACE_TYPE_LABELS[type][lang]}
+                          {type}
                         </option>
                       ))}
                     </select>
@@ -3180,7 +3212,7 @@ function CreateComposerModal({
                       htmlFor="create-place-lat"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.lat[lang]}
+                      Lat
                     </label>
                     <input
                       id="create-place-lat"
@@ -3199,7 +3231,7 @@ function CreateComposerModal({
                       htmlFor="create-place-lng"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.lng[lang]}
+                      Lng
                     </label>
                     <input
                       id="create-place-lng"
@@ -3218,7 +3250,7 @@ function CreateComposerModal({
                       htmlFor="create-place-image"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.photoUrl[lang]}
+                      Photo URL
                     </label>
                     <input
                       id="create-place-image"
@@ -3232,7 +3264,7 @@ function CreateComposerModal({
                   </div>
                   <div className="col-span-2">
                     <label htmlFor="create-place-short" className="sr-only">
-                      {COMPOSER_STRINGS.descriptionLabel[lang]}
+                      Description
                     </label>
                     <textarea
                       id="create-place-short"
@@ -3240,7 +3272,7 @@ function CreateComposerModal({
                       data-testid="composer-place-short"
                       value={placeShort}
                       onChange={(e) => setPlaceShort(e.target.value)}
-                      placeholder={COMPOSER_STRINGS.descriptionPlaceholder[lang]}
+                      placeholder={t("What should locals know?…")}
                       className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                       rows={3}
                     />
@@ -3250,7 +3282,7 @@ function CreateComposerModal({
                       htmlFor="create-place-tags"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.tags[lang]}
+                      Tags
                     </label>
                     <input
                       id="create-place-tags"
@@ -3258,7 +3290,7 @@ function CreateComposerModal({
                       data-testid="composer-place-tags"
                       value={placeTags}
                       onChange={(e) => setPlaceTags(e.target.value)}
-                      placeholder={COMPOSER_STRINGS.tagsPlaceholderPlace[lang]}
+                      placeholder="beach, quiet, sunset"
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
@@ -3267,7 +3299,7 @@ function CreateComposerModal({
                       htmlFor="create-place-crowd"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.crowd[lang]}
+                      Crowd
                     </label>
                     <select
                       id="create-place-crowd"
@@ -3277,9 +3309,9 @@ function CreateComposerModal({
                       onChange={(e) => setPlaceCrowd(e.target.value)}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
                     >
-                      <option value="low">{CROWD_OPTION_LABELS.low[lang]}</option>
-                      <option value="medium">{CROWD_OPTION_LABELS.medium[lang]}</option>
-                      <option value="high">{CROWD_OPTION_LABELS.high[lang]}</option>
+                      <option value="low">low</option>
+                      <option value="medium">medium</option>
+                      <option value="high">high</option>
                     </select>
                   </div>
                   <div>
@@ -3287,7 +3319,7 @@ function CreateComposerModal({
                       htmlFor="create-place-budget"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.budget[lang]}
+                      Budget
                     </label>
                     <select
                       id="create-place-budget"
@@ -3297,10 +3329,10 @@ function CreateComposerModal({
                       onChange={(e) => setPlaceBudget(e.target.value)}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
                     >
-                      <option value="free">{BUDGET_OPTION_LABELS.free[lang]}</option>
-                      <option value="€">{BUDGET_OPTION_LABELS["€"][lang]}</option>
-                      <option value="€€">{BUDGET_OPTION_LABELS["€€"][lang]}</option>
-                      <option value="€€€">{BUDGET_OPTION_LABELS["€€€"][lang]}</option>
+                      <option value="free">free</option>
+                      <option value="€">€</option>
+                      <option value="€€">€€</option>
+                      <option value="€€€">€€€</option>
                     </select>
                   </div>
                   <div className="col-span-2">
@@ -3308,7 +3340,7 @@ function CreateComposerModal({
                       htmlFor="create-place-best-time"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.bestTime[lang]}
+                      Best time
                     </label>
                     <input
                       id="create-place-best-time"
@@ -3327,7 +3359,7 @@ function CreateComposerModal({
                   disabled={saving}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {saving ? COMPOSER_STRINGS.saving[lang] : COMPOSER_STRINGS.savePlace[lang]}
+                  {saving ? "Saving…" : "Save place"}
                 </button>
               </form>
             ) : mode === "story" ? (
@@ -3343,14 +3375,17 @@ function CreateComposerModal({
                   <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 text-hp-paper">
                     <ImagePlus size={18} />
                     <span className="text-[12px] font-bold">
-                      {storyPhotoUsingLabel(lang, selectedPlace.name)}
+                      Story photo · using {selectedPlace.name} image
                     </span>
                   </div>
                 </div>
-                <p className="mt-2 text-[11px] text-hp-muted">{COMPOSER_STRINGS.storyPreviewHint[lang]}</p>
+                <p className="mt-2 text-[11px] text-hp-muted">
+                  Shows full-screen, 9:16. Swap in your own photo later — this previews with the
+                  place image.
+                </p>
 
                 <label htmlFor="create-story-caption" className="sr-only">
-                  {COMPOSER_STRINGS.storyCaptionLabel[lang]}
+                  Story caption
                 </label>
                 <textarea
                   id="create-story-caption"
@@ -3359,14 +3394,14 @@ function CreateComposerModal({
                   value={storyCaption}
                   onChange={(e) => setStoryCaption(e.target.value)}
                   autoComplete="off"
-                  placeholder={COMPOSER_STRINGS.storyCaptionPlaceholder[lang]}
+                  placeholder={t("What's happening here right now?…")}
                   className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                   rows={3}
                 />
 
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {COMPOSER_STRINGS.type[lang]}
+                    Type
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                     {(["photo", "report"] as const).map((option) => {
@@ -3382,7 +3417,7 @@ function CreateComposerModal({
                             active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                           }`}
                         >
-                          {option === "report" ? COMPOSER_STRINGS.liveReport[lang] : COMPOSER_STRINGS.photo[lang]}
+                          {option === "report" ? "Live report" : "Photo"}
                         </button>
                       );
                     })}
@@ -3394,7 +3429,7 @@ function CreateComposerModal({
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          {COMPOSER_STRINGS.crowd[lang]}
+                          Crowd
                         </div>
                         <div className="grid grid-cols-3 gap-1">
                           {(["low", "medium", "high"] as const).map((c) => (
@@ -3409,14 +3444,14 @@ function CreateComposerModal({
                                   : "bg-hp-paper text-hp-ink/65"
                               }`}
                             >
-                              {CROWD_OPTION_LABELS[c][lang]}
+                              {c}
                             </button>
                           ))}
                         </div>
                       </div>
                       <div>
                         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          {COMPOSER_STRINGS.parking[lang]}
+                          Parking
                         </div>
                         <div className="grid grid-cols-3 gap-1">
                           {(["easy", "tight", "full"] as const).map((p) => (
@@ -3431,7 +3466,7 @@ function CreateComposerModal({
                                   : "bg-hp-paper text-hp-ink/65"
                               }`}
                             >
-                              {PARKING_OPTION_LABELS[p][lang]}
+                              {p}
                             </button>
                           ))}
                         </div>
@@ -3439,7 +3474,7 @@ function CreateComposerModal({
                     </div>
                     <div className="mt-2">
                       <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                        {COMPOSER_STRINGS.condition[lang]}
+                        Condition
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {STORY_CONDITION_OPTIONS.map((cond) => {
@@ -3460,7 +3495,7 @@ function CreateComposerModal({
                                   : "border border-hp-ink/10 text-hp-ink/70"
                               }`}
                             >
-                              {STORY_CONDITION_LABELS[cond][lang]}
+                              {cond}
                             </button>
                           );
                         })}
@@ -3471,14 +3506,14 @@ function CreateComposerModal({
 
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {COMPOSER_STRINGS.visibleFor[lang]}
+                    Visible for
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                     {(
                       [
                         { h: 6, label: "6h" },
                         { h: 24, label: "24h" },
-                        { h: undefined, label: COMPOSER_STRINGS.keepTip[lang] },
+                        { h: undefined, label: t("Keep tip") },
                       ] as const
                     ).map((opt) => {
                       const active = storyVisibility === opt.h;
@@ -3501,7 +3536,7 @@ function CreateComposerModal({
 
                 <div className="mt-3">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {COMPOSER_STRINGS.location[lang]}
+                    Location
                   </div>
                   <SearchablePlacePicker
                     places={places}
@@ -3519,7 +3554,7 @@ function CreateComposerModal({
                   disabled={!storyCaption.trim()}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {COMPOSER_STRINGS.postStory[lang]}
+                  {t("Post story")}
                 </button>
               </form>
             ) : (
@@ -3533,7 +3568,7 @@ function CreateComposerModal({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
                   <div className="absolute bottom-3 left-3 right-3 text-hp-paper">
-                    <div className="text-[10px] font-bold uppercase">{COMPOSER_STRINGS.hostingAt[lang]}</div>
+                    <div className="text-[10px] font-bold uppercase">{t("Hosting at")}</div>
                     <div className="text-[15px] font-black leading-tight">{selectedPlace.name}</div>
                   </div>
                 </div>
@@ -3544,7 +3579,7 @@ function CreateComposerModal({
                       htmlFor="create-event-title"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.gatheringTitle[lang]}
+                      {t("Gathering title")}
                     </label>
                     <input
                       id="create-event-title"
@@ -3552,13 +3587,13 @@ function CreateComposerModal({
                       value={eventTitle}
                       onChange={(e) => setEventTitle(e.target.value)}
                       autoComplete="off"
-                      placeholder={COMPOSER_STRINGS.gatheringTitlePlaceholder[lang]}
+                      placeholder={t("Sunset swim, coffee tips, live music...")}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
                   <div className="col-span-2">
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {COMPOSER_STRINGS.location[lang]}
+                      {t("Location")}
                     </div>
                     <SearchablePlacePicker
                       places={places}
@@ -3573,7 +3608,7 @@ function CreateComposerModal({
                       htmlFor="create-event-when"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.when[lang]}
+                      {t("When")}
                     </label>
                     <input
                       id="create-event-when"
@@ -3589,7 +3624,7 @@ function CreateComposerModal({
                       htmlFor="create-event-category"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.type[lang]}
+                      {t("Type")}
                     </label>
                     <select
                       id="create-event-category"
@@ -3600,7 +3635,7 @@ function CreateComposerModal({
                     >
                       {MEET_CATEGORIES.map((category) => (
                         <option key={category} value={category}>
-                          {MEET_CATEGORY_META[category].label}
+                          {t(MEET_CATEGORY_META[category].label)}
                         </option>
                       ))}
                     </select>
@@ -3610,7 +3645,7 @@ function CreateComposerModal({
                       htmlFor="create-event-vibe"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.vibe[lang]}
+                      {t("Vibe")}
                     </label>
                     <input
                       id="create-event-vibe"
@@ -3625,7 +3660,7 @@ function CreateComposerModal({
                       htmlFor="create-event-price"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.price[lang]}
+                      {t("Price")}
                     </label>
                     <input
                       id="create-event-price"
@@ -3640,7 +3675,7 @@ function CreateComposerModal({
                       htmlFor="create-event-capacity"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.capacity[lang]}
+                      {t("Capacity")}
                     </label>
                     <input
                       id="create-event-capacity"
@@ -3650,7 +3685,7 @@ function CreateComposerModal({
                       min={2}
                       value={eventCapacity}
                       onChange={(e) => setEventCapacity(e.target.value)}
-                      placeholder={COMPOSER_STRINGS.optional[lang]}
+                      placeholder={t("Optional")}
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
@@ -3659,27 +3694,27 @@ function CreateComposerModal({
                       htmlFor="create-event-tags"
                       className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                     >
-                      {COMPOSER_STRINGS.tags[lang]}
+                      {t("Tags")}
                     </label>
                     <input
                       id="create-event-tags"
                       name="create-event-tags"
                       value={eventTags}
                       onChange={(e) => setEventTags(e.target.value)}
-                      placeholder={COMPOSER_STRINGS.tagsPlaceholderEvent[lang]}
+                      placeholder="sunset, local, free"
                       className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
                     />
                   </div>
                   <div className="col-span-2">
                     <label htmlFor="create-event-description" className="sr-only">
-                      {COMPOSER_STRINGS.gatheringDescriptionLabel[lang]}
+                      {t("Gathering description")}
                     </label>
                     <textarea
                       id="create-event-description"
                       name="create-event-description"
                       value={eventDescription}
                       onChange={(e) => setEventDescription(e.target.value)}
-                      placeholder={COMPOSER_STRINGS.gatheringDescriptionPlaceholder[lang]}
+                      placeholder={t("What should people know before they join?")}
                       className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
                       rows={3}
                     />
@@ -3693,7 +3728,7 @@ function CreateComposerModal({
                   disabled={!eventTitle.trim() || !eventDescription.trim() || saving}
                   className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
                 >
-                  {saving ? COMPOSER_STRINGS.hosting[lang] : COMPOSER_STRINGS.hostGathering[lang]}
+                  {saving ? "Hosting..." : "Host gathering"}
                 </button>
               </form>
             )}
@@ -3706,7 +3741,7 @@ function CreateComposerModal({
 
 /* ============== Bottom Nav ============== */
 function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
-  const { lang } = useLang();
+  const { t } = useI18n();
   return (
     <div className="relative z-50 shrink-0 border-t border-hp-ink/10 bg-hp-paper px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_28px_rgba(23,20,17,0.08)]">
       <div
@@ -3714,7 +3749,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
         className="pointer-events-none absolute inset-x-0 -top-7 h-7 bg-gradient-to-t from-hp-paper to-transparent"
       />
       <div className="grid grid-cols-4">
-        {TAB_ITEMS.map(({ id, Icon }) => {
+        {TAB_ITEMS.map(({ id, label, Icon }) => {
           const on = tab === id;
           return (
             <button
@@ -3736,7 +3771,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
                 <Icon size={16} />
               </motion.span>
               <span className={`text-[10px] font-bold ${on ? "text-hp-ink" : "text-hp-ink/50"}`}>
-                {NAV_TAB_LABELS[id][lang]}
+                {t(label)}
               </span>
             </button>
           );
@@ -3748,14 +3783,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
 
 /* ============== Main App ============== */
 export function PulseApp() {
-  return (
-    <LanguageProvider>
-      <PulseAppInner />
-    </LanguageProvider>
-  );
-}
-
-function PulseAppInner() {
+  const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
@@ -3769,7 +3797,6 @@ function PulseAppInner() {
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const { lang } = useLang();
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
@@ -4046,15 +4073,25 @@ function PulseAppInner() {
     }
   };
 
+  const toggleAppLanguage = () => {
+    const next = language === "GR" ? "EN" : "GR";
+    setLanguage(next);
+    if (account.status === "ready" || account.status === "needsProfile") {
+      void savePulseLanguage(account.userId, next).catch((error) => {
+        console.warn("Could not save language preference.", error);
+      });
+    }
+  };
+
   const requireProfile = (action = "post") => {
     if (account.status === "ready") return true;
     if (account.status === "needsProfile") {
       setProfileOpen(true);
-      showToast("Complete your profile first");
+      showToast(t("Complete your profile first"));
       return false;
     }
     setAuthOpen(true);
-    showToast(`Sign in to ${action}`);
+    showToast(language === "GR" ? "Συνδέσου για να συνεχίσεις" : `Sign in to ${action}`);
     return false;
   };
 
@@ -4062,11 +4099,11 @@ function PulseAppInner() {
     void sharePulseTarget(target)
       .then((result) => {
         if (result === "cancelled") return;
-        showToast(result === "shared" ? "Share opened" : "Link copied");
+        showToast(t(result === "shared" ? "Share opened" : "Link copied"));
       })
       .catch((error) => {
         console.warn("Could not share item.", error);
-        showToast("Could not share link");
+        showToast(t("Could not share link"));
       });
   };
 
@@ -4104,60 +4141,90 @@ function PulseAppInner() {
       text: truncateShareText(story.caption),
     });
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadData() {
-      try {
-        setDataStatus("loading");
-        const data = await loadPulseData();
-        if (ignore) return;
-        setPulseData(data);
-        setPlaceComments(data.placeComments);
-        setRouteComments(data.routeComments);
-        setCulturalEventComments(data.culturalEventComments);
-        setSelectedPlace((current) =>
-          current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
-        );
-        setOpenPlace((current) =>
-          current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
-        );
-        setOpenPost((current) =>
-          current ? (data.posts.find((p) => p.id === current.id) ?? null) : null,
-        );
-        setOpenRoute((current) =>
-          current ? (data.routes.find((r) => r.id === current.id) ?? null) : null,
-        );
-        setDataStatus("ready");
-      } catch (error) {
-        console.warn("Could not load Supabase pulse data.", error);
-        if (!ignore) {
-          setPulseData(emptyPulseData);
-          setDataStatus("error");
-        }
-      }
+  const refreshPulseData = useCallback(async () => {
+    try {
+      setDataStatus("loading");
+      const data = await loadPulseData();
+      setPulseData(data);
+      setPlaceComments(data.placeComments);
+      setRouteComments(data.routeComments);
+      setCulturalEventComments(data.culturalEventComments);
+      setSelectedPlace((current) =>
+        current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
+      );
+      setOpenPlace((current) =>
+        current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
+      );
+      setOpenPost((current) =>
+        current ? (data.posts.find((p) => p.id === current.id) ?? null) : null,
+      );
+      setOpenRoute((current) =>
+        current ? (data.routes.find((r) => r.id === current.id) ?? null) : null,
+      );
+      setDataStatus("ready");
+    } catch (error) {
+      console.warn("Could not load Supabase pulse data.", error);
+      setPulseData(emptyPulseData);
+      setDataStatus("error");
     }
-
-    void loadData();
-    return () => {
-      ignore = true;
-    };
   }, []);
 
   useEffect(() => {
-    // refreshAccount() loads the account AND the admin/organizer status; loading
-    // only the account here left the Owner/Verified-organizer badges empty until
-    // the next save. Reuse the same path on mount and on every auth change.
-    void refreshAccount();
+    void refreshPulseData();
+  }, [refreshPulseData]);
+
+  useEffect(() => {
+    let ignore = false;
+    const loadAccount = async () => {
+      const nextAccount = await getCurrentPulseAccount().catch((error) => {
+        console.warn("Could not load account state.", error);
+        return { status: "signedOut" } as PulseAccountState;
+      });
+      if (ignore) return;
+      setAccount(nextAccount);
+      if (
+        (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
+        nextAccount.preferences?.language
+      ) {
+        setLanguage(nextAccount.preferences.language);
+      }
+      // Admin/organizer status drives the Admin workspace / Verified organizer
+      // badges; fetch it here too, not only through refreshAccount() on save.
+      if (nextAccount.status === "ready") {
+        const nextAdminRole = await getAdminRole().catch(() => null);
+        if (!ignore) setAdminRole(nextAdminRole);
+      } else {
+        setAdminRole(null);
+      }
+      if (nextAccount.status === "ready" || nextAccount.status === "needsProfile") {
+        const nextOrganizerStatus = await getMyOrganizerStatus().catch(() => null);
+        if (!ignore) setOrganizerStatus(nextOrganizerStatus);
+      } else {
+        setOrganizerStatus(null);
+      }
+      const profile =
+        nextAccount.status === "ready" || nextAccount.status === "needsProfile"
+          ? nextAccount.profile
+          : null;
+      if (profile) {
+        const summary = profileSummaryFromAccount(profile);
+        setPulseData((data) => ({
+          ...data,
+          profiles: [summary, ...data.profiles.filter((item) => item.id !== summary.id)],
+        }));
+      }
+    };
+
+    void loadAccount();
     const unsubscribe = subscribeToPulseAuth(() => {
-      void refreshAccount();
+      void loadAccount();
     });
 
     return () => {
+      ignore = true;
       unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setLanguage]);
 
   useEffect(() => {
     let ignore = false;
@@ -4332,11 +4399,11 @@ function PulseAppInner() {
     const wasSaved = savedIds.includes(id);
     const nextSaved = !wasSaved;
     setSavedIds((arr) => (wasSaved ? arr.filter((x) => x !== id) : [...arr, id]));
-    showToast(wasSaved ? "Removed from saved" : "Saved");
+    showToast(t(wasSaved ? "Removed from saved" : "Saved"));
     void setSavedItem({ type: "place", id }, nextSaved).catch((error) => {
       console.warn("Could not persist place save.", error);
       setSavedIds((arr) => (wasSaved ? [...arr, id] : arr.filter((x) => x !== id)));
-      showToast("Could not save");
+      showToast(t("Could not save"));
     });
   };
   const toggleLike = (id: string) => {
@@ -4346,7 +4413,9 @@ function PulseAppInner() {
     void setPostLike(id, nextLiked).catch((error) => {
       console.warn("Could not persist post like.", error);
       setLikes((m) => ({ ...m, [id]: !nextLiked }));
-      showToast("Could not save like");
+      showToast(
+        language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση του like" : "Could not save like",
+      );
     });
   };
   const addPlaceComment = (id: string, text: string) => {
@@ -4364,7 +4433,7 @@ function PulseAppInner() {
       authorKind: "user",
     };
     setPlaceComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast("Comment posted");
+    showToast(t("Comment posted"));
     void addPulseComment({ type: "place", id }, text, {
       profileId: account.profile.id,
       authorName,
@@ -4384,7 +4453,7 @@ function PulseAppInner() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast("Could not post comment");
+        showToast(t("Could not post comment"));
       });
   };
   const addPostComment = (id: string, text: string) => {
@@ -4402,7 +4471,7 @@ function PulseAppInner() {
       authorKind: "user",
     };
     setPostComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast("Comment posted");
+    showToast(t("Comment posted"));
     void addPulseComment({ type: "post", id }, text, {
       profileId: account.profile.id,
       authorName,
@@ -4422,29 +4491,49 @@ function PulseAppInner() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast("Could not post comment");
+        showToast(t("Could not post comment"));
       });
   };
   const toggleSavePost = (id: string) => {
     const wasSaved = !!savedPosts[id];
     const nextSaved = !wasSaved;
     setSavedPosts((m) => ({ ...m, [id]: nextSaved }));
-    showToast(wasSaved ? "Removed post" : "Saved post");
+    showToast(
+      language === "GR"
+        ? wasSaved
+          ? "Η δημοσίευση αφαιρέθηκε"
+          : "Η δημοσίευση αποθηκεύτηκε"
+        : wasSaved
+          ? "Removed post"
+          : "Saved post",
+    );
     void setSavedItem({ type: "post", id }, nextSaved).catch((error) => {
       console.warn("Could not persist post save.", error);
       setSavedPosts((m) => ({ ...m, [id]: wasSaved }));
-      showToast("Could not save post");
+      showToast(
+        language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση της δημοσίευσης" : "Could not save post",
+      );
     });
   };
   const toggleSaveRoute = (id: string) => {
     const wasSaved = !!savedRoutes[id];
     const nextSaved = !wasSaved;
     setSavedRoutes((m) => ({ ...m, [id]: nextSaved }));
-    showToast(wasSaved ? "Removed route" : "Saved route");
+    showToast(
+      language === "GR"
+        ? wasSaved
+          ? "Η διαδρομή αφαιρέθηκε"
+          : "Η διαδρομή αποθηκεύτηκε"
+        : wasSaved
+          ? "Removed route"
+          : "Saved route",
+    );
     void setSavedItem({ type: "route", id }, nextSaved).catch((error) => {
       console.warn("Could not persist route save.", error);
       setSavedRoutes((m) => ({ ...m, [id]: wasSaved }));
-      showToast("Could not save route");
+      showToast(
+        language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση της διαδρομής" : "Could not save route",
+      );
     });
   };
   const addRouteComment = (id: string, text: string) => {
@@ -4462,7 +4551,7 @@ function PulseAppInner() {
       authorKind: "user",
     };
     setRouteComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast("Comment posted");
+    showToast(t("Comment posted"));
     void addPulseComment({ type: "route", id }, text, {
       profileId: account.profile.id,
       authorName,
@@ -4482,7 +4571,7 @@ function PulseAppInner() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast("Could not post comment");
+        showToast(t("Could not post comment"));
       });
   };
   const addLocalPost = async ({
@@ -4515,7 +4604,7 @@ function PulseAppInner() {
     setComposerPin(null);
     setTab("pulse");
     markContribution();
-    showToast("Post saved");
+    showToast(t("Post saved"));
   };
   const addLocalPlace = async (input: CreatePulsePlaceInput) => {
     if (account.status !== "ready") {
@@ -4541,7 +4630,7 @@ function PulseAppInner() {
     setComposerPin(null);
     setTab("map");
     markContribution();
-    showToast("Place saved");
+    showToast(t("Place saved"));
   };
   const addLocalStory = async (input: CreateStoryInput) => {
     if (account.status !== "ready") {
@@ -4579,7 +4668,7 @@ function PulseAppInner() {
     setComposerPin(null);
     setStoryViewer({ placeId: input.placeId, storyId: story.id });
     markContribution();
-    showToast("Story added");
+    showToast(t("Story added"));
   };
 
   const addMeetEvent = async (input: CreateMeetInput) => {
@@ -4614,7 +4703,7 @@ function PulseAppInner() {
     setComposerPin(null);
     setTab("meet");
     setMeetSubTab("community");
-    showToast("Gathering hosted");
+    showToast(t("Gathering hosted"));
   };
 
   const applyOrganizer = async () => {
@@ -4625,7 +4714,7 @@ function PulseAppInner() {
     const displayName = profileDisplayName(account.profile);
     const status = await applyToBecomeOrganizer(displayName, DEFAULT_ORGANIZER_BIO);
     setOrganizerStatus(status);
-    showToast("Organizer application sent");
+    showToast(t("Organizer application sent"));
   };
 
   const addCulturalEvent = async (input: CreateCulturalEventInput) => {
@@ -4642,7 +4731,7 @@ function PulseAppInner() {
       culturalEvents: [event, ...data.culturalEvents.filter((item) => item.id !== event.id)],
     }));
     markContribution();
-    showToast("Event submitted for review");
+    showToast(t("Event submitted for review"));
   };
 
   const toggleCulturalEventLike = (id: string) => {
@@ -4659,7 +4748,7 @@ function PulseAppInner() {
     void setCulturalEventLike(id, nextLiked).catch((error) => {
       console.warn("Could not persist cultural event like.", error);
       setCulturalEventLikes((m) => ({ ...m, [id]: !nextLiked }));
-      showToast("Could not save like");
+      showToast(t("Could not save"));
     });
   };
 
@@ -4678,7 +4767,7 @@ function PulseAppInner() {
       authorKind: "user",
     };
     setCulturalEventComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast("Comment posted");
+    showToast(t("Comment posted"));
     void addPulseComment({ type: "cultural_event", id }, text, {
       profileId: account.profile.id,
       authorName,
@@ -4698,7 +4787,7 @@ function PulseAppInner() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast("Could not post comment");
+        showToast(t("Could not post comment"));
       });
   };
 
@@ -4717,7 +4806,7 @@ function PulseAppInner() {
       return copy;
     });
     if (!clearing) markContribution();
-    showToast(clearing ? "RSVP removed" : next === "going" ? "You are in" : "Marked maybe");
+    showToast(t(clearing ? "RSVP removed" : next === "going" ? "You are in" : "Marked maybe"));
 
     setPulseData((data) => ({
       ...data,
@@ -4750,14 +4839,14 @@ function PulseAppInner() {
         ...data,
         meetEvents: data.meetEvents.map((item) => (item.id === event.id ? event : item)),
       }));
-      showToast("Could not save RSVP");
+      showToast(t("Could not save RSVP"));
     });
   };
 
   const markTrendingGoing = (place: Place) => {
     const event = meetEvents.find((item) => item.placeId === place.id);
     if (!event) {
-      showToast("No gathering there yet");
+      showToast(t("No gathering there yet"));
       setTab("meet");
       setMeetSubTab("community");
       return;
@@ -4782,7 +4871,7 @@ function PulseAppInner() {
     setTab("map");
     const firstPlace = findPlace(route.stops[0]?.placeId ?? "");
     if (firstPlace) selectPlacePreview(firstPlace, false);
-    showToast("Route opened on map");
+    showToast(t("Route opened on map"));
   };
 
   const centerRouteStop = (placeId: string, index: number) => {
@@ -4809,12 +4898,12 @@ function PulseAppInner() {
 
   const requestLocationFromOnboarding = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      showToast("Location is not available");
+      showToast(t("Location is not available"));
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      () => showToast("Location enabled"),
-      () => showToast("Location skipped"),
+      () => showToast(t("Location enabled")),
+      () => showToast(t("Location skipped")),
       { enableHighAccuracy: true, maximumAge: 60_000, timeout: 8000 },
     );
   };
@@ -4834,8 +4923,8 @@ function PulseAppInner() {
     return first ?? null;
   }, [filteredPlaces]);
   const mapClusters = useMemo(
-    () => buildAreaClusters(filteredPlaces, events, lang),
-    [events, filteredPlaces, lang],
+    () => buildAreaClusters(filteredPlaces, events),
+    [events, filteredPlaces],
   );
   const selectedCluster = selectedAreaId
     ? (mapClusters.find((cluster) => cluster.id === selectedAreaId) ?? null)
@@ -4894,7 +4983,7 @@ function PulseAppInner() {
             routePath={activeRoutePath}
             onMapLongPress={(lat, lng) => {
               openComposer("place", { lat, lng });
-              showToast("Drop a new spot");
+              showToast(t("Drop a new spot"));
             }}
           />
           <AnimatePresence>
@@ -4964,7 +5053,7 @@ function PulseAppInner() {
               transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.6 }}
               onClick={() => openComposer("post")}
               className="absolute right-4 bottom-3 z-40 grid h-12 w-12 place-items-center rounded-full bg-hp-sunset text-hp-paper shadow-[0_10px_24px_rgba(224,106,50,0.45)]"
-              aria-label={PULSE_FEED_STRINGS.createLocalPost[lang]}
+              aria-label={t("Create local post")}
             >
               <Plus size={20} />
             </motion.button>
@@ -4993,10 +5082,10 @@ function PulseAppInner() {
           <div className="flex shrink-0 gap-1.5 px-4 pt-3">
             {(
               [
-                { id: "community" as MeetSubTab, Icon: CalendarHeart },
-                { id: "events" as MeetSubTab, Icon: Ticket },
-              ] satisfies { id: MeetSubTab; Icon: LucideIcon }[]
-            ).map(({ id, Icon }) => {
+                { id: "community" as MeetSubTab, label: t("Community"), Icon: CalendarHeart },
+                { id: "events" as MeetSubTab, label: t("Events"), Icon: Ticket },
+              ] satisfies { id: MeetSubTab; label: string; Icon: LucideIcon }[]
+            ).map(({ id, label, Icon }) => {
               const active = meetSubTab === id;
               return (
                 <button
@@ -5011,7 +5100,7 @@ function PulseAppInner() {
                   }`}
                 >
                   <Icon size={14} strokeWidth={2.6} />
-                  {MEET_SUB_TAB_LABELS[id][lang]}
+                  {label}
                 </button>
               );
             })}
@@ -5029,7 +5118,7 @@ function PulseAppInner() {
             ) : (
               <CulturalEventsScreen
                 events={culturalEvents}
-                lang={lang}
+                lang={language}
                 onOpenDetail={setOpenCulturalEvent}
                 canCreate={organizerStatus?.verificationStatus === "verified"}
                 onCreate={() => setOrganizerComposerOpen(true)}
@@ -5073,6 +5162,7 @@ function PulseAppInner() {
         <TopBar
           query={query}
           setQuery={setQuery}
+          onToggleLanguage={toggleAppLanguage}
           showSearch={showSearch}
           setShowSearch={setShowSearch}
           account={account}
@@ -5083,8 +5173,24 @@ function PulseAppInner() {
 
         <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
           {dataStatus !== "ready" && (
-            <div className="absolute inset-x-4 top-4 z-[60] rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur">
-              {dataStatus === "loading" ? "Loading pulse data…" : "Could not load pulse data."}
+            <div
+              role={dataStatus === "error" ? "alert" : "status"}
+              aria-live="polite"
+              className="absolute inset-x-4 top-4 z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur"
+            >
+              <span>
+                {t(dataStatus === "loading" ? "Loading pulse data…" : "Could not load pulse data.")}
+              </span>
+              {dataStatus === "error" && (
+                <button
+                  type="button"
+                  onClick={() => void refreshPulseData()}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-hp-ink px-3 py-2 text-[11px] font-black text-hp-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hp-sunset"
+                >
+                  <RefreshCw size={13} />
+                  {t("Try again")}
+                </button>
+              )}
             </div>
           )}
           <AnimatePresence mode="wait" initial={false}>
@@ -5179,14 +5285,14 @@ function PulseAppInner() {
 
       <OrganizerEventComposer
         open={organizerComposerOpen}
-        lang={lang}
+        lang={language}
         onClose={() => setOrganizerComposerOpen(false)}
         onSubmit={addCulturalEvent}
       />
 
       <CulturalEventDetailModal
         event={openCulturalEvent}
-        lang={lang}
+        lang={language}
         onClose={() => setOpenCulturalEvent(null)}
         onOpenMap={jumpToMap}
         onLike={() => openCulturalEvent && toggleCulturalEventLike(openCulturalEvent.id)}

@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Radio } from "lucide-react";
 import type { ActivityTick } from "@/lib/hp/activity-data";
-import { useLang } from "@/lib/hp/language-context";
-import { liveTickerTimeLabel } from "@/lib/hp/pulse-strings";
 
 interface Props {
   ticks: ActivityTick[];
@@ -16,7 +14,6 @@ interface Props {
  * reward that makes people come back.
  */
 export function LiveTicker({ ticks, onOpenPlace }: Props) {
-  const { lang } = useLang();
   const [spotlight, setSpotlight] = useState(0);
   const timer = useRef<number | null>(null);
 
@@ -60,7 +57,7 @@ export function LiveTicker({ ticks, onOpenPlace }: Props) {
                 <span className="text-hp-ink/55"> · {head.at}</span>
               </p>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-hp-muted">
-                {liveTickerTimeLabel(lang, head.minutesAgo)}
+                {head.minutesAgo < 1 ? "just now" : `${head.minutesAgo}m ago`} · live
               </p>
             </motion.div>
           </AnimatePresence>

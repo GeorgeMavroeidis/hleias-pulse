@@ -1,8 +1,7 @@
 import { motion } from "framer-motion";
 import { ImageBox } from "./ImageBox";
 import { toneStyle, type PlaceStoryGroup } from "@/lib/hp/place-stories";
-import { useLang } from "@/lib/hp/language-context";
-import { STORY_LIVE_BADGE, openStoriesAriaLabel } from "@/lib/hp/pulse-strings";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   groups: PlaceStoryGroup[];
@@ -14,14 +13,14 @@ interface Props {
  * its tone (sea/olive/purple/sunset) and dims once every story has been seen.
  */
 export function PlaceStoryRail({ groups, onOpen }: Props) {
-  const { lang } = useLang();
+  const { language } = useI18n();
   if (groups.length === 0) return null;
 
   return (
     <div
       className="hp-no-scrollbar -mx-4 mb-4 flex gap-3 overflow-x-auto px-4"
       role="list"
-      aria-label={lang === "GR" ? "Ιστορίες μερών" : "Place stories"}
+      aria-label={language === "GR" ? "Stories ανά σημείο" : "Place stories"}
     >
       {groups.map((group) => {
         const tone = toneStyle(group.hasUnseen ? group.tone : "muted");
@@ -33,7 +32,11 @@ export function PlaceStoryRail({ groups, onOpen }: Props) {
             role="listitem"
             whileTap={{ scale: 0.93 }}
             onClick={() => onOpen(group.placeId)}
-            aria-label={openStoriesAriaLabel(lang, group.count, group.placeName)}
+            aria-label={
+              language === "GR"
+                ? `Άνοιγμα ${group.count} stories για ${group.placeName}`
+                : `Open ${group.count} stor${group.count === 1 ? "y" : "ies"} for ${group.placeName}`
+            }
             className="hp-story-bubble flex w-[4.25rem] shrink-0 flex-col items-center gap-1 text-center"
           >
             <div className="hp-story-bubble__ring" style={{ background: tone.gradient }}>
@@ -45,7 +48,7 @@ export function PlaceStoryRail({ groups, onOpen }: Props) {
                   rounded="rounded-full"
                 />
               </div>
-              {group.live && <span className="hp-story-bubble__live">{STORY_LIVE_BADGE[lang]}</span>}
+              {group.live && <span className="hp-story-bubble__live">Live</span>}
               {group.count > 1 && (
                 <span className="hp-story-bubble__count" aria-hidden="true">
                   {group.count}
