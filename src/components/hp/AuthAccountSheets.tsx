@@ -8,10 +8,12 @@ import {
   Mail,
   Save,
   ShieldCheck,
+  Ticket,
   UserCircle2,
   X,
 } from "lucide-react";
 import type { AdminRole } from "@/lib/admin-api";
+import type { OrganizerStatus } from "@/lib/hp/cultural-events-types";
 import { useI18n } from "@/lib/i18n";
 import {
   normalizeHandle,
@@ -364,6 +366,81 @@ export function AuthSheet({
   );
 }
 
+function OrganizerSection({
+  status,
+  onApply,
+  onOpenComposer,
+}: {
+  status: OrganizerStatus | null;
+  onApply: () => Promise<void>;
+  onOpenComposer: () => void;
+}) {
+  const { t } = useI18n();
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const apply = async () => {
+    setApplying(true);
+    setError(null);
+    try {
+      await onApply();
+    } catch (applyError) {
+      setError(applyError instanceof Error ? applyError.message : t("Could not send application."));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  if (status?.verificationStatus === "verified") {
+    return (
+      <button
+        type="button"
+        onClick={onOpenComposer}
+        className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
+      >
+        <span className="grid h-10 w-10 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+          <Ticket size={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13px] font-black text-hp-ink">{t("Verified organizer")}</span>
+          <span className="block text-[11px] text-hp-muted">{t("Submit a cultural event")}</span>
+        </span>
+      </button>
+    );
+  }
+
+  if (status?.verificationStatus === "pending") {
+    return (
+      <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-[12px] font-semibold text-hp-muted">
+        {t("Your request to become an events organizer is pending approval.")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
+      <div className="text-[13px] font-black text-hp-ink">{t("Do you organize events?")}</div>
+      <p className="mt-0.5 text-[11px] text-hp-muted">
+        {t("Become an organizer to submit theater shows, concerts, and festivals.")}
+      </p>
+      {status?.verificationStatus === "rejected" && (
+        <p className="mt-1 text-[11px] font-semibold text-red-600">
+          {t("Your previous request was rejected.")}
+        </p>
+      )}
+      {error && <p className="mt-1 text-[11px] font-semibold text-red-600">{error}</p>}
+      <button
+        type="button"
+        onClick={() => void apply()}
+        disabled={applying}
+        className="mt-2 w-full rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper disabled:opacity-60"
+      >
+        {applying ? t("Submitting…") : t("Become an organizer")}
+      </button>
+    </div>
+  );
+}
+
 export function AccountSheet({
   open,
   account,
@@ -374,6 +451,9 @@ export function AccountSheet({
   onOpenAuth,
   adminRole,
   onOpenAdmin,
+  organizerStatus,
+  onApplyOrganizer,
+  onOpenOrganizerComposer,
 }: {
   open: boolean;
   account: PulseAccountState;
@@ -389,6 +469,9 @@ export function AccountSheet({
   onOpenAuth: () => void;
   adminRole: AdminRole | null;
   onOpenAdmin: () => void;
+  organizerStatus: OrganizerStatus | null;
+  onApplyOrganizer: () => Promise<void>;
+  onOpenOrganizerComposer: () => void;
 }) {
   const { t } = useI18n();
   const profile = accountProfile(account);
@@ -610,6 +693,12 @@ export function AccountSheet({
                     </div>
                   </div>
                 </div>
+
+                <OrganizerSection
+                  status={organizerStatus}
+                  onApply={onApplyOrganizer}
+                  onOpenComposer={onOpenOrganizerComposer}
+                />
 
                 <form onSubmit={submit} className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
