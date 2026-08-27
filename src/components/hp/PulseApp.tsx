@@ -1146,13 +1146,18 @@ function TouristStartHere({
   const { language, t } = useI18n();
 
   // "Must-see today": the lively spots (popular/busy), strongest first. Falls back
-  // to a plain hotness ranking only if fewer than 5 places are flagged live.
+  // to a plain hotness ranking only if fewer than 6 places are flagged live.
+  // Top 6 (not 5) so Ancient Olympia — the region's headline site, currently
+  // hotness 7 / popular / rank #6 — makes the deck with today's seed data.
+  // NOTE (possible phase 2): this hotness-driven pick is the immediate fix, not
+  // the final one. A `places.featured` flag set from the admin panel would give
+  // stable editorial control over this deck if we want it later.
   const mustSee = useMemo(() => {
     const live = places.filter(
       (place) => place.status === "popular" || place.status === "busy",
     );
-    const pool = live.length >= 5 ? live : places;
-    return [...pool].sort((a, b) => b.hotness - a.hotness).slice(0, 5);
+    const pool = live.length >= 6 ? live : places;
+    return [...pool].sort((a, b) => b.hotness - a.hotness).slice(0, 6);
   }, [places]);
 
   // Same "curated" filter the Routes screen uses: editor-authored routes only.
@@ -5198,7 +5203,7 @@ export function PulseApp() {
               />
             )}
           </div>
-          {places.length > 0 && (
+          {places.length > 0 && !showTouristStartHere && (
             <motion.button
               type="button"
               whileTap={{ scale: 0.92 }}
