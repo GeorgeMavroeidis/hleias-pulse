@@ -166,6 +166,8 @@ type CulturalEventRow = Pick<
   | "is_past_event"
   | "is_official"
   | "likes_count"
+  | "moderation_status"
+  | "user_id"
   | "created_at"
 >;
 type OrganizerRow = Pick<
@@ -222,7 +224,7 @@ const STORY_RETURN_COLUMNS =
 const MEET_EVENT_RETURN_COLUMNS =
   "id,place_id,user_id,profile_id,title,host_name,host_avatar_url,host_type,starts_at,duration_min,category,vibe,price,capacity,description,cover_url,tags,going_count,maybe_count,hot,attendee_avatar_urls";
 const CULTURAL_EVENT_RETURN_COLUMNS =
-  "id,title,greek_title,event_type,venue_name,area,place_id,lat,lng,event_date,organizer_name,organizer_id,description_el,description_en,poster_url,ticket_url,is_past_event,is_official,likes_count,created_at";
+  "id,title,greek_title,event_type,venue_name,area,place_id,lat,lng,event_date,organizer_name,organizer_id,description_el,description_en,poster_url,ticket_url,is_past_event,is_official,likes_count,moderation_status,user_id,created_at";
 const ORGANIZER_RETURN_COLUMNS = "id,display_name,bio,verification_status";
 
 type SavedTarget =
@@ -668,6 +670,8 @@ function mapCulturalEvent(row: CulturalEventRow): CulturalEvent {
     isPastEvent: row.is_past_event,
     isOfficial: row.is_official,
     likesCount: row.likes_count,
+    moderationStatus: row.moderation_status ?? undefined,
+    userId: row.user_id ?? null,
     createdAt: row.created_at,
   };
 }
@@ -1271,6 +1275,56 @@ export async function createPulseCulturalEvent(
       user_id: userId,
       moderation_status: "pending",
     })
+    .select(CULTURAL_EVENT_RETURN_COLUMNS)
+    .single();
+
+  if (result.error) throw result.error;
+  return mapCulturalEvent(result.data);
+}
+
+// An organizer's own submissions (any moderation_status). RLS "Users can read
+// own cultural event submissions" already scopes this to user_id = auth.uid().
+export async function getMyCulturalEvents(): Promise<CulturalEvent[]> {
+  const client = assertSupabase();
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  const userId = sessionResult.data.session?.user.id;
+  if (!userId) return [];
+
+  const result = await client
+    .from("cultural_events")
+    .select(CULTURAL_EVENT_RETURN_COLUMNS)
+    .eq("user_id", userId)
+    .order("event_date", { ascending: true });
+  if (result.error) throw result.error;
+  return (result.data ?? []).map(mapCulturalEvent);
+}
+
+// Edits the content fields only. moderation_status / user_id / organizer_id /
+// place linkage are never sent -- RLS "Organizers can update own pending
+// cultural events" also rejects the update unless the row stays 'pending'.
+export async function updatePulseCulturalEvent(
+  id: string,
+  input: CreateCulturalEventInput,
+): Promise<CulturalEvent> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+
+  const result = await client
+    .from("cultural_events")
+    .update({
+      title: input.title.trim(),
+      greek_title: input.greekTitle.trim(),
+      event_type: culturalEventType(input.eventType),
+      venue_name: input.venueName.trim(),
+      area: input.area.trim(),
+      event_date: input.eventDate,
+      description_el: input.descriptionEl.trim(),
+      description_en: input.descriptionEn?.trim() || null,
+      poster_url: input.posterUrl.trim(),
+      ticket_url: input.ticketUrl?.trim() || null,
+    })
+    .eq("id", id)
     .select(CULTURAL_EVENT_RETURN_COLUMNS)
     .single();
 

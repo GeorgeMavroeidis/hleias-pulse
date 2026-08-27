@@ -455,6 +455,8 @@ const EL: Record<string, string> = {
   "Your request to become an events organizer is pending approval.":
     "Το αίτημά σου να γίνεις διοργανωτής εκδηλώσεων είναι σε αναμονή έγκρισης.",
   "Become an organizer": "Γίνε διοργανωτής",
+  "My events": "Οι εκδηλώσεις μου",
+  "Changes saved": "Οι αλλαγές αποθηκεύτηκαν",
   "Submitting…": "Υποβολή…",
   // Tourist "Must-see today" deck (top of the Routes tab)
   "Must-see today": "Πρέπει να δεις σήμερα",

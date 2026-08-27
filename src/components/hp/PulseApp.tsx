@@ -54,7 +54,9 @@ import {
   createPulseCulturalEvent,
   createPulseStory,
   emptyPulseData,
+  getMyCulturalEvents,
   getMyOrganizerStatus,
+  updatePulseCulturalEvent,
   loadPulseData,
   loadPulseUserState,
   markPulseStoriesSeen,
@@ -100,6 +102,7 @@ import { TrendingHero } from "./TrendingHero";
 import { MeetScreen } from "./MeetScreen";
 import { CulturalEventsScreen } from "./CulturalEventsScreen";
 import { OrganizerEventComposer } from "./OrganizerEventComposer";
+import { OrganizerEventsSheet } from "./OrganizerEventsSheet";
 import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet } from "./AuthAccountSheets";
@@ -4098,6 +4101,9 @@ export function PulseApp() {
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [organizerStatus, setOrganizerStatus] = useState<OrganizerStatus | null>(null);
   const [organizerComposerOpen, setOrganizerComposerOpen] = useState(false);
+  const [myCulturalEvents, setMyCulturalEvents] = useState<CulturalEvent[]>([]);
+  const [myEventsOpen, setMyEventsOpen] = useState(false);
+  const [editingCulturalEvent, setEditingCulturalEvent] = useState<CulturalEvent | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   // Tourist-only "Must-see today" overlay on the Map tab. Starts open on every
   // page load (a "welcome" moment); the X dismisses it for the session only.
@@ -4307,6 +4313,16 @@ export function PulseApp() {
       });
   };
 
+  // Only verified organizers have any cultural events to own; everyone else gets
+  // an empty list without a round-trip.
+  const loadMyCulturalEvents = async (status: OrganizerStatus | null) => {
+    if (status?.verificationStatus !== "verified") {
+      setMyCulturalEvents([]);
+      return;
+    }
+    setMyCulturalEvents(await getMyCulturalEvents().catch(() => [] as CulturalEvent[]));
+  };
+
   const refreshAccount = async () => {
     try {
       const nextAccount = await getCurrentPulseAccount();
@@ -4320,8 +4336,10 @@ export function PulseApp() {
       if (nextAccount.status === "ready" || nextAccount.status === "needsProfile") {
         const nextOrganizerStatus = await getMyOrganizerStatus().catch(() => null);
         setOrganizerStatus(nextOrganizerStatus);
+        await loadMyCulturalEvents(nextOrganizerStatus);
       } else {
         setOrganizerStatus(null);
+        setMyCulturalEvents([]);
       }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
@@ -4341,6 +4359,7 @@ export function PulseApp() {
       setAccount(fallback);
       setAdminRole(null);
       setOrganizerStatus(null);
+      setMyCulturalEvents([]);
       return fallback;
     }
   };
@@ -4471,8 +4490,15 @@ export function PulseApp() {
       if (nextAccount.status === "ready" || nextAccount.status === "needsProfile") {
         const nextOrganizerStatus = await getMyOrganizerStatus().catch(() => null);
         if (!ignore) setOrganizerStatus(nextOrganizerStatus);
+        if (nextOrganizerStatus?.verificationStatus === "verified") {
+          const myEvents = await getMyCulturalEvents().catch(() => [] as CulturalEvent[]);
+          if (!ignore) setMyCulturalEvents(myEvents);
+        } else if (!ignore) {
+          setMyCulturalEvents([]);
+        }
       } else {
         setOrganizerStatus(null);
+        setMyCulturalEvents([]);
       }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
@@ -5021,8 +5047,23 @@ export function PulseApp() {
       ...data,
       culturalEvents: [event, ...data.culturalEvents.filter((item) => item.id !== event.id)],
     }));
+    setMyCulturalEvents((list) => [event, ...list.filter((item) => item.id !== event.id)]);
     markContribution();
     showToast(t("Event submitted for review"));
+  };
+
+  // Edit an own pending cultural event. RLS rejects the update unless the row
+  // stays 'pending', so a published event's Edit button is never shown.
+  const editCulturalEvent = async (id: string, input: CreateCulturalEventInput) => {
+    const updated = await updatePulseCulturalEvent(id, input);
+    setMyCulturalEvents((list) => list.map((item) => (item.id === id ? updated : item)));
+    setPulseData((data) => ({
+      ...data,
+      culturalEvents: data.culturalEvents.map((item) => (item.id === id ? updated : item)),
+    }));
+    setEditingCulturalEvent(null);
+    markContribution();
+    showToast(t("Changes saved"));
   };
 
   const toggleCulturalEventLike = (id: string) => {
@@ -5621,10 +5662,28 @@ export function PulseApp() {
       />
 
       <OrganizerEventComposer
+        key={editingCulturalEvent?.id ?? "new"}
         open={organizerComposerOpen}
         lang={language}
-        onClose={() => setOrganizerComposerOpen(false)}
+        event={editingCulturalEvent}
+        onClose={() => {
+          setOrganizerComposerOpen(false);
+          setEditingCulturalEvent(null);
+        }}
         onSubmit={addCulturalEvent}
+        onUpdate={editCulturalEvent}
+      />
+
+      <OrganizerEventsSheet
+        open={myEventsOpen}
+        lang={language}
+        events={myCulturalEvents}
+        onClose={() => setMyEventsOpen(false)}
+        onEdit={(ev) => {
+          setEditingCulturalEvent(ev);
+          setMyEventsOpen(false);
+          setOrganizerComposerOpen(true);
+        }}
       />
 
       <CulturalEventDetailModal
@@ -5676,10 +5735,16 @@ export function PulseApp() {
           window.location.assign("/admin");
         }}
         organizerStatus={organizerStatus}
+        organizerEventCount={myCulturalEvents.length}
         onApplyOrganizer={applyOrganizer}
         onOpenOrganizerComposer={() => {
           setProfileOpen(false);
+          setEditingCulturalEvent(null);
           setOrganizerComposerOpen(true);
+        }}
+        onOpenOrganizerEvents={() => {
+          setProfileOpen(false);
+          setMyEventsOpen(true);
         }}
       />
 

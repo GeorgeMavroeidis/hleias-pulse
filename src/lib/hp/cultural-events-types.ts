@@ -150,4 +150,17 @@ export const CULTURAL_EVENTS_STRINGS = {
   like: { GR: "Μου αρέσει", EN: "Like" },
   unlike: { GR: "Αφαίρεση μου αρέσει", EN: "Unlike" },
   postComment: { GR: "Δημοσίευση σχολίου", EN: "Post comment" },
+  // "My events" list + composer edit mode
+  myEvents: { GR: "Οι εκδηλώσεις μου", EN: "My events" },
+  myEventsEmpty: {
+    GR: "Δεν έχεις υποβάλει εκδηλώσεις ακόμη.",
+    EN: "You haven't submitted any events yet.",
+  },
+  edit: { GR: "Επεξεργασία", EN: "Edit" },
+  editLockedCaption: { GR: "Κλειδώνει μετά την έγκριση", EN: "Locked after approval" },
+  editCulturalEvent: { GR: "Επεξεργασία εκδήλωσης", EN: "Edit event" },
+  saveChanges: { GR: "Αποθήκευση αλλαγών", EN: "Save changes" },
+  statusPending: { GR: "Σε αναμονή", EN: "Pending" },
+  statusPublished: { GR: "Δημοσιευμένο", EN: "Published" },
+  statusHidden: { GR: "Κρυφό", EN: "Hidden" },
 } as const satisfies Record<string, { GR: string; EN: string }>;

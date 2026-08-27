@@ -368,12 +368,16 @@ export function AuthSheet({
 
 function OrganizerSection({
   status,
+  myEventsCount,
   onApply,
   onOpenComposer,
+  onOpenMyEvents,
 }: {
   status: OrganizerStatus | null;
+  myEventsCount: number;
   onApply: () => Promise<void>;
   onOpenComposer: () => void;
+  onOpenMyEvents: () => void;
 }) {
   const { t } = useI18n();
   const [applying, setApplying] = useState(false);
@@ -393,19 +397,35 @@ function OrganizerSection({
 
   if (status?.verificationStatus === "verified") {
     return (
-      <button
-        type="button"
-        onClick={onOpenComposer}
-        className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
-      >
-        <span className="grid h-10 w-10 place-items-center rounded-full bg-hp-sunset text-hp-paper">
-          <Ticket size={16} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13px] font-black text-hp-ink">{t("Verified organizer")}</span>
-          <span className="block text-[11px] text-hp-muted">{t("Submit a cultural event")}</span>
-        </span>
-      </button>
+      <div className="mb-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+            <Ticket size={16} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-black text-hp-ink">
+              {t("Verified organizer")}
+            </span>
+            <span className="block text-[11px] text-hp-muted">{t("Submit a cultural event")}</span>
+          </span>
+        </div>
+        <div className="mt-2.5 flex gap-2">
+          <button
+            type="button"
+            onClick={onOpenComposer}
+            className="flex-1 rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper transition active:scale-[0.98]"
+          >
+            {t("Submit a cultural event")}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenMyEvents}
+            className="flex-1 rounded-full border border-hp-ink/15 py-2 text-[12px] font-bold text-hp-ink transition active:scale-[0.98]"
+          >
+            {t("My events")} ({myEventsCount})
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -452,8 +472,10 @@ export function AccountSheet({
   adminRole,
   onOpenAdmin,
   organizerStatus,
+  organizerEventCount,
   onApplyOrganizer,
   onOpenOrganizerComposer,
+  onOpenOrganizerEvents,
 }: {
   open: boolean;
   account: PulseAccountState;
@@ -470,8 +492,10 @@ export function AccountSheet({
   adminRole: AdminRole | null;
   onOpenAdmin: () => void;
   organizerStatus: OrganizerStatus | null;
+  organizerEventCount: number;
   onApplyOrganizer: () => Promise<void>;
   onOpenOrganizerComposer: () => void;
+  onOpenOrganizerEvents: () => void;
 }) {
   const { t } = useI18n();
   const profile = accountProfile(account);
@@ -696,8 +720,10 @@ export function AccountSheet({
 
                 <OrganizerSection
                   status={organizerStatus}
+                  myEventsCount={organizerEventCount}
                   onApply={onApplyOrganizer}
                   onOpenComposer={onOpenOrganizerComposer}
+                  onOpenMyEvents={onOpenOrganizerEvents}
                 />
 
                 <form onSubmit={submit} className="space-y-3">
