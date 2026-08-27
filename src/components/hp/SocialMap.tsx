@@ -4,6 +4,12 @@ import Supercluster from "supercluster";
 import "leaflet/dist/leaflet.css";
 import { type EventItem, type Place } from "@/lib/hp-model";
 import { useImageUrls } from "@/lib/hp/image-cache";
+import {
+  aggregatePulseMetrics,
+  pulseMetricForPlace,
+  type PulseActivitySnapshot,
+  type PulseTier,
+} from "@/lib/hp/pulse-activity";
 import { useI18n } from "@/lib/i18n";
 
 type LeafletModule = typeof import("leaflet");
@@ -48,7 +54,7 @@ const AREA_FOCUS_MAX_ZOOM = 16.25;
 const ILIA_DETAIL_BBOX: [number, number, number, number] = [19.9, 36.35, 23.25, 39.15];
 
 type AreaTone = "beach" | "culture" | "local" | "music" | "nature" | "village";
-type AreaStatus = "quiet" | "moving" | "hot" | "live";
+type AreaStatus = PulseTier;
 
 type AreaDef = {
   id: string;
@@ -74,7 +80,9 @@ export type MapAreaCluster = {
   activityLine: string;
   eventCount: number;
   postCount: number;
+  commentCount: number;
   hotness: number;
+  activityScore: number;
   labelOffsetPx: number;
   avatars: string[];
 };
@@ -86,6 +94,7 @@ type ClusterRenderNode = {
   latLng: LatLngTuple;
   opacity: number;
   selected: boolean;
+  tier: PulseTier;
 };
 
 type ChildRenderNode = {
@@ -98,6 +107,7 @@ type ChildRenderNode = {
   opacity: number;
   selected: boolean;
   solo: boolean;
+  tier: PulseTier;
 };
 
 type ActivityClusterRenderNode = {
@@ -114,6 +124,7 @@ type ActivityClusterRenderNode = {
   hotness: number;
   selected: boolean;
   tone: AreaTone;
+  tier: PulseTier;
 };
 
 type RenderNode = ClusterRenderNode | ActivityClusterRenderNode | ChildRenderNode;
@@ -123,6 +134,7 @@ type PlacePointProperties = {
   areaId: string;
   eventCount: number;
   postCount: number;
+  commentCount: number;
   hotness: number;
   tone: AreaTone;
 };
@@ -130,6 +142,7 @@ type PlacePointProperties = {
 type ActivityClusterProperties = {
   eventCount: number;
   postCount: number;
+  commentCount: number;
   hotness: number;
 };
 
@@ -296,19 +309,8 @@ function eventCountForPlace(events: EventItem[]) {
   }, new Map());
 }
 
-function scorePlace(place: Place, eventCount = 0) {
-  return (
-    place.hotness * 10 + place.recentPostCount * 1.8 + eventCount * 14 + place.commentCount * 0.45
-  );
-}
-
-function statusForCluster(places: Place[], eventCount: number, hotness: number): AreaStatus {
-  if (places.some((place) => place.status === "busy") || (eventCount >= 2 && hotness >= 9)) {
-    return "live";
-  }
-  if (hotness >= 8.2 || eventCount > 0) return "hot";
-  if (hotness >= 5.5 || places.length >= 3) return "moving";
-  return "quiet";
+function scorePlace(place: Place, activitySnapshot: PulseActivitySnapshot, fallbackEventCount = 0) {
+  return pulseMetricForPlace(place, activitySnapshot, fallbackEventCount).score;
 }
 
 function activityLineForCluster(
@@ -329,8 +331,13 @@ function activityLineForCluster(
   return `${postCount} posts`;
 }
 
-function markerStyle(size: number) {
-  return `--marker-size:${size}px`;
+function markerStyle(size: number, id: string) {
+  let hash = 0;
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
+  }
+  const delaySeconds = ((hash % 5400) / 1000).toFixed(3);
+  return `--marker-size:${size}px;--hp-pulse-delay:-${delaySeconds}s`;
 }
 
 function clusterSize(status: AreaStatus) {
@@ -380,7 +387,11 @@ function centerOfPlaces(places: Place[], fallback: LatLngTuple): LatLngTuple {
   return [lat, lng];
 }
 
-export function buildAreaClusters(places: Place[], events: EventItem[]): MapAreaCluster[] {
+export function buildAreaClusters(
+  places: Place[],
+  events: EventItem[],
+  activitySnapshot: PulseActivitySnapshot = {},
+): MapAreaCluster[] {
   const eventCounts = eventCountForPlace(events);
 
   // Group by curated neighbourhood; places not in any def become standalone
@@ -398,19 +409,15 @@ export function buildAreaClusters(places: Place[], events: EventItem[]): MapArea
       const def = areaDefForId(id);
       const sortedPlaces = [...areaPlaces].sort(
         (a, b) =>
-          scorePlace(b, eventCounts.get(b.id) ?? 0) - scorePlace(a, eventCounts.get(a.id) ?? 0),
+          scorePlace(b, activitySnapshot, eventCounts.get(b.id) ?? 0) -
+          scorePlace(a, activitySnapshot, eventCounts.get(a.id) ?? 0),
       );
       const lead = sortedPlaces[0];
-      const placeIds = new Set(areaPlaces.map((place) => place.id));
-      const eventCount = events.filter((event) => placeIds.has(event.placeId)).length;
-      const postCount = areaPlaces.reduce((sum, place) => sum + place.recentPostCount, 0);
-      const averageHotness =
-        areaPlaces.reduce((sum, place) => sum + place.hotness, 0) / Math.max(areaPlaces.length, 1);
-      const hotness = Math.min(
-        10,
-        Math.max(...areaPlaces.map((place) => place.hotness), averageHotness + eventCount * 0.85),
-      );
-      const status = statusForCluster(areaPlaces, eventCount, hotness);
+      const activity = aggregatePulseMetrics(areaPlaces, activitySnapshot, eventCounts);
+      const eventCount = activity.eventCount;
+      const postCount = activity.postCount;
+      const hotness = activity.hotness;
+      const status = activity.tier;
       const tone = def?.tone ?? toneForPlace(lead);
       const name = def?.name ?? lead.name;
       const [lat, lng] = centerOfPlaces(areaPlaces, [lead.lat, lead.lng]);
@@ -429,12 +436,14 @@ export function buildAreaClusters(places: Place[], events: EventItem[]): MapArea
         activityLine: activityLineForCluster(tone, areaPlaces, postCount, eventCount),
         eventCount,
         postCount,
+        commentCount: activity.commentCount,
         hotness,
+        activityScore: activity.score,
         labelOffsetPx: 0,
         avatars: uniqueAvatars(sortedPlaces).slice(0, 3),
       };
     })
-    .sort((a, b) => b.hotness + b.eventCount * 0.5 - (a.hotness + a.eventCount * 0.5));
+    .sort((a, b) => b.activityScore - a.activityScore);
 }
 
 function escapeHtml(value: string) {
@@ -485,8 +494,8 @@ function createAreaIcon(
     className: "hp-area-marker",
     html: `
       <div
-        class="hp-area-marker__shell ${selected ? "is-selected" : ""} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
-        style="${markerStyle(size)}"
+        class="hp-area-marker__shell is-pulse-${cluster.status} ${selected ? "is-selected" : ""} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
+        style="${markerStyle(size, cluster.id)}"
       >
         <span class="hp-marker-aura"></span>
         <span class="hp-area-marker__ring"></span>
@@ -512,6 +521,7 @@ function createChildIcon(
   L: LeafletModule,
   place: Place,
   eventCount: number,
+  tier: PulseTier,
   selected: boolean,
   hasStories = false,
   solo = false,
@@ -528,16 +538,14 @@ function createChildIcon(
       (avatar) => `<img src="${escapeHtml(resolveUrl(resolve, avatar))}" alt="" loading="lazy" />`,
     )
     .join("");
-  const statusLabel = place.status === "busy" ? "live" : place.status === "popular" ? "hot" : "";
-  const pulseStatus: AreaStatus =
-    place.status === "busy" ? "live" : place.status === "popular" ? "hot" : "moving";
+  const statusLabel = tier === "live" ? "live" : tier === "hot" ? "hot" : "";
 
   return L.divIcon({
     className: "hp-child-marker",
     html: `
       <div
-        class="hp-child-marker__shell ${selected ? "is-selected" : ""} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${pulseStatus === "live" ? "is-live" : ""} ${pulseStatus === "hot" ? "is-hot" : ""}"
-        style="${markerStyle(size)}"
+        class="hp-child-marker__shell is-pulse-${tier} ${selected ? "is-selected" : ""} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${tier === "live" ? "is-live" : ""} ${tier === "hot" ? "is-hot" : ""}"
+        style="${markerStyle(size, place.id)}"
       >
         <span class="hp-marker-aura"></span>
         ${hasStories ? '<span class="hp-child-marker__story-ring"></span>' : ""}
@@ -568,9 +576,8 @@ function createActivityClusterIcon(
   resolve: (url: string) => string,
 ) {
   const size = activityClusterSize(node.pointCount);
-  const status = statusForCluster(node.leaves, node.eventCount, node.hotness);
   const images = [...node.leaves]
-    .sort((a, b) => scorePlace(b) - scorePlace(a) || a.id.localeCompare(b.id))
+    .sort((a, b) => b.hotness - a.hotness || a.id.localeCompare(b.id))
     .slice(0, 3);
   const collage = images
     .map(
@@ -589,8 +596,8 @@ function createActivityClusterIcon(
     className: "hp-activity-cluster",
     html: `
       <div
-        class="hp-area-marker__shell hp-area-marker__shell--activity ${node.selected ? "is-selected" : ""} ${status === "live" ? "is-live" : ""} ${status === "hot" ? "is-hot" : ""}"
-        style="${markerStyle(size)}"
+        class="hp-area-marker__shell hp-area-marker__shell--activity is-pulse-${node.tier} ${node.selected ? "is-selected" : ""} ${node.tier === "live" ? "is-live" : ""} ${node.tier === "hot" ? "is-hot" : ""}"
+        style="${markerStyle(size, node.id)}"
       >
         <span class="hp-marker-aura"></span>
         <span class="hp-area-marker__ring"></span>
@@ -638,6 +645,7 @@ function markerZoomProfile(zoom: number) {
 function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   if (!node) return;
   const profile = markerZoomProfile(zoom);
+  const farPulse = 1 - smoothstep(OVERVIEW_ZOOM, PLACE_FOCUS_ZOOM, zoom);
   const childScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.35;
   const nearbyScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.07 + profile.ultra * 0.28;
   const soloScale = 0.32 + profile.medium * (nearbyScale - 0.32);
@@ -661,6 +669,9 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   node.style.setProperty("--hp-map-dot-opacity", (0.35 + profile.medium * 0.65).toFixed(4));
   node.style.setProperty("--hp-map-solo-scale", soloScale.toFixed(4));
   node.style.setProperty("--hp-map-copy-offset", `${((1 - profile.rich) * 0.2).toFixed(4)}rem`);
+  node.style.setProperty("--hp-map-pulse-moving-peak", (1.04 + farPulse * 0.08).toFixed(4));
+  node.style.setProperty("--hp-map-pulse-hot-peak", (1.08 + farPulse * 0.14).toFixed(4));
+  node.style.setProperty("--hp-map-pulse-live-peak", (1.12 + farPulse * 0.18).toFixed(4));
 }
 
 function centroidOfPlaces(places: Place[], fallback: LatLngTuple): LatLngTuple {
@@ -707,7 +718,9 @@ function createPlaceFeature(
   place: Place,
   cluster: MapAreaCluster,
   eventCount: number,
+  activitySnapshot: PulseActivitySnapshot,
 ): Supercluster.PointFeature<PlacePointProperties> {
+  const activity = pulseMetricForPlace(place, activitySnapshot, eventCount);
   return {
     type: "Feature",
     geometry: {
@@ -717,9 +730,10 @@ function createPlaceFeature(
     properties: {
       placeId: place.id,
       areaId: cluster.id,
-      eventCount,
-      postCount: place.recentPostCount,
-      hotness: place.hotness,
+      eventCount: activity.eventCount,
+      postCount: activity.postCount,
+      commentCount: activity.commentCount,
+      hotness: activity.hotness,
       tone: cluster.tone,
     },
   };
@@ -728,6 +742,7 @@ function createPlaceFeature(
 interface Props {
   clusters: MapAreaCluster[];
   events: EventItem[];
+  activitySnapshot: PulseActivitySnapshot;
   selectedAreaId: string | null;
   selectedPlaceId?: string | null;
   activeFilterLabel?: string | null;
@@ -748,6 +763,7 @@ interface Props {
 export function SocialMap({
   clusters,
   events,
+  activitySnapshot,
   selectedAreaId,
   selectedPlaceId,
   activeFilterLabel,
@@ -833,11 +849,13 @@ export function SocialMap({
       map: (props) => ({
         eventCount: props.eventCount,
         postCount: props.postCount,
+        commentCount: props.commentCount,
         hotness: props.hotness,
       }),
       reduce: (accumulated, props) => {
         accumulated.eventCount += props.eventCount;
         accumulated.postCount += props.postCount;
+        accumulated.commentCount += props.commentCount;
         accumulated.hotness = Math.max(accumulated.hotness, props.hotness);
       },
     });
@@ -845,12 +863,12 @@ export function SocialMap({
     index.load(
       clusters.flatMap((cluster) =>
         cluster.childPlaces.map((place) =>
-          createPlaceFeature(place, cluster, eventCounts.get(place.id) ?? 0),
+          createPlaceFeature(place, cluster, eventCounts.get(place.id) ?? 0, activitySnapshot),
         ),
       ),
     );
     return index;
-  }, [clusters, eventCounts]);
+  }, [activitySnapshot, clusters, eventCounts]);
 
   const renderNodes = useMemo<RenderNode[]>(() => {
     const nodes: RenderNode[] = [];
@@ -863,16 +881,22 @@ export function SocialMap({
       cluster.places.forEach((place) => {
         const selected = place.id === selectedPlaceId;
         const solo = cluster.places.length === 1;
+        const activity = pulseMetricForPlace(
+          place,
+          activitySnapshot,
+          eventCounts.get(place.id) ?? 0,
+        );
         nodes.push({
           id: `child-${cluster.id}-${place.id}`,
           kind: "child",
           cluster,
           place,
-          eventCount: eventCounts.get(place.id) ?? 0,
+          eventCount: activity.eventCount,
           latLng: [place.lat, place.lng],
           opacity: selected ? 1 : solo ? Math.max(0.72, placeOpacity) : placeOpacity,
           selected,
           solo,
+          tier: activity.tier,
         });
       });
     });
@@ -891,6 +915,7 @@ export function SocialMap({
             latLng: [cluster.lat, cluster.lng],
             opacity: cluster.id === selectedAreaId ? Math.max(areaOpacity, 0.6) : areaOpacity,
             selected: cluster.id === selectedAreaId,
+            tier: cluster.status,
           });
         });
       }
@@ -919,7 +944,10 @@ export function SocialMap({
         const areaScores = new Map<string, number>();
         leaves.forEach((place) => {
           const areaId = clusterIdForPlace(place);
-          areaScores.set(areaId, (areaScores.get(areaId) ?? 0) + scorePlace(place));
+          areaScores.set(
+            areaId,
+            (areaScores.get(areaId) ?? 0) + scorePlace(place, activitySnapshot),
+          );
         });
         const dominantAreaId = [...areaScores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
         const dominantCluster =
@@ -929,6 +957,7 @@ export function SocialMap({
 
         const [lng, lat] = feature.geometry.coordinates;
         const centroid = centroidOfPlaces(leaves, [lat, lng]);
+        const activity = aggregatePulseMetrics(leaves, activitySnapshot, eventCounts);
 
         nodes.push({
           id: `activity-${feature.properties.cluster_id}`,
@@ -939,19 +968,21 @@ export function SocialMap({
           latLng: centroid,
           opacity,
           pointCount: feature.properties.point_count,
-          eventCount: feature.properties.eventCount,
-          postCount: feature.properties.postCount,
-          hotness: feature.properties.hotness,
+          eventCount: activity.eventCount,
+          postCount: activity.postCount,
+          hotness: activity.hotness,
           selected: Boolean(
             selectedAreaId && leaves.some((place) => clusterIdForPlace(place) === selectedAreaId),
           ),
           tone: dominantCluster.tone,
+          tier: activity.tier,
         });
       });
     }
 
     return nodes;
   }, [
+    activitySnapshot,
     clusterById,
     clusters,
     eventCounts,
@@ -1214,6 +1245,15 @@ export function SocialMap({
   }, []);
 
   useEffect(() => {
+    const syncPageVisibility = () => {
+      mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
+    };
+    syncPageVisibility();
+    document.addEventListener("visibilitychange", syncPageVisibility);
+    return () => document.removeEventListener("visibilitychange", syncPageVisibility);
+  }, []);
+
+  useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
     if (!L || !map || !mapReady) return;
@@ -1236,6 +1276,7 @@ export function SocialMap({
                 L,
                 node.place,
                 node.eventCount,
+                node.tier,
                 node.selected,
                 storyPlaceIds?.has(node.place.id) ?? false,
                 node.solo,
@@ -1295,8 +1336,8 @@ export function SocialMap({
         node.kind === "cluster"
           ? `${node.cluster.id}:${node.cluster.status}:${node.selected ? 1 : 0}:${imageToken}`
           : node.kind === "activity-cluster"
-            ? `${node.clusterId}:${node.pointCount}:${node.selected ? 1 : 0}:${node.tone}:${imageToken}`
-            : `${node.place.id}:${node.selected ? 1 : 0}:${hasStory ? 1 : 0}:${node.solo ? 1 : 0}:${node.eventCount}:${imageToken}`,
+            ? `${node.clusterId}:${node.pointCount}:${node.tier}:${node.selected ? 1 : 0}:${node.tone}:${imageToken}`
+            : `${node.place.id}:${node.tier}:${node.selected ? 1 : 0}:${hasStory ? 1 : 0}:${node.solo ? 1 : 0}:${node.eventCount}:${imageToken}`,
       ].join("|");
       const needsRebuild = markerSigRef.current.get(node.id) !== sig;
 
@@ -1323,6 +1364,11 @@ export function SocialMap({
         currentMarkerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
         currentMarkerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
         currentMarkerElement.tabIndex = visibleForInteraction ? 0 : -1;
+        const markerShell = currentMarkerElement.firstElementChild as HTMLElement | null;
+        markerShell?.style.setProperty(
+          "--hp-marker-motion-state",
+          visibleForInteraction && !document.hidden ? "running" : "paused",
+        );
       }
 
       // Rebuild icon + re-wire DOM only when the content actually changed.
@@ -1336,6 +1382,11 @@ export function SocialMap({
           markerElement.style.pointerEvents = visibleForInteraction ? "auto" : "none";
           markerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
           markerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
+          const markerShell = markerElement.firstElementChild as HTMLElement | null;
+          markerShell?.style.setProperty(
+            "--hp-marker-motion-state",
+            visibleForInteraction && !document.hidden ? "running" : "paused",
+          );
           if (interactiveElement.__hpClickHandler) {
             interactiveElement.removeEventListener(
               "click",
@@ -1378,7 +1429,6 @@ export function SocialMap({
           markerElement.tabIndex = visibleForInteraction ? 0 : -1;
           markerElement.addEventListener("click", activateFromEvent, true);
           markerElement.addEventListener("keydown", keyHandler, true);
-          const markerShell = markerElement.firstElementChild;
           markerShell?.addEventListener("click", activateFromEvent, true);
           interactiveElement.__hpClickHandler = activateFromEvent;
           interactiveElement.__hpKeyHandler = keyHandler;

@@ -94,6 +94,10 @@ import { MeetScreen } from "./MeetScreen";
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet } from "./AuthAccountSheets";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
+import {
+  buildPulseActivitySnapshot,
+  type PulseActivitySnapshot,
+} from "@/lib/hp/pulse-activity";
 import { type StreakState } from "@/lib/hp/meet-store";
 import {
   MEET_CATEGORIES,
@@ -3770,6 +3774,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
 export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
+  const [activitySnapshot, setActivitySnapshot] = useState<PulseActivitySnapshot>({});
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -3808,6 +3813,8 @@ export function PulseApp() {
   const [activeRouteStopIndex, setActiveRouteStopIndex] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const initialShareHandled = useRef(false);
+  const lastActivityRefreshAtRef = useRef(0);
+  const activityRefreshInFlightRef = useRef(false);
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const [storyViewer, setStoryViewer] = useState<{ placeId: string; storyId?: string } | null>(
     null,
@@ -4118,6 +4125,8 @@ export function PulseApp() {
       setDataStatus("loading");
       const data = await loadPulseData();
       setPulseData(data);
+      setActivitySnapshot(buildPulseActivitySnapshot(data));
+      lastActivityRefreshAtRef.current = Date.now();
       setPlaceComments(data.placeComments);
       setRouteComments(data.routeComments);
       setSelectedPlace((current) =>
@@ -4143,6 +4152,45 @@ export function PulseApp() {
   useEffect(() => {
     void refreshPulseData();
   }, [refreshPulseData]);
+
+  const refreshActivitySnapshot = useCallback(async () => {
+    if (
+      typeof document === "undefined" ||
+      document.hidden ||
+      activityRefreshInFlightRef.current
+    ) {
+      return;
+    }
+
+    activityRefreshInFlightRef.current = true;
+    try {
+      const data = await loadPulseData();
+      setActivitySnapshot(buildPulseActivitySnapshot(data));
+      lastActivityRefreshAtRef.current = Date.now();
+    } catch (error) {
+      console.warn("Could not refresh the map activity snapshot.", error);
+    } finally {
+      activityRefreshInFlightRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const refreshIfStale = () => {
+      if (document.hidden || Date.now() - lastActivityRefreshAtRef.current < 60_000) return;
+      void refreshActivitySnapshot();
+    };
+    const interval = window.setInterval(refreshIfStale, 60_000);
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
+  }, [refreshActivitySnapshot]);
 
   useEffect(() => {
     void refreshAccount();
@@ -4759,8 +4807,8 @@ export function PulseApp() {
     return first ?? null;
   }, [filteredPlaces]);
   const mapClusters = useMemo(
-    () => buildAreaClusters(filteredPlaces, events),
-    [events, filteredPlaces],
+    () => buildAreaClusters(filteredPlaces, events, activitySnapshot),
+    [activitySnapshot, events, filteredPlaces],
   );
   const selectedCluster = selectedAreaId
     ? (mapClusters.find((cluster) => cluster.id === selectedAreaId) ?? null)
@@ -4805,6 +4853,7 @@ export function PulseApp() {
           <SocialMap
             clusters={mapClusters}
             events={events}
+            activitySnapshot={activitySnapshot}
             selectedAreaId={selectedAreaId}
             selectedPlaceId={sel?.id ?? null}
             activeFilterLabel={activeVibe}
