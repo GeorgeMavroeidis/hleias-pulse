@@ -117,6 +117,7 @@ export type Database = {
           author_kind: string;
           author_name: string;
           created_at: string;
+          cultural_event_id: string | null;
           id: string;
           moderation_status: string;
           place_id: string | null;
@@ -135,6 +136,7 @@ export type Database = {
           author_kind?: string;
           author_name: string;
           created_at?: string;
+          cultural_event_id?: string | null;
           id?: string;
           moderation_status?: string;
           place_id?: string | null;
@@ -153,6 +155,7 @@ export type Database = {
           author_kind?: string;
           author_name?: string;
           created_at?: string;
+          cultural_event_id?: string | null;
           id?: string;
           moderation_status?: string;
           place_id?: string | null;
@@ -172,6 +175,13 @@ export type Database = {
             columns: ["author_id"];
             isOneToOne: false;
             referencedRelation: "authors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comments_cultural_event_id_fkey";
+            columns: ["cultural_event_id"];
+            isOneToOne: false;
+            referencedRelation: "cultural_events";
             referencedColumns: ["id"];
           },
           {
@@ -200,6 +210,125 @@ export type Database = {
             columns: ["route_id"];
             isOneToOne: false;
             referencedRelation: "routes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      cultural_events: {
+        Row: {
+          area: string;
+          created_at: string;
+          description_el: string;
+          description_en: string | null;
+          event_date: string;
+          event_type: string;
+          greek_title: string;
+          id: string;
+          is_official: boolean;
+          is_past_event: boolean;
+          lat: number | null;
+          likes_count: number;
+          lng: number | null;
+          moderation_status: string;
+          organizer_id: string | null;
+          organizer_name: string;
+          place_id: string | null;
+          poster_url: string;
+          ticket_url: string | null;
+          title: string;
+          updated_at: string;
+          user_id: string | null;
+          venue_name: string;
+        };
+        Insert: {
+          area: string;
+          created_at?: string;
+          description_el: string;
+          description_en?: string | null;
+          event_date: string;
+          event_type: string;
+          greek_title: string;
+          id: string;
+          is_official?: boolean;
+          is_past_event?: boolean;
+          lat?: number | null;
+          likes_count?: number;
+          lng?: number | null;
+          moderation_status?: string;
+          organizer_id?: string | null;
+          organizer_name: string;
+          place_id?: string | null;
+          poster_url: string;
+          ticket_url?: string | null;
+          title: string;
+          updated_at?: string;
+          user_id?: string | null;
+          venue_name: string;
+        };
+        Update: {
+          area?: string;
+          created_at?: string;
+          description_el?: string;
+          description_en?: string | null;
+          event_date?: string;
+          event_type?: string;
+          greek_title?: string;
+          id?: string;
+          is_official?: boolean;
+          is_past_event?: boolean;
+          lat?: number | null;
+          likes_count?: number;
+          lng?: number | null;
+          moderation_status?: string;
+          organizer_id?: string | null;
+          organizer_name?: string;
+          place_id?: string | null;
+          poster_url?: string;
+          ticket_url?: string | null;
+          title?: string;
+          updated_at?: string;
+          user_id?: string | null;
+          venue_name?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cultural_events_organizer_id_fkey";
+            columns: ["organizer_id"];
+            isOneToOne: false;
+            referencedRelation: "organizers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cultural_events_place_id_fkey";
+            columns: ["place_id"];
+            isOneToOne: false;
+            referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      cultural_event_likes: {
+        Row: {
+          created_at: string;
+          cultural_event_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          cultural_event_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          cultural_event_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cultural_event_likes_cultural_event_id_fkey";
+            columns: ["cultural_event_id"];
+            isOneToOne: false;
+            referencedRelation: "cultural_events";
             referencedColumns: ["id"];
           },
         ];
@@ -388,6 +517,47 @@ export type Database = {
           },
           {
             foreignKeyName: "meet_events_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      organizers: {
+        Row: {
+          bio: string;
+          created_at: string;
+          display_name: string;
+          id: string;
+          profile_id: string | null;
+          updated_at: string;
+          user_id: string;
+          verification_status: string;
+        };
+        Insert: {
+          bio?: string;
+          created_at?: string;
+          display_name: string;
+          id?: string;
+          profile_id?: string | null;
+          updated_at?: string;
+          user_id: string;
+          verification_status?: string;
+        };
+        Update: {
+          bio?: string;
+          created_at?: string;
+          display_name?: string;
+          id?: string;
+          profile_id?: string | null;
+          updated_at?: string;
+          user_id?: string;
+          verification_status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "organizers_profile_id_fkey";
             columns: ["profile_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
@@ -1031,6 +1201,7 @@ export type Database = {
     };
     Functions: {
       current_admin_role: { Args: never; Returns: string | null };
+      current_organizer_id: { Args: never; Returns: string | null };
       get_pulse_bootstrap: { Args: never; Returns: Json };
       moderate_content: {
         Args: { next_status: string; target_id: string; target_type: string };

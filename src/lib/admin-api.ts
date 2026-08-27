@@ -3,7 +3,14 @@ import type { Database } from "./supabase/database.types";
 
 export type AdminRole = "owner" | "editor" | "moderator";
 export type ModerationStatus = "pending" | "published" | "hidden";
-export type ModerationTarget = "place" | "post" | "comment" | "story" | "meet_event";
+export type ModerationTarget =
+  | "place"
+  | "post"
+  | "comment"
+  | "story"
+  | "meet_event"
+  | "cultural_event";
+export type OrganizerVerificationStatus = "pending" | "verified" | "rejected";
 
 type Row<TableName extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][TableName]["Row"];
@@ -13,6 +20,8 @@ export type AdminPost = Row<"posts">;
 export type AdminComment = Row<"comments">;
 export type AdminStory = Row<"stories">;
 export type AdminMeetEvent = Row<"meet_events">;
+export type AdminCulturalEvent = Row<"cultural_events">;
+export type AdminOrganizer = Row<"organizers">;
 export type AdminRoute = Row<"routes">;
 export type AdminRouteStop = Row<"route_stops">;
 export type AdminProfile = Row<"profiles">;
@@ -25,6 +34,8 @@ export interface AdminData {
   comments: AdminComment[];
   stories: AdminStory[];
   meetEvents: AdminMeetEvent[];
+  culturalEvents: AdminCulturalEvent[];
+  organizers: AdminOrganizer[];
   routes: AdminRoute[];
   routeStops: AdminRouteStop[];
   profiles: AdminProfile[];
@@ -38,6 +49,8 @@ export const EMPTY_ADMIN_DATA: AdminData = {
   comments: [],
   stories: [],
   meetEvents: [],
+  culturalEvents: [],
+  organizers: [],
   routes: [],
   routeStops: [],
   profiles: [],
@@ -64,6 +77,8 @@ export async function loadAdminData(): Promise<AdminData> {
     comments,
     stories,
     meetEvents,
+    culturalEvents,
+    organizers,
     routes,
     routeStops,
     profiles,
@@ -75,6 +90,8 @@ export async function loadAdminData(): Promise<AdminData> {
     supabase.from("comments").select("*").order("created_at", { ascending: false }),
     supabase.from("stories").select("*").order("created_at", { ascending: false }),
     supabase.from("meet_events").select("*").order("starts_at", { ascending: true }),
+    supabase.from("cultural_events").select("*").order("event_date", { ascending: true }),
+    supabase.from("organizers").select("*").order("created_at", { ascending: false }),
     supabase.from("routes").select("*").order("sort_order", { ascending: true }),
     supabase.from("route_stops").select("*").order("position", { ascending: true }),
     supabase.from("profiles").select("*").order("updated_at", { ascending: false }),
@@ -92,6 +109,8 @@ export async function loadAdminData(): Promise<AdminData> {
     comments,
     stories,
     meetEvents,
+    culturalEvents,
+    organizers,
     routes,
     routeStops,
     profiles,
@@ -107,6 +126,8 @@ export async function loadAdminData(): Promise<AdminData> {
     comments: required(comments.data, "Could not load comments."),
     stories: required(stories.data, "Could not load stories."),
     meetEvents: required(meetEvents.data, "Could not load Meet events."),
+    culturalEvents: required(culturalEvents.data, "Could not load cultural events."),
+    organizers: required(organizers.data, "Could not load organizers."),
     routes: required(routes.data, "Could not load routes."),
     routeStops: required(routeStops.data, "Could not load route stops."),
     profiles: required(profiles.data, "Could not load profiles."),
@@ -148,6 +169,38 @@ export async function saveAdminMeetEvent(
   event: Database["public"]["Tables"]["meet_events"]["Insert"],
 ) {
   const result = await supabase.from("meet_events").upsert(event).select("*").single();
+  if (result.error) throw result.error;
+  return result.data;
+}
+
+export async function saveAdminCulturalEvent(
+  event: Database["public"]["Tables"]["cultural_events"]["Insert"],
+) {
+  const result = await supabase.from("cultural_events").upsert(event).select("*").single();
+  if (result.error) throw result.error;
+  return result.data;
+}
+
+export async function setOrganizerVerification(
+  organizerId: string,
+  status: OrganizerVerificationStatus,
+) {
+  const result = await supabase
+    .from("organizers")
+    .update({ verification_status: status })
+    .eq("id", organizerId);
+  if (result.error) throw result.error;
+}
+
+export async function createAdminOrganizer(userId: string, displayName: string) {
+  const result = await supabase
+    .from("organizers")
+    .upsert(
+      { user_id: userId, display_name: displayName, verification_status: "verified" },
+      { onConflict: "user_id" },
+    )
+    .select("*")
+    .single();
   if (result.error) throw result.error;
   return result.data;
 }
