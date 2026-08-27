@@ -372,6 +372,9 @@ const EL: Record<string, string> = {
     "Τα έχεις δει όλα στη λίστα. Respect.",
   "Five new places — you're really exploring now.":
     "Πέντε νέα μέρη — τώρα μάλιστα εξερευνείς!",
+  "I've been here": "Έχω πάει εδώ",
+  "Marked as visited": "Σημειώθηκε ως επίσκεψη",
+  "Visit removed": "Η επίσκεψη αφαιρέθηκε",
 };
 
 function interpolate(message: string, params?: TranslationParams) {

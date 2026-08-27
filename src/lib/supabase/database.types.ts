@@ -1117,6 +1117,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_place_visits: {
+        Row: {
+          place_id: string;
+          user_id: string;
+          visited_at: string;
+        };
+        Insert: {
+          place_id: string;
+          user_id: string;
+          visited_at?: string;
+        };
+        Update: {
+          place_id?: string;
+          user_id?: string;
+          visited_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_place_visits_place_id_fkey";
+            columns: ["place_id"];
+            isOneToOne: false;
+            referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       user_preferences: {
         Row: {
           created_at: string;

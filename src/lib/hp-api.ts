@@ -182,6 +182,7 @@ type CulturalEventLikeRow = Pick<TableRow<"cultural_event_likes">, "cultural_eve
 type EventRsvpRow = Pick<TableRow<"event_rsvps">, "event_id" | "status">;
 type StoryViewRow = Pick<TableRow<"story_views">, "story_id">;
 type ActivityDayRow = Pick<TableRow<"user_activity_days">, "activity_day">;
+type PlaceVisitRow = Pick<TableRow<"user_place_visits">, "place_id">;
 type ProfileRow = Pick<
   TableRow<"profiles">,
   | "id"
@@ -267,6 +268,7 @@ export interface PulseUserState {
   likedCulturalEvents: Record<string, boolean>;
   rsvpMap: Record<string, RsvpStatus>;
   seenStoryIds: string[];
+  visitedPlaceIds: string[];
   streak: StreakState;
 }
 
@@ -868,6 +870,7 @@ function emptyPulseUserState(): PulseUserState {
     likedCulturalEvents: {},
     rsvpMap: {},
     seenStoryIds: [],
+    visitedPlaceIds: [],
     streak: { count: 0, lastContributionDay: "", freezeAvailable: true },
   };
 }
@@ -885,6 +888,7 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
     culturalEventLikesResult,
     rsvpsResult,
     storyViewsResult,
+    placeVisitsResult,
     activityDaysResult,
   ] = await Promise.all([
     client
@@ -895,6 +899,7 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
     client.from("cultural_event_likes").select("cultural_event_id").eq("user_id", userId),
     client.from("event_rsvps").select("event_id,status").eq("user_id", userId),
     client.from("story_views").select("story_id").eq("user_id", userId),
+    client.from("user_place_visits").select("place_id").eq("user_id", userId),
     client
       .from("user_activity_days")
       .select("activity_day")
@@ -908,6 +913,7 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
   if (culturalEventLikesResult.error) throw culturalEventLikesResult.error;
   if (rsvpsResult.error) throw rsvpsResult.error;
   if (storyViewsResult.error) throw storyViewsResult.error;
+  if (placeVisitsResult.error) throw placeVisitsResult.error;
   if (activityDaysResult.error) throw activityDaysResult.error;
 
   const activityDays =
@@ -946,6 +952,8 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
       ) ?? {},
     seenStoryIds:
       (storyViewsResult.data as StoryViewRow[] | null)?.map((item) => item.story_id) ?? [],
+    visitedPlaceIds:
+      (placeVisitsResult.data as PlaceVisitRow[] | null)?.map((item) => item.place_id) ?? [],
     streak: computeStreak(activityDays),
   };
 }
@@ -1387,6 +1395,28 @@ export async function setPostLike(postId: string, liked: boolean) {
   const result = await client.from("post_likes").insert({
     user_id: userId,
     post_id: postId,
+  });
+
+  if (result.error && result.error.code !== "23505") throw result.error;
+}
+
+export async function setVisited(placeId: string, visited: boolean) {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+
+  if (!visited) {
+    const result = await client
+      .from("user_place_visits")
+      .delete()
+      .eq("user_id", userId)
+      .eq("place_id", placeId);
+    if (result.error) throw result.error;
+    return;
+  }
+
+  const result = await client.from("user_place_visits").insert({
+    user_id: userId,
+    place_id: placeId,
   });
 
   if (result.error && result.error.code !== "23505") throw result.error;

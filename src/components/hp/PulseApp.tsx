@@ -32,6 +32,7 @@ import {
   LockKeyhole,
   RefreshCw,
   Ticket,
+  Check,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -62,6 +63,7 @@ import {
   setPostLike,
   setPulseMeetRsvp,
   setSavedItem,
+  setVisited,
   type CreatePulsePlaceInput,
   type PulseData,
   type PulseProfileSummary,
@@ -1942,6 +1944,8 @@ function PlaceDetailModal({
   onClose,
   onSave,
   saved,
+  visited,
+  onToggleVisited,
   posts,
   onOpenMap,
   onShare,
@@ -1957,6 +1961,8 @@ function PlaceDetailModal({
   onClose: () => void;
   onSave: (id: string) => void;
   saved: boolean;
+  visited: boolean;
+  onToggleVisited: (id: string) => void;
   posts: Post[];
   onOpenMap: (id: string) => void;
   onShare: (place: Place) => void;
@@ -2180,41 +2186,54 @@ function PlaceDetailModal({
                 )}
               </div>
             </div>
-            <div className="sticky bottom-0 flex gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3 backdrop-blur">
-              <button
-                type="button"
-                onClick={() => onSave(place.id)}
-                className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
-              >
-                <Bookmark size={13} className="mr-1 inline" /> {saved ? "Saved" : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenMap(place.id);
-                }}
-                className="flex-1 rounded-full bg-hp-ink py-3 text-[12px] font-bold text-hp-paper"
-              >
-                Map
-              </button>
-              <a
-                href={openStreetMapUrl(place)}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
-                className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-              >
-                <ExternalLink size={14} />
-              </a>
-              <button
-                type="button"
-                onClick={() => onShare(place)}
-                className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                aria-label={t("Share {place}", { place: place.name })}
-              >
-                <Share2 size={14} />
-              </button>
+            <div className="sticky bottom-0 flex flex-col gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3 backdrop-blur">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSave(place.id)}
+                  className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
+                >
+                  <Bookmark size={13} className="mr-1 inline" /> {saved ? "Saved" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggleVisited(place.id)}
+                  aria-pressed={visited}
+                  className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${visited ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
+                >
+                  <Check size={13} strokeWidth={visited ? 3 : 2.4} className="mr-1 inline" />{" "}
+                  {t("I've been here")}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenMap(place.id);
+                  }}
+                  className="flex-1 rounded-full bg-hp-ink py-3 text-[12px] font-bold text-hp-paper"
+                >
+                  Map
+                </button>
+                <a
+                  href={openStreetMapUrl(place)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
+                  className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+                >
+                  <ExternalLink size={14} />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => onShare(place)}
+                  className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+                  aria-label={t("Share {place}", { place: place.name })}
+                >
+                  <Share2 size={14} />
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>
@@ -4036,6 +4055,7 @@ export function PulseApp() {
   const [showSearch, setShowSearch] = useState(false);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [visitedPlaceIds, setVisitedPlaceIds] = useState<string[]>([]);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [postLikes, setPostLikes] = useState<Record<string, number>>({});
   const [culturalEventLikes, setCulturalEventLikes] = useState<Record<string, boolean>>({});
@@ -4480,6 +4500,7 @@ export function PulseApp() {
         setCulturalEventLikes(state.likedCulturalEvents);
         setRsvpMap(state.rsvpMap);
         setSeen(new Set(state.seenStoryIds));
+        setVisitedPlaceIds(state.visitedPlaceIds);
         setStreak(state.streak);
       } catch (error) {
         console.warn("Could not load Supabase user state.", error);
@@ -4540,18 +4561,21 @@ export function PulseApp() {
     const ownedPosts = accountProfileId
       ? allPosts.filter((post) => post.profileId === accountProfileId)
       : [];
-    // Posts-as-visited proxy: a discovery place counts as "covered" once the
-    // user has posted there at least once.
-    const ownedPlaceIds = new Set(ownedPosts.map((post) => post.placeId));
 
     return {
       posts: ownedPosts.length,
       tips: ownedPosts.filter((post) => post.kind === "tip").length,
       rsvps: account.status === "ready" ? Object.keys(rsvpMap).length : 0,
       routesSaved: account.status === "ready" ? savedRouteIds.length : 0,
-      discoveryExploredIds: DISCOVERY_PLACE_IDS.filter((id) => ownedPlaceIds.has(id)),
     };
   }, [account.status, accountProfileId, allPosts, rsvpMap, savedRouteIds.length]);
+
+  // Discovery progress now comes from the real user_place_visits check-ins
+  // (phase 2), not the v1 posts-as-proxy.
+  const discoveryExploredIds = useMemo(
+    () => DISCOVERY_PLACE_IDS.filter((id) => visitedPlaceIds.includes(id)),
+    [visitedPlaceIds],
+  );
 
   useEffect(() => {
     if (initialShareHandled.current || dataStatus !== "ready" || typeof window === "undefined") {
@@ -4647,6 +4671,17 @@ export function PulseApp() {
     void setSavedItem({ type: "place", id }, nextSaved).catch((error) => {
       console.warn("Could not persist place save.", error);
       setSavedIds((arr) => (wasSaved ? [...arr, id] : arr.filter((x) => x !== id)));
+      showToast(t("Could not save"));
+    });
+  };
+  const toggleVisited = (id: string) => {
+    const wasVisited = visitedPlaceIds.includes(id);
+    const nextVisited = !wasVisited;
+    setVisitedPlaceIds((arr) => (wasVisited ? arr.filter((x) => x !== id) : [...arr, id]));
+    showToast(t(wasVisited ? "Visit removed" : "Marked as visited"));
+    void setVisited(id, nextVisited).catch((error) => {
+      console.warn("Could not persist place visit.", error);
+      setVisitedPlaceIds((arr) => (wasVisited ? [...arr, id] : arr.filter((x) => x !== id)));
       showToast(t("Could not save"));
     });
   };
@@ -5301,7 +5336,7 @@ export function PulseApp() {
               <div className="px-4 pt-3">
                 <LocalDiscoveryCard
                   places={places}
-                  coveredIds={profileStats.discoveryExploredIds}
+                  coveredIds={discoveryExploredIds}
                   onOpenPlace={setOpenPlace}
                   onMilestone={() => showToast(t("Five new places — you're really exploring now."))}
                 />
@@ -5510,6 +5545,8 @@ export function PulseApp() {
         onClose={() => setOpenPlace(null)}
         onSave={toggleSave}
         saved={openPlace ? savedIds.includes(openPlace.id) : false}
+        visited={openPlace ? visitedPlaceIds.includes(openPlace.id) : false}
+        onToggleVisited={toggleVisited}
         posts={openPlace ? allPosts.filter((p) => p.placeId === openPlace.id) : []}
         onOpenMap={jumpToMap}
         onShare={sharePlace}
