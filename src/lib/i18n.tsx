@@ -85,7 +85,34 @@ const EL: Record<string, string> = {
   Email: "Email",
   Password: "Κωδικός πρόσβασης",
   "Minimum 6 characters": "Τουλάχιστον 6 χαρακτήρες",
+  "Forgot your password?": "Ξέχασες τον κωδικό σου;",
+  "Reset password": "Επαναφορά κωδικού",
+  "Enter your email and we'll send you a secure reset link.":
+    "Γράψε το email σου και θα σου στείλουμε έναν ασφαλή σύνδεσμο επαναφοράς.",
+  "Check your email for a secure password reset link.":
+    "Έλεγξε το email σου για τον ασφαλή σύνδεσμο επαναφοράς κωδικού.",
+  "Send reset link": "Αποστολή συνδέσμου",
+  "Back to sign in": "Πίσω στη σύνδεση",
+  "Choose a new password": "Επίλεξε νέο κωδικό",
+  "Use a password you don't use for another account.":
+    "Χρησιμοποίησε έναν κωδικό που δεν χρησιμοποιείς σε άλλον λογαριασμό.",
+  "Cancel password reset": "Ακύρωση επαναφοράς κωδικού",
+  "New password": "Νέος κωδικός",
+  "Minimum 8 characters": "Τουλάχιστον 8 χαρακτήρες",
+  "Confirm new password": "Επιβεβαίωση νέου κωδικού",
+  "Type the new password again": "Γράψε ξανά τον νέο κωδικό",
+  "Use at least 8 characters for your new password.":
+    "Ο νέος κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες.",
+  "The passwords do not match.": "Οι κωδικοί δεν ταιριάζουν.",
+  "Update password": "Αλλαγή κωδικού",
+  "Your password has been updated.": "Ο κωδικός σου άλλαξε επιτυχώς.",
+  "Incorrect email or password.": "Το email ή ο κωδικός δεν είναι σωστός.",
+  "Too many attempts. Please wait a little and try again.":
+    "Έγιναν πολλές προσπάθειες. Περίμενε λίγο και δοκίμασε ξανά.",
+  "This reset link is invalid or has expired. Request a new one.":
+    "Ο σύνδεσμος επαναφοράς δεν είναι έγκυρος ή έχει λήξει. Ζήτησε έναν νέο.",
   "Working...": "Γίνεται επεξεργασία…",
+  "Saving...": "Αποθήκευση…",
   Local: "Ντόπιος",
   Tourist: "Επισκέπτης",
   Guide: "Οδηγός",

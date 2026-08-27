@@ -166,7 +166,8 @@ async function signInForSmoke(
   });
   requireNoError("password login after test confirmation", secondLogin.data, secondLogin.error);
 
-  if (!secondLogin.data.user?.id) throw new Error("Confirmed password login did not return user ID.");
+  if (!secondLogin.data.user?.id)
+    throw new Error("Confirmed password login did not return user ID.");
   state.userId = secondLogin.data.user.id;
   return "password-login-after-test-confirm";
 }
@@ -208,7 +209,8 @@ async function main() {
       },
     });
     requireNoError("auth admin createUser", createUserResult.data, createUserResult.error);
-    if (!createUserResult.data.user?.id) throw new Error("Auth Admin createUser did not return ID.");
+    if (!createUserResult.data.user?.id)
+      throw new Error("Auth Admin createUser did not return ID.");
     state.userId = createUserResult.data.user.id;
     console.log(`[auth] disposable auth user created user_id=${state.userId}`);
 
@@ -220,7 +222,11 @@ async function main() {
       .select("id,handle,display_name,default_identity,profile_completed_at")
       .eq("id", state.userId)
       .single();
-    const profile = requireNoError("profile trigger select", profileResult.data, profileResult.error);
+    const profile = requireNoError(
+      "profile trigger select",
+      profileResult.data,
+      profileResult.error,
+    );
     if (!profile?.id) throw new Error("Profile trigger did not create a profile row.");
     console.log("[profile] trigger-created profile row ok");
 
@@ -361,6 +367,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`smoke_auth_profile_failed ${error instanceof Error ? error.message : String(error)}`);
+  console.error(
+    `smoke_auth_profile_failed ${error instanceof Error ? error.message : String(error)}`,
+  );
   process.exit(1);
 });

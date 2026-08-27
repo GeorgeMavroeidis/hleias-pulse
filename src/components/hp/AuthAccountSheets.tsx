@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowLeft,
   BadgeCheck,
   Camera,
   LockKeyhole,
@@ -18,15 +19,19 @@ import {
   profileAvatarUrl,
   profileDisplayName,
   profileInitials,
+  requestPulsePasswordReset,
   savePulseProfile,
   signInWithPassword,
   signOutPulseAccount,
   signUpWithPassword,
+  updatePulsePassword,
   uploadPulseAvatar,
   type AccountIdentity,
   type PulseAccountProfile,
   type PulseAccountState,
 } from "@/lib/hp-auth";
+
+type AuthMode = "signIn" | "signUp" | "forgotPassword";
 
 const PROFILE_IDENTITIES: { id: AccountIdentity; label: string; helper: string }[] = [
   { id: "LOCAL", label: "Local", helper: "Area signal" },
@@ -63,9 +68,17 @@ function fieldClass() {
 
 function authErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "Authentication failed.";
-  return /confirm|confirmation|verify|verification/i.test(message)
-    ? "This account needs email verification before it can sign in."
-    : message;
+  if (/confirm|confirmation|verify|verification/i.test(message)) {
+    return "This account needs email verification before it can sign in.";
+  }
+  if (/invalid login credentials/i.test(message)) return "Incorrect email or password.";
+  if (/rate limit|too many requests/i.test(message)) {
+    return "Too many attempts. Please wait a little and try again.";
+  }
+  if (/session.*missing|invalid.*token|expired/i.test(message)) {
+    return "This reset link is invalid or has expired. Request a new one.";
+  }
+  return message;
 }
 
 export function AccountBubble({
@@ -119,7 +132,7 @@ export function AuthSheet({
   onAuthenticated: () => Promise<void>;
 }) {
   const { t } = useI18n();
-  const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
+  const [mode, setMode] = useState<AuthMode>("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -131,6 +144,8 @@ export function AuthSheet({
 
   useEffect(() => {
     if (!open) {
+      setMode("signIn");
+      setPassword("");
       setSaving(false);
       setMessage(null);
       setError(null);
@@ -143,6 +158,12 @@ export function AuthSheet({
     setMessage(null);
     setError(null);
     try {
+      if (mode === "forgotPassword") {
+        await requestPulsePasswordReset(email);
+        setMessage(t("Check your email for a secure password reset link."));
+        return;
+      }
+
       if (mode === "signIn") {
         await signInWithPassword(email, password);
         await onAuthenticated();
@@ -212,17 +233,33 @@ export function AuthSheet({
             transition={{ type: "spring", damping: 30, stiffness: 240 }}
             role="dialog"
             aria-modal="true"
-            aria-label={t(mode === "signIn" ? "Sign in" : "Create account")}
+            aria-label={t(
+              mode === "signIn"
+                ? "Sign in"
+                : mode === "signUp"
+                  ? "Create account"
+                  : "Reset password",
+            )}
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-black text-hp-ink">
-                  {t(mode === "signIn" ? "Sign in" : "Create profile")}
+                  {t(
+                    mode === "signIn"
+                      ? "Sign in"
+                      : mode === "signUp"
+                        ? "Create profile"
+                        : "Reset password",
+                  )}
                 </h3>
                 <p className="mt-0.5 text-[11px] text-hp-muted">
-                  {t("Posts and comments will use this identity.")}
+                  {t(
+                    mode === "forgotPassword"
+                      ? "Enter your email and we'll send you a secure reset link."
+                      : "Posts and comments will use this identity.",
+                  )}
                 </p>
               </div>
               <button
@@ -235,28 +272,30 @@ export function AuthSheet({
               </button>
             </div>
 
-            <div className="mb-3 grid grid-cols-2 rounded-full border border-hp-ink/10 bg-white/50 p-1">
-              {[
-                { id: "signIn" as const, label: t("Sign in") },
-                { id: "signUp" as const, label: t("New") },
-              ].map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => {
-                    setMode(option.id);
-                    setError(null);
-                    setMessage(null);
-                  }}
-                  aria-pressed={mode === option.id}
-                  className={`rounded-full px-3 py-2 text-[12px] font-bold ${
-                    mode === option.id ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            {mode !== "forgotPassword" && (
+              <div className="mb-3 grid grid-cols-2 rounded-full border border-hp-ink/10 bg-white/50 p-1">
+                {[
+                  { id: "signIn" as const, label: t("Sign in") },
+                  { id: "signUp" as const, label: t("New") },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      setMode(option.id);
+                      setError(null);
+                      setMessage(null);
+                    }}
+                    aria-pressed={mode === option.id}
+                    className={`rounded-full px-3 py-2 text-[12px] font-bold ${
+                      mode === option.id ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <form onSubmit={submit} className="space-y-3">
               {mode === "signUp" && (
@@ -326,21 +365,38 @@ export function AuthSheet({
                   />
                 </div>
               </Field>
-              <Field label={t("Password")}>
-                <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
-                  <LockKeyhole size={14} className="text-hp-muted" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    autoComplete={mode === "signIn" ? "current-password" : "new-password"}
-                    className="w-full bg-transparent text-[13px] text-hp-ink outline-none placeholder:text-hp-muted"
-                    placeholder={t("Minimum 6 characters")}
-                    minLength={6}
-                    required
-                  />
-                </div>
-              </Field>
+              {mode !== "forgotPassword" && (
+                <Field label={t("Password")}>
+                  <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
+                    <LockKeyhole size={14} className="text-hp-muted" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      autoComplete={mode === "signIn" ? "current-password" : "new-password"}
+                      className="w-full bg-transparent text-[13px] text-hp-ink outline-none placeholder:text-hp-muted"
+                      placeholder={t("Minimum 6 characters")}
+                      minLength={6}
+                      required
+                    />
+                  </div>
+                </Field>
+              )}
+
+              {mode === "signIn" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("forgotPassword");
+                    setPassword("");
+                    setError(null);
+                    setMessage(null);
+                  }}
+                  className="block min-h-10 px-1 text-left text-[12px] font-bold text-hp-sunset"
+                >
+                  {t("Forgot your password?")}
+                </button>
+              )}
 
               {message && (
                 <p className="rounded-2xl bg-hp-olive/10 px-3 py-2 text-[12px] font-semibold text-hp-olive">
@@ -354,7 +410,182 @@ export function AuthSheet({
                 disabled={saving}
                 className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
               >
-                {saving ? t("Working...") : t(mode === "signIn" ? "Sign in" : "Create account")}
+                {saving
+                  ? t("Working...")
+                  : t(
+                      mode === "signIn"
+                        ? "Sign in"
+                        : mode === "signUp"
+                          ? "Create account"
+                          : "Send reset link",
+                    )}
+              </button>
+
+              {mode === "forgotPassword" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signIn");
+                    setError(null);
+                    setMessage(null);
+                  }}
+                  className="flex min-h-10 w-full items-center justify-center gap-2 rounded-full text-[12px] font-bold text-hp-ink/70"
+                >
+                  <ArrowLeft size={14} />
+                  {t("Back to sign in")}
+                </button>
+              )}
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+export function PasswordRecoverySheet({
+  open,
+  onComplete,
+  onCancel,
+}: {
+  open: boolean;
+  onComplete: () => Promise<void>;
+  onCancel: () => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setPassword("");
+      setConfirmation("");
+      setSaving(false);
+      setError(null);
+    }
+  }, [open]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    if (password.length < 8) {
+      setError(t("Use at least 8 characters for your new password."));
+      return;
+    }
+    if (password !== confirmation) {
+      setError(t("The passwords do not match."));
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updatePulsePassword(password);
+      await onComplete();
+    } catch (updateError) {
+      console.warn("Could not update password.", updateError);
+      setError(t(authErrorMessage(updateError)));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancel = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onCancel();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 z-[90] overflow-hidden"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/55"
+            onClick={() => void cancel()}
+            aria-label={t("Cancel password reset")}
+          />
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 240 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("Choose a new password")}
+            className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper p-4"
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-black text-hp-ink">{t("Choose a new password")}</h3>
+                <p className="mt-0.5 text-[11px] text-hp-muted">
+                  {t("Use a password you don't use for another account.")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void cancel()}
+                disabled={saving}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink disabled:opacity-45"
+                aria-label={t("Cancel password reset")}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={submit} className="space-y-3">
+              <Field label={t("New password")}>
+                <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
+                  <LockKeyhole size={14} className="text-hp-muted" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="new-password"
+                    className="w-full bg-transparent text-[13px] text-hp-ink outline-none placeholder:text-hp-muted"
+                    placeholder={t("Minimum 8 characters")}
+                    minLength={8}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </Field>
+              <Field label={t("Confirm new password")}>
+                <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
+                  <LockKeyhole size={14} className="text-hp-muted" />
+                  <input
+                    type="password"
+                    value={confirmation}
+                    onChange={(event) => setConfirmation(event.target.value)}
+                    autoComplete="new-password"
+                    className="w-full bg-transparent text-[13px] text-hp-ink outline-none placeholder:text-hp-muted"
+                    placeholder={t("Type the new password again")}
+                    minLength={8}
+                    required
+                  />
+                </div>
+              </Field>
+
+              {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+              >
+                {saving ? t("Saving...") : t("Update password")}
               </button>
             </form>
           </motion.div>

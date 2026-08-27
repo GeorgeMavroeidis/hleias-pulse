@@ -62,10 +62,13 @@ import {
   type PulseProfileSummary,
 } from "@/lib/hp-api";
 import {
+  clearPasswordRecoveryUrl,
   getCurrentPulseAccount,
+  hasPasswordRecoveryUrl,
   profileAvatarUrl,
   profileDisplayName,
   savePulseLanguage,
+  signOutPulseAccount,
   subscribeToPulseAuth,
   type PulseAccountProfile,
   type PulseAccountState,
@@ -92,8 +95,9 @@ import { LiveTicker } from "./LiveTicker";
 import { TrendingHero } from "./TrendingHero";
 import { MeetScreen } from "./MeetScreen";
 import { OnboardingGate } from "./OnboardingGate";
-import { AccountBubble, AccountSheet, AuthSheet } from "./AuthAccountSheets";
+import { AccountBubble, AccountSheet, AuthSheet, PasswordRecoverySheet } from "./AuthAccountSheets";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
+import { buildPulseActivitySnapshot, type PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
 import { type StreakState } from "@/lib/hp/meet-store";
 import {
   MEET_CATEGORIES,
@@ -3770,6 +3774,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
 export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
+  const [activitySnapshot, setActivitySnapshot] = useState<PulseActivitySnapshot>({});
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -3801,6 +3806,7 @@ export function PulseApp() {
   const [composerPin, setComposerPin] = useState<{ lat: number; lng: number } | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
   const [account, setAccount] = useState<PulseAccountState>({ status: "loading" });
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -3808,6 +3814,8 @@ export function PulseApp() {
   const [activeRouteStopIndex, setActiveRouteStopIndex] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const initialShareHandled = useRef(false);
+  const lastActivityRefreshAtRef = useRef(0);
+  const activityRefreshInFlightRef = useRef(false);
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const [storyViewer, setStoryViewer] = useState<{ placeId: string; storyId?: string } | null>(
     null,
@@ -4008,10 +4016,16 @@ export function PulseApp() {
       });
   };
 
-  const refreshAccount = async () => {
+  const refreshAccount = useCallback(async () => {
     try {
       const nextAccount = await getCurrentPulseAccount();
       setAccount(nextAccount);
+      if (
+        (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
+        nextAccount.preferences?.language
+      ) {
+        setLanguage(nextAccount.preferences.language);
+      }
       if (nextAccount.status === "ready") {
         const nextAdminRole = await getAdminRole().catch(() => null);
         setAdminRole(nextAdminRole);
@@ -4037,7 +4051,7 @@ export function PulseApp() {
       setAdminRole(null);
       return fallback;
     }
-  };
+  }, [setLanguage]);
 
   const toggleAppLanguage = () => {
     const next = language === "GR" ? "EN" : "GR";
@@ -4112,6 +4126,8 @@ export function PulseApp() {
       setDataStatus("loading");
       const data = await loadPulseData();
       setPulseData(data);
+      setActivitySnapshot(buildPulseActivitySnapshot(data));
+      lastActivityRefreshAtRef.current = Date.now();
       setPlaceComments(data.placeComments);
       setRouteComments(data.routeComments);
       setSelectedPlace((current) =>
@@ -4138,44 +4154,60 @@ export function PulseApp() {
     void refreshPulseData();
   }, [refreshPulseData]);
 
-  useEffect(() => {
-    let ignore = false;
-    const loadAccount = async () => {
-      const nextAccount = await getCurrentPulseAccount().catch((error) => {
-        console.warn("Could not load account state.", error);
-        return { status: "signedOut" } as PulseAccountState;
-      });
-      if (ignore) return;
-      setAccount(nextAccount);
-      if (
-        (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
-        nextAccount.preferences?.language
-      ) {
-        setLanguage(nextAccount.preferences.language);
-      }
-      const profile =
-        nextAccount.status === "ready" || nextAccount.status === "needsProfile"
-          ? nextAccount.profile
-          : null;
-      if (profile) {
-        const summary = profileSummaryFromAccount(profile);
-        setPulseData((data) => ({
-          ...data,
-          profiles: [summary, ...data.profiles.filter((item) => item.id !== summary.id)],
-        }));
-      }
-    };
+  const refreshActivitySnapshot = useCallback(async () => {
+    if (typeof document === "undefined" || document.hidden || activityRefreshInFlightRef.current) {
+      return;
+    }
 
-    void loadAccount();
-    const unsubscribe = subscribeToPulseAuth(() => {
-      void loadAccount();
+    activityRefreshInFlightRef.current = true;
+    try {
+      const data = await loadPulseData();
+      setActivitySnapshot(buildPulseActivitySnapshot(data));
+      lastActivityRefreshAtRef.current = Date.now();
+    } catch (error) {
+      console.warn("Could not refresh the map activity snapshot.", error);
+    } finally {
+      activityRefreshInFlightRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const refreshIfStale = () => {
+      if (document.hidden || Date.now() - lastActivityRefreshAtRef.current < 60_000) return;
+      void refreshActivitySnapshot();
+    };
+    const interval = window.setInterval(refreshIfStale, 60_000);
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
+  }, [refreshActivitySnapshot]);
+
+  useEffect(() => {
+    if (hasPasswordRecoveryUrl()) setPasswordRecoveryOpen(true);
+  }, []);
+
+  useEffect(() => {
+    void refreshAccount();
+    const unsubscribe = subscribeToPulseAuth((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setAuthOpen(false);
+        setProfileOpen(false);
+        setPasswordRecoveryOpen(true);
+      }
+      void refreshAccount();
     });
 
     return () => {
-      ignore = true;
       unsubscribe();
     };
-  }, [setLanguage]);
+  }, [refreshAccount]);
 
   useEffect(() => {
     let ignore = false;
@@ -4781,8 +4813,8 @@ export function PulseApp() {
     return first ?? null;
   }, [filteredPlaces]);
   const mapClusters = useMemo(
-    () => buildAreaClusters(filteredPlaces, events),
-    [events, filteredPlaces],
+    () => buildAreaClusters(filteredPlaces, events, activitySnapshot),
+    [activitySnapshot, events, filteredPlaces],
   );
   const selectedCluster = selectedAreaId
     ? (mapClusters.find((cluster) => cluster.id === selectedAreaId) ?? null)
@@ -4827,6 +4859,7 @@ export function PulseApp() {
           <SocialMap
             clusters={mapClusters}
             events={events}
+            activitySnapshot={activitySnapshot}
             selectedAreaId={selectedAreaId}
             selectedPlaceId={sel?.id ?? null}
             activeFilterLabel={activeVibe}
@@ -5107,6 +5140,25 @@ export function PulseApp() {
         onAuthenticated={async () => {
           const nextAccount = await refreshAccount();
           if (nextAccount.status === "needsProfile") setProfileOpen(true);
+        }}
+      />
+
+      <PasswordRecoverySheet
+        open={passwordRecoveryOpen}
+        onComplete={async () => {
+          clearPasswordRecoveryUrl();
+          setPasswordRecoveryOpen(false);
+          await refreshAccount();
+          showToast(t("Your password has been updated."));
+        }}
+        onCancel={async () => {
+          await signOutPulseAccount().catch((error) => {
+            console.warn("Could not close the password recovery session.", error);
+          });
+          clearPasswordRecoveryUrl();
+          setPasswordRecoveryOpen(false);
+          await refreshAccount();
+          setAuthOpen(true);
         }}
       />
 

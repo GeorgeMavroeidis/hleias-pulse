@@ -51,7 +51,8 @@ The most important user-facing change is a persistent account entry point in the
 
 The current app lives at:
 
-`/Users/theodoroskapsalis/Projects/NOMOSILIASPROJECT/ilia-pulse-local`
+Use the local checkout of `GeorgeMavroeidis/hleias-pulse`. On George's Windows machine the
+project folder is `C:\Users\user\Desktop\hleias-pulse-mavroeidis`.
 
 Current stack:
 
@@ -124,7 +125,7 @@ The upgrade should keep the mobile-first tactile product direction, but replace 
    Email change, password change, account deletion, exporting account data, business verification, or admin actions should require recent sign-in and ideally MFA for privileged users.
 
 10. Fail closed.
-   If profile lookup fails, write actions should pause and show a clear sign-in/profile-completion prompt. Do not write anonymous fake display identity as a fallback for signed-in features.
+    If profile lookup fails, write actions should pause and show a clear sign-in/profile-completion prompt. Do not write anonymous fake display identity as a fallback for signed-in features.
 
 ## Recommended Auth Product Strategy
 
@@ -271,7 +272,8 @@ Recommended evolution:
 - Keep badges/streaks only as a secondary "Activity" tab.
 - Put real account controls first.
 - Replace hardcoded avatar and handle with Supabase profile data.
-- Replace "accounts & sync coming soon" with real auth state.
+- The old "accounts & sync coming soon" placeholder has been replaced; the active account UI
+  uses the real Supabase auth state.
 
 Suggested new structure:
 
