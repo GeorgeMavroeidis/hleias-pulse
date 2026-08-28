@@ -256,8 +256,7 @@ const EL: Record<string, string> = {
   "Title, venue, area, date, organizer, Greek description, and poster are required.":
     "Τίτλος, χώρος, περιοχή, ημερομηνία, διοργανωτής, ελληνική περιγραφή και αφίσα είναι υποχρεωτικά.",
   "Cultural event saved.": "Η πολιτιστική εκδήλωση αποθηκεύτηκε.",
-  "Could not save cultural event.":
-    "Δεν ήταν δυνατή η αποθήκευση της πολιτιστικής εκδήλωσης.",
+  "Could not save cultural event.": "Δεν ήταν δυνατή η αποθήκευση της πολιτιστικής εκδήλωσης.",
   "Could not upload poster.": "Δεν ήταν δυνατή η μεταφόρτωση της αφίσας.",
   // Admin: organizers panel
   Organizers: "Διοργανωτές",
@@ -311,8 +310,7 @@ const EL: Record<string, string> = {
     "Τίτλος, σύνοψη, διάρκεια και εικόνα είναι υποχρεωτικά.",
   "Route and stops saved.": "Η διαδρομή και οι στάσεις αποθηκεύτηκαν.",
   "Could not save route.": "Δεν ήταν δυνατή η αποθήκευση της διαδρομής.",
-  "Could not update moderation status.":
-    "Δεν ήταν δυνατή η ενημέρωση της κατάστασης ελέγχου.",
+  "Could not update moderation status.": "Δεν ήταν δυνατή η ενημέρωση της κατάστασης ελέγχου.",
   "Could not load admin data.": "Δεν ήταν δυνατή η φόρτωση των δεδομένων διαχείρισης.",
   "Content text updated.": "Το κείμενο του περιεχομένου ενημερώθηκε.",
   "Could not update content text.": "Δεν ήταν δυνατή η ενημέρωση του κειμένου.",
@@ -469,10 +467,8 @@ const EL: Record<string, string> = {
     "Ανακάλυψε τη ΒΔ και ορεινή Ηλεία — τις γωνιές με τα λιγότερα σημεία.",
   "{covered}/{total} places": "{covered}/{total} μέρη",
   "Discovery progress": "Πρόοδος εξερεύνησης",
-  "You've been everywhere on this list. Respect.":
-    "Τα έχεις δει όλα στη λίστα. Respect.",
-  "Five new places — you're really exploring now.":
-    "Πέντε νέα μέρη — τώρα μάλιστα εξερευνείς!",
+  "You've been everywhere on this list. Respect.": "Τα έχεις δει όλα στη λίστα. Respect.",
+  "Five new places — you're really exploring now.": "Πέντε νέα μέρη — τώρα μάλιστα εξερευνείς!",
   "I've been here": "Έχω πάει εδώ",
   "Marked as visited": "Σημειώθηκε ως επίσκεψη",
   "Visit removed": "Η επίσκεψη αφαιρέθηκε",
@@ -500,6 +496,69 @@ const EL: Record<string, string> = {
   "One line about your Ilia taste.": "Μια γραμμή για τα γούστα σου στην Ηλεία.",
   "Theo from Pyrgos": "Θοδωρής από τον Πύργο",
   "Pyrgos, Katakolo, Ancient Olympia…": "Πύργος, Κατάκολο, Αρχαία Ολυμπία…",
+  // Business Profile (stage B1) -- account sheet
+  "Verified business": "Επαληθευμένη επιχείρηση",
+  "Claim your place and add hours, menu, and photos.":
+    "Διεκδίκησε το σημείο σου και πρόσθεσε ωράριο, μενού και φωτογραφίες.",
+  "Claim a place": "Διεκδίκησε ένα σημείο",
+  "My places": "Τα σημεία μου",
+  "Your request to register a business is pending approval.":
+    "Το αίτημά σου να καταχωρήσεις επιχείρηση είναι σε αναμονή έγκρισης.",
+  "Do you run a local business?": "Έχεις τοπική επιχείρηση;",
+  "Register to claim your place on the map and keep its details up to date.":
+    "Καταχωρήσου για να διεκδικήσεις το σημείο σου στον χάρτη και να κρατάς τα στοιχεία του ενημερωμένα.",
+  "Register a business": "Καταχώρηση επιχείρησης",
+  // Business Profile -- claim / "My places" sheet
+  "Could not send the claim.": "Δεν ήταν δυνατή η αποστολή της διεκδίκησης.",
+  "Could not save the details.": "Δεν ήταν δυνατή η αποθήκευση των στοιχείων.",
+  "Could not upload the photo.": "Δεν ήταν δυνατή η μεταφόρτωση της φωτογραφίας.",
+  "You haven't claimed a place yet.": "Δεν έχεις διεκδικήσει σημείο ακόμη.",
+  Approved: "Εγκρίθηκε",
+  "Locked after approval — the team edits it now.":
+    "Κλειδώνει μετά την έγκριση — η ομάδα το επεξεργάζεται πλέον.",
+  "Opening hours": "Ωράριο λειτουργίας",
+  "Mon–Sat 9:00–17:00, Sun closed": "Δευτ–Σάβ 9:00–17:00, Κυρ κλειστά",
+  Phone: "Τηλέφωνο",
+  Website: "Ιστότοπος",
+  "Menu link": "Σύνδεσμος μενού",
+  Photos: "Φωτογραφίες",
+  "Remove photo": "Αφαίρεση φωτογραφίας",
+  "Save details": "Αποθήκευση στοιχείων",
+  "Search by name or area…": "Αναζήτηση με όνομα ή περιοχή…",
+  "No places match.": "Κανένα σημείο δεν ταιριάζει.",
+  "Sending…": "Αποστολή…",
+  Claim: "Διεκδίκηση",
+  // Business Profile -- place detail
+  "Managed by {name}": "Διαχειρίζεται από {name}",
+  "Business info": "Πληροφορίες επιχείρησης",
+  "See menu": "Δες το μενού",
+  "Is this your business?": "Είναι δικό σου;",
+  "Claim it to add hours, a menu, and photos.":
+    "Διεκδίκησέ το για να προσθέσεις ωράριο, μενού και φωτογραφίες.",
+  // Business Profile -- toasts
+  "Business request sent": "Το αίτημα επιχείρησης στάλθηκε",
+  "Claim submitted for review": "Η διεκδίκηση υποβλήθηκε για έλεγχο",
+  "Register a business first": "Καταχώρησε πρώτα μια επιχείρηση",
+  // Admin: businesses panel
+  Businesses: "Επιχειρήσεις",
+  "Verify business accounts, then approve the places they claim.":
+    "Επαλήθευσε λογαριασμούς επιχειρήσεων και έγκρινε τα σημεία που διεκδικούν.",
+  "Business accounts": "Λογαριασμοί επιχειρήσεων",
+  "Place claims": "Διεκδικήσεις σημείων",
+  "Claimed by": "Διεκδικήθηκε από",
+  Approve: "Έγκριση",
+  "No business applications yet.": "Δεν υπάρχουν ακόμη αιτήσεις επιχειρήσεων.",
+  "No place claims yet.": "Δεν υπάρχουν ακόμη διεκδικήσεις σημείων.",
+  "Add a business directly": "Προσθήκη επιχείρησης απευθείας",
+  "Add & verify business": "Προσθήκη & επαλήθευση επιχείρησης",
+  "Business verified.": "Η επιχείρηση επαληθεύτηκε.",
+  "Business rejected.": "Η επιχείρηση απορρίφθηκε.",
+  "Business added and verified.": "Η επιχείρηση προστέθηκε και επαληθεύτηκε.",
+  "Could not add business.": "Δεν ήταν δυνατή η προσθήκη επιχείρησης.",
+  "Could not update business.": "Δεν ήταν δυνατή η ενημέρωση της επιχείρησης.",
+  "Claim approved.": "Η διεκδίκηση εγκρίθηκε.",
+  "Claim rejected.": "Η διεκδίκηση απορρίφθηκε.",
+  "Could not update the claim.": "Δεν ήταν δυνατή η ενημέρωση της διεκδίκησης.",
 };
 
 function interpolate(message: string, params?: TranslationParams) {

@@ -8,12 +8,14 @@ import {
   Mail,
   Save,
   ShieldCheck,
+  Store,
   Ticket,
   UserCircle2,
   X,
 } from "lucide-react";
 import type { AdminRole } from "@/lib/admin-api";
 import type { OrganizerStatus } from "@/lib/hp/cultural-events-types";
+import type { BusinessStatus } from "@/lib/hp/business-types";
 import { useI18n } from "@/lib/i18n";
 import {
   normalizeHandle,
@@ -461,6 +463,101 @@ function OrganizerSection({
   );
 }
 
+function BusinessSection({
+  status,
+  myPlacesCount,
+  onApply,
+  onOpenPlaces,
+}: {
+  status: BusinessStatus | null;
+  myPlacesCount: number;
+  onApply: () => Promise<void>;
+  onOpenPlaces: () => void;
+}) {
+  const { t } = useI18n();
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const apply = async () => {
+    setApplying(true);
+    setError(null);
+    try {
+      await onApply();
+    } catch (applyError) {
+      setError(applyError instanceof Error ? applyError.message : t("Could not send application."));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  if (status?.verificationStatus === "verified") {
+    return (
+      <div className="mb-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+            <Store size={16} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-black text-hp-ink">
+              {t("Verified business")}
+            </span>
+            <span className="block text-[11px] text-hp-muted">
+              {t("Claim your place and add hours, menu, and photos.")}
+            </span>
+          </span>
+        </div>
+        <div className="mt-2.5 flex gap-2">
+          <button
+            type="button"
+            onClick={onOpenPlaces}
+            className="flex-1 rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper transition active:scale-[0.98]"
+          >
+            {t("Claim a place")}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenPlaces}
+            className="flex-1 rounded-full border border-hp-ink/15 py-2 text-[12px] font-bold text-hp-ink transition active:scale-[0.98]"
+          >
+            {t("My places")} ({myPlacesCount})
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status?.verificationStatus === "pending") {
+    return (
+      <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-[12px] font-semibold text-hp-muted">
+        {t("Your request to register a business is pending approval.")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
+      <div className="text-[13px] font-black text-hp-ink">{t("Do you run a local business?")}</div>
+      <p className="mt-0.5 text-[11px] text-hp-muted">
+        {t("Register to claim your place on the map and keep its details up to date.")}
+      </p>
+      {status?.verificationStatus === "rejected" && (
+        <p className="mt-1 text-[11px] font-semibold text-red-600">
+          {t("Your previous request was rejected.")}
+        </p>
+      )}
+      {error && <p className="mt-1 text-[11px] font-semibold text-red-600">{error}</p>}
+      <button
+        type="button"
+        onClick={() => void apply()}
+        disabled={applying}
+        className="mt-2 w-full rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper disabled:opacity-60"
+      >
+        {applying ? t("Submitting…") : t("Register a business")}
+      </button>
+    </div>
+  );
+}
+
 export function AccountSheet({
   open,
   account,
@@ -476,6 +573,10 @@ export function AccountSheet({
   onApplyOrganizer,
   onOpenOrganizerComposer,
   onOpenOrganizerEvents,
+  businessStatus,
+  businessPlaceCount,
+  onApplyBusiness,
+  onOpenBusinessPlaces,
 }: {
   open: boolean;
   account: PulseAccountState;
@@ -496,6 +597,10 @@ export function AccountSheet({
   onApplyOrganizer: () => Promise<void>;
   onOpenOrganizerComposer: () => void;
   onOpenOrganizerEvents: () => void;
+  businessStatus: BusinessStatus | null;
+  businessPlaceCount: number;
+  onApplyBusiness: () => Promise<void>;
+  onOpenBusinessPlaces: () => void;
 }) {
   const { t } = useI18n();
   const profile = accountProfile(account);
@@ -724,6 +829,13 @@ export function AccountSheet({
                   onApply={onApplyOrganizer}
                   onOpenComposer={onOpenOrganizerComposer}
                   onOpenMyEvents={onOpenOrganizerEvents}
+                />
+
+                <BusinessSection
+                  status={businessStatus}
+                  myPlacesCount={businessPlaceCount}
+                  onApply={onApplyBusiness}
+                  onOpenPlaces={onOpenBusinessPlaces}
                 />
 
                 <form onSubmit={submit} className="space-y-3">

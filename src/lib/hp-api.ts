@@ -716,9 +716,7 @@ function mapOrganizer(row: OrganizerRow): OrganizerStatus {
   };
 }
 
-function businessVerificationStatus(
-  value: string | null | undefined,
-): BusinessVerificationStatus {
+function businessVerificationStatus(value: string | null | undefined): BusinessVerificationStatus {
   const normalized = (value ?? "pending").toLowerCase();
   if (normalized === "pending" || normalized === "verified" || normalized === "rejected") {
     return normalized;

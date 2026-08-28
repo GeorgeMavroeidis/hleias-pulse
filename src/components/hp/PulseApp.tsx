@@ -33,6 +33,11 @@ import {
   RefreshCw,
   Ticket,
   Check,
+  Store,
+  Phone,
+  Globe,
+  UtensilsCrossed,
+  BadgeCheck,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -48,15 +53,22 @@ import {
 import {
   addPulseComment,
   applyToBecomeOrganizer,
+  applyToBecomeBusiness,
+  claimPlace,
   createPulsePlace,
   createPulsePost,
   createPulseMeetEvent,
   createPulseCulturalEvent,
   createPulseStory,
   emptyPulseData,
+  getMyBusinessStatus,
   getMyCulturalEvents,
   getMyOrganizerStatus,
+  getMyPlaceClaims,
+  getPlaceBusinessProfile,
+  updatePlaceBusinessProfile,
   updatePulseCulturalEvent,
+  uploadBusinessPhoto,
   loadPulseData,
   loadPulseUserState,
   markPulseStoriesSeen,
@@ -103,6 +115,13 @@ import { MeetScreen } from "./MeetScreen";
 import { CulturalEventsScreen } from "./CulturalEventsScreen";
 import { OrganizerEventComposer } from "./OrganizerEventComposer";
 import { OrganizerEventsSheet } from "./OrganizerEventsSheet";
+import { BusinessPlacesSheet } from "./BusinessPlacesSheet";
+import type {
+  BusinessStatus,
+  PlaceBusinessProfile,
+  PlaceBusinessProfileFields,
+  PlaceClaim,
+} from "@/lib/hp/business-types";
 import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet } from "./AuthAccountSheets";
@@ -470,6 +489,7 @@ function MapBottomSheet({
   onSavePlace,
   onSharePlace,
   savedPlaceIds,
+  claimedPlaceIds,
 }: {
   cluster: MapAreaCluster | null;
   selectedPlace: Place | null;
@@ -485,6 +505,7 @@ function MapBottomSheet({
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
   savedPlaceIds: string[];
+  claimedPlaceIds: string[];
 }) {
   const { t } = useI18n();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
@@ -637,6 +658,7 @@ function MapBottomSheet({
               events={events}
               expanded={isExpanded}
               savedPlaceIds={savedPlaceIds}
+              claimedPlaceIds={claimedPlaceIds}
               storyGroups={storyGroups}
               onOpenStory={onOpenStory}
               onSavePlace={onSavePlace}
@@ -672,6 +694,7 @@ function AreaSheetContent({
   events,
   expanded,
   savedPlaceIds,
+  claimedPlaceIds,
   storyGroups,
   onOpenStory,
   onSavePlace,
@@ -683,6 +706,7 @@ function AreaSheetContent({
   events: PulseData["events"];
   expanded: boolean;
   savedPlaceIds: string[];
+  claimedPlaceIds: string[];
   storyGroups: PlaceStoryGroup[];
   onOpenStory: (placeId: string) => void;
   onSavePlace: (id: string) => void;
@@ -830,7 +854,18 @@ function AreaSheetContent({
               {focusPlace.type} · {focusPlace.bestTime}
             </span>
           </div>
-          <h3 className="mt-1 text-[16px] font-black text-hp-ink">{focusPlace.name}</h3>
+          <div className="mt-1 flex items-center gap-1.5">
+            <h3 className="text-[16px] font-black text-hp-ink">{focusPlace.name}</h3>
+            {claimedPlaceIds.includes(focusPlace.id) && (
+              <span
+                className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset/12 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-hp-sunset"
+                title={t("Verified business")}
+              >
+                <BadgeCheck size={10} />
+                {t("Business")}
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-hp-muted">
             {focusPlace.greekName} · {focusPlace.area}
           </p>
@@ -1958,6 +1993,9 @@ function PlaceDetailModal({
   findPostAuthor,
   storyGroups,
   onOpenStory,
+  businessProfile,
+  showClaimCta,
+  onClaimPlace,
 }: {
   place: Place | null;
   events: PulseData["events"];
@@ -1975,6 +2013,9 @@ function PlaceDetailModal({
   findPostAuthor: (post: Post) => Author;
   storyGroups: PlaceStoryGroup[];
   onOpenStory: (placeId: string) => void;
+  businessProfile: PlaceBusinessProfile | null;
+  showClaimCta: boolean;
+  onClaimPlace: () => void;
 }) {
   const [commentText, setCommentText] = useState("");
   const { language, t } = useI18n();
@@ -2036,6 +2077,14 @@ function PlaceDetailModal({
                 <p className="text-[12px] opacity-85">
                   {place.greekName} · {place.area}
                 </p>
+                {businessProfile && (
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-hp-paper/95 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-hp-sunset">
+                    <BadgeCheck size={12} />
+                    {businessProfile.businessName
+                      ? t("Managed by {name}", { name: businessProfile.businessName })
+                      : t("Verified business")}
+                  </span>
+                )}
               </div>
             </div>
             {placeStories.length > 0 && (
@@ -2098,6 +2147,90 @@ function PlaceDetailModal({
                 </div>
                 <div className="mt-1 text-[13px] font-semibold text-hp-ink">{place.mood}</div>
               </div>
+
+              {businessProfile &&
+                (businessProfile.hoursText ||
+                  businessProfile.phone ||
+                  businessProfile.websiteUrl ||
+                  businessProfile.menuUrl ||
+                  businessProfile.photos.length > 0) && (
+                  <div className="mt-4 rounded-2xl border border-hp-sunset/25 bg-hp-sunset/5 p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-sunset">
+                      <Store size={12} /> {t("Business info")}
+                    </div>
+                    {businessProfile.hoursText && (
+                      <div className="mt-2 flex items-start gap-2 text-[12.5px] text-hp-ink">
+                        <Clock size={13} className="mt-0.5 shrink-0 text-hp-muted" />
+                        <span className="whitespace-pre-line">{businessProfile.hoursText}</span>
+                      </div>
+                    )}
+                    {businessProfile.phone && (
+                      <a
+                        href={`tel:${businessProfile.phone}`}
+                        className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-hp-ink"
+                      >
+                        <Phone size={13} className="shrink-0 text-hp-muted" />
+                        {businessProfile.phone}
+                      </a>
+                    )}
+                    {businessProfile.websiteUrl && (
+                      <a
+                        href={businessProfile.websiteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-hp-sunset"
+                      >
+                        <Globe size={13} className="shrink-0" />
+                        {t("Website")}
+                      </a>
+                    )}
+                    {businessProfile.menuUrl && (
+                      <a
+                        href={businessProfile.menuUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-hp-sunset"
+                      >
+                        <UtensilsCrossed size={13} className="shrink-0" />
+                        {t("See menu")}
+                      </a>
+                    )}
+                    {businessProfile.photos.length > 0 && (
+                      <div className="hp-no-scrollbar -mx-1 mt-3 flex gap-2 overflow-x-auto px-1">
+                        {businessProfile.photos.map((url) => (
+                          <ImageBox
+                            key={url}
+                            src={url}
+                            alt=""
+                            className="h-24 w-32 shrink-0"
+                            rounded="rounded-xl"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {showClaimCta && (
+                <button
+                  type="button"
+                  onClick={onClaimPlace}
+                  className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-dashed border-hp-ink/20 bg-hp-paper p-3 text-left transition active:scale-[0.99]"
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink">
+                    <Store size={15} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12.5px] font-black text-hp-ink">
+                      {t("Is this your business?")}
+                    </span>
+                    <span className="block text-[11px] text-hp-muted">
+                      {t("Claim it to add hours, a menu, and photos.")}
+                    </span>
+                  </span>
+                </button>
+              )}
+
               <div className="mt-5">
                 <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-hp-muted">
                   Recent posts
@@ -4077,9 +4210,7 @@ export function PulseApp() {
   const [culturalEventLikeCounts, setCulturalEventLikeCounts] = useState<Record<string, number>>(
     {},
   );
-  const [culturalEventComments, setCulturalEventComments] = useState<Record<string, Comment[]>>(
-    {},
-  );
+  const [culturalEventComments, setCulturalEventComments] = useState<Record<string, Comment[]>>({});
   const [openCulturalEvent, setOpenCulturalEvent] = useState<CulturalEvent | null>(null);
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
   const [savedRoutes, setSavedRoutes] = useState<Record<string, boolean>>({});
@@ -4104,6 +4235,11 @@ export function PulseApp() {
   const [myCulturalEvents, setMyCulturalEvents] = useState<CulturalEvent[]>([]);
   const [myEventsOpen, setMyEventsOpen] = useState(false);
   const [editingCulturalEvent, setEditingCulturalEvent] = useState<CulturalEvent | null>(null);
+  const [businessStatus, setBusinessStatus] = useState<BusinessStatus | null>(null);
+  const [myPlaceClaims, setMyPlaceClaims] = useState<PlaceClaim[]>([]);
+  const [businessPlacesOpen, setBusinessPlacesOpen] = useState(false);
+  const [openPlaceBusinessProfile, setOpenPlaceBusinessProfile] =
+    useState<PlaceBusinessProfile | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   // Tourist-only "Must-see today" overlay on the Map tab. Starts open on every
   // page load (a "welcome" moment); the X dismisses it for the session only.
@@ -4323,6 +4459,20 @@ export function PulseApp() {
     setMyCulturalEvents(await getMyCulturalEvents().catch(() => [] as CulturalEvent[]));
   };
 
+  // Business status + claims, mirroring the organizer pattern. Claims are only
+  // readable (RLS) once the business is verified, so skip the round-trip
+  // otherwise.
+  const loadMyBusinessState = async () => {
+    const status = await getMyBusinessStatus().catch(() => null);
+    setBusinessStatus(status);
+    if (status?.verificationStatus === "verified") {
+      setMyPlaceClaims(await getMyPlaceClaims().catch(() => [] as PlaceClaim[]));
+    } else {
+      setMyPlaceClaims([]);
+    }
+    return status;
+  };
+
   const refreshAccount = async () => {
     try {
       const nextAccount = await getCurrentPulseAccount();
@@ -4337,9 +4487,12 @@ export function PulseApp() {
         const nextOrganizerStatus = await getMyOrganizerStatus().catch(() => null);
         setOrganizerStatus(nextOrganizerStatus);
         await loadMyCulturalEvents(nextOrganizerStatus);
+        await loadMyBusinessState();
       } else {
         setOrganizerStatus(null);
         setMyCulturalEvents([]);
+        setBusinessStatus(null);
+        setMyPlaceClaims([]);
       }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
@@ -4360,6 +4513,8 @@ export function PulseApp() {
       setAdminRole(null);
       setOrganizerStatus(null);
       setMyCulturalEvents([]);
+      setBusinessStatus(null);
+      setMyPlaceClaims([]);
       return fallback;
     }
   };
@@ -4496,9 +4651,19 @@ export function PulseApp() {
         } else if (!ignore) {
           setMyCulturalEvents([]);
         }
+        const nextBusinessStatus = await getMyBusinessStatus().catch(() => null);
+        if (!ignore) setBusinessStatus(nextBusinessStatus);
+        if (nextBusinessStatus?.verificationStatus === "verified") {
+          const claims = await getMyPlaceClaims().catch(() => [] as PlaceClaim[]);
+          if (!ignore) setMyPlaceClaims(claims);
+        } else if (!ignore) {
+          setMyPlaceClaims([]);
+        }
       } else {
         setOrganizerStatus(null);
         setMyCulturalEvents([]);
+        setBusinessStatus(null);
+        setMyPlaceClaims([]);
       }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
@@ -5034,6 +5199,82 @@ export function PulseApp() {
     showToast(t("Organizer application sent"));
   };
 
+  const applyBusiness = async () => {
+    if (account.status !== "ready") {
+      requireProfile("post");
+      return;
+    }
+    const displayName = profileDisplayName(account.profile);
+    const status = await applyToBecomeBusiness(displayName);
+    setBusinessStatus(status);
+    showToast(t("Business request sent"));
+  };
+
+  // Claim a place from the BusinessPlacesSheet (the caller is already a verified
+  // business). Errors (e.g. the place already has a live claim) surface as a
+  // toast; the sheet also shows them inline.
+  const handleClaimPlace = async (placeId: string) => {
+    const claim = await claimPlace(placeId);
+    setMyPlaceClaims((list) => [claim, ...list.filter((item) => item.id !== claim.id)]);
+    showToast(t("Claim submitted for review"));
+  };
+
+  const handleSavePlaceProfile = async (
+    claimId: string,
+    fields: Partial<PlaceBusinessProfileFields>,
+  ) => {
+    const updated = await updatePlaceBusinessProfile(claimId, fields);
+    setMyPlaceClaims((list) => list.map((item) => (item.id === claimId ? updated : item)));
+    showToast(t("Changes saved"));
+  };
+
+  // PlaceDetailModal "Is this your business?" entry. Routes the user to the
+  // right next step depending on how far along they are.
+  const claimFromPlaceDetail = () => {
+    if (!openPlace) return;
+    if (account.status !== "ready") {
+      requireProfile("post");
+      return;
+    }
+    if (businessStatus?.verificationStatus !== "verified") {
+      setOpenPlace(null);
+      setProfileOpen(true);
+      showToast(
+        businessStatus?.verificationStatus === "pending"
+          ? t("Your request to register a business is pending approval.")
+          : t("Register a business first"),
+      );
+      return;
+    }
+    const placeId = openPlace.id;
+    void handleClaimPlace(placeId).catch((error) => {
+      showToast(error instanceof Error ? error.message : t("Could not send the claim."));
+    });
+  };
+
+  // Lazy-load the approved business enrichment for whichever place detail is
+  // open -- only when the bootstrap flagged it as claimed, so unclaimed places
+  // cost no request.
+  useEffect(() => {
+    const placeId = openPlace?.id;
+    if (!placeId || !pulseData.claimedPlaceIds.includes(placeId)) {
+      setOpenPlaceBusinessProfile(null);
+      return;
+    }
+    let ignore = false;
+    setOpenPlaceBusinessProfile(null);
+    void getPlaceBusinessProfile(placeId)
+      .then((profile) => {
+        if (!ignore) setOpenPlaceBusinessProfile(profile);
+      })
+      .catch((error) => {
+        console.warn("Could not load business profile.", error);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [openPlace?.id, pulseData.claimedPlaceIds]);
+
   const addCulturalEvent = async (input: CreateCulturalEventInput) => {
     if (organizerStatus?.verificationStatus !== "verified") {
       throw new Error("Only verified organizers can submit cultural events.");
@@ -5345,6 +5586,7 @@ export function PulseApp() {
             onSavePlace={toggleSave}
             onSharePlace={sharePlace}
             savedPlaceIds={savedIds}
+            claimedPlaceIds={pulseData.claimedPlaceIds}
           />
           {/* Tourist-only orientation: the "Must-see today" deck floats over the
               live map. The map underneath stays fully loaded; the X just hides
@@ -5609,6 +5851,15 @@ export function PulseApp() {
         findPostAuthor={findPostAuthor}
         storyGroups={placeStoryGroups}
         onOpenStory={(placeId) => setStoryViewer({ placeId })}
+        businessProfile={openPlaceBusinessProfile}
+        showClaimCta={
+          !!openPlace &&
+          !pulseData.claimedPlaceIds.includes(openPlace.id) &&
+          !myPlaceClaims.some(
+            (claim) => claim.placeId === openPlace.id && claim.status !== "rejected",
+          )
+        }
+        onClaimPlace={claimFromPlaceDetail}
       />
       <PostDetailModal
         post={openPost}
@@ -5686,6 +5937,17 @@ export function PulseApp() {
         }}
       />
 
+      <BusinessPlacesSheet
+        open={businessPlacesOpen}
+        onClose={() => setBusinessPlacesOpen(false)}
+        places={places}
+        claims={myPlaceClaims}
+        otherClaimedPlaceIds={pulseData.claimedPlaceIds}
+        onClaim={handleClaimPlace}
+        onSaveProfile={handleSavePlaceProfile}
+        onUploadPhoto={uploadBusinessPhoto}
+      />
+
       <CulturalEventDetailModal
         event={openCulturalEvent}
         lang={language}
@@ -5700,7 +5962,9 @@ export function PulseApp() {
             : 0
         }
         comments={openCulturalEvent ? (culturalEventComments[openCulturalEvent.id] ?? []) : []}
-        onComment={(text) => openCulturalEvent && addCulturalEventComment(openCulturalEvent.id, text)}
+        onComment={(text) =>
+          openCulturalEvent && addCulturalEventComment(openCulturalEvent.id, text)
+        }
       />
 
       <AuthSheet
@@ -5745,6 +6009,13 @@ export function PulseApp() {
         onOpenOrganizerEvents={() => {
           setProfileOpen(false);
           setMyEventsOpen(true);
+        }}
+        businessStatus={businessStatus}
+        businessPlaceCount={myPlaceClaims.filter((claim) => claim.status !== "rejected").length}
+        onApplyBusiness={applyBusiness}
+        onOpenBusinessPlaces={() => {
+          setProfileOpen(false);
+          setBusinessPlacesOpen(true);
         }}
       />
 

@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Route,
   ShieldCheck,
+  Store,
   Ticket,
   UserCheck,
   Users,
@@ -20,20 +21,25 @@ import {
 import { AdminMapPicker } from "./AdminMapPicker";
 import {
   EMPTY_ADMIN_DATA,
+  type AdminBusiness,
   type AdminComment,
   type AdminCulturalEvent,
   type AdminData,
   type AdminMeetEvent,
   type AdminOrganizer,
   type AdminPlace,
+  type AdminPlaceClaim,
   type AdminPost,
   type AdminProfile,
   type AdminRole,
   type AdminRoute,
   type AdminRouteStop,
   type AdminStory,
+  type BusinessVerificationStatus,
   type ModerationTarget,
   type OrganizerVerificationStatus,
+  type PlaceClaimStatus,
+  createAdminBusiness,
   editAdminComment,
   editAdminPost,
   getAdminRole,
@@ -41,6 +47,7 @@ import {
   moderateContent,
   removeAdminMember,
   replaceAdminRouteStops,
+  reviewPlaceClaim,
   saveAdminCulturalEvent,
   createAdminOrganizer,
   saveAdminMeetEvent,
@@ -48,6 +55,7 @@ import {
   saveAdminRoute,
   saveAdminStory,
   setAdminMember,
+  setBusinessVerification,
   setOrganizerVerification,
   uploadContentMedia,
 } from "@/lib/admin-api";
@@ -62,6 +70,7 @@ type AdminTab =
   | "meet"
   | "cultural"
   | "organizers"
+  | "businesses"
   | "routes"
   | "moderation"
   | "team";
@@ -87,6 +96,7 @@ const TABS: Array<{ id: AdminTab; label: string; icon: typeof LayoutDashboard }>
   { id: "meet", label: "Meet events", icon: Clock3 },
   { id: "cultural", label: "Cultural events", icon: Ticket },
   { id: "organizers", label: "Organizers", icon: UserCheck },
+  { id: "businesses", label: "Businesses", icon: Store },
   { id: "routes", label: "Routes", icon: Route },
   { id: "moderation", label: "Moderation", icon: ShieldCheck },
   { id: "team", label: "Team", icon: Users },
@@ -313,6 +323,7 @@ export function AdminDashboard() {
                     item.id === "meet" ||
                     item.id === "cultural" ||
                     item.id === "organizers" ||
+                    item.id === "businesses" ||
                     item.id === "routes"
                   ? canEdit
                   : true,
@@ -381,6 +392,9 @@ export function AdminDashboard() {
           )}
           {tab === "organizers" && canEdit && (
             <OrganizersPanel data={data} onSaved={load} setNotice={setNotice} />
+          )}
+          {tab === "businesses" && canEdit && (
+            <BusinessesPanel data={data} onSaved={load} setNotice={setNotice} />
           )}
           {tab === "routes" && canEdit && (
             <RoutesPanel data={data} onSaved={load} setNotice={setNotice} />
@@ -1744,6 +1758,200 @@ function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
   );
 }
 
+function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
+  const { language, t } = useI18n();
+  const businessUserIds = new Set(data.businesses.map((business) => business.user_id));
+  const [selectedId, setSelectedId] = useState("");
+  const [adding, setAdding] = useState(false);
+  const eligibleProfiles = data.profiles.filter(
+    (profile) => profile.profile_completed_at && !businessUserIds.has(profile.id),
+  );
+  const placeName = (id: string) => data.places.find((place) => place.id === id)?.name ?? id;
+  const businessName = (id: string) =>
+    data.businesses.find((business) => business.id === id)?.display_name ?? "—";
+
+  const verify = async (business: AdminBusiness, status: BusinessVerificationStatus) => {
+    try {
+      await setBusinessVerification(business.id, status);
+      await onSaved();
+      setNotice({
+        tone: "success",
+        message: t(status === "verified" ? "Business verified." : "Business rejected."),
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not update business."),
+      });
+    }
+  };
+
+  const review = async (claim: AdminPlaceClaim, status: PlaceClaimStatus) => {
+    try {
+      await reviewPlaceClaim(claim.id, status);
+      await onSaved();
+      setNotice({
+        tone: "success",
+        message: t(status === "approved" ? "Claim approved." : "Claim rejected."),
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not update the claim."),
+      });
+    }
+  };
+
+  const addDirect = async () => {
+    const profile = data.profiles.find((item) => item.id === selectedId);
+    if (!profile) return;
+    try {
+      setAdding(true);
+      await createAdminBusiness(profile.id, profile.display_name || profile.handle || "Business");
+      await onSaved();
+      setSelectedId("");
+      setNotice({ tone: "success", message: t("Business added and verified.") });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not add business."),
+      });
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <>
+      <SectionHeader
+        title="Businesses"
+        detail="Verify business accounts, then approve the places they claim."
+      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="flex flex-col gap-6">
+          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div className="border-b border-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+              {t("Business accounts")}
+            </div>
+            <div className="divide-y divide-slate-100">
+              {data.businesses.length ? (
+                data.businesses.map((business) => (
+                  <div key={business.id} className="flex flex-wrap items-center gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">{business.display_name}</span>
+                        <StatusBadge status={business.verification_status} />
+                      </div>
+                      <p className="mt-1 max-w-2xl text-sm text-slate-600">{business.bio}</p>
+                      <time className="mt-1 block text-xs text-slate-400">
+                        {t("Applied")} {formatDate(business.created_at, language)}
+                      </time>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {business.verification_status !== "verified" && (
+                        <ActionButton onClick={() => void verify(business, "verified")}>
+                          <Check size={15} /> Verify
+                        </ActionButton>
+                      )}
+                      {business.verification_status !== "rejected" && (
+                        <ActionButton
+                          tone="muted"
+                          onClick={() => void verify(business, "rejected")}
+                        >
+                          Reject
+                        </ActionButton>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState>No business applications yet.</EmptyState>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div className="border-b border-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+              {t("Place claims")}
+            </div>
+            <div className="divide-y divide-slate-100">
+              {data.placeClaims.length ? (
+                data.placeClaims.map((claim) => (
+                  <div key={claim.id} className="flex flex-wrap items-center gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">
+                          {placeName(claim.place_id)}
+                        </span>
+                        <StatusBadge status={claim.status} />
+                      </div>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {t("Claimed by")} {businessName(claim.business_id)}
+                      </p>
+                      {(claim.hours_text || claim.phone) && (
+                        <p className="mt-1 max-w-2xl text-xs text-slate-400">
+                          {[claim.hours_text, claim.phone].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {claim.status !== "approved" && (
+                        <ActionButton onClick={() => void review(claim, "approved")}>
+                          <Check size={15} /> Approve
+                        </ActionButton>
+                      )}
+                      {claim.status !== "rejected" && (
+                        <ActionButton tone="muted" onClick={() => void review(claim, "rejected")}>
+                          Reject
+                        </ActionButton>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState>No place claims yet.</EmptyState>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h3 className="font-black">{t("Add a business directly")}</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            {t("Skip the self-service application and verify an existing user right away.")}
+          </p>
+          <div className="mt-4 grid gap-3">
+            <Field label="Profile">
+              <select
+                className={inputClass}
+                value={selectedId}
+                onChange={(event) => setSelectedId(event.target.value)}
+              >
+                <option value="">{t("Choose a profile…")}</option>
+                {eligibleProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.display_name || profile.handle} · @{profile.handle}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {eligibleProfiles.length === 0 && (
+              <p className="text-xs text-slate-400">
+                {t(
+                  "No eligible profiles — a user needs to complete their profile (display name + handle) before they can be added here.",
+                )}
+              </p>
+            )}
+            <ActionButton onClick={() => void addDirect()} disabled={!selectedId || adding}>
+              {adding ? "Adding…" : "Add & verify business"}
+            </ActionButton>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function RoutesPanel({ data, onSaved, setNotice }: PanelProps) {
   const [selected, setSelected] = useState<AdminRoute | null>(null);
   return (
@@ -2309,7 +2517,9 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                             setNotice({
                               tone: "error",
                               message:
-                                error instanceof Error ? error.message : t("Could not change role."),
+                                error instanceof Error
+                                  ? error.message
+                                  : t("Could not change role."),
                             }),
                           )
                       }

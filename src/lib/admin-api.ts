@@ -103,10 +103,7 @@ export async function loadAdminData(): Promise<AdminData> {
     supabase.from("cultural_events").select("*").order("event_date", { ascending: true }),
     supabase.from("organizers").select("*").order("created_at", { ascending: false }),
     supabase.from("businesses").select("*").order("created_at", { ascending: false }),
-    supabase
-      .from("place_business_profiles")
-      .select("*")
-      .order("created_at", { ascending: false }),
+    supabase.from("place_business_profiles").select("*").order("created_at", { ascending: false }),
     supabase.from("routes").select("*").order("sort_order", { ascending: true }),
     supabase.from("route_stops").select("*").order("position", { ascending: true }),
     supabase.from("profiles").select("*").order("updated_at", { ascending: false }),
