@@ -1,8 +1,12 @@
 import { useMemo, useState, type ChangeEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Lock, Plus, Store, X } from "lucide-react";
+import { Gift, Lock, Plus, Store, X } from "lucide-react";
 import type { Place } from "@/lib/hp-model";
-import type { PlaceBusinessProfileFields, PlaceClaim } from "@/lib/hp/business-types";
+import {
+  DEAL_TEXT_MAX_LENGTH,
+  type PlaceBusinessProfileFields,
+  type PlaceClaim,
+} from "@/lib/hp/business-types";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
 
@@ -18,6 +22,9 @@ interface Props {
   onClaim: (placeId: string) => Promise<void>;
   onSaveProfile: (claimId: string, fields: Partial<PlaceBusinessProfileFields>) => Promise<void>;
   onUploadPhoto: (file: File) => Promise<string>;
+  // Deal write path (stage B2): works even on an APPROVED claim, unlike
+  // onSaveProfile which is locked once the claim leaves 'pending'.
+  onSaveDeal: (claimId: string, dealText: string | null, dealActive: boolean) => Promise<void>;
 }
 
 // Same palette as the admin panel status badges.
@@ -49,6 +56,8 @@ function fieldClass() {
   return "w-full rounded-2xl border border-hp-ink/10 bg-white/70 px-3 py-2 text-[12px] text-hp-ink outline-none placeholder:text-hp-muted";
 }
 
+type DealDraft = { text: string; active: boolean };
+
 export function BusinessPlacesSheet({
   open,
   onClose,
@@ -58,13 +67,16 @@ export function BusinessPlacesSheet({
   onClaim,
   onSaveProfile,
   onUploadPhoto,
+  onSaveDeal,
 }: Props) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [savingDealId, setSavingDealId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [dealDrafts, setDealDrafts] = useState<Record<string, DealDraft>>({});
 
   const placeById = useMemo(() => new Map(places.map((place) => [place.id, place])), [places]);
   const unavailablePlaceIds = useMemo(
@@ -90,6 +102,32 @@ export function BusinessPlacesSheet({
   const draftFor = (claim: PlaceClaim) => drafts[claim.id] ?? draftFromClaim(claim);
   const patchDraft = (claim: PlaceClaim, patch: Partial<Draft>) =>
     setDrafts((current) => ({ ...current, [claim.id]: { ...draftFor(claim), ...patch } }));
+
+  const dealDraftFor = (claim: PlaceClaim): DealDraft =>
+    dealDrafts[claim.id] ?? { text: claim.dealText ?? "", active: claim.dealActive };
+  const patchDealDraft = (claim: PlaceClaim, patch: Partial<DealDraft>) =>
+    setDealDrafts((current) => ({
+      ...current,
+      [claim.id]: { ...dealDraftFor(claim), ...patch },
+    }));
+
+  const saveDeal = async (target: PlaceClaim) => {
+    const draft = dealDraftFor(target);
+    setSavingDealId(target.id);
+    setError(null);
+    try {
+      await onSaveDeal(target.id, draft.text.trim() || null, draft.active);
+      setDealDrafts((current) => {
+        const next = { ...current };
+        delete next[target.id];
+        return next;
+      });
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : t("Could not save the deal."));
+    } finally {
+      setSavingDealId(null);
+    }
+  };
 
   const claim = async (placeId: string) => {
     setClaimingId(placeId);
@@ -222,6 +260,54 @@ export function BusinessPlacesSheet({
                           )}
                         </span>
                       </div>
+
+                      {entry.status === "approved" &&
+                        (() => {
+                          const dealDraft = dealDraftFor(entry);
+                          return (
+                            <div className="mt-3 rounded-2xl border border-hp-sunset/25 bg-hp-sunset/5 p-2.5">
+                              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-sunset">
+                                <Gift size={12} /> {t("Deal")}
+                              </div>
+                              <textarea
+                                value={dealDraft.text}
+                                onChange={(event) =>
+                                  patchDealDraft(entry, {
+                                    text: event.target.value.slice(0, DEAL_TEXT_MAX_LENGTH),
+                                  })
+                                }
+                                rows={2}
+                                maxLength={DEAL_TEXT_MAX_LENGTH}
+                                placeholder={t("Show the app, get your 2nd coffee free")}
+                                className={`${fieldClass()} mt-1.5 resize-none`}
+                              />
+                              <div className="mt-1 flex items-center justify-between">
+                                <span className="text-[10px] font-semibold text-hp-muted">
+                                  {dealDraft.text.length}/{DEAL_TEXT_MAX_LENGTH}
+                                </span>
+                                <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-hp-ink">
+                                  <input
+                                    type="checkbox"
+                                    checked={dealDraft.active}
+                                    onChange={(event) =>
+                                      patchDealDraft(entry, { active: event.target.checked })
+                                    }
+                                    className="h-3.5 w-3.5 accent-hp-sunset"
+                                  />
+                                  {t("Deal active")}
+                                </label>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => void saveDeal(entry)}
+                                disabled={savingDealId === entry.id}
+                                className="mt-2 w-full rounded-full bg-hp-sunset py-2 text-[12px] font-bold text-hp-paper disabled:opacity-50"
+                              >
+                                {savingDealId === entry.id ? t("Saving…") : t("Save deal")}
+                              </button>
+                            </div>
+                          );
+                        })()}
 
                       {entry.status !== "rejected" && (
                         <div className="mt-3 flex flex-col gap-2">

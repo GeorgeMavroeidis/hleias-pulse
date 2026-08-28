@@ -39,6 +39,7 @@ import {
   type ModerationTarget,
   type OrganizerVerificationStatus,
   type PlaceClaimStatus,
+  clearPlaceDeal,
   createAdminBusiness,
   editAdminComment,
   editAdminPost,
@@ -1802,6 +1803,19 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
     }
   };
 
+  const clearDeal = async (claim: AdminPlaceClaim) => {
+    try {
+      await clearPlaceDeal(claim.id);
+      await onSaved();
+      setNotice({ tone: "success", message: t("Deal cleared.") });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not clear the deal."),
+      });
+    }
+  };
+
   const addDirect = async () => {
     const profile = data.profiles.find((item) => item.id === selectedId);
     if (!profile) return;
@@ -1893,6 +1907,16 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
                           {[claim.hours_text, claim.phone].filter(Boolean).join(" · ")}
                         </p>
                       )}
+                      {claim.deal_text && (
+                        <p className="mt-1 max-w-2xl text-xs font-semibold text-orange-700">
+                          🎁 {claim.deal_text}
+                          {!claim.deal_active && (
+                            <span className="ml-1 font-normal text-slate-400">
+                              ({t("inactive")})
+                            </span>
+                          )}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {claim.status !== "approved" && (
@@ -1903,6 +1927,11 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
                       {claim.status !== "rejected" && (
                         <ActionButton tone="muted" onClick={() => void review(claim, "rejected")}>
                           Reject
+                        </ActionButton>
+                      )}
+                      {claim.deal_text && (
+                        <ActionButton tone="muted" onClick={() => void clearDeal(claim)}>
+                          Clear deal
                         </ActionButton>
                       )}
                     </div>

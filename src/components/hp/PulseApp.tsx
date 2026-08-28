@@ -66,6 +66,7 @@ import {
   getMyOrganizerStatus,
   getMyPlaceClaims,
   getPlaceBusinessProfile,
+  setPlaceDeal,
   updatePlaceBusinessProfile,
   updatePulseCulturalEvent,
   uploadBusinessPhoto,
@@ -490,6 +491,7 @@ function MapBottomSheet({
   onSharePlace,
   savedPlaceIds,
   claimedPlaceIds,
+  dealPlaceIds,
 }: {
   cluster: MapAreaCluster | null;
   selectedPlace: Place | null;
@@ -506,6 +508,7 @@ function MapBottomSheet({
   onSharePlace: (place: Place) => void;
   savedPlaceIds: string[];
   claimedPlaceIds: string[];
+  dealPlaceIds: string[];
 }) {
   const { t } = useI18n();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
@@ -659,6 +662,7 @@ function MapBottomSheet({
               expanded={isExpanded}
               savedPlaceIds={savedPlaceIds}
               claimedPlaceIds={claimedPlaceIds}
+              dealPlaceIds={dealPlaceIds}
               storyGroups={storyGroups}
               onOpenStory={onOpenStory}
               onSavePlace={onSavePlace}
@@ -695,6 +699,7 @@ function AreaSheetContent({
   expanded,
   savedPlaceIds,
   claimedPlaceIds,
+  dealPlaceIds,
   storyGroups,
   onOpenStory,
   onSavePlace,
@@ -707,6 +712,7 @@ function AreaSheetContent({
   expanded: boolean;
   savedPlaceIds: string[];
   claimedPlaceIds: string[];
+  dealPlaceIds: string[];
   storyGroups: PlaceStoryGroup[];
   onOpenStory: (placeId: string) => void;
   onSavePlace: (id: string) => void;
@@ -854,7 +860,7 @@ function AreaSheetContent({
               {focusPlace.type} · {focusPlace.bestTime}
             </span>
           </div>
-          <div className="mt-1 flex items-center gap-1.5">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <h3 className="text-[16px] font-black text-hp-ink">{focusPlace.name}</h3>
             {claimedPlaceIds.includes(focusPlace.id) && (
               <span
@@ -863,6 +869,14 @@ function AreaSheetContent({
               >
                 <BadgeCheck size={10} />
                 {t("Business")}
+              </span>
+            )}
+            {dealPlaceIds.includes(focusPlace.id) && (
+              <span
+                className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset/12 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-hp-sunset"
+                title={t("This place has an app deal")}
+              >
+                🎁 {t("Deal")}
               </span>
             )}
           </div>
@@ -2147,6 +2161,20 @@ function PlaceDetailModal({
                 </div>
                 <div className="mt-1 text-[13px] font-semibold text-hp-ink">{place.mood}</div>
               </div>
+
+              {businessProfile?.dealActive && businessProfile.dealText && (
+                <div className="mt-4 rounded-2xl border-2 border-hp-sunset/40 bg-hp-sunset/10 p-3">
+                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-hp-sunset">
+                    🎁 {t("App deal")}
+                  </div>
+                  <p className="mt-1.5 text-[14px] font-bold leading-snug text-hp-ink">
+                    {businessProfile.dealText}
+                  </p>
+                  <p className="mt-1.5 text-[11px] text-hp-muted">
+                    {t("Show this screen at the counter to redeem.")}
+                  </p>
+                </div>
+              )}
 
               {businessProfile &&
                 (businessProfile.hoursText ||
@@ -5228,6 +5256,30 @@ export function PulseApp() {
     showToast(t("Changes saved"));
   };
 
+  // Stage B2: set/toggle the single static deal on an approved claim. Goes
+  // through set_place_deal (RPC), then patches local state so the badge (map
+  // peek) and the open place detail reflect it without a bootstrap refetch.
+  const handleSaveDeal = async (claimId: string, dealText: string | null, dealActive: boolean) => {
+    await setPlaceDeal(claimId, dealText, dealActive);
+    const claim = myPlaceClaims.find((item) => item.id === claimId);
+    setMyPlaceClaims((list) =>
+      list.map((item) => (item.id === claimId ? { ...item, dealText, dealActive } : item)),
+    );
+    if (claim) {
+      const showsDeal = dealActive && !!dealText;
+      setPulseData((data) => ({
+        ...data,
+        dealPlaceIds: showsDeal
+          ? Array.from(new Set([...data.dealPlaceIds, claim.placeId]))
+          : data.dealPlaceIds.filter((id) => id !== claim.placeId),
+      }));
+      if (openPlace?.id === claim.placeId) {
+        setOpenPlaceBusinessProfile((prev) => (prev ? { ...prev, dealText, dealActive } : prev));
+      }
+    }
+    showToast(t("Deal saved"));
+  };
+
   // PlaceDetailModal "Is this your business?" entry. Routes the user to the
   // right next step depending on how far along they are.
   const claimFromPlaceDetail = () => {
@@ -5587,6 +5639,7 @@ export function PulseApp() {
             onSharePlace={sharePlace}
             savedPlaceIds={savedIds}
             claimedPlaceIds={pulseData.claimedPlaceIds}
+            dealPlaceIds={pulseData.dealPlaceIds}
           />
           {/* Tourist-only orientation: the "Must-see today" deck floats over the
               live map. The map underneath stays fully loaded; the X just hides
@@ -5946,6 +5999,7 @@ export function PulseApp() {
         onClaim={handleClaimPlace}
         onSaveProfile={handleSavePlaceProfile}
         onUploadPhoto={uploadBusinessPhoto}
+        onSaveDeal={handleSaveDeal}
       />
 
       <CulturalEventDetailModal

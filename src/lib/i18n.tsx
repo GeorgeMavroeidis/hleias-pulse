@@ -559,6 +559,22 @@ const EL: Record<string, string> = {
   "Claim approved.": "Η διεκδίκηση εγκρίθηκε.",
   "Claim rejected.": "Η διεκδίκηση απορρίφθηκε.",
   "Could not update the claim.": "Δεν ήταν δυνατή η ενημέρωση της διεκδίκησης.",
+  // Business — static deals (B2)
+  Deal: "Προσφορά",
+  "Deal active": "Ενεργή προσφορά",
+  "Save deal": "Αποθήκευση προσφοράς",
+  "Show the app, get your 2nd coffee free": "Δείξε την εφαρμογή, πάρε τον 2ο καφέ δωρεάν",
+  "Could not save the deal.": "Δεν ήταν δυνατή η αποθήκευση της προσφοράς.",
+  "App deal": "Προσφορά εφαρμογής",
+  "Show this screen at the counter to redeem.":
+    "Δείξε αυτή την οθόνη στο ταμείο για να την εξαργυρώσεις.",
+  "This place has an app deal": "Αυτό το σημείο έχει προσφορά μέσω εφαρμογής",
+  "Deal saved": "Η προσφορά αποθηκεύτηκε",
+  // Admin — deals
+  "Clear deal": "Καθαρισμός προσφοράς",
+  "Deal cleared.": "Η προσφορά καθαρίστηκε.",
+  "Could not clear the deal.": "Δεν ήταν δυνατός ο καθαρισμός της προσφοράς.",
+  inactive: "ανενεργή",
 };
 
 function interpolate(message: string, params?: TranslationParams) {
