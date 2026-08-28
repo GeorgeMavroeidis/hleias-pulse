@@ -16,13 +16,14 @@ import type {
   OrganizerStatus,
   OrganizerVerificationStatus,
 } from "./hp/cultural-events-types";
-import type {
-  BusinessStatus,
-  BusinessVerificationStatus,
-  PlaceBusinessProfile,
-  PlaceBusinessProfileFields,
-  PlaceClaim,
-  PlaceClaimStatus,
+import {
+  DEAL_TEXT_MAX_LENGTH,
+  type BusinessStatus,
+  type BusinessVerificationStatus,
+  type PlaceBusinessProfile,
+  type PlaceBusinessProfileFields,
+  type PlaceClaim,
+  type PlaceClaimStatus,
 } from "./hp/business-types";
 import { supabase } from "./supabase/client";
 import type { Database } from "./supabase/database.types";
@@ -197,6 +198,8 @@ type PlaceBusinessProfileRow = Pick<
   | "website_url"
   | "menu_url"
   | "photos"
+  | "deal_text"
+  | "deal_active"
 >;
 type VibeChipRow = Pick<TableRow<"vibe_chips">, "label">;
 type SavedItemRow = Pick<
@@ -236,6 +239,7 @@ interface PulseBootstrapPayload {
   stories: LiveStoryRow[];
   vibe_chips: VibeChipRow[];
   claimed_place_ids: string[];
+  deal_place_ids: string[];
 }
 
 const COMMENT_RETURN_COLUMNS =
@@ -254,7 +258,7 @@ const ORGANIZER_RETURN_COLUMNS = "id,display_name,bio,verification_status";
 const BUSINESS_RETURN_COLUMNS =
   "id,display_name,bio,contact_phone,contact_email,verification_status";
 const PLACE_BUSINESS_PROFILE_RETURN_COLUMNS =
-  "id,place_id,business_id,status,hours_text,phone,website_url,menu_url,photos";
+  "id,place_id,business_id,status,hours_text,phone,website_url,menu_url,photos,deal_text,deal_active";
 
 type SavedTarget =
   | { type: "place"; id: string }
@@ -275,6 +279,7 @@ export interface PulseData {
   stories: StoryItem[];
   vibeChips: string[];
   claimedPlaceIds: string[];
+  dealPlaceIds: string[];
   placeComments: Record<string, Comment[]>;
   routeComments: Record<string, Comment[]>;
   culturalEventComments: Record<string, Comment[]>;
@@ -371,6 +376,7 @@ export const emptyPulseData: PulseData = {
   stories: [],
   vibeChips: [],
   claimedPlaceIds: [],
+  dealPlaceIds: [],
   placeComments: {},
   routeComments: {},
   culturalEventComments: {},
@@ -754,6 +760,8 @@ function mapPlaceClaim(row: PlaceBusinessProfileRow): PlaceClaim {
     websiteUrl: row.website_url,
     menuUrl: row.menu_url,
     photos: row.photos ?? [],
+    dealText: row.deal_text,
+    dealActive: row.deal_active ?? false,
   };
 }
 
@@ -860,6 +868,7 @@ async function fetchPulseData(): Promise<PulseData> {
     stories: [],
     vibe_chips: [],
     claimed_place_ids: [],
+    deal_place_ids: [],
   }) as unknown as PulseBootstrapPayload;
 
   const commentRows = data.comments ?? [];
@@ -891,6 +900,7 @@ async function fetchPulseData(): Promise<PulseData> {
     stories: (data.stories ?? []).map(mapStory),
     vibeChips: (data.vibe_chips ?? []).map((chip) => chip.label),
     claimedPlaceIds: Array.isArray(data.claimed_place_ids) ? data.claimed_place_ids : [],
+    dealPlaceIds: Array.isArray(data.deal_place_ids) ? data.deal_place_ids : [],
     placeComments: commentsByPlace,
     routeComments: commentsByRoute,
     culturalEventComments: commentsByCulturalEvent,
@@ -1434,7 +1444,31 @@ export async function getPlaceBusinessProfile(
     websiteUrl: claim.websiteUrl,
     menuUrl: claim.menuUrl,
     photos: claim.photos,
+    dealText: claim.dealText,
+    dealActive: claim.dealActive,
   };
+}
+
+// Stage B2: the owning business sets/toggles the single deal on its OWN approved
+// claim. Goes through set_place_deal() (SECURITY DEFINER) so it works even
+// though the blanket row UPDATE policy is locked once the claim is approved.
+export async function setPlaceDeal(
+  claimId: string,
+  dealText: string | null,
+  dealActive: boolean,
+): Promise<void> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+  const trimmed = dealText?.trim() ? dealText.trim() : null;
+  if (trimmed && trimmed.length > DEAL_TEXT_MAX_LENGTH) {
+    throw new Error(`Deal text must be ${DEAL_TEXT_MAX_LENGTH} characters or fewer.`);
+  }
+  const result = await client.rpc("set_place_deal", {
+    claim_id: claimId,
+    deal_text: trimmed,
+    deal_active: dealActive,
+  });
+  if (result.error) throw result.error;
 }
 
 export async function uploadBusinessPhoto(file: File): Promise<string> {

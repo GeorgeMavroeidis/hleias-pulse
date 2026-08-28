@@ -253,6 +253,17 @@ export async function reviewPlaceClaim(claimId: string, status: PlaceClaimStatus
   if (result.error) throw result.error;
 }
 
+// Kill-switch for a bad static deal (stage B2). Editors already have the
+// "Editors can manage place business profiles" policy, so a direct update is
+// enough -- this just clears the text and deactivates it.
+export async function clearPlaceDeal(claimId: string) {
+  const result = await supabase
+    .from("place_business_profiles")
+    .update({ deal_text: null, deal_active: false })
+    .eq("id", claimId);
+  if (result.error) throw result.error;
+}
+
 export async function saveAdminRoute(route: Database["public"]["Tables"]["routes"]["Insert"]) {
   const result = await supabase.from("routes").upsert(route).select("*").single();
   if (result.error) throw result.error;
