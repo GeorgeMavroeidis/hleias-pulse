@@ -16,6 +16,14 @@ import type {
   OrganizerStatus,
   OrganizerVerificationStatus,
 } from "./hp/cultural-events-types";
+import type {
+  BusinessStatus,
+  BusinessVerificationStatus,
+  PlaceBusinessProfile,
+  PlaceBusinessProfileFields,
+  PlaceClaim,
+  PlaceClaimStatus,
+} from "./hp/business-types";
 import { supabase } from "./supabase/client";
 import type { Database } from "./supabase/database.types";
 
@@ -174,6 +182,22 @@ type OrganizerRow = Pick<
   TableRow<"organizers">,
   "id" | "display_name" | "bio" | "verification_status"
 >;
+type BusinessRow = Pick<
+  TableRow<"businesses">,
+  "id" | "display_name" | "bio" | "contact_phone" | "contact_email" | "verification_status"
+>;
+type PlaceBusinessProfileRow = Pick<
+  TableRow<"place_business_profiles">,
+  | "id"
+  | "place_id"
+  | "business_id"
+  | "status"
+  | "hours_text"
+  | "phone"
+  | "website_url"
+  | "menu_url"
+  | "photos"
+>;
 type VibeChipRow = Pick<TableRow<"vibe_chips">, "label">;
 type SavedItemRow = Pick<
   TableRow<"saved_items">,
@@ -211,6 +235,7 @@ interface PulseBootstrapPayload {
   route_stops: RouteStopRow[];
   stories: LiveStoryRow[];
   vibe_chips: VibeChipRow[];
+  claimed_place_ids: string[];
 }
 
 const COMMENT_RETURN_COLUMNS =
@@ -226,6 +251,10 @@ const MEET_EVENT_RETURN_COLUMNS =
 const CULTURAL_EVENT_RETURN_COLUMNS =
   "id,title,greek_title,event_type,venue_name,area,place_id,lat,lng,event_date,organizer_name,organizer_id,description_el,description_en,poster_url,ticket_url,is_past_event,is_official,likes_count,moderation_status,user_id,created_at";
 const ORGANIZER_RETURN_COLUMNS = "id,display_name,bio,verification_status";
+const BUSINESS_RETURN_COLUMNS =
+  "id,display_name,bio,contact_phone,contact_email,verification_status";
+const PLACE_BUSINESS_PROFILE_RETURN_COLUMNS =
+  "id,place_id,business_id,status,hours_text,phone,website_url,menu_url,photos";
 
 type SavedTarget =
   | { type: "place"; id: string }
@@ -245,6 +274,7 @@ export interface PulseData {
   routes: RouteItem[];
   stories: StoryItem[];
   vibeChips: string[];
+  claimedPlaceIds: string[];
   placeComments: Record<string, Comment[]>;
   routeComments: Record<string, Comment[]>;
   culturalEventComments: Record<string, Comment[]>;
@@ -340,6 +370,7 @@ export const emptyPulseData: PulseData = {
   routes: [],
   stories: [],
   vibeChips: [],
+  claimedPlaceIds: [],
   placeComments: {},
   routeComments: {},
   culturalEventComments: {},
@@ -685,6 +716,49 @@ function mapOrganizer(row: OrganizerRow): OrganizerStatus {
   };
 }
 
+function businessVerificationStatus(
+  value: string | null | undefined,
+): BusinessVerificationStatus {
+  const normalized = (value ?? "pending").toLowerCase();
+  if (normalized === "pending" || normalized === "verified" || normalized === "rejected") {
+    return normalized;
+  }
+  return "pending";
+}
+
+function placeClaimStatus(value: string | null | undefined): PlaceClaimStatus {
+  const normalized = (value ?? "pending").toLowerCase();
+  if (normalized === "pending" || normalized === "approved" || normalized === "rejected") {
+    return normalized;
+  }
+  return "pending";
+}
+
+function mapBusiness(row: BusinessRow): BusinessStatus {
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    bio: row.bio,
+    contactPhone: row.contact_phone,
+    contactEmail: row.contact_email,
+    verificationStatus: businessVerificationStatus(row.verification_status),
+  };
+}
+
+function mapPlaceClaim(row: PlaceBusinessProfileRow): PlaceClaim {
+  return {
+    id: row.id,
+    placeId: row.place_id,
+    businessId: row.business_id,
+    status: placeClaimStatus(row.status),
+    hoursText: row.hours_text,
+    phone: row.phone,
+    websiteUrl: row.website_url,
+    menuUrl: row.menu_url,
+    photos: row.photos ?? [],
+  };
+}
+
 function mapRoute(row: RouteRow, stopsByRoute: Record<string, RouteStopRow[]>): RouteItem {
   return {
     id: row.id,
@@ -787,6 +861,7 @@ async function fetchPulseData(): Promise<PulseData> {
     route_stops: [],
     stories: [],
     vibe_chips: [],
+    claimed_place_ids: [],
   }) as unknown as PulseBootstrapPayload;
 
   const commentRows = data.comments ?? [];
@@ -817,6 +892,7 @@ async function fetchPulseData(): Promise<PulseData> {
     routes: (data.routes ?? []).map((route) => mapRoute(route, stopsByRoute)),
     stories: (data.stories ?? []).map(mapStory),
     vibeChips: (data.vibe_chips ?? []).map((chip) => chip.label),
+    claimedPlaceIds: Array.isArray(data.claimed_place_ids) ? data.claimed_place_ids : [],
     placeComments: commentsByPlace,
     routeComments: commentsByRoute,
     culturalEventComments: commentsByCulturalEvent,
@@ -1223,6 +1299,163 @@ export async function updateOrganizerProfile(
     .single();
   if (result.error) throw result.error;
   return mapOrganizer(result.data);
+}
+
+// ---- Business profile (stage B1) -------------------------------------------
+
+export async function getMyBusinessStatus(): Promise<BusinessStatus | null> {
+  const client = assertSupabase();
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  const userId = sessionResult.data.session?.user.id;
+  if (!userId) return null;
+
+  const result = await client
+    .from("businesses")
+    .select(BUSINESS_RETURN_COLUMNS)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (result.error) throw result.error;
+  return result.data ? mapBusiness(result.data) : null;
+}
+
+export async function applyToBecomeBusiness(
+  displayName: string,
+  options: { bio?: string; contactPhone?: string; contactEmail?: string } = {},
+): Promise<BusinessStatus> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+
+  const result = await client
+    .from("businesses")
+    .insert({
+      user_id: userId,
+      display_name: displayName.trim(),
+      ...(options.bio?.trim() ? { bio: options.bio.trim() } : {}),
+      ...(options.contactPhone?.trim() ? { contact_phone: options.contactPhone.trim() } : {}),
+      ...(options.contactEmail?.trim() ? { contact_email: options.contactEmail.trim() } : {}),
+    })
+    .select(BUSINESS_RETURN_COLUMNS)
+    .single();
+  if (result.error) throw result.error;
+  return mapBusiness(result.data);
+}
+
+// The caller's own claims, any status. RLS "Business can read own claims" scopes
+// this to business_id = current_business_id().
+export async function getMyPlaceClaims(): Promise<PlaceClaim[]> {
+  const client = assertSupabase();
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  if (!sessionResult.data.session?.user.id) return [];
+
+  const result = await client
+    .from("place_business_profiles")
+    .select(PLACE_BUSINESS_PROFILE_RETURN_COLUMNS)
+    .order("created_at", { ascending: false });
+  if (result.error) throw result.error;
+  return (result.data ?? []).map(mapPlaceClaim);
+}
+
+export async function claimPlace(placeId: string): Promise<PlaceClaim> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+
+  const business = await getMyBusinessStatus();
+  if (!business || business.verificationStatus !== "verified") {
+    throw new Error("Only a verified business can claim a place.");
+  }
+
+  const result = await client
+    .from("place_business_profiles")
+    .insert({ place_id: placeId, business_id: business.id, status: "pending" })
+    .select(PLACE_BUSINESS_PROFILE_RETURN_COLUMNS)
+    .single();
+  if (result.error) {
+    // 23505 = the partial unique index: another live claim already exists.
+    if (result.error.code === "23505") {
+      throw new Error("This place already has a pending or approved claim.");
+    }
+    throw result.error;
+  }
+  return mapPlaceClaim(result.data);
+}
+
+// Enrichment fields only. status / business_id / place_id are never sent -- RLS
+// "Business can edit own pending claim" also rejects the update once the claim
+// leaves 'pending'.
+export async function updatePlaceBusinessProfile(
+  claimId: string,
+  fields: Partial<PlaceBusinessProfileFields>,
+): Promise<PlaceClaim> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+
+  const patch: Database["public"]["Tables"]["place_business_profiles"]["Update"] = {};
+  if (fields.hoursText !== undefined) patch.hours_text = fields.hoursText?.trim() || null;
+  if (fields.phone !== undefined) patch.phone = fields.phone?.trim() || null;
+  if (fields.websiteUrl !== undefined) patch.website_url = fields.websiteUrl?.trim() || null;
+  if (fields.menuUrl !== undefined) patch.menu_url = fields.menuUrl?.trim() || null;
+  if (fields.photos !== undefined) patch.photos = fields.photos;
+
+  const result = await client
+    .from("place_business_profiles")
+    .update(patch)
+    .eq("id", claimId)
+    .select(PLACE_BUSINESS_PROFILE_RETURN_COLUMNS)
+    .single();
+  if (result.error) throw result.error;
+  return mapPlaceClaim(result.data);
+}
+
+// Public, approved-only enrichment for a place detail. RLS "Public can read
+// approved place business profiles" already filters to status = 'approved'.
+export async function getPlaceBusinessProfile(
+  placeId: string,
+): Promise<PlaceBusinessProfile | null> {
+  const client = assertSupabase();
+  const result = await client
+    .from("place_business_profiles")
+    .select(`${PLACE_BUSINESS_PROFILE_RETURN_COLUMNS},businesses(display_name)`)
+    .eq("place_id", placeId)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (result.error) throw result.error;
+  if (!result.data) return null;
+
+  const row = result.data as PlaceBusinessProfileRow & {
+    businesses: { display_name: string } | { display_name: string }[] | null;
+  };
+  const business = Array.isArray(row.businesses) ? row.businesses[0] : row.businesses;
+  const claim = mapPlaceClaim(row);
+  return {
+    placeId: claim.placeId,
+    businessName: business?.display_name ?? "",
+    hoursText: claim.hoursText,
+    phone: claim.phone,
+    websiteUrl: claim.websiteUrl,
+    menuUrl: claim.menuUrl,
+    photos: claim.photos,
+  };
+}
+
+export async function uploadBusinessPhoto(file: File): Promise<string> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+  if (!file.type.match(/^image\/(png|jpeg|webp)$/)) {
+    throw new Error("Use a PNG, JPEG, or WebP image.");
+  }
+  if (file.size > 5 * 1024 * 1024) throw new Error("Images must be 5 MB or smaller.");
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const fileName = `business-profiles/${userId}/${Date.now()}-${randomIdSuffix()}.${extension}`;
+  const upload = await client.storage.from("content-media").upload(fileName, file, {
+    cacheControl: "31536000",
+    contentType: file.type,
+    upsert: false,
+  });
+  if (upload.error) throw upload.error;
+  return client.storage.from("content-media").getPublicUrl(upload.data.path).data.publicUrl;
 }
 
 export async function uploadCulturalEventPoster(file: File): Promise<string> {

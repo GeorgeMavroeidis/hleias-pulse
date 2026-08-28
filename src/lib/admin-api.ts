@@ -11,6 +11,8 @@ export type ModerationTarget =
   | "meet_event"
   | "cultural_event";
 export type OrganizerVerificationStatus = "pending" | "verified" | "rejected";
+export type BusinessVerificationStatus = "pending" | "verified" | "rejected";
+export type PlaceClaimStatus = "pending" | "approved" | "rejected";
 
 type Row<TableName extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][TableName]["Row"];
@@ -22,6 +24,8 @@ export type AdminStory = Row<"stories">;
 export type AdminMeetEvent = Row<"meet_events">;
 export type AdminCulturalEvent = Row<"cultural_events">;
 export type AdminOrganizer = Row<"organizers">;
+export type AdminBusiness = Row<"businesses">;
+export type AdminPlaceClaim = Row<"place_business_profiles">;
 export type AdminRoute = Row<"routes">;
 export type AdminRouteStop = Row<"route_stops">;
 export type AdminProfile = Row<"profiles">;
@@ -36,6 +40,8 @@ export interface AdminData {
   meetEvents: AdminMeetEvent[];
   culturalEvents: AdminCulturalEvent[];
   organizers: AdminOrganizer[];
+  businesses: AdminBusiness[];
+  placeClaims: AdminPlaceClaim[];
   routes: AdminRoute[];
   routeStops: AdminRouteStop[];
   profiles: AdminProfile[];
@@ -51,6 +57,8 @@ export const EMPTY_ADMIN_DATA: AdminData = {
   meetEvents: [],
   culturalEvents: [],
   organizers: [],
+  businesses: [],
+  placeClaims: [],
   routes: [],
   routeStops: [],
   profiles: [],
@@ -79,6 +87,8 @@ export async function loadAdminData(): Promise<AdminData> {
     meetEvents,
     culturalEvents,
     organizers,
+    businesses,
+    placeClaims,
     routes,
     routeStops,
     profiles,
@@ -92,6 +102,11 @@ export async function loadAdminData(): Promise<AdminData> {
     supabase.from("meet_events").select("*").order("starts_at", { ascending: true }),
     supabase.from("cultural_events").select("*").order("event_date", { ascending: true }),
     supabase.from("organizers").select("*").order("created_at", { ascending: false }),
+    supabase.from("businesses").select("*").order("created_at", { ascending: false }),
+    supabase
+      .from("place_business_profiles")
+      .select("*")
+      .order("created_at", { ascending: false }),
     supabase.from("routes").select("*").order("sort_order", { ascending: true }),
     supabase.from("route_stops").select("*").order("position", { ascending: true }),
     supabase.from("profiles").select("*").order("updated_at", { ascending: false }),
@@ -111,6 +126,8 @@ export async function loadAdminData(): Promise<AdminData> {
     meetEvents,
     culturalEvents,
     organizers,
+    businesses,
+    placeClaims,
     routes,
     routeStops,
     profiles,
@@ -128,6 +145,8 @@ export async function loadAdminData(): Promise<AdminData> {
     meetEvents: required(meetEvents.data, "Could not load Meet events."),
     culturalEvents: required(culturalEvents.data, "Could not load cultural events."),
     organizers: required(organizers.data, "Could not load organizers."),
+    businesses: required(businesses.data, "Could not load businesses."),
+    placeClaims: required(placeClaims.data, "Could not load place claims."),
     routes: required(routes.data, "Could not load routes."),
     routeStops: required(routeStops.data, "Could not load route stops."),
     profiles: required(profiles.data, "Could not load profiles."),
@@ -203,6 +222,38 @@ export async function createAdminOrganizer(userId: string, displayName: string) 
     .single();
   if (result.error) throw result.error;
   return result.data;
+}
+
+export async function setBusinessVerification(
+  businessId: string,
+  status: BusinessVerificationStatus,
+) {
+  const result = await supabase
+    .from("businesses")
+    .update({ verification_status: status })
+    .eq("id", businessId);
+  if (result.error) throw result.error;
+}
+
+export async function createAdminBusiness(userId: string, displayName: string) {
+  const result = await supabase
+    .from("businesses")
+    .upsert(
+      { user_id: userId, display_name: displayName, verification_status: "verified" },
+      { onConflict: "user_id" },
+    )
+    .select("*")
+    .single();
+  if (result.error) throw result.error;
+  return result.data;
+}
+
+export async function reviewPlaceClaim(claimId: string, status: PlaceClaimStatus) {
+  const result = await supabase.rpc("review_place_claim", {
+    claim_id: claimId,
+    next_status: status,
+  });
+  if (result.error) throw result.error;
 }
 
 export async function saveAdminRoute(route: Database["public"]["Tables"]["routes"]["Insert"]) {

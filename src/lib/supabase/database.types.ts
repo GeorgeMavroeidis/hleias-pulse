@@ -111,6 +111,53 @@ export type Database = {
         };
         Relationships: [];
       };
+      businesses: {
+        Row: {
+          bio: string;
+          contact_email: string | null;
+          contact_phone: string | null;
+          created_at: string;
+          display_name: string;
+          id: string;
+          profile_id: string | null;
+          updated_at: string;
+          user_id: string | null;
+          verification_status: string;
+        };
+        Insert: {
+          bio?: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          created_at?: string;
+          display_name: string;
+          id?: string;
+          profile_id?: string | null;
+          updated_at?: string;
+          user_id?: string | null;
+          verification_status?: string;
+        };
+        Update: {
+          bio?: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          created_at?: string;
+          display_name?: string;
+          id?: string;
+          profile_id?: string | null;
+          updated_at?: string;
+          user_id?: string | null;
+          verification_status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "businesses_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       comments: {
         Row: {
           author_id: string | null;
@@ -692,6 +739,63 @@ export type Database = {
           },
         ];
       };
+      place_business_profiles: {
+        Row: {
+          business_id: string;
+          created_at: string;
+          hours_text: string | null;
+          id: string;
+          menu_url: string | null;
+          phone: string | null;
+          photos: string[];
+          place_id: string;
+          status: string;
+          updated_at: string;
+          website_url: string | null;
+        };
+        Insert: {
+          business_id: string;
+          created_at?: string;
+          hours_text?: string | null;
+          id?: string;
+          menu_url?: string | null;
+          phone?: string | null;
+          photos?: string[];
+          place_id: string;
+          status?: string;
+          updated_at?: string;
+          website_url?: string | null;
+        };
+        Update: {
+          business_id?: string;
+          created_at?: string;
+          hours_text?: string | null;
+          id?: string;
+          menu_url?: string | null;
+          phone?: string | null;
+          photos?: string[];
+          place_id?: string;
+          status?: string;
+          updated_at?: string;
+          website_url?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "place_business_profiles_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "place_business_profiles_place_id_fkey";
+            columns: ["place_id"];
+            isOneToOne: false;
+            referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       post_likes: {
         Row: {
           created_at: string;
@@ -1227,10 +1331,15 @@ export type Database = {
     };
     Functions: {
       current_admin_role: { Args: never; Returns: string | null };
+      current_business_id: { Args: never; Returns: string | null };
       current_organizer_id: { Args: never; Returns: string | null };
       get_pulse_bootstrap: { Args: never; Returns: Json };
       moderate_content: {
         Args: { next_status: string; target_id: string; target_type: string };
+        Returns: undefined;
+      };
+      review_place_claim: {
+        Args: { claim_id: string; next_status: string };
         Returns: undefined;
       };
       refresh_meet_event_rsvp_counts: {
