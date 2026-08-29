@@ -21,6 +21,7 @@ const EL: Record<string, string> = {
   Appearance: "Εμφάνιση",
   Language: "Γλώσσα",
   "Marker animation": "Κίνηση σημείων χάρτη",
+  "Current: {theme}": "Ενεργό: {theme}",
   "Open appearance menu": "Άνοιγμα επιλογών εμφάνισης",
   "Close appearance menu": "Κλείσιμο επιλογών εμφάνισης",
   "A quiet selected-marker breath with a still map around it.":
