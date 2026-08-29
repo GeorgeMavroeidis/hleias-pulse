@@ -633,12 +633,86 @@ function smoothstep(start: number, end: number, value: number) {
   return t * t * (3 - 2 * t);
 }
 
+type ZoomAnchor = readonly [zoom: number, value: number];
+
+function interpolateZoomAnchors(zoom: number, anchors: readonly ZoomAnchor[]) {
+  const first = anchors[0];
+  const last = anchors[anchors.length - 1];
+  if (!first || !last) return 0;
+  if (zoom <= first[0]) return first[1];
+  if (zoom >= last[0]) return last[1];
+
+  for (let index = 1; index < anchors.length; index += 1) {
+    const previous = anchors[index - 1];
+    const next = anchors[index];
+    if (!previous || !next || zoom > next[0]) continue;
+    const progress = smoothstep(previous[0], next[0], zoom);
+    return previous[1] + (next[1] - previous[1]) * progress;
+  }
+
+  return last[1];
+}
+
 function markerZoomProfile(zoom: number) {
+  const childScale = interpolateZoomAnchors(zoom, [
+    [MIN_ZOOM, 0.24],
+    [OVERVIEW_ZOOM, 0.24],
+    [11.5, 0.52],
+    [12.5, 0.68],
+    [PLACE_FOCUS_ZOOM, 0.9],
+    [ALL_MARKERS_RICH_ZOOM, 1],
+  ]);
+  const soloScale = interpolateZoomAnchors(zoom, [
+    [MIN_ZOOM, 0.38],
+    [OVERVIEW_ZOOM, 0.38],
+    [11.5, 0.58],
+    [12.5, 0.68],
+    [PLACE_FOCUS_ZOOM, 0.9],
+    [ALL_MARKERS_RICH_ZOOM, 1],
+  ]);
+
   return {
     medium: smoothstep(PLACE_REVEAL_START, MEDIUM_VISUAL_END, zoom),
     detail: smoothstep(DETAIL_VISUAL_START, PLACE_FOCUS_ZOOM, zoom),
     rich: smoothstep(RICH_VISUAL_START, PLACE_FOCUS_ZOOM, zoom),
     ultra: smoothstep(PLACE_FOCUS_ZOOM, ALL_MARKERS_RICH_ZOOM, zoom),
+    childScale,
+    soloScale,
+    areaScale: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.38],
+      [OVERVIEW_ZOOM, 0.38],
+      [11.5, 0.52],
+      [AREA_FADE_END, 0.62],
+    ]),
+    activityScale: interpolateZoomAnchors(zoom, [
+      [ACTIVITY_CLUSTER_START, 0.58],
+      [ACTIVITY_CLUSTER_FULL, 0.75],
+      [DETAIL_CLUSTER_MAX_ZOOM, 0.84],
+      [PLACE_FOCUS_ZOOM, 0.9],
+    ]),
+    surfaceOpacity: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.74],
+      [OVERVIEW_ZOOM, 0.78],
+      [11.5, 0.86],
+      [12.5, 0.92],
+      [PLACE_FOCUS_ZOOM, 0.98],
+      [ALL_MARKERS_RICH_ZOOM, 1],
+    ]),
+    auraOpacity: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.3],
+      [OVERVIEW_ZOOM, 0.34],
+      [11.5, 0.42],
+      [12.5, 0.48],
+      [PLACE_FOCUS_ZOOM, 0.58],
+      [ALL_MARKERS_RICH_ZOOM, 0.6],
+    ]),
+    ringOpacity: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.68],
+      [OVERVIEW_ZOOM, 0.72],
+      [12.5, 0.86],
+      [PLACE_FOCUS_ZOOM, 0.96],
+      [ALL_MARKERS_RICH_ZOOM, 1],
+    ]),
   };
 }
 
@@ -646,28 +720,38 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   if (!node) return;
   const profile = markerZoomProfile(zoom);
   const farPulse = 1 - smoothstep(OVERVIEW_ZOOM, PLACE_FOCUS_ZOOM, zoom);
-  const childScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.35;
-  const nearbyScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.07 + profile.ultra * 0.28;
-  const soloScale = 0.32 + profile.medium * (nearbyScale - 0.32);
   node.style.setProperty("--hp-map-medium", profile.medium.toFixed(4));
   node.style.setProperty("--hp-map-detail", profile.detail.toFixed(4));
   node.style.setProperty("--hp-map-rich", profile.rich.toFixed(4));
   node.style.setProperty("--hp-map-ultra", profile.ultra.toFixed(4));
-  node.style.setProperty("--hp-map-child-scale", childScale.toFixed(4));
-  node.style.setProperty("--hp-map-nearby-scale", nearbyScale.toFixed(4));
-  node.style.setProperty("--hp-map-area-scale", (0.34 + profile.medium * 0.3).toFixed(4));
-  node.style.setProperty(
-    "--hp-map-activity-scale",
-    (0.46 + profile.medium * 0.2 + profile.detail * 0.24).toFixed(4),
-  );
+  node.style.setProperty("--hp-map-child-scale", profile.childScale.toFixed(4));
+  node.style.setProperty("--hp-map-nearby-scale", profile.childScale.toFixed(4));
+  node.style.setProperty("--hp-map-solo-scale", profile.soloScale.toFixed(4));
+  node.style.setProperty("--hp-map-area-scale", profile.areaScale.toFixed(4));
+  node.style.setProperty("--hp-map-activity-scale", profile.activityScale.toFixed(4));
+  node.style.setProperty("--hp-map-surface-opacity", profile.surfaceOpacity.toFixed(4));
+  node.style.setProperty("--hp-map-aura-opacity", profile.auraOpacity.toFixed(4));
+  node.style.setProperty("--hp-map-ring-opacity", profile.ringOpacity.toFixed(4));
   node.style.setProperty(
     "--hp-map-media-opacity",
-    (0.78 + profile.medium * 0.14 + profile.detail * 0.08).toFixed(4),
+    interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.82],
+      [11.5, 0.86],
+      [12.5, 0.92],
+      [PLACE_FOCUS_ZOOM, 0.98],
+      [ALL_MARKERS_RICH_ZOOM, 1],
+    ]).toFixed(4),
   );
-  node.style.setProperty("--hp-map-media-scale", (0.92 + profile.medium * 0.08).toFixed(4));
+  node.style.setProperty(
+    "--hp-map-media-scale",
+    interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.94],
+      [12.5, 0.97],
+      [PLACE_FOCUS_ZOOM, 1],
+    ]).toFixed(4),
+  );
   node.style.setProperty("--hp-map-rich-scale", (0.8 + profile.rich * 0.2).toFixed(4));
   node.style.setProperty("--hp-map-dot-opacity", (0.35 + profile.medium * 0.65).toFixed(4));
-  node.style.setProperty("--hp-map-solo-scale", soloScale.toFixed(4));
   node.style.setProperty("--hp-map-copy-offset", `${((1 - profile.rich) * 0.2).toFixed(4)}rem`);
   node.style.setProperty("--hp-map-pulse-moving-peak", (1.04 + farPulse * 0.08).toFixed(4));
   node.style.setProperty("--hp-map-pulse-hot-peak", (1.08 + farPulse * 0.14).toFixed(4));
@@ -1566,7 +1650,9 @@ export function SocialMap({
   };
 
   return (
-    <div className="hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper">
+    <div
+      className={`hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper ${selectedAreaId || selectedPlaceId ? "has-marker-selection" : ""}`}
+    >
       <div ref={mapNodeRef} className="h-full w-full" aria-label={t("Interactive map of Ilia")} />
 
       {!mapReady && (
