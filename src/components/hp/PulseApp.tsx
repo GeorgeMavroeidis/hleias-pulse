@@ -63,9 +63,12 @@ import {
   emptyPulseData,
   getMyBusinessStatus,
   getMyCulturalEvents,
+  getMyDealStats,
   getMyOrganizerStatus,
   getMyPlaceClaims,
   getPlaceBusinessProfile,
+  issueDealCode,
+  redeemDealCode,
   setPlaceDeal,
   updatePlaceBusinessProfile,
   updatePulseCulturalEvent,
@@ -117,8 +120,11 @@ import { CulturalEventsScreen } from "./CulturalEventsScreen";
 import { OrganizerEventComposer } from "./OrganizerEventComposer";
 import { OrganizerEventsSheet } from "./OrganizerEventsSheet";
 import { BusinessPlacesSheet } from "./BusinessPlacesSheet";
+import { DealCodeModal } from "./DealCodeModal";
 import type {
   BusinessStatus,
+  DealCode,
+  DealRedemptionStats,
   PlaceBusinessProfile,
   PlaceBusinessProfileFields,
   PlaceClaim,
@@ -2010,6 +2016,8 @@ function PlaceDetailModal({
   businessProfile,
   showClaimCta,
   onClaimPlace,
+  onGetDealCode,
+  gettingDealCode,
 }: {
   place: Place | null;
   events: PulseData["events"];
@@ -2030,6 +2038,8 @@ function PlaceDetailModal({
   businessProfile: PlaceBusinessProfile | null;
   showClaimCta: boolean;
   onClaimPlace: () => void;
+  onGetDealCode: () => void;
+  gettingDealCode: boolean;
 }) {
   const [commentText, setCommentText] = useState("");
   const { language, t } = useI18n();
@@ -2170,9 +2180,14 @@ function PlaceDetailModal({
                   <p className="mt-1.5 text-[14px] font-bold leading-snug text-hp-ink">
                     {businessProfile.dealText}
                   </p>
-                  <p className="mt-1.5 text-[11px] text-hp-muted">
-                    {t("Show this screen at the counter to redeem.")}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={onGetDealCode}
+                    disabled={gettingDealCode}
+                    className="mt-2.5 w-full rounded-full bg-hp-sunset py-2.5 text-[12px] font-bold text-hp-paper disabled:opacity-50"
+                  >
+                    {gettingDealCode ? t("Working...") : `🎟️ ${t("Get code")}`}
+                  </button>
                 </div>
               )}
 
@@ -4268,6 +4283,9 @@ export function PulseApp() {
   const [businessPlacesOpen, setBusinessPlacesOpen] = useState(false);
   const [openPlaceBusinessProfile, setOpenPlaceBusinessProfile] =
     useState<PlaceBusinessProfile | null>(null);
+  const [myDealStats, setMyDealStats] = useState<DealRedemptionStats[]>([]);
+  const [dealCodeModal, setDealCodeModal] = useState<DealCode | null>(null);
+  const [issuingDealCode, setIssuingDealCode] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   // Tourist-only "Must-see today" overlay on the Map tab. Starts open on every
   // page load (a "welcome" moment); the X dismisses it for the session only.
@@ -4494,9 +4512,15 @@ export function PulseApp() {
     const status = await getMyBusinessStatus().catch(() => null);
     setBusinessStatus(status);
     if (status?.verificationStatus === "verified") {
-      setMyPlaceClaims(await getMyPlaceClaims().catch(() => [] as PlaceClaim[]));
+      const [claims, stats] = await Promise.all([
+        getMyPlaceClaims().catch(() => [] as PlaceClaim[]),
+        getMyDealStats().catch(() => [] as DealRedemptionStats[]),
+      ]);
+      setMyPlaceClaims(claims);
+      setMyDealStats(stats);
     } else {
       setMyPlaceClaims([]);
+      setMyDealStats([]);
     }
     return status;
   };
@@ -4521,6 +4545,7 @@ export function PulseApp() {
         setMyCulturalEvents([]);
         setBusinessStatus(null);
         setMyPlaceClaims([]);
+        setMyDealStats([]);
       }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
@@ -4543,6 +4568,7 @@ export function PulseApp() {
       setMyCulturalEvents([]);
       setBusinessStatus(null);
       setMyPlaceClaims([]);
+      setMyDealStats([]);
       return fallback;
     }
   };
@@ -4682,16 +4708,24 @@ export function PulseApp() {
         const nextBusinessStatus = await getMyBusinessStatus().catch(() => null);
         if (!ignore) setBusinessStatus(nextBusinessStatus);
         if (nextBusinessStatus?.verificationStatus === "verified") {
-          const claims = await getMyPlaceClaims().catch(() => [] as PlaceClaim[]);
-          if (!ignore) setMyPlaceClaims(claims);
+          const [claims, stats] = await Promise.all([
+            getMyPlaceClaims().catch(() => [] as PlaceClaim[]),
+            getMyDealStats().catch(() => [] as DealRedemptionStats[]),
+          ]);
+          if (!ignore) {
+            setMyPlaceClaims(claims);
+            setMyDealStats(stats);
+          }
         } else if (!ignore) {
           setMyPlaceClaims([]);
+          setMyDealStats([]);
         }
       } else {
         setOrganizerStatus(null);
         setMyCulturalEvents([]);
         setBusinessStatus(null);
         setMyPlaceClaims([]);
+        setMyDealStats([]);
       }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
@@ -5278,6 +5312,29 @@ export function PulseApp() {
       }
     }
     showToast(t("Deal saved"));
+  };
+
+  // Stage B3: user taps "Get code" in the APP DEAL callout. Any session works
+  // (issueDealCode calls ensurePulseUserId first). A repeat tap for the same
+  // deal returns the existing live code.
+  const handleGetDealCode = async () => {
+    if (!openPlace || issuingDealCode) return;
+    setIssuingDealCode(true);
+    try {
+      setDealCodeModal(await issueDealCode(openPlace.id));
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t("Could not get a code."));
+    } finally {
+      setIssuingDealCode(false);
+    }
+  };
+
+  // Business side: redeem a code typed into "My places". Refreshes the counters
+  // on success; the sheet surfaces the failure inline.
+  const handleRedeemDealCode = async (code: string) => {
+    await redeemDealCode(code);
+    setMyDealStats(await getMyDealStats().catch(() => myDealStats));
+    showToast(t("Code redeemed"));
   };
 
   // PlaceDetailModal "Is this your business?" entry. Routes the user to the
@@ -5913,7 +5970,10 @@ export function PulseApp() {
           )
         }
         onClaimPlace={claimFromPlaceDetail}
+        onGetDealCode={handleGetDealCode}
+        gettingDealCode={issuingDealCode}
       />
+      <DealCodeModal code={dealCodeModal} onClose={() => setDealCodeModal(null)} />
       <PostDetailModal
         post={openPost}
         onClose={() => setOpenPost(null)}
@@ -6000,6 +6060,8 @@ export function PulseApp() {
         onSaveProfile={handleSavePlaceProfile}
         onUploadPhoto={uploadBusinessPhoto}
         onSaveDeal={handleSaveDeal}
+        dealStats={myDealStats}
+        onRedeemCode={handleRedeemDealCode}
       />
 
       <CulturalEventDetailModal

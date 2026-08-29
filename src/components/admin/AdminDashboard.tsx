@@ -40,6 +40,7 @@ import {
   type OrganizerVerificationStatus,
   type PlaceClaimStatus,
   clearPlaceDeal,
+  getClaimRedemptionCounts,
   createAdminBusiness,
   editAdminComment,
   editAdminPost,
@@ -1764,6 +1765,21 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
   const businessUserIds = new Set(data.businesses.map((business) => business.user_id));
   const [selectedId, setSelectedId] = useState("");
   const [adding, setAdding] = useState(false);
+  const [redemptionCounts, setRedemptionCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let ignore = false;
+    getClaimRedemptionCounts()
+      .then((counts) => {
+        if (!ignore) setRedemptionCounts(counts);
+      })
+      .catch(() => {
+        // read-only decoration -- a failure here just hides the counts
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [data.placeClaims]);
   const eligibleProfiles = data.profiles.filter(
     (profile) => profile.profile_completed_at && !businessUserIds.has(profile.id),
   );
@@ -1913,6 +1929,11 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
                           {!claim.deal_active && (
                             <span className="ml-1 font-normal text-slate-400">
                               ({t("inactive")})
+                            </span>
+                          )}
+                          {(redemptionCounts[claim.id] ?? 0) > 0 && (
+                            <span className="ml-2 font-normal text-slate-500">
+                              🎟️ {redemptionCounts[claim.id]} {t("redeemed")}
                             </span>
                           )}
                         </p>

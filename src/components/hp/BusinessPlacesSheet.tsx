@@ -1,9 +1,11 @@
 import { useMemo, useState, type ChangeEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Gift, Lock, Plus, Store, X } from "lucide-react";
+import { Gift, Lock, Plus, Store, Ticket, X } from "lucide-react";
 import type { Place } from "@/lib/hp-model";
 import {
+  DEAL_CODE_LENGTH,
   DEAL_TEXT_MAX_LENGTH,
+  type DealRedemptionStats,
   type PlaceBusinessProfileFields,
   type PlaceClaim,
 } from "@/lib/hp/business-types";
@@ -25,6 +27,9 @@ interface Props {
   // Deal write path (stage B2): works even on an APPROVED claim, unlike
   // onSaveProfile which is locked once the claim leaves 'pending'.
   onSaveDeal: (claimId: string, dealText: string | null, dealActive: boolean) => Promise<void>;
+  // Coupon redemptions (stage B3).
+  dealStats: DealRedemptionStats[];
+  onRedeemCode: (code: string) => Promise<void>;
 }
 
 // Same palette as the admin panel status badges.
@@ -68,6 +73,8 @@ export function BusinessPlacesSheet({
   onSaveProfile,
   onUploadPhoto,
   onSaveDeal,
+  dealStats,
+  onRedeemCode,
 }: Props) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -77,6 +84,54 @@ export function BusinessPlacesSheet({
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [dealDrafts, setDealDrafts] = useState<Record<string, DealDraft>>({});
+  const [codeDrafts, setCodeDrafts] = useState<Record<string, string>>({});
+  const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [redeemFeedback, setRedeemFeedback] = useState<
+    Record<string, { ok: boolean; text: string }>
+  >({});
+
+  const statsByClaim = useMemo(
+    () => new Map(dealStats.map((entry) => [entry.claimId, entry])),
+    [dealStats],
+  );
+
+  const redeem = async (claimId: string) => {
+    const code = (codeDrafts[claimId] ?? "").trim().toUpperCase();
+    if (code.length < DEAL_CODE_LENGTH) return;
+    setRedeemingId(claimId);
+    setRedeemFeedback((current) => {
+      const next = { ...current };
+      delete next[claimId];
+      return next;
+    });
+    try {
+      await onRedeemCode(code);
+      setCodeDrafts((current) => ({ ...current, [claimId]: "" }));
+      setRedeemFeedback((current) => ({
+        ...current,
+        [claimId]: { ok: true, text: t("Redeemed ✓") },
+      }));
+    } catch (redeemError) {
+      // The RPC's own message is "Code not found or already used"; any other
+      // failure (network, unverified) collapses to the same user-facing line.
+      const raw =
+        redeemError && typeof redeemError === "object" && "message" in redeemError
+          ? String((redeemError as { message: unknown }).message)
+          : "";
+      setRedeemFeedback((current) => ({
+        ...current,
+        [claimId]: {
+          ok: false,
+          text:
+            raw && raw !== "Code not found or already used"
+              ? raw
+              : t("Code not found or already used"),
+        },
+      }));
+    } finally {
+      setRedeemingId(null);
+    }
+  };
 
   const placeById = useMemo(() => new Map(places.map((place) => [place.id, place])), [places]);
   const unavailablePlaceIds = useMemo(
@@ -305,6 +360,64 @@ export function BusinessPlacesSheet({
                               >
                                 {savingDealId === entry.id ? t("Saving…") : t("Save deal")}
                               </button>
+                            </div>
+                          );
+                        })()}
+
+                      {entry.status === "approved" &&
+                        entry.dealText &&
+                        (() => {
+                          const stats = statsByClaim.get(entry.id);
+                          const feedback = redeemFeedback[entry.id];
+                          const draft = codeDrafts[entry.id] ?? "";
+                          return (
+                            <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
+                              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                                <Ticket size={12} /> {t("Verify a code")}
+                              </div>
+                              <div className="mt-1.5 flex gap-2">
+                                <input
+                                  value={draft}
+                                  onChange={(event) =>
+                                    setCodeDrafts((current) => ({
+                                      ...current,
+                                      [entry.id]: event.target.value
+                                        .toUpperCase()
+                                        .replace(/[^A-Z0-9]/g, "")
+                                        .slice(0, DEAL_CODE_LENGTH),
+                                    }))
+                                  }
+                                  maxLength={DEAL_CODE_LENGTH}
+                                  autoCapitalize="characters"
+                                  autoCorrect="off"
+                                  spellCheck={false}
+                                  placeholder={"".padEnd(DEAL_CODE_LENGTH, "X")}
+                                  className={`${fieldClass()} font-mono tracking-[0.3em]`}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => void redeem(entry.id)}
+                                  disabled={
+                                    redeemingId === entry.id || draft.length < DEAL_CODE_LENGTH
+                                  }
+                                  className="shrink-0 rounded-full bg-hp-ink px-3 py-2 text-[12px] font-bold text-hp-paper disabled:opacity-40"
+                                >
+                                  {redeemingId === entry.id ? t("Working...") : t("Redeem")}
+                                </button>
+                              </div>
+                              {feedback && (
+                                <p
+                                  className={`mt-1.5 text-[11px] font-semibold ${
+                                    feedback.ok ? "text-hp-olive" : "text-red-600"
+                                  }`}
+                                >
+                                  {feedback.text}
+                                </p>
+                              )}
+                              <p className="mt-2 text-[11px] font-semibold text-hp-muted">
+                                🎟️ {stats?.redeemedTotal ?? 0} {t("redemptions")} ·{" "}
+                                {stats?.issuedLive ?? 0} {t("pending")}
+                              </p>
                             </div>
                           );
                         })()}

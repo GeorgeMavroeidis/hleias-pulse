@@ -575,6 +575,23 @@ const EL: Record<string, string> = {
   "Deal cleared.": "Η προσφορά καθαρίστηκε.",
   "Could not clear the deal.": "Δεν ήταν δυνατός ο καθαρισμός της προσφοράς.",
   inactive: "ανενεργή",
+  redeemed: "εξαργυρώθηκαν",
+  // Trackable coupons (B3) — user side
+  "Get code": "Λάβε κωδικό",
+  "Your coupon code": "Ο κωδικός σου",
+  "Show this code at the counter.": "Δείξε αυτόν τον κωδικό στο ταμείο.",
+  Expires: "Λήγει",
+  Copy: "Αντιγραφή",
+  Copied: "Αντιγράφηκε",
+  "Could not get a code.": "Δεν ήταν δυνατή η λήψη κωδικού.",
+  "Code redeemed": "Ο κωδικός εξαργυρώθηκε",
+  // Trackable coupons (B3) — business side ("My places")
+  "Verify a code": "Επιβεβαίωση κωδικού",
+  Redeem: "Εξαργύρωση",
+  "Redeemed ✓": "Εξαργυρώθηκε ✓",
+  "Code not found or already used": "Ο κωδικός δεν βρέθηκε ή έχει ήδη χρησιμοποιηθεί",
+  redemptions: "εξαργυρώσεις",
+  pending: "σε εκκρεμότητα",
 };
 
 function interpolate(message: string, params?: TranslationParams) {
