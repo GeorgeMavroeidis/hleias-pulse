@@ -4,6 +4,10 @@ import Supercluster from "supercluster";
 import "leaflet/dist/leaflet.css";
 import { type EventItem, type Place } from "@/lib/hp-model";
 import { useImageUrls } from "@/lib/hp/image-cache";
+import {
+  SEA_SHIMMER_LATLNGS,
+  SEA_SHIMMER_MAX_ZOOM,
+} from "@/lib/hp/sea-shimmer";
 import { useI18n } from "@/lib/i18n";
 
 type LeafletModule = typeof import("leaflet");
@@ -746,6 +750,8 @@ export function SocialMap({
   const markerSigRef = useRef<Map<string, string>>(new Map());
   const userMarkerRef = useRef<LeafletMarker | null>(null);
   const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const seaLayerRef = useRef<import("leaflet").Polygon | null>(null);
+  const seaVisibleRef = useRef(false);
   const onMapLongPressRef = useRef(onMapLongPress);
   onMapLongPressRef.current = onMapLongPress;
   const didInitialFitRef = useRef(false);
@@ -1068,6 +1074,14 @@ export function SocialMap({
       guidePane.style.zIndex = "625";
       guidePane.style.pointerEvents = "none";
 
+      // Decorative animated sea shimmer: sits just above the tiles, below every
+      // marker/vector. Fades in/out via CSS as the zoom gate flips.
+      const seaPane = map.createPane("hp-sea-shimmer");
+      seaPane.style.zIndex = "250";
+      seaPane.style.pointerEvents = "none";
+      seaPane.style.opacity = "0";
+      seaPane.style.transition = "opacity 360ms ease";
+
       L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> · <a href="https://carto.com/attributions">CARTO</a>',
@@ -1186,6 +1200,8 @@ export function SocialMap({
       leafletRef.current = null;
       userMarkerRef.current = null;
       routeLayerRef.current = null;
+      seaLayerRef.current = null;
+      seaVisibleRef.current = false;
     };
   }, []);
 
@@ -1409,6 +1425,47 @@ export function SocialMap({
     });
   }, [clusters, isSplitZoom, mapReady, selectedAreaId, selectedPlaceId]);
 
+  // Decorative sea shimmer: only at overview zoom, and never while a specific
+  // place is focused (the crude polygon edge would show, and it is pointless
+  // perf-wise up close). The pane's CSS opacity transition does the fade; the
+  // layer itself is removed shortly after so Leaflet stops re-projecting it.
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!L || !map || !mapReady) return;
+
+    const shouldShow = zoom <= SEA_SHIMMER_MAX_ZOOM && !selectedPlaceId;
+    if (shouldShow === seaVisibleRef.current) return;
+    seaVisibleRef.current = shouldShow;
+
+    const pane = map.getPane("hp-sea-shimmer");
+
+    if (shouldShow) {
+      if (!seaLayerRef.current) {
+        seaLayerRef.current = L.polygon(SEA_SHIMMER_LATLNGS as LatLngTuple[][][], {
+          pane: "hp-sea-shimmer",
+          className: "hp-sea-shimmer",
+          interactive: false,
+          stroke: false,
+          fillOpacity: 1,
+        });
+      }
+      seaLayerRef.current.addTo(map);
+      window.requestAnimationFrame(() => {
+        if (seaVisibleRef.current && pane) pane.style.opacity = "1";
+      });
+      return;
+    }
+
+    if (pane) pane.style.opacity = "0";
+    const layer = seaLayerRef.current;
+    if (layer) {
+      window.setTimeout(() => {
+        if (!seaVisibleRef.current) layer.remove();
+      }, 400);
+    }
+  }, [mapReady, zoom, selectedPlaceId]);
+
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
@@ -1480,6 +1537,33 @@ export function SocialMap({
   return (
     <div className="hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper">
       <div ref={mapNodeRef} className="h-full w-full" aria-label={t("Interactive map of Ilia")} />
+
+      {/* Paint server for the decorative sea shimmer. Referenced from the
+          Leaflet polygon via `fill: url(#hp-waves)` in styles.css. Purely
+          aesthetic — carries no real sea/weather data. */}
+      <svg
+        aria-hidden="true"
+        focusable="false"
+        width="0"
+        height="0"
+        className="pointer-events-none absolute"
+      >
+        <defs>
+          <pattern id="hp-waves" width="28" height="20" patternUnits="userSpaceOnUse">
+            <rect className="hp-sea-shimmer__tint" width="28" height="20" />
+            <g className="hp-sea-shimmer__waves" fill="none" strokeLinecap="round">
+              <path
+                className="hp-sea-shimmer__wave-a"
+                d="M-28 7 Q-21 2 -14 7 T0 7 T14 7 T28 7 T42 7 T56 7"
+              />
+              <path
+                className="hp-sea-shimmer__wave-b"
+                d="M-28 14 Q-21 10 -14 14 T0 14 T14 14 T28 14 T42 14 T56 14"
+              />
+            </g>
+          </pattern>
+        </defs>
+      </svg>
 
       {!mapReady && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-hp-paper/70">

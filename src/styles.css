@@ -945,6 +945,38 @@ select:focus-visible {
     stroke-dashoffset: -24;
   }
 }
+
+/* Map: decorative animated sea shimmer (purely aesthetic — NOT real sea state).
+   The polygon is filled with an SVG <pattern> of drifting wavy lines. */
+.hp-real-map .hp-sea-shimmer {
+  fill: url(#hp-waves);
+  fill-opacity: 1;
+}
+.hp-sea-shimmer__tint {
+  fill: var(--hp-sea);
+  fill-opacity: 0.12;
+}
+.hp-sea-shimmer__waves {
+  stroke: var(--hp-sea);
+  animation: hp-sea-drift 7s linear infinite;
+}
+.hp-sea-shimmer__wave-a {
+  stroke-width: 1.4;
+  stroke-opacity: 0.5;
+}
+.hp-sea-shimmer__wave-b {
+  stroke-width: 1.1;
+  stroke-opacity: 0.3;
+}
+@keyframes hp-sea-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-28px);
+  }
+}
+
 .hp-real-map .hp-route-stop {
   display: grid;
   width: 28px;
@@ -1084,6 +1116,7 @@ h3 {
   .hp-marker-glow,
   .hp-user-dot::after,
   .hp-real-map .hp-route-line,
+  .hp-sea-shimmer__waves,
   .hp-pin-target,
   .hp-shimmer::after {
     animation: none;
