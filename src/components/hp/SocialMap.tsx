@@ -521,6 +521,14 @@ function escapeHtml(value: string) {
 // reads as a calm placeholder rather than a broken image.
 const PLACEHOLDER_IMG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=";
+const MARKER_EFFECTS_VERSION = "2";
+const MARKER_EFFECTS_HTML = `
+  <span class="hp-marker-effects" data-effects-version="${MARKER_EFFECTS_VERSION}">
+    <span class="hp-marker-field"></span>
+    <span class="hp-marker-wave"></span>
+    <span class="hp-marker-sweep"></span>
+  </span>
+`;
 
 function resolveUrl(resolve: (url: string) => string, url: string) {
   const value = url ? resolve(url) : "";
@@ -557,17 +565,19 @@ function createAreaIcon(
         class="hp-area-marker__shell is-pulse-${cluster.status} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, cluster.id)}"
       >
-        <span class="hp-marker-aura"></span>
-        <span class="hp-area-marker__ring"></span>
-        <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
-        <span class="hp-area-marker__shade"></span>
-        ${statusLabel ? `<span class="hp-area-marker__status">${escapeHtml(statusLabel)}</span>` : ""}
-        <span class="hp-area-marker__copy">
-          <strong>${escapeHtml(cluster.name)}</strong>
-          <em>${escapeHtml(cluster.activityLine)}</em>
+        ${MARKER_EFFECTS_HTML}
+        <span class="hp-marker-core">
+          <span class="hp-area-marker__ring"></span>
+          <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
+          <span class="hp-area-marker__shade"></span>
+          ${statusLabel ? `<span class="hp-area-marker__status">${escapeHtml(statusLabel)}</span>` : ""}
+          <span class="hp-area-marker__copy">
+            <strong>${escapeHtml(cluster.name)}</strong>
+            <em>${escapeHtml(cluster.activityLine)}</em>
+          </span>
+          ${avatars ? `<span class="hp-area-marker__avatars">${avatars}</span>` : ""}
+          ${cluster.status !== "quiet" ? '<span class="hp-area-marker__dot"></span>' : ""}
         </span>
-        ${avatars ? `<span class="hp-area-marker__avatars">${avatars}</span>` : ""}
-        ${cluster.status !== "quiet" ? '<span class="hp-area-marker__dot"></span>' : ""}
       </div>
     `,
     // A stable one-pixel Leaflet anchor lets CSS scale the visual around the
@@ -606,22 +616,24 @@ function createChildIcon(
         class="hp-child-marker__shell is-pulse-${tier} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${tier === "live" ? "is-live" : ""} ${tier === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, place.id)}"
       >
-        <span class="hp-marker-aura"></span>
-        ${hasStories ? '<span class="hp-child-marker__story-ring"></span>' : ""}
-        <span class="hp-child-marker__ring"></span>
-        <span class="hp-child-marker__media">
-          <img class="hp-child-marker__image" src="${escapeHtml(
-            resolveUrl(resolve, place.imageUrl),
-          )}" alt="" loading="lazy" />
-          <span class="hp-child-marker__shade"></span>
-          <span class="hp-child-marker__copy">
-            <strong>${escapeHtml(shortPlaceName(place.name))}</strong>
-            <em>${escapeHtml(line)}</em>
+        ${MARKER_EFFECTS_HTML}
+        <span class="hp-marker-core">
+          ${hasStories ? '<span class="hp-child-marker__story-ring"></span>' : ""}
+          <span class="hp-child-marker__ring"></span>
+          <span class="hp-child-marker__media">
+            <img class="hp-child-marker__image" src="${escapeHtml(
+              resolveUrl(resolve, place.imageUrl),
+            )}" alt="" loading="lazy" />
+            <span class="hp-child-marker__shade"></span>
+            <span class="hp-child-marker__copy">
+              <strong>${escapeHtml(shortPlaceName(place.name))}</strong>
+              <em>${escapeHtml(line)}</em>
+            </span>
+            ${place.recentPostCount > 0 ? '<span class="hp-child-marker__dot"></span>' : ""}
           </span>
-          ${place.recentPostCount > 0 ? '<span class="hp-child-marker__dot"></span>' : ""}
+          ${statusLabel ? `<span class="hp-child-marker__status">${statusLabel}</span>` : ""}
+          ${avatars ? `<span class="hp-child-marker__avatars">${avatars}</span>` : ""}
         </span>
-        ${statusLabel ? `<span class="hp-child-marker__status">${statusLabel}</span>` : ""}
-        ${avatars ? `<span class="hp-child-marker__avatars">${avatars}</span>` : ""}
       </div>
     `,
     iconSize: [1, 1],
@@ -658,13 +670,15 @@ function createActivityClusterIcon(
         class="hp-area-marker__shell hp-area-marker__shell--activity is-pulse-${node.tier} ${node.tier === "live" ? "is-live" : ""} ${node.tier === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, node.id)}"
       >
-        <span class="hp-marker-aura"></span>
-        <span class="hp-area-marker__ring"></span>
-        <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
-        <span class="hp-area-marker__shade"></span>
-        <span class="hp-area-marker__copy">
-          <strong>${escapeHtml(node.dominantCluster.name)}</strong>
-          <em>${escapeHtml(line)}</em>
+        ${MARKER_EFFECTS_HTML}
+        <span class="hp-marker-core">
+          <span class="hp-area-marker__ring"></span>
+          <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
+          <span class="hp-area-marker__shade"></span>
+          <span class="hp-area-marker__copy">
+            <strong>${escapeHtml(node.dominantCluster.name)}</strong>
+            <em>${escapeHtml(line)}</em>
+          </span>
         </span>
       </div>
     `,
@@ -779,6 +793,8 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   if (!node) return;
   const profile = markerZoomProfile(zoom);
   const farPulse = 1 - smoothstep(OVERVIEW_ZOOM, PLACE_FOCUS_ZOOM, zoom);
+  const themeDetail = smoothstep(10.5, RICH_VISUAL_START, zoom);
+  node.classList.toggle("hp-map-identity-far", zoom < 10.5);
   node.style.setProperty("--hp-map-medium", profile.medium.toFixed(4));
   node.style.setProperty("--hp-map-detail", profile.detail.toFixed(4));
   node.style.setProperty("--hp-map-rich", profile.rich.toFixed(4));
@@ -815,6 +831,9 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   node.style.setProperty("--hp-map-pulse-moving-peak", (1.04 + farPulse * 0.08).toFixed(4));
   node.style.setProperty("--hp-map-pulse-hot-peak", (1.08 + farPulse * 0.14).toFixed(4));
   node.style.setProperty("--hp-map-pulse-live-peak", (1.12 + farPulse * 0.18).toFixed(4));
+  node.style.setProperty("--hp-map-theme-detail", themeDetail.toFixed(4));
+  node.style.setProperty("--hp-map-effect-opacity", (0.58 + themeDetail * 0.42).toFixed(4));
+  node.style.setProperty("--hp-map-secondary-opacity", themeDetail.toFixed(4));
 }
 
 function centroidOfPlaces(places: Place[], fallback: LatLngTuple): LatLngTuple {
@@ -1389,6 +1408,8 @@ export function SocialMap({
     let cancelled = false;
     let map: LeafletMap | null = null;
     let zoomFrame: number | null = null;
+    let effectsResumeFrame: number | null = null;
+    const activeMapMotion = new Set<"move" | "zoom">();
     const cleanupFns: Array<() => void> = [];
     const markers = markersRef.current;
     const markerSigs = markerSigRef.current;
@@ -1538,6 +1559,53 @@ export function SocialMap({
         });
       };
       map.on("zoom zoomend", syncZoom);
+      const pauseMarkerEffects = (kind: "move" | "zoom") => {
+        activeMapMotion.add(kind);
+        if (effectsResumeFrame !== null) {
+          window.cancelAnimationFrame(effectsResumeFrame);
+          effectsResumeFrame = null;
+        }
+        mapNodeRef.current?.classList.add("hp-map-is-moving");
+      };
+      const syncMarkerViewportMotion = () => {
+        if (!map) return;
+        const motionBounds = map.getBounds().pad(0.15);
+        markerRuntimes.forEach((runtime, id) => {
+          const markerElement = markers.get(id)?.getElement();
+          const markerShell = markerElement?.firstElementChild as HTMLElement | null;
+          markerShell?.style.setProperty(
+            "--hp-marker-motion-state",
+            runtime.opacity > 0.08 && motionBounds.contains([runtime.lat, runtime.lng])
+              ? "running"
+              : "paused",
+          );
+        });
+      };
+      const resumeMarkerEffects = (kind: "move" | "zoom") => {
+        activeMapMotion.delete(kind);
+        if (activeMapMotion.size > 0) return;
+        effectsResumeFrame = window.requestAnimationFrame(() => {
+          effectsResumeFrame = null;
+          mapNodeRef.current?.classList.remove("hp-map-is-moving");
+        });
+      };
+      const onMoveStart = () => pauseMarkerEffects("move");
+      const onZoomStart = () => pauseMarkerEffects("zoom");
+      const onMoveEnd = () => {
+        syncMarkerViewportMotion();
+        resumeMarkerEffects("move");
+      };
+      const onZoomEnd = () => resumeMarkerEffects("zoom");
+      map.on("movestart", onMoveStart);
+      map.on("zoomstart", onZoomStart);
+      map.on("moveend", onMoveEnd);
+      map.on("zoomend", onZoomEnd);
+      cleanupFns.push(() => {
+        map?.off("movestart", onMoveStart);
+        map?.off("zoomstart", onZoomStart);
+        map?.off("moveend", onMoveEnd);
+        map?.off("zoomend", onZoomEnd);
+      });
       map.whenReady(() => {
         if (cancelled || !map) return;
         mapRef.current = map;
@@ -1554,6 +1622,9 @@ export function SocialMap({
       cancelled = true;
       if (zoomFrame !== null) {
         window.cancelAnimationFrame(zoomFrame);
+      }
+      if (effectsResumeFrame !== null) {
+        window.cancelAnimationFrame(effectsResumeFrame);
       }
       cleanupFns.forEach((cleanup) => cleanup());
       setMapReady(false);
@@ -1583,6 +1654,12 @@ export function SocialMap({
     const L = leafletRef.current;
     const map = mapRef.current;
     if (!L || !map || !mapReady) return;
+
+    const visibleRenderNodeCount = renderNodes.reduce(
+      (count, node) => count + (node.opacity > 0.08 ? 1 : 0),
+      0,
+    );
+    mapNodeRef.current?.classList.toggle("hp-marker-density-high", visibleRenderNodeCount > 36);
 
     const nodeIds = new Set(renderNodes.map((node) => node.id));
     markersRef.current.forEach((marker, id) => {
@@ -1628,6 +1705,7 @@ export function SocialMap({
                 .map((url) => resolveImg(url))
                 .join(",");
       const sig = [
+        `effects-${MARKER_EFFECTS_VERSION}`,
         node.kind,
         node.kind === "cluster"
           ? `${node.cluster.id}:${node.cluster.status}:${imageToken}`
@@ -1707,7 +1785,9 @@ export function SocialMap({
           markerShell?.classList.toggle("is-selected", node.selected);
           markerShell?.style.setProperty(
             "--hp-marker-motion-state",
-            visuallyVisible && !document.hidden ? "running" : "paused",
+            visuallyVisible && !document.hidden && map.getBounds().pad(0.15).contains(node.latLng)
+              ? "running"
+              : "paused",
           );
         }
 
