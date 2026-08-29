@@ -519,7 +519,10 @@ function TopBar({
                       data-theme-preview={theme.id}
                     >
                       <span className="hp-animation-theme-preview" aria-hidden="true">
-                        <span />
+                        <span className="hp-animation-theme-preview__field" />
+                        <span className="hp-animation-theme-preview__wave" />
+                        <span className="hp-animation-theme-preview__sweep" />
+                        <span className="hp-animation-theme-preview__core" />
                       </span>
                       <span className="hp-animation-theme-copy">
                         <strong>{theme.label}</strong>
