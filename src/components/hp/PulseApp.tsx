@@ -38,6 +38,7 @@ import {
   Globe,
   UtensilsCrossed,
   BadgeCheck,
+  Gift,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -117,6 +118,7 @@ import { LiveTicker } from "./LiveTicker";
 import { TrendingHero } from "./TrendingHero";
 import { MeetScreen } from "./MeetScreen";
 import { CulturalEventsScreen } from "./CulturalEventsScreen";
+import { DealsScreen } from "./DealsScreen";
 import { OrganizerEventComposer } from "./OrganizerEventComposer";
 import { OrganizerEventsSheet } from "./OrganizerEventsSheet";
 import { BusinessPlacesSheet } from "./BusinessPlacesSheet";
@@ -149,8 +151,8 @@ import {
   type OrganizerStatus,
 } from "@/lib/hp/cultural-events-types";
 
-type Tab = "map" | "pulse" | "routes" | "meet" | "saved";
-type NavTab = Exclude<Tab, "saved">;
+type Tab = "map" | "pulse" | "routes" | "meet" | "saved" | "deals";
+type NavTab = Exclude<Tab, "saved" | "deals">;
 type MeetSubTab = "community" | "events";
 type ComposerMode = "post" | "place" | "story" | "event";
 type CreateStoryInput = {
@@ -197,7 +199,8 @@ const isTab = (value: string | null): value is Tab =>
   value === "pulse" ||
   value === "routes" ||
   value === "meet" ||
-  value === "saved";
+  value === "saved" ||
+  value === "deals";
 
 const truncateShareText = (text: string) =>
   text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;
@@ -352,6 +355,7 @@ interface TopBarProps {
   account: PulseAccountState;
   onOpenAccount: () => void;
   onOpenAuth: () => void;
+  onOpenDeals: () => void;
 }
 
 function TopBar({
@@ -363,6 +367,7 @@ function TopBar({
   account,
   onOpenAccount,
   onOpenAuth,
+  onOpenDeals,
 }: TopBarProps) {
   const { language, t } = useI18n();
   return (
@@ -383,6 +388,15 @@ function TopBar({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenDeals}
+            className="inline-flex items-center gap-1 rounded-full border border-hp-sunset/30 bg-hp-sunset/10 px-2.5 py-1.5 text-[11px] font-bold text-hp-sunset"
+            aria-label={t("Open deals")}
+          >
+            <Gift size={13} strokeWidth={2.6} />
+            {t("Deals")}
+          </button>
           <button
             type="button"
             onClick={() => setShowSearch((s) => !s)}
@@ -4302,6 +4316,7 @@ export function PulseApp() {
   const places = pulseData.places;
   const posts = pulseData.posts;
   const events = pulseData.events;
+  const deals = pulseData.deals;
   const culturalEvents = pulseData.culturalEvents;
   const routes = pulseData.routes;
   const stories = pulseData.stories;
@@ -5306,6 +5321,16 @@ export function PulseApp() {
         dealPlaceIds: showsDeal
           ? Array.from(new Set([...data.dealPlaceIds, claim.placeId]))
           : data.dealPlaceIds.filter((id) => id !== claim.placeId),
+        deals: showsDeal
+          ? [
+              ...data.deals.filter((deal) => deal.placeId !== claim.placeId),
+              {
+                placeId: claim.placeId,
+                dealText: dealText as string,
+                businessName: businessStatus?.displayName ?? "",
+              },
+            ]
+          : data.deals.filter((deal) => deal.placeId !== claim.placeId),
       }));
       if (openPlace?.id === claim.placeId) {
         setOpenPlaceBusinessProfile((prev) => (prev ? { ...prev, dealText, dealActive } : prev));
@@ -5857,6 +5882,10 @@ export function PulseApp() {
       );
     }
 
+    if (tab === "deals") {
+      return <DealsScreen deals={deals} places={places} onOpenPlace={setOpenPlace} />;
+    }
+
     return (
       <div className="h-full overflow-y-auto">
         <SavedScreen
@@ -5896,6 +5925,7 @@ export function PulseApp() {
           account={account}
           onOpenAccount={() => setProfileOpen(true)}
           onOpenAuth={() => setAuthOpen(true)}
+          onOpenDeals={() => setTab("deals")}
         />
         <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
 

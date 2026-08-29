@@ -242,6 +242,13 @@ interface PulseBootstrapPayload {
   vibe_chips: VibeChipRow[];
   claimed_place_ids: string[];
   deal_place_ids: string[];
+  deals: PulseDealRow[];
+}
+
+interface PulseDealRow {
+  place_id: string;
+  deal_text: string;
+  business_name: string;
 }
 
 const COMMENT_RETURN_COLUMNS =
@@ -282,10 +289,19 @@ export interface PulseData {
   vibeChips: string[];
   claimedPlaceIds: string[];
   dealPlaceIds: string[];
+  deals: PulseDeal[];
   placeComments: Record<string, Comment[]>;
   routeComments: Record<string, Comment[]>;
   culturalEventComments: Record<string, Comment[]>;
   source: "supabase";
+}
+
+// One active static deal, denormalised for the browsable Deals screen. The
+// place name / area / image live in PulseData.places (looked up by placeId).
+export interface PulseDeal {
+  placeId: string;
+  dealText: string;
+  businessName: string;
 }
 
 export interface PulseProfileSummary {
@@ -379,6 +395,7 @@ export const emptyPulseData: PulseData = {
   vibeChips: [],
   claimedPlaceIds: [],
   dealPlaceIds: [],
+  deals: [],
   placeComments: {},
   routeComments: {},
   culturalEventComments: {},
@@ -871,6 +888,7 @@ async function fetchPulseData(): Promise<PulseData> {
     vibe_chips: [],
     claimed_place_ids: [],
     deal_place_ids: [],
+    deals: [],
   }) as unknown as PulseBootstrapPayload;
 
   const commentRows = data.comments ?? [];
@@ -903,6 +921,13 @@ async function fetchPulseData(): Promise<PulseData> {
     vibeChips: (data.vibe_chips ?? []).map((chip) => chip.label),
     claimedPlaceIds: Array.isArray(data.claimed_place_ids) ? data.claimed_place_ids : [],
     dealPlaceIds: Array.isArray(data.deal_place_ids) ? data.deal_place_ids : [],
+    deals: Array.isArray(data.deals)
+      ? data.deals.map((deal) => ({
+          placeId: deal.place_id,
+          dealText: deal.deal_text,
+          businessName: deal.business_name,
+        }))
+      : [],
     placeComments: commentsByPlace,
     routeComments: commentsByRoute,
     culturalEventComments: commentsByCulturalEvent,

@@ -592,6 +592,14 @@ const EL: Record<string, string> = {
   "Code not found or already used": "Ο κωδικός δεν βρέθηκε ή έχει ήδη χρησιμοποιηθεί",
   redemptions: "εξαργυρώσεις",
   pending: "σε εκκρεμότητα",
+  // Discovery layer — browsable Deals screen
+  Deals: "Προσφορές",
+  "Open deals": "Άνοιγμα προσφορών",
+  "Active offers from local businesses.": "Ενεργές προσφορές από τοπικές επιχειρήσεις.",
+  "No active deals": "Δεν υπάρχουν ενεργές προσφορές",
+  "Check back soon — local businesses add deals here.":
+    "Έλεγξε ξανά σύντομα — οι τοπικές επιχειρήσεις προσθέτουν προσφορές εδώ.",
+  "Open deal at {place}": "Άνοιγμα προσφοράς στο {place}",
 };
 
 function interpolate(message: string, params?: TranslationParams) {
