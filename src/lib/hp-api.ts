@@ -20,6 +20,8 @@ import {
   DEAL_TEXT_MAX_LENGTH,
   type BusinessStatus,
   type BusinessVerificationStatus,
+  type DealCode,
+  type DealRedemptionStats,
   type PlaceBusinessProfile,
   type PlaceBusinessProfileFields,
   type PlaceClaim,
@@ -1469,6 +1471,82 @@ export async function setPlaceDeal(
     deal_active: dealActive,
   });
   if (result.error) throw result.error;
+}
+
+// ---- Trackable coupons (stage B3) -----------------------------------------
+
+// Take a coupon code for the active deal at a place. Any signed-in session
+// (anonymous included) can call it; ensurePulseUserId() guarantees one. A
+// repeat call for the same deal returns the caller's existing live code.
+export async function issueDealCode(placeId: string): Promise<DealCode> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+  const result = await client.rpc("issue_deal_code", { target_place_id: placeId });
+  if (result.error) throw result.error;
+  const row = (result.data ?? {}) as {
+    code?: string;
+    expires_at?: string;
+    deal_text?: string;
+  };
+  return {
+    code: row.code ?? "",
+    expiresAt: row.expires_at ?? "",
+    dealText: row.deal_text ?? "",
+  };
+}
+
+// Business-only: mark a code redeemed. Throws "Code not found or already used"
+// for an unknown / expired / other-business / already-redeemed code.
+export async function redeemDealCode(
+  code: string,
+): Promise<{ dealText: string; issuedAt: string }> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+  const result = await client.rpc("redeem_deal_code", { code: code.trim().toUpperCase() });
+  if (result.error) throw result.error;
+  const row = (result.data ?? {}) as { deal_text?: string; issued_at?: string };
+  return { dealText: row.deal_text ?? "", issuedAt: row.issued_at ?? "" };
+}
+
+// Per-claim redemption tallies for the owning business. RLS "Business can read
+// redemptions for its claims" scopes the rows; aggregation is done here.
+export async function getMyDealStats(): Promise<DealRedemptionStats[]> {
+  const client = assertSupabase();
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  if (!sessionResult.data.session?.user.id) return [];
+
+  const result = await client
+    .from("deal_redemptions")
+    .select("profile_claim_id,status,redeemed_at,expires_at");
+  if (result.error) throw result.error;
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const now = Date.now();
+
+  const byClaim = new Map<string, DealRedemptionStats>();
+  for (const row of result.data ?? []) {
+    const stats =
+      byClaim.get(row.profile_claim_id) ??
+      ({
+        claimId: row.profile_claim_id,
+        redeemedTotal: 0,
+        redeemedThisMonth: 0,
+        issuedLive: 0,
+      } satisfies DealRedemptionStats);
+    if (row.status === "redeemed") {
+      stats.redeemedTotal += 1;
+      if (row.redeemed_at && new Date(row.redeemed_at) >= monthStart) {
+        stats.redeemedThisMonth += 1;
+      }
+    } else if (row.status === "issued" && new Date(row.expires_at).getTime() > now) {
+      stats.issuedLive += 1;
+    }
+    byClaim.set(row.profile_claim_id, stats);
+  }
+  return [...byClaim.values()];
 }
 
 export async function uploadBusinessPhoto(file: File): Promise<string> {

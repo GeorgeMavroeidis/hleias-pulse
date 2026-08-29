@@ -54,5 +54,21 @@ export interface PlaceBusinessProfile extends PlaceBusinessProfileFields, PlaceD
   businessName: string;
 }
 
+/** A coupon code issued for one use of a deal (stage B3). */
+export interface DealCode {
+  code: string;
+  expiresAt: string;
+  dealText: string;
+}
+
+/** Per-claim redemption tallies shown to the owning business (stage B3). */
+export interface DealRedemptionStats {
+  claimId: string;
+  redeemedTotal: number;
+  redeemedThisMonth: number;
+  issuedLive: number;
+}
+
 export const DEFAULT_BUSINESS_BIO = "Local business in Ilia.";
 export const DEAL_TEXT_MAX_LENGTH = 140;
+export const DEAL_CODE_LENGTH = 6;

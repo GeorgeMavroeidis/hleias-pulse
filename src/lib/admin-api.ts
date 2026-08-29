@@ -264,6 +264,21 @@ export async function clearPlaceDeal(claimId: string) {
   if (result.error) throw result.error;
 }
 
+// Redeemed-coupon count per claim (stage B3), for the "Place claims" list. RLS
+// "Admins can read all deal redemptions" scopes this for owner/editor/moderator.
+export async function getClaimRedemptionCounts(): Promise<Record<string, number>> {
+  const result = await supabase
+    .from("deal_redemptions")
+    .select("profile_claim_id")
+    .eq("status", "redeemed");
+  if (result.error) throw result.error;
+  const counts: Record<string, number> = {};
+  for (const row of result.data ?? []) {
+    counts[row.profile_claim_id] = (counts[row.profile_claim_id] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function saveAdminRoute(route: Database["public"]["Tables"]["routes"]["Insert"]) {
   const result = await supabase.from("routes").upsert(route).select("*").single();
   if (result.error) throw result.error;

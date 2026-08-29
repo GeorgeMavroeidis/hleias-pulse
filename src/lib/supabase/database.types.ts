@@ -380,6 +380,70 @@ export type Database = {
           },
         ];
       };
+      deal_redemptions: {
+        Row: {
+          business_id: string;
+          code: string;
+          expires_at: string;
+          id: string;
+          issued_at: string;
+          place_id: string;
+          profile_claim_id: string;
+          redeemed_at: string | null;
+          redeemed_by: string | null;
+          status: string;
+          user_id: string | null;
+        };
+        Insert: {
+          business_id: string;
+          code: string;
+          expires_at?: string;
+          id?: string;
+          issued_at?: string;
+          place_id: string;
+          profile_claim_id: string;
+          redeemed_at?: string | null;
+          redeemed_by?: string | null;
+          status?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          business_id?: string;
+          code?: string;
+          expires_at?: string;
+          id?: string;
+          issued_at?: string;
+          place_id?: string;
+          profile_claim_id?: string;
+          redeemed_at?: string | null;
+          redeemed_by?: string | null;
+          status?: string;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "deal_redemptions_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deal_redemptions_place_id_fkey";
+            columns: ["place_id"];
+            isOneToOne: false;
+            referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deal_redemptions_profile_claim_id_fkey";
+            columns: ["profile_claim_id"];
+            isOneToOne: false;
+            referencedRelation: "place_business_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       event_rsvps: {
         Row: {
           created_at: string;
@@ -1340,6 +1404,8 @@ export type Database = {
       current_business_id: { Args: never; Returns: string | null };
       current_organizer_id: { Args: never; Returns: string | null };
       get_pulse_bootstrap: { Args: never; Returns: Json };
+      issue_deal_code: { Args: { target_place_id: string }; Returns: Json };
+      redeem_deal_code: { Args: { code: string }; Returns: Json };
       moderate_content: {
         Args: { next_status: string; target_id: string; target_type: string };
         Returns: undefined;
