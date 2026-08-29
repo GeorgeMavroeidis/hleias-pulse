@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   Search,
   Map as MapIcon,
@@ -136,6 +136,17 @@ const TAB_ITEMS: { id: NavTab; label: string; Icon: LucideIcon }[] = [
   { id: "routes", label: "Routes", Icon: RouteIcon },
   { id: "meet", label: "Meet", Icon: CalendarHeart },
 ];
+const HP_EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const HP_EASE_STANDARD: [number, number, number, number] = [0.2, 0.8, 0.2, 1];
+const HP_TRANSITION = {
+  press: { duration: 0.08, ease: HP_EASE_STANDARD },
+  micro: { duration: 0.12, ease: HP_EASE_STANDARD },
+  state: { duration: 0.16, ease: HP_EASE_STANDARD },
+  panel: { duration: 0.24, ease: HP_EASE_OUT },
+  spatial: { duration: 0.32, ease: HP_EASE_OUT },
+  tab: { duration: 0.18, ease: HP_EASE_OUT },
+  sheetContent: { duration: 0.19, ease: HP_EASE_OUT },
+} as const;
 type ShareTarget = {
   type: "app" | "place" | "post" | "route" | "story";
   id?: string;
@@ -323,9 +334,10 @@ function TopBar({
   onOpenAuth,
 }: TopBarProps) {
   const { language, t } = useI18n();
+  const searchActive = showSearch || query.trim().length > 0;
   return (
-    <div className="relative z-30 border-b border-hp-ink/10 bg-hp-paper/95 backdrop-blur">
-      <div className="flex items-center justify-between px-4 pt-2.5">
+    <div className="relative z-30 border-b border-hp-ink/10 bg-hp-paper/95">
+      <div className="hp-safe-px flex items-center justify-between pt-2.5">
         <div className="flex items-center gap-2.5" aria-label="ΗΛΕΙΑ PULSE">
           <img
             src="/brand/ilia-pulse-logo.png"
@@ -344,16 +356,17 @@ function TopBar({
           <button
             type="button"
             onClick={() => setShowSearch((s) => !s)}
-            className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+            className={`hp-icon-button hp-topbar-search h-9 w-9 ${searchActive ? "is-active" : ""} ${query.trim() ? "has-query" : ""}`}
             aria-label={t(showSearch ? "Close search" : "Open search")}
             aria-expanded={showSearch}
+            aria-pressed={searchActive}
           >
-            <Search size={16} />
+            <Search size={16} strokeWidth={2.2} />
           </button>
           <button
             type="button"
             onClick={onToggleLanguage}
-            className="rounded-full border border-hp-ink/10 px-2.5 py-1.5 text-[11px] font-bold tracking-wider text-hp-ink/80"
+            className="hp-chip hp-language-chip text-[11px] tracking-wider"
             aria-label={t("Toggle language")}
           >
             {language === "GR" ? "GR / en" : "gr / EN"}
@@ -361,7 +374,7 @@ function TopBar({
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
-      <div className="px-4 pb-1.5 pt-0.5">
+      <div className="hp-safe-px pb-1.5 pt-0.5">
         <p className="text-[12px] text-hp-muted">{t("Local spots, routes, and tips.")}</p>
       </div>
       <AnimatePresence>
@@ -370,9 +383,10 @@ function TopBar({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden px-4"
+            transition={HP_TRANSITION.state}
+            className="hp-safe-px overflow-hidden"
           >
-            <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
+            <div className="hp-search-field mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 px-3 py-2">
               <Search size={14} className="text-hp-muted" />
               <input
                 name="hp-search"
@@ -406,25 +420,19 @@ function VibeChips({
   setActive: (v: string | null) => void;
 }) {
   return (
-    <div className="hp-no-scrollbar flex gap-2 overflow-x-auto border-b border-hp-ink/10 bg-hp-paper px-4 py-2">
+    <div className="hp-no-scrollbar hp-safe-px flex gap-2 overflow-x-auto border-b border-hp-ink/10 bg-hp-paper py-2">
       {chips.map((c) => {
         const on = active === c;
         return (
-          <motion.button
+          <button
             key={c}
             type="button"
             onClick={() => setActive(on ? null : c)}
             aria-pressed={on}
-            whileTap={{ scale: 0.94 }}
-            animate={{ scale: on ? 1.03 : 1 }}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold transition ${
-              on
-                ? "bg-hp-ink text-hp-paper shadow-sm"
-                : "border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
-            }`}
+            className={`hp-chip shrink-0 text-[12px] ${on ? "is-active" : ""}`}
           >
             {c}
-          </motion.button>
+          </button>
         );
       })}
     </div>
@@ -493,25 +501,18 @@ function MapBottomSheet({
       Math.abs(point - height) < Math.abs(closest - height) ? point : closest,
     );
 
-    if (Math.abs(closestSnap - height) <= 24) {
-      onSetSnap(closestSnap);
-      return;
-    }
-
     if (!cluster) {
       onSetSnap(peek);
       return;
     }
 
-    if (Math.abs(velocityY) < 180) {
-      onSetSnap(height);
-      return;
+    if (velocityY < -180) {
+      onSetSnap(snapPoints.find((point) => point > height + 4) ?? full);
+    } else if (velocityY > 180) {
+      onSetSnap([...snapPoints].reverse().find((point) => point < height - 4) ?? peek);
+    } else {
+      onSetSnap(closestSnap);
     }
-
-    let snap = peek;
-    if (height > (half + full) / 2 || velocityY < -500) snap = full;
-    else if (height > (peek + half) / 2 || velocityY < -200) snap = half;
-    onSetSnap(snap);
   };
 
   const onHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -576,15 +577,13 @@ function MapBottomSheet({
     <motion.div
       style={{ height }}
       animate={{ height }}
-      transition={
-        isDraggingSheet ? { duration: 0 } : { type: "spring", stiffness: 260, damping: 30 }
-      }
-      className="hp-map-sheet absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overscroll-contain rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper/98 shadow-[0_-12px_40px_rgba(23,20,17,0.18)] backdrop-blur"
+      transition={isDraggingSheet ? { duration: 0 } : HP_TRANSITION.panel}
+      className="hp-map-sheet absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper/98 shadow-[0_-12px_40px_rgba(23,20,17,0.18)]"
     >
       {/* Drag handle */}
       <div
         {...sheetDragHandlers}
-        className="touch-none select-none cursor-grab pt-2 pb-1 active:cursor-grabbing"
+        className="hp-map-sheet-handle touch-none select-none cursor-grab pt-2 pb-1 active:cursor-grabbing"
       >
         <div className="mx-auto h-1.5 w-12 rounded-full bg-hp-ink/15" />
         {cluster && !isSelectedCollapsed && (
@@ -599,39 +598,53 @@ function MapBottomSheet({
                 type="button"
                 onClick={() => onSetSnap(s.h)}
                 aria-label={t("Set sheet to {position}", { position: t(s.label) })}
-                className={`h-1 w-6 rounded-full transition ${Math.abs(height - s.h) < 4 ? "bg-hp-ink" : "bg-hp-ink/15"}`}
-              />
+                aria-pressed={Math.abs(height - s.h) < 4}
+                className="hp-sheet-snap-button"
+              >
+                <span
+                  className={`hp-sheet-snap-indicator ${Math.abs(height - s.h) < 4 ? "is-active" : ""}`}
+                />
+              </button>
             ))}
           </div>
         )}
       </div>
 
-      {!isSelectedCollapsed && (
-        <div
-          className={`min-h-0 px-4 pt-0 ${cluster ? "pb-5" : "pb-3"} ${
-            cluster
-              ? `flex flex-1 overscroll-contain ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`
-              : "overflow-y-auto overscroll-contain"
-          }`}
-        >
-          {cluster ? (
-            <AreaSheetContent
-              cluster={cluster}
-              selectedPlace={selectedPlace}
-              events={events}
-              expanded={isExpanded}
-              savedPlaceIds={savedPlaceIds}
-              storyGroups={storyGroups}
-              onOpenStory={onOpenStory}
-              onSavePlace={onSavePlace}
-              onSharePlace={onSharePlace}
-              onOpenDetails={onOpenDetails}
-            />
-          ) : (
-            <TonightPulseContent />
-          )}
-        </div>
-      )}
+      <AnimatePresence initial={false} mode="popLayout">
+        {!isSelectedCollapsed && (
+          <motion.div
+            key={
+              selectedPlace ? `place-${selectedPlace.id}` : cluster ? `area-${cluster.id}` : "idle"
+            }
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -3 }}
+            transition={HP_TRANSITION.sheetContent}
+            className={`hp-safe-px min-h-0 pt-0 ${cluster ? "pb-5" : "pb-3"} ${
+              cluster
+                ? `flex flex-1 overscroll-contain ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`
+                : "overflow-y-auto overscroll-contain"
+            }`}
+          >
+            {cluster ? (
+              <AreaSheetContent
+                cluster={cluster}
+                selectedPlace={selectedPlace}
+                events={events}
+                expanded={isExpanded}
+                savedPlaceIds={savedPlaceIds}
+                storyGroups={storyGroups}
+                onOpenStory={onOpenStory}
+                onSavePlace={onSavePlace}
+                onSharePlace={onSharePlace}
+                onOpenDetails={onOpenDetails}
+              />
+            ) : (
+              <TonightPulseContent />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -680,12 +693,7 @@ function AreaSheetContent({
 
   if (!isPlaceSheet) {
     return (
-      <motion.div
-        key={`area-${cluster.id}`}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex h-full min-h-0 w-full flex-col"
-      >
+      <div className="flex h-full min-h-0 w-full flex-col">
         <div className="flex gap-3">
           <div className="grid h-16 w-16 shrink-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-ink/5">
             {cluster.places.slice(0, 4).map((place) => (
@@ -780,7 +788,7 @@ function AreaSheetContent({
             </div>
           </div>
         )}
-      </motion.div>
+      </div>
     );
   }
 
@@ -791,12 +799,7 @@ function AreaSheetContent({
   const placeEvents = events.filter((event) => event.placeId === focusPlace.id);
 
   return (
-    <motion.div
-      key={`place-${focusPlace.id}`}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={expanded ? "w-full" : "flex h-full min-h-0 w-full flex-col"}
-    >
+    <div className={expanded ? "w-full" : "flex h-full min-h-0 w-full flex-col"}>
       <div className="flex gap-3">
         <ImageBox
           src={focusPlace.imageUrl}
@@ -883,7 +886,7 @@ function AreaSheetContent({
           <Share2 size={13} />
         </button>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -1424,7 +1427,8 @@ function ActiveRouteGuide({
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="absolute left-4 right-4 top-[6.75rem] z-30 rounded-2xl border border-hp-ink/10 bg-hp-paper/96 p-3 shadow-[0_12px_32px_rgba(23,20,17,0.16)] backdrop-blur"
+      transition={HP_TRANSITION.state}
+      className="hp-active-route-guide absolute top-[6.75rem] z-30 rounded-2xl border border-hp-ink/10 bg-hp-paper/96 p-3 shadow-[0_12px_32px_rgba(23,20,17,0.16)] backdrop-blur"
     >
       <div className="flex items-start gap-2.5">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-sunset text-[13px] font-black text-hp-paper">
@@ -1734,6 +1738,7 @@ function PlaceDetailModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={HP_TRANSITION.panel}
           className="absolute inset-0 z-[70] overflow-hidden"
         >
           <button
@@ -1746,7 +1751,7 @@ function PlaceDetailModal({
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 240 }}
+            transition={HP_TRANSITION.panel}
             role="dialog"
             aria-modal="true"
             aria-label={`${place.name} details`}
@@ -1932,7 +1937,7 @@ function PlaceDetailModal({
                 )}
               </div>
             </div>
-            <div className="sticky bottom-0 flex gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3 backdrop-blur">
+            <div className="sticky bottom-0 flex gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3">
               <button
                 type="button"
                 onClick={() => onSave(place.id)}
@@ -3732,7 +3737,7 @@ function CreateComposerModal({
 function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
   const { t } = useI18n();
   return (
-    <div className="relative z-50 shrink-0 border-t border-hp-ink/10 bg-hp-paper px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_28px_rgba(23,20,17,0.08)]">
+    <div className="hp-bottom-nav relative z-50 shrink-0 border-t border-hp-ink/10 bg-hp-paper pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_28px_rgba(23,20,17,0.08)]">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 -top-7 h-7 bg-gradient-to-t from-hp-paper to-transparent"
@@ -3750,15 +3755,11 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: NavTab) => void }) {
               aria-current={on ? "page" : undefined}
               className="flex flex-col items-center gap-0.5 rounded-2xl py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hp-sunset focus-visible:ring-offset-2 focus-visible:ring-offset-hp-paper"
             >
-              <motion.span
-                layout
-                transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
-                className={`grid h-9 w-9 place-items-center rounded-full transition-colors duration-150 ${
-                  on ? "bg-hp-ink text-hp-paper" : "text-hp-ink/60"
-                }`}
+              <span
+                className={`hp-bottom-nav-icon grid h-9 w-9 place-items-center rounded-full ${on ? "is-active" : ""}`}
               >
-                <Icon size={16} />
-              </motion.span>
+                <Icon size={16} strokeWidth={2.2} />
+              </span>
               <span className={`text-[10px] font-bold ${on ? "text-hp-ink" : "text-hp-ink/50"}`}>
                 {t(label)}
               </span>
@@ -3877,6 +3878,8 @@ export function PulseApp() {
 
   // sheet snap
   const mapBodyRef = useRef<HTMLDivElement>(null);
+  const validMapPlaceIdsRef = useRef<Set<string>>(new Set());
+  const validMapAreaIdsRef = useRef<Set<string>>(new Set());
   const [mapAreaH, setMapAreaH] = useState(560);
   useEffect(() => {
     if (tab !== "map") return;
@@ -3899,18 +3902,41 @@ export function PulseApp() {
   const full = Math.round(safeMapAreaH * 0.85);
   const idlePeek = 92;
   const selectedPeek = 44;
-  const areaPreview = Math.min(full, Math.min(276, Math.max(248, Math.round(safeMapAreaH * 0.34))));
+  const compactMap = safeMapAreaH < 460;
+  const areaPreview = Math.min(
+    full,
+    Math.min(276, Math.max(compactMap ? 200 : 248, Math.round(safeMapAreaH * 0.34))),
+  );
   const placePreview = Math.min(
     full,
-    Math.min(228, Math.max(210, Math.round(safeMapAreaH * 0.28))),
+    Math.min(228, Math.max(compactMap ? 184 : 210, Math.round(safeMapAreaH * 0.28))),
   );
   const hasMapFocus = Boolean(selectedAreaId);
   const peek = hasMapFocus ? selectedPeek : idlePeek;
   const half = hasMapFocus ? (selectedPlace ? placePreview : areaPreview) : idlePeek;
   const [sheetH, setSheetH] = useState(peek);
+  const previousSheetGeometryRef = useRef({ mapAreaH: safeMapAreaH, peek, half, full });
   useEffect(() => {
-    if (sheetH < peek) setSheetH(peek);
-  }, [peek, sheetH]);
+    const previous = previousSheetGeometryRef.current;
+    setSheetH((currentHeight) => {
+      if (previous.mapAreaH !== safeMapAreaH) {
+        const previousSnaps = [
+          { id: "peek", value: previous.peek },
+          { id: "preview", value: previous.half },
+          { id: "full", value: previous.full },
+        ] as const;
+        const nearest = previousSnaps.reduce((closest, candidate) =>
+          Math.abs(candidate.value - currentHeight) < Math.abs(closest.value - currentHeight)
+            ? candidate
+            : closest,
+        );
+        const remapped = nearest.id === "peek" ? peek : nearest.id === "preview" ? half : full;
+        return Math.min(full, Math.max(peek, remapped));
+      }
+      return Math.min(full, Math.max(peek, currentHeight));
+    });
+    previousSheetGeometryRef.current = { mapAreaH: safeMapAreaH, peek, half, full };
+  }, [full, half, peek, safeMapAreaH]);
   useEffect(() => {
     if (!hasMapFocus) {
       setSheetH(idlePeek);
@@ -3952,10 +3978,18 @@ export function PulseApp() {
   };
 
   const goBackMapView = () => {
-    const previous = mapBackStack[mapBackStack.length - 1];
-    if (!previous) return;
+    const validStack = mapBackStack.filter(
+      (snapshot) =>
+        (!snapshot.areaId || validMapAreaIdsRef.current.has(snapshot.areaId)) &&
+        (!snapshot.placeId || validMapPlaceIdsRef.current.has(snapshot.placeId)),
+    );
+    const previous = validStack[validStack.length - 1];
+    if (!previous) {
+      clearMapView();
+      return;
+    }
 
-    setMapBackStack((stack) => stack.slice(0, -1));
+    setMapBackStack(validStack.slice(0, -1));
     applyMapSnapshot(previous);
   };
 
@@ -4760,7 +4794,10 @@ export function PulseApp() {
     setOpenPost(null);
     setTab("map");
     const firstPlace = findPlace(route.stops[0]?.placeId ?? "");
-    if (firstPlace) selectPlacePreview(firstPlace, false);
+    if (firstPlace) {
+      selectPlacePreview(firstPlace, false);
+      setSheetH(selectedPeek);
+    }
     showToast(t("Route opened on map"));
   };
 
@@ -4770,6 +4807,7 @@ export function PulseApp() {
     setActiveRouteStopIndex(index);
     setTab("map");
     selectPlacePreview(place, false);
+    setSheetH(selectedPeek);
   };
 
   const nextRouteStop = () => {
@@ -4816,18 +4854,41 @@ export function PulseApp() {
     () => buildAreaClusters(filteredPlaces, events, activitySnapshot),
     [activitySnapshot, events, filteredPlaces],
   );
+  const filteredPlaceIdSet = useMemo(
+    () => new Set(filteredPlaces.map((place) => place.id)),
+    [filteredPlaces],
+  );
+  const mapAreaIdSet = useMemo(
+    () => new Set(mapClusters.map((cluster) => cluster.id)),
+    [mapClusters],
+  );
+  validMapPlaceIdsRef.current = filteredPlaceIdSet;
+  validMapAreaIdsRef.current = mapAreaIdSet;
   const selectedCluster = selectedAreaId
     ? (mapClusters.find((cluster) => cluster.id === selectedAreaId) ?? null)
     : null;
+  const availableMapHeight = Math.max(0, safeMapAreaH - sheetH);
+  const utilityRailHidden = availableMapHeight < 248;
 
   useEffect(() => {
-    if (!selectedAreaId) return;
-    if (mapClusters.some((cluster) => cluster.id === selectedAreaId)) return;
+    setMapBackStack((stack) => {
+      const valid = stack.filter(
+        (snapshot) =>
+          (!snapshot.areaId || mapAreaIdSet.has(snapshot.areaId)) &&
+          (!snapshot.placeId || filteredPlaceIdSet.has(snapshot.placeId)),
+      );
+      return valid.length === stack.length ? stack : valid;
+    });
+
+    const selectedPlaceHidden = Boolean(selectedPlace && !filteredPlaceIdSet.has(selectedPlace.id));
+    const selectedAreaHidden = Boolean(selectedAreaId && !mapAreaIdSet.has(selectedAreaId));
+    if (!selectedPlaceHidden && !selectedAreaHidden) return;
+
     setMapBackStack([]);
     setSelectedAreaId(null);
     setSelectedPlace(null);
     setSheetH(idlePeek);
-  }, [idlePeek, mapClusters, selectedAreaId]);
+  }, [filteredPlaceIdSet, idlePeek, mapAreaIdSet, selectedAreaId, selectedPlace]);
 
   const filteredPosts = allPosts.filter((post) => {
     const place = findPlace(post.placeId);
@@ -4855,7 +4916,11 @@ export function PulseApp() {
   const renderActiveTab = () => {
     if (tab === "map") {
       return (
-        <div ref={mapBodyRef} className="relative h-full w-full">
+        <div
+          ref={mapBodyRef}
+          className="hp-map-stage relative h-full w-full"
+          data-utility-rail-hidden={utilityRailHidden ? "true" : "false"}
+        >
           <SocialMap
             clusters={mapClusters}
             events={events}
@@ -4867,10 +4932,11 @@ export function PulseApp() {
             onSelectArea={selectAreaPreview}
             onSelectPlace={selectMapPlacePreview}
             onResetView={clearMapView}
+            onClearSelection={clearMapView}
             canGoBack={mapBackStack.length > 0}
             onBack={goBackMapView}
-            areaFocusBottomPadding={areaPreview + 112}
-            selectedBottomPadding={selectedCluster ? sheetH + 96 : 0}
+            bottomOverlayHeight={sheetH}
+            availableMapHeight={availableMapHeight}
             routePath={activeRoutePath}
             onMapLongPress={(lat, lng) => {
               openComposer("place", { lat, lng });
@@ -5004,214 +5070,218 @@ export function PulseApp() {
   };
 
   return (
-    <div className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10">
-      <div
-        className="flex min-h-0 flex-1 flex-col"
-        inert={modalOpen ? true : undefined}
-        aria-hidden={modalOpen ? true : undefined}
-      >
-        <TopBar
-          query={query}
-          setQuery={setQuery}
-          onToggleLanguage={toggleAppLanguage}
-          showSearch={showSearch}
-          setShowSearch={setShowSearch}
-          account={account}
-          onOpenAccount={() => setProfileOpen(true)}
-          onOpenAuth={() => setAuthOpen(true)}
-        />
-        <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
+    <MotionConfig reducedMotion="user">
+      <div className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10">
+        <div
+          className="flex min-h-0 flex-1 flex-col"
+          inert={modalOpen ? true : undefined}
+          aria-hidden={modalOpen ? true : undefined}
+        >
+          <TopBar
+            query={query}
+            setQuery={setQuery}
+            onToggleLanguage={toggleAppLanguage}
+            showSearch={showSearch}
+            setShowSearch={setShowSearch}
+            account={account}
+            onOpenAccount={() => setProfileOpen(true)}
+            onOpenAuth={() => setAuthOpen(true)}
+          />
+          <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
 
-        <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
-          {dataStatus !== "ready" && (
-            <div
-              role={dataStatus === "error" ? "alert" : "status"}
-              aria-live="polite"
-              className="absolute inset-x-4 top-4 z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur"
-            >
-              <span>
-                {t(dataStatus === "loading" ? "Loading pulse data…" : "Could not load pulse data.")}
-              </span>
-              {dataStatus === "error" && (
-                <button
-                  type="button"
-                  onClick={() => void refreshPulseData()}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-hp-ink px-3 py-2 text-[11px] font-black text-hp-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hp-sunset"
-                >
-                  <RefreshCw size={13} />
-                  {t("Try again")}
-                </button>
-              )}
-            </div>
-          )}
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={tab}
-              initial={{ opacity: 0, y: 10, scale: 0.996, filter: "blur(2px)" }}
-              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -8, scale: 0.996, filter: "blur(2px)" }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 overflow-hidden bg-hp-bg"
-              style={{
-                backfaceVisibility: "hidden",
-                contain: "layout paint style",
-                transform: "translateZ(0)",
-                willChange: "opacity, transform, filter",
-              }}
-            >
-              {renderActiveTab()}
-            </motion.div>
-          </AnimatePresence>
+          <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
+            {dataStatus !== "ready" && (
+              <div
+                role={dataStatus === "error" ? "alert" : "status"}
+                aria-live="polite"
+                className="absolute inset-x-4 top-4 z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur"
+              >
+                <span>
+                  {t(
+                    dataStatus === "loading" ? "Loading pulse data…" : "Could not load pulse data.",
+                  )}
+                </span>
+                {dataStatus === "error" && (
+                  <button
+                    type="button"
+                    onClick={() => void refreshPulseData()}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-hp-ink px-3 py-2 text-[11px] font-black text-hp-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hp-sunset"
+                  >
+                    <RefreshCw size={13} />
+                    {t("Try again")}
+                  </button>
+                )}
+              </div>
+            )}
+            <AnimatePresence initial={false}>
+              <motion.div
+                key={tab}
+                initial={{ opacity: 0, y: 4, scale: 0.998 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.998 }}
+                transition={HP_TRANSITION.tab}
+                className="absolute inset-0 overflow-hidden bg-hp-bg"
+                style={{
+                  backfaceVisibility: "hidden",
+                  contain: "layout paint style",
+                  transform: "translateZ(0)",
+                  willChange: "opacity, transform",
+                }}
+              >
+                {renderActiveTab()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          <BottomNav tab={tab} setTab={setTab} />
         </div>
 
-        <BottomNav tab={tab} setTab={setTab} />
-      </div>
-
-      <PlaceDetailModal
-        place={openPlace}
-        events={events}
-        onClose={() => setOpenPlace(null)}
-        onSave={toggleSave}
-        saved={openPlace ? savedIds.includes(openPlace.id) : false}
-        posts={openPlace ? allPosts.filter((p) => p.placeId === openPlace.id) : []}
-        onOpenMap={jumpToMap}
-        onShare={sharePlace}
-        comments={openPlace ? (placeComments[openPlace.id] ?? []) : []}
-        onComment={addPlaceComment}
-        findAuthor={findAuthor}
-        findPostAuthor={findPostAuthor}
-        storyGroups={placeStoryGroups}
-        onOpenStory={(placeId) => setStoryViewer({ placeId })}
-      />
-      <PostDetailModal
-        post={openPost}
-        onClose={() => setOpenPost(null)}
-        onOpenMap={jumpToMap}
-        onLike={() => openPost && toggleLike(openPost.id)}
-        liked={openPost ? !!likes[openPost.id] : false}
-        likeCount={
-          openPost ? (postLikes[openPost.id] ?? openPost.likes) + (likes[openPost.id] ? 1 : 0) : 0
-        }
-        comments={openPost ? [...openPost.comments, ...(postComments[openPost.id] ?? [])] : []}
-        onComment={(t) => openPost && addPostComment(openPost.id, t)}
-        saved={openPost ? !!savedPosts[openPost.id] : false}
-        onSave={() => openPost && toggleSavePost(openPost.id)}
-        onShare={sharePost}
-        findPlace={findPlace}
-        findAuthor={findAuthor}
-        findPostAuthor={findPostAuthor}
-      />
-      <RouteArticleModal
-        route={openRoute}
-        onClose={() => setOpenRoute(null)}
-        onOpenMap={jumpToMap}
-        onMapRoute={startRouteOnMap}
-        saved={openRoute ? !!savedRoutes[openRoute.id] : false}
-        comments={openRoute ? (routeComments[openRoute.id] ?? []) : []}
-        onSave={() => openRoute && toggleSaveRoute(openRoute.id)}
-        onShare={() => openRoute && shareRoute(openRoute)}
-        onComment={(text) => openRoute && addRouteComment(openRoute.id, text)}
-        findPlace={findPlace}
-        findAuthor={findAuthor}
-      />
-      <CreateComposerModal
-        open={createOpen}
-        initialMode={composerMode}
-        prefillPlace={composerPin}
-        places={places}
-        vibeChips={vibeChips}
-        account={account}
-        onClose={() => {
-          setCreateOpen(false);
-          setComposerPin(null);
-        }}
-        onRequireAccount={() => {
-          requireProfile("post");
-        }}
-        onPost={addLocalPost}
-        onPlace={addLocalPlace}
-        onStory={addLocalStory}
-        onEvent={addMeetEvent}
-      />
-
-      <AuthSheet
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        onAuthenticated={async () => {
-          const nextAccount = await refreshAccount();
-          if (nextAccount.status === "needsProfile") setProfileOpen(true);
-        }}
-      />
-
-      <PasswordRecoverySheet
-        open={passwordRecoveryOpen}
-        onComplete={async () => {
-          clearPasswordRecoveryUrl();
-          setPasswordRecoveryOpen(false);
-          await refreshAccount();
-          showToast(t("Your password has been updated."));
-        }}
-        onCancel={async () => {
-          await signOutPulseAccount().catch((error) => {
-            console.warn("Could not close the password recovery session.", error);
-          });
-          clearPasswordRecoveryUrl();
-          setPasswordRecoveryOpen(false);
-          await refreshAccount();
-          setAuthOpen(true);
-        }}
-      />
-
-      <AccountSheet
-        open={profileOpen}
-        account={account}
-        onClose={() => setProfileOpen(false)}
-        stats={profileStats}
-        saved={{
-          placeCount: savedIds.length,
-          postCount: savedPostIds.length,
-          routeCount: savedRouteIds.length,
-          onOpenSaved: () => {
-            setProfileOpen(false);
-            setTab("saved");
-          },
-        }}
-        onSaved={async () => {
-          await refreshAccount();
-        }}
-        onOpenAuth={() => setAuthOpen(true)}
-        adminRole={adminRole}
-        onOpenAdmin={() => {
-          window.location.assign("/admin");
-        }}
-      />
-
-      <OnboardingGate
-        open={onboardingOpen}
-        vibeChips={vibeChips}
-        onClose={closeOnboarding}
-        onRequestLocation={requestLocationFromOnboarding}
-      />
-
-      {storyViewer && (
-        <PlaceStoryViewer
-          groups={placeStoryGroups}
-          startPlaceId={storyViewer.placeId}
-          startStoryId={storyViewer.storyId}
-          markSeen={markSeen}
-          onClose={() => setStoryViewer(null)}
-          onOpenPlace={jumpToMap}
-          onOpenPlaceDetails={(id) => {
-            const place = findPlace(id);
-            if (place) setOpenPlace(place);
-          }}
-          onShare={shareStory}
-          onToggleSave={toggleSave}
-          savedPlaceIds={savedIds}
+        <PlaceDetailModal
+          place={openPlace}
+          events={events}
+          onClose={() => setOpenPlace(null)}
+          onSave={toggleSave}
+          saved={openPlace ? savedIds.includes(openPlace.id) : false}
+          posts={openPlace ? allPosts.filter((p) => p.placeId === openPlace.id) : []}
+          onOpenMap={jumpToMap}
+          onShare={sharePlace}
+          comments={openPlace ? (placeComments[openPlace.id] ?? []) : []}
+          onComment={addPlaceComment}
+          findAuthor={findAuthor}
+          findPostAuthor={findPostAuthor}
+          storyGroups={placeStoryGroups}
+          onOpenStory={(placeId) => setStoryViewer({ placeId })}
         />
-      )}
+        <PostDetailModal
+          post={openPost}
+          onClose={() => setOpenPost(null)}
+          onOpenMap={jumpToMap}
+          onLike={() => openPost && toggleLike(openPost.id)}
+          liked={openPost ? !!likes[openPost.id] : false}
+          likeCount={
+            openPost ? (postLikes[openPost.id] ?? openPost.likes) + (likes[openPost.id] ? 1 : 0) : 0
+          }
+          comments={openPost ? [...openPost.comments, ...(postComments[openPost.id] ?? [])] : []}
+          onComment={(t) => openPost && addPostComment(openPost.id, t)}
+          saved={openPost ? !!savedPosts[openPost.id] : false}
+          onSave={() => openPost && toggleSavePost(openPost.id)}
+          onShare={sharePost}
+          findPlace={findPlace}
+          findAuthor={findAuthor}
+          findPostAuthor={findPostAuthor}
+        />
+        <RouteArticleModal
+          route={openRoute}
+          onClose={() => setOpenRoute(null)}
+          onOpenMap={jumpToMap}
+          onMapRoute={startRouteOnMap}
+          saved={openRoute ? !!savedRoutes[openRoute.id] : false}
+          comments={openRoute ? (routeComments[openRoute.id] ?? []) : []}
+          onSave={() => openRoute && toggleSaveRoute(openRoute.id)}
+          onShare={() => openRoute && shareRoute(openRoute)}
+          onComment={(text) => openRoute && addRouteComment(openRoute.id, text)}
+          findPlace={findPlace}
+          findAuthor={findAuthor}
+        />
+        <CreateComposerModal
+          open={createOpen}
+          initialMode={composerMode}
+          prefillPlace={composerPin}
+          places={places}
+          vibeChips={vibeChips}
+          account={account}
+          onClose={() => {
+            setCreateOpen(false);
+            setComposerPin(null);
+          }}
+          onRequireAccount={() => {
+            requireProfile("post");
+          }}
+          onPost={addLocalPost}
+          onPlace={addLocalPlace}
+          onStory={addLocalStory}
+          onEvent={addMeetEvent}
+        />
 
-      <Toast msg={toast} />
-    </div>
+        <AuthSheet
+          open={authOpen}
+          onClose={() => setAuthOpen(false)}
+          onAuthenticated={async () => {
+            const nextAccount = await refreshAccount();
+            if (nextAccount.status === "needsProfile") setProfileOpen(true);
+          }}
+        />
+
+        <PasswordRecoverySheet
+          open={passwordRecoveryOpen}
+          onComplete={async () => {
+            clearPasswordRecoveryUrl();
+            setPasswordRecoveryOpen(false);
+            await refreshAccount();
+            showToast(t("Your password has been updated."));
+          }}
+          onCancel={async () => {
+            await signOutPulseAccount().catch((error) => {
+              console.warn("Could not close the password recovery session.", error);
+            });
+            clearPasswordRecoveryUrl();
+            setPasswordRecoveryOpen(false);
+            await refreshAccount();
+            setAuthOpen(true);
+          }}
+        />
+
+        <AccountSheet
+          open={profileOpen}
+          account={account}
+          onClose={() => setProfileOpen(false)}
+          stats={profileStats}
+          saved={{
+            placeCount: savedIds.length,
+            postCount: savedPostIds.length,
+            routeCount: savedRouteIds.length,
+            onOpenSaved: () => {
+              setProfileOpen(false);
+              setTab("saved");
+            },
+          }}
+          onSaved={async () => {
+            await refreshAccount();
+          }}
+          onOpenAuth={() => setAuthOpen(true)}
+          adminRole={adminRole}
+          onOpenAdmin={() => {
+            window.location.assign("/admin");
+          }}
+        />
+
+        <OnboardingGate
+          open={onboardingOpen}
+          vibeChips={vibeChips}
+          onClose={closeOnboarding}
+          onRequestLocation={requestLocationFromOnboarding}
+        />
+
+        {storyViewer && (
+          <PlaceStoryViewer
+            groups={placeStoryGroups}
+            startPlaceId={storyViewer.placeId}
+            startStoryId={storyViewer.storyId}
+            markSeen={markSeen}
+            onClose={() => setStoryViewer(null)}
+            onOpenPlace={jumpToMap}
+            onOpenPlaceDetails={(id) => {
+              const place = findPlace(id);
+              if (place) setOpenPlace(place);
+            }}
+            onShare={shareStory}
+            onToggleSave={toggleSave}
+            savedPlaceIds={savedIds}
+          />
+        )}
+
+        <Toast msg={toast} />
+      </div>
+    </MotionConfig>
   );
 }
