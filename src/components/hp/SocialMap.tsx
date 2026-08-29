@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, Crosshair, MapPinned, Minus, Plus } from "lucide-react";
 import Supercluster from "supercluster";
 import "leaflet/dist/leaflet.css";
@@ -61,6 +61,58 @@ const ALL_MARKERS_RICH_ZOOM = 15.5;
 // whose pins sit within ~800m) need ~z16 to separate; spread areas stay lower.
 const AREA_FOCUS_MAX_ZOOM = 16.25;
 const ILIA_DETAIL_BBOX: [number, number, number, number] = [19.9, 36.35, 23.25, 39.15];
+const MAP_PAN_DURATION = 0.28;
+const MAP_OVERVIEW_DURATION = 0.34;
+const MAP_FOCUS_DURATION = 0.38;
+const MAP_EASE_LINEARITY = 0.25;
+const RICH_VISUAL_ZOOM = 13.25;
+const MIN_UTILITY_RAIL_HEIGHT = 248;
+const MIN_MAP_CHROME_HEIGHT = 188;
+const SAFE_MARKER_RADIUS = 36;
+
+type SafeMapRect = { left: number; right: number; top: number; bottom: number };
+
+const prefersReducedMapMotion = () =>
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function safeMapRect(
+  container: HTMLElement,
+  bottomOverlayHeight: number,
+  availableMapHeight: number,
+): SafeMapRect {
+  const railVisible = availableMapHeight >= MIN_UTILITY_RAIL_HEIGHT;
+  const chromeVisible = availableMapHeight >= MIN_MAP_CHROME_HEIGHT;
+  const edgeInset = 20 + SAFE_MARKER_RADIUS;
+  const rawBottom = Math.max(
+    edgeInset + 32,
+    container.clientHeight - bottomOverlayHeight - 20 - SAFE_MARKER_RADIUS,
+  );
+  const desiredTop = (chromeVisible ? 108 : 20) + SAFE_MARKER_RADIUS;
+  const top = Math.max(edgeInset, Math.min(desiredTop, rawBottom - 32));
+  return {
+    left: edgeInset,
+    right: Math.max(
+      edgeInset + 32,
+      container.clientWidth - (railVisible ? 64 : 20) - SAFE_MARKER_RADIUS,
+    ),
+    top,
+    bottom: Math.max(top + 32, rawBottom),
+  };
+}
+
+function panDeltaIntoSafeRect(point: { x: number; y: number }, rect: SafeMapRect) {
+  const x =
+    point.x < rect.left ? point.x - rect.left : point.x > rect.right ? point.x - rect.right : 0;
+  const y =
+    point.y < rect.top ? point.y - rect.top : point.y > rect.bottom ? point.y - rect.bottom : 0;
+  return { x, y };
+}
+
+function pointIsInSafeRect(point: { x: number; y: number }, rect: SafeMapRect) {
+  return (
+    point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
+  );
+}
 
 type AreaTone = "beach" | "culture" | "local" | "music" | "nature" | "village";
 type AreaStatus = PulseTier;
@@ -841,10 +893,11 @@ interface Props {
   onSelectArea: (cluster: MapAreaCluster) => void;
   onSelectPlace: (place: Place, cluster: MapAreaCluster) => void;
   onResetView: () => void;
+  onClearSelection: () => void;
   canGoBack?: boolean;
   onBack?: () => void;
-  areaFocusBottomPadding?: number;
-  selectedBottomPadding?: number;
+  bottomOverlayHeight: number;
+  availableMapHeight: number;
   /** Ordered lat/lng path to draw as a route polyline (e.g. an open route's stops). */
   routePath?: { lat: number; lng: number; label: string }[] | null;
   /** Fired on map long-press so the shell can open the composer pre-filled. */
@@ -862,10 +915,11 @@ export function SocialMap({
   onSelectArea,
   onSelectPlace,
   onResetView,
+  onClearSelection,
   canGoBack = false,
   onBack,
-  areaFocusBottomPadding = 0,
-  selectedBottomPadding = 0,
+  bottomOverlayHeight,
+  availableMapHeight,
   routePath = null,
   onMapLongPress,
 }: Props) {
@@ -883,6 +937,12 @@ export function SocialMap({
   const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const onMapLongPressRef = useRef(onMapLongPress);
   onMapLongPressRef.current = onMapLongPress;
+  const onClearSelectionRef = useRef(onClearSelection);
+  onClearSelectionRef.current = onClearSelection;
+  const bottomOverlayHeightRef = useRef(bottomOverlayHeight);
+  bottomOverlayHeightRef.current = bottomOverlayHeight;
+  const availableMapHeightRef = useRef(availableMapHeight);
+  availableMapHeightRef.current = availableMapHeight;
   const didInitialFitRef = useRef(false);
   const lastMarkerActivationRef = useRef<{ id: string; at: number } | null>(null);
   const previousSelectionRef = useRef<{ areaId: string | null; placeId: string | null }>({
@@ -891,9 +951,14 @@ export function SocialMap({
   });
   const lastFocusedPlaceIdRef = useRef<string | null>(null);
   const selectionMotionUntilRef = useRef(0);
+  const cameraHandledSelectionRef = useRef<string | null>(null);
+  const ignoreBackgroundClickUntilRef = useRef(0);
   const lastZoomRef = useRef(OVERVIEW_ZOOM);
   const [mapReady, setMapReady] = useState(false);
   const [zoom, setZoom] = useState(OVERVIEW_ZOOM);
+  const selectionKey = `${selectedAreaId ?? ""}|${selectedPlaceId ?? ""}`;
+  const selectionKeyRef = useRef(selectionKey);
+  selectionKeyRef.current = selectionKey;
 
   const eventCounts = useMemo(() => eventCountForPlace(events), [events]);
   const clusterById = useMemo(
@@ -1154,72 +1219,118 @@ export function SocialMap({
     return `${clusters.length} area${clusters.length === 1 ? "" : "s"} moving tonight`;
   }, [activeFilterLabel, clusters, isSplitZoom, selectedAreaCluster, selectedPlaceNode]);
 
-  const zoomIntoCluster = useCallback(
-    (cluster: MapAreaCluster) => {
-      const L = leafletRef.current;
-      const map = mapRef.current;
-      if (!L || !map) return;
+  const zoomIntoCluster = useCallback((cluster: MapAreaCluster) => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    const container = mapNodeRef.current;
+    if (!L || !map || !container) return;
 
-      const places = cluster.childPlaces;
-      const bottomPadding = Math.min(430, Math.max(190, areaFocusBottomPadding));
-      map.stop();
-      selectionMotionUntilRef.current = Date.now() + 440;
+    const places = cluster.childPlaces;
+    const overlayHeight = bottomOverlayHeightRef.current;
+    const viewport = safeMapRect(container, overlayHeight, availableMapHeightRef.current);
+    const childrenAlreadySafe =
+      map.getZoom() >= SPLIT_ZOOM &&
+      places.length > 0 &&
+      places.every((place) =>
+        pointIsInSafeRect(map.latLngToContainerPoint([place.lat, place.lng]), viewport),
+      );
+    if (childrenAlreadySafe) return;
 
-      if (places.length <= 1) {
-        const focus: LatLngTuple = places[0]
-          ? [places[0].lat, places[0].lng]
-          : [cluster.lat, cluster.lng];
-        const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(SPLIT_ZOOM, map.getZoom() + 0.5));
-        const projected = map.project(focus, targetZoom);
-        const shifted = map.unproject(
-          [projected.x, projected.y + bottomPadding * 0.42],
-          targetZoom,
-        );
+    const visibleMapHeight = Math.max(80, container.clientHeight - overlayHeight);
+    const topPadding = Math.min(96, Math.max(52, Math.round(visibleMapHeight * 0.35)));
+    const maximumBottomPadding = Math.max(96, container.clientHeight - topPadding - 72);
+    const bottomPadding = Math.min(maximumBottomPadding, Math.max(96, overlayHeight + 24));
+    const reduceMotion = prefersReducedMapMotion();
+    map.stop();
+    selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
+
+    if (places.length <= 1) {
+      const focus: LatLngTuple = places[0]
+        ? [places[0].lat, places[0].lng]
+        : [cluster.lat, cluster.lng];
+      const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(SPLIT_ZOOM, map.getZoom() + 0.5));
+      const projected = map.project(focus, targetZoom);
+      const shifted = map.unproject([projected.x, projected.y + bottomPadding * 0.42], targetZoom);
+      if (reduceMotion) {
+        map.setView([shifted.lat, shifted.lng], targetZoom, { animate: false });
+      } else {
         map.flyTo([shifted.lat, shifted.lng], targetZoom, {
-          duration: 0.4,
-          easeLinearity: 0.25,
+          duration: MAP_FOCUS_DURATION,
+          easeLinearity: MAP_EASE_LINEARITY,
         });
-        return;
       }
+      return;
+    }
 
-      // Frame EVERY pin above the bottom sheet. The high maxZoom is the key:
-      // a tight cluster like Ancient Olympia (pins within ~800m) now flies in to
-      // ~z15, where the pins clearly separate and the supercluster bubble
-      // (which stops clustering above z13) can no longer swallow them.
-      const bounds = L.latLngBounds(
-        places.map((place) => [place.lat, place.lng] as LatLngTuple),
-      ).pad(0.25);
-      map.fitBounds(bounds, {
-        animate: true,
-        duration: 0.4,
-        easeLinearity: 0.25,
-        maxZoom: AREA_FOCUS_MAX_ZOOM,
-        paddingTopLeft: [56, 120],
-        paddingBottomRight: [56, bottomPadding],
-      });
-    },
-    [areaFocusBottomPadding],
-  );
+    // Frame EVERY pin above the bottom sheet. The high maxZoom is the key:
+    // a tight cluster like Ancient Olympia (pins within ~800m) now flies in to
+    // ~z15, where the pins clearly separate and the supercluster bubble
+    // (which stops clustering above z13) can no longer swallow them.
+    const bounds = L.latLngBounds(places.map((place) => [place.lat, place.lng] as LatLngTuple)).pad(
+      0.25,
+    );
+    map.fitBounds(bounds, {
+      animate: !reduceMotion,
+      duration: MAP_FOCUS_DURATION,
+      easeLinearity: MAP_EASE_LINEARITY,
+      maxZoom: AREA_FOCUS_MAX_ZOOM,
+      paddingTopLeft: [48, topPadding],
+      paddingBottomRight: [48, bottomPadding],
+    });
+  }, []);
 
   const zoomIntoActivityCluster = useCallback(
     (node: ActivityClusterRenderNode) => {
       const map = mapRef.current;
-      if (!map) return;
+      const container = mapNodeRef.current;
+      if (!map || !container) return;
 
       const expansionZoom = placeClusterIndex.getClusterExpansionZoom(node.clusterId);
       const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(map.getZoom() + 0.75, expansionZoom));
+      const viewport = safeMapRect(
+        container,
+        bottomOverlayHeightRef.current,
+        availableMapHeightRef.current,
+      );
+      const desiredPoint = {
+        x: (viewport.left + viewport.right) / 2,
+        y: (viewport.top + viewport.bottom) / 2,
+      };
+      const projected = map.project(node.latLng, targetZoom);
+      const targetCenter = map.unproject(
+        [
+          projected.x + container.clientWidth / 2 - desiredPoint.x,
+          projected.y + container.clientHeight / 2 - desiredPoint.y,
+        ],
+        targetZoom,
+      );
+      const reduceMotion = prefersReducedMapMotion();
       map.stop();
-      selectionMotionUntilRef.current = Date.now() + 420;
-      map.flyTo(node.latLng, targetZoom, {
-        duration: 0.38,
-        easeLinearity: 0.25,
-      });
+      selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
+      if (reduceMotion) {
+        map.setView(targetCenter, targetZoom, { animate: false });
+      } else {
+        map.flyTo(targetCenter, targetZoom, {
+          duration: MAP_FOCUS_DURATION,
+          easeLinearity: MAP_EASE_LINEARITY,
+        });
+      }
     },
     [placeClusterIndex],
   );
 
   const flyToOverview = useCallback(() => {
-    mapRef.current?.flyTo(ILIA_CENTER, OVERVIEW_ZOOM, { duration: 0.45, easeLinearity: 0.25 });
+    const map = mapRef.current;
+    if (!map) return;
+    map.stop();
+    if (prefersReducedMapMotion()) {
+      map.setView(ILIA_CENTER, OVERVIEW_ZOOM, { animate: false });
+    } else {
+      map.flyTo(ILIA_CENTER, OVERVIEW_ZOOM, {
+        duration: MAP_OVERVIEW_DURATION,
+        easeLinearity: MAP_EASE_LINEARITY,
+      });
+    }
   }, []);
 
   activateMarkerByIdRef.current = (id: string) => {
@@ -1228,13 +1339,21 @@ export function SocialMap({
 
     const now = Date.now();
     const previousActivation = lastMarkerActivationRef.current;
-    if (previousActivation && now - previousActivation.at < 420) return;
+    if (previousActivation?.id === id && now - previousActivation.at < 420) return;
     lastMarkerActivationRef.current = { id, at: now };
 
     if (node.kind === "cluster") {
+      const nextSelectionKey = `${node.cluster.id}|`;
+      if (selectionKeyRef.current !== nextSelectionKey) {
+        cameraHandledSelectionRef.current = nextSelectionKey;
+      }
       onSelectArea(node.cluster);
       zoomIntoCluster(node.cluster);
     } else if (node.kind === "activity-cluster") {
+      const nextSelectionKey = `${node.dominantCluster.id}|`;
+      if (selectionKeyRef.current !== nextSelectionKey) {
+        cameraHandledSelectionRef.current = nextSelectionKey;
+      }
       onSelectArea(node.dominantCluster);
       zoomIntoActivityCluster(node);
     } else {
@@ -1248,6 +1367,12 @@ export function SocialMap({
     previousSelectionRef.current = next;
 
     if (!mapReady) return;
+
+    const nextSelectionKey = `${next.areaId ?? ""}|${next.placeId ?? ""}`;
+    if (cameraHandledSelectionRef.current === nextSelectionKey) {
+      cameraHandledSelectionRef.current = null;
+      return;
+    }
 
     if (previous.placeId && !next.placeId && next.areaId) {
       const cluster = clusters.find((item) => item.id === next.areaId);
@@ -1305,6 +1430,27 @@ export function SocialMap({
         opacity: 1,
       }).addTo(map);
 
+      const onMapClick = (event: import("leaflet").LeafletMouseEvent) => {
+        if (Date.now() < ignoreBackgroundClickUntilRef.current) return;
+        const target = event.originalEvent?.target as Element | null;
+        if (target?.closest(".leaflet-marker-icon, .leaflet-control, button, a")) return;
+        if (selectionKeyRef.current === "|") return;
+
+        cameraHandledSelectionRef.current = "|";
+        onClearSelectionRef.current();
+      };
+      map.on("click", onMapClick);
+      cleanupFns.push(() => map?.off("click", onMapClick));
+
+      if (mapNodeRef.current) {
+        const mapContainer = mapNodeRef.current;
+        const resizeObserver = new ResizeObserver(() => {
+          map?.invalidateSize({ animate: false, pan: false });
+        });
+        resizeObserver.observe(mapContainer);
+        cleanupFns.push(() => resizeObserver.disconnect());
+      }
+
       // Geolocation -> pulsing "you are here" dot
       const onLocationFound = (e: import("leaflet").LocationEvent) => {
         if (cancelled || !map) return;
@@ -1350,6 +1496,7 @@ export function SocialMap({
               pressPoint.x - rect.left,
               pressPoint.y - rect.top,
             ]);
+            ignoreBackgroundClickUntilRef.current = Date.now() + 700;
             onMapLongPressRef.current?.(ll.lat, ll.lng);
             clearPress();
           }, 480);
@@ -1547,7 +1694,8 @@ export function SocialMap({
           needsRebuild ||
           !previousRuntime ||
           previousRuntime.selected !== node.selected ||
-          previousRuntime.visible !== visibleForInteraction;
+          previousRuntime.visible !== visibleForInteraction ||
+          previousRuntime.opacity > 0.001 !== node.opacity > 0.001;
 
         if (shouldSyncInteraction) {
           markerElement.style.pointerEvents = visibleForInteraction ? "auto" : "none";
@@ -1610,19 +1758,42 @@ export function SocialMap({
 
   useEffect(() => {
     const map = mapRef.current;
+    const container = mapNodeRef.current;
     if (!selectedPlaceId) {
       lastFocusedPlaceIdRef.current = null;
       return;
     }
-    if (!map || !mapReady || lastFocusedPlaceIdRef.current === selectedPlaceId) return;
+    if (!map || !container || !mapReady || lastFocusedPlaceIdRef.current === selectedPlaceId)
+      return;
 
     if (!selectedPlaceNode) return;
 
     lastFocusedPlaceIdRef.current = selectedPlaceId;
-    selectionMotionUntilRef.current = Date.now() + 460;
 
     const latLng: LatLngTuple = [selectedPlaceNode.place.lat, selectedPlaceNode.place.lng];
-    const bottomPadding = Math.min(460, Math.max(220, selectedBottomPadding));
+    const viewport = safeMapRect(container, bottomOverlayHeight, availableMapHeight);
+    const currentPoint = map.latLngToContainerPoint(latLng);
+    const currentZoom = map.getZoom();
+
+    if (currentZoom >= RICH_VISUAL_ZOOM && pointIsInSafeRect(currentPoint, viewport)) return;
+
+    const reduceMotion = prefersReducedMapMotion();
+    map.stop();
+
+    if (currentZoom >= RICH_VISUAL_ZOOM) {
+      const delta = panDeltaIntoSafeRect(currentPoint, viewport);
+      if (delta.x === 0 && delta.y === 0) return;
+      selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 320);
+      map.panBy([delta.x, delta.y], {
+        animate: !reduceMotion,
+        duration: MAP_PAN_DURATION,
+        easeLinearity: MAP_EASE_LINEARITY,
+      });
+      return;
+    }
+
+    selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
+    const bottomPadding = Math.min(460, Math.max(180, bottomOverlayHeight + 40));
     const focusOffset = Math.min(270, Math.max(128, bottomPadding * 0.44));
     const targetPoint = map.project(latLng, PLACE_FOCUS_ZOOM);
     const offsetCenter = map.unproject(
@@ -1631,32 +1802,26 @@ export function SocialMap({
     );
     const targetCenter: LatLngTuple = [offsetCenter.lat, offsetCenter.lng];
 
-    map.stop();
-
-    if (Math.abs(map.getZoom() - PLACE_FOCUS_ZOOM) > 0.1) {
+    if (reduceMotion) {
+      map.setView(targetCenter, PLACE_FOCUS_ZOOM, { animate: false });
+    } else {
       map.flyTo(targetCenter, PLACE_FOCUS_ZOOM, {
-        duration: 0.42,
-        easeLinearity: 0.24,
+        duration: MAP_FOCUS_DURATION,
+        easeLinearity: MAP_EASE_LINEARITY,
       });
-      return;
     }
-
-    map.panTo(targetCenter, {
-      animate: true,
-      duration: 0.32,
-      easeLinearity: 0.24,
-    });
-  }, [mapReady, selectedBottomPadding, selectedPlaceId, selectedPlaceNode]);
+  }, [availableMapHeight, bottomOverlayHeight, mapReady, selectedPlaceId, selectedPlaceNode]);
 
   useEffect(() => {
     const map = mapRef.current;
     const container = mapNodeRef.current;
-    if (!map || !container || !mapReady || !primarySelectedNode || selectedBottomPadding <= 0) {
+    if (!map || !container || !mapReady || !primarySelectedNode || bottomOverlayHeight <= 0) {
       return;
     }
 
     let frame: number | null = null;
     let timer: number | null = null;
+    let correctionCount = 0;
     const keepSelectionVisible = () => {
       const remainingMotion = selectionMotionUntilRef.current - Date.now();
       if (remainingMotion > 0) {
@@ -1667,9 +1832,14 @@ export function SocialMap({
       }
 
       const point = map.latLngToContainerPoint(primarySelectedNode.latLng);
-      const visibleBottom = Math.max(20, container.clientHeight - selectedBottomPadding - 20);
-      if (point.y > visibleBottom) {
-        map.panBy([0, point.y - visibleBottom], { animate: false });
+      const viewport = safeMapRect(container, bottomOverlayHeight, availableMapHeight);
+      const delta = panDeltaIntoSafeRect(point, viewport);
+      if (delta.x !== 0 || delta.y !== 0) {
+        map.panBy([delta.x, delta.y], { animate: false });
+        correctionCount += 1;
+        if (correctionCount < 3) {
+          frame = window.requestAnimationFrame(keepSelectionVisible);
+        }
       }
     };
 
@@ -1678,7 +1848,7 @@ export function SocialMap({
       if (frame !== null) window.cancelAnimationFrame(frame);
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [mapReady, primarySelectedNode, selectedBottomPadding]);
+  }, [availableMapHeight, bottomOverlayHeight, mapReady, primarySelectedNode]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1690,8 +1860,8 @@ export function SocialMap({
 
     const bounds = clusters.map((cluster) => [cluster.lat, cluster.lng] as LatLngTuple);
     map.fitBounds(bounds, {
-      animate: true,
-      duration: 0.35,
+      animate: !prefersReducedMapMotion(),
+      duration: MAP_OVERVIEW_DURATION,
       maxZoom: OVERVIEW_ZOOM,
       paddingBottomRight: [52, 210],
       paddingTopLeft: [52, 108],
@@ -1732,11 +1902,14 @@ export function SocialMap({
     });
 
     routeLayerRef.current = group;
+    const reduceMotion = prefersReducedMapMotion();
+    const routeBottomPadding = Math.max(188, bottomOverlayHeightRef.current + 40);
+    map.stop();
     map.fitBounds(line.getBounds().pad(0.22), {
-      animate: true,
-      duration: 0.4,
+      animate: !reduceMotion,
+      duration: MAP_FOCUS_DURATION,
       maxZoom: PLACE_FOCUS_ZOOM,
-      paddingBottomRight: [48, selectedBottomPadding || 188],
+      paddingBottomRight: [48, routeBottomPadding],
       paddingTopLeft: [48, 116],
     });
 
@@ -1744,14 +1917,19 @@ export function SocialMap({
       group.remove();
       if (routeLayerRef.current === group) routeLayerRef.current = null;
     };
-  }, [mapReady, routePath, selectedBottomPadding]);
+  }, [mapReady, routePath]);
 
   const resetToOverview = () => {
+    if (selectionKeyRef.current !== "|") cameraHandledSelectionRef.current = "|";
     flyToOverview();
     onResetView();
   };
 
   const selectDiscoveryCluster = (cluster: MapAreaCluster) => {
+    const nextSelectionKey = `${cluster.id}|`;
+    if (selectionKeyRef.current !== nextSelectionKey) {
+      cameraHandledSelectionRef.current = nextSelectionKey;
+    }
     onSelectArea(cluster);
     zoomIntoCluster(cluster);
   };
@@ -1766,9 +1944,16 @@ export function SocialMap({
     map.locate({ enableHighAccuracy: true, maxZoom: 15, setView: true });
   };
 
+  const utilityRailHidden = availableMapHeight < MIN_UTILITY_RAIL_HEIGHT;
+  const mapChromeHidden = availableMapHeight < MIN_MAP_CHROME_HEIGHT;
+  const mapStyle = {
+    "--hp-map-bottom-overlay-height": `${Math.max(0, bottomOverlayHeight)}px`,
+  } as CSSProperties;
+
   return (
     <div
-      className={`hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""}`}
+      className={`hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""} ${mapChromeHidden ? "is-map-compressed" : ""}`}
+      style={mapStyle}
     >
       <div ref={mapNodeRef} className="h-full w-full" aria-label={t("Interactive map of Ilia")} />
 
@@ -1784,21 +1969,23 @@ export function SocialMap({
         <button
           type="button"
           onClick={onBack}
-          className="absolute left-3 top-14 z-20 grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur transition active:scale-95"
+          className="hp-icon-button hp-control-surface hp-map-back absolute"
           aria-label={t("Back to previous map view")}
         >
-          <ChevronLeft size={18} strokeWidth={2.6} />
+          <ChevronLeft size={18} strokeWidth={2.5} />
         </button>
       )}
 
-      <div className="pointer-events-none absolute left-1/2 top-3 z-20 max-w-[72%] -translate-x-1/2 rounded-full border border-hp-ink/10 bg-hp-paper/95 px-3 py-1.5 text-center text-[11px] font-semibold text-hp-ink/80 shadow-sm backdrop-blur">
-        <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
-        {summaryText}
+      <div className="hp-map-summary pointer-events-none">
+        <span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-hp-sunset" />
+        <span className="hp-map-summary__text">{summaryText}</span>
       </div>
 
       {clusters.length > 0 && (
         <div
-          className={`hp-no-scrollbar absolute ${canGoBack ? "left-16" : "left-3"} right-16 top-14 z-20 flex gap-2 overflow-x-auto pb-2`}
+          className={`hp-map-chip-rail hp-no-scrollbar ${canGoBack ? "has-back" : ""} ${selectedAreaId ? "has-selection" : ""}`}
+          inert={mapChromeHidden ? true : undefined}
+          aria-hidden={mapChromeHidden ? true : undefined}
           aria-label={t("Top map areas")}
         >
           {clusters
@@ -1812,11 +1999,8 @@ export function SocialMap({
                   type="button"
                   onClick={() => selectDiscoveryCluster(cluster)}
                   aria-pressed={selected}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-left text-[11px] font-bold shadow-sm backdrop-blur transition active:scale-95 ${
-                    selected
-                      ? "border-hp-ink bg-hp-ink text-hp-paper"
-                      : "border-hp-ink/10 bg-hp-paper/95 text-hp-ink"
-                  }`}
+                  tabIndex={mapChromeHidden ? -1 : undefined}
+                  className={`hp-chip hp-map-chip ${selected ? "is-active" : ""}`}
                 >
                   <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
                   {cluster.name}
@@ -1829,43 +2013,55 @@ export function SocialMap({
         </div>
       )}
 
-      <div className="absolute right-3 top-14 z-20 flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={() => mapRef.current?.zoomIn()}
-          disabled={!mapReady || zoom >= MAX_ZOOM}
-          className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Zoom in map")}
-        >
-          <Plus size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={zoomOut}
-          disabled={!mapReady || zoom <= MIN_ZOOM}
-          className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Zoom out map")}
-        >
-          <Minus size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={locateUser}
-          disabled={!mapReady}
-          className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Find my location")}
-        >
-          <Crosshair size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={resetToOverview}
-          disabled={!mapReady}
-          className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Show Ilia overview")}
-        >
-          <MapPinned size={16} />
-        </button>
+      <div
+        className={`hp-map-utility-rail ${utilityRailHidden ? "is-hidden" : ""}`}
+        inert={utilityRailHidden ? true : undefined}
+        aria-hidden={utilityRailHidden ? true : undefined}
+      >
+        <div className="hp-map-control-group" role="group" aria-label={t("Map zoom controls")}>
+          <button
+            type="button"
+            onClick={() => mapRef.current?.zoomIn()}
+            disabled={!mapReady || zoom >= MAX_ZOOM}
+            tabIndex={utilityRailHidden ? -1 : undefined}
+            className="hp-icon-button hp-map-icon-button"
+            aria-label={t("Zoom in map")}
+          >
+            <Plus size={17} strokeWidth={2.5} />
+          </button>
+          <button
+            type="button"
+            onClick={zoomOut}
+            disabled={!mapReady || zoom <= MIN_ZOOM}
+            tabIndex={utilityRailHidden ? -1 : undefined}
+            className="hp-icon-button hp-map-icon-button"
+            aria-label={t("Zoom out map")}
+          >
+            <Minus size={17} strokeWidth={2.5} />
+          </button>
+        </div>
+        <div className="hp-map-control-group" role="group" aria-label={t("Map view controls")}>
+          <button
+            type="button"
+            onClick={locateUser}
+            disabled={!mapReady}
+            tabIndex={utilityRailHidden ? -1 : undefined}
+            className="hp-icon-button hp-map-icon-button"
+            aria-label={t("Find my location")}
+          >
+            <Crosshair size={17} strokeWidth={2.2} />
+          </button>
+          <button
+            type="button"
+            onClick={resetToOverview}
+            disabled={!mapReady}
+            tabIndex={utilityRailHidden ? -1 : undefined}
+            className="hp-icon-button hp-map-icon-button"
+            aria-label={t("Show Ilia overview")}
+          >
+            <MapPinned size={17} strokeWidth={2.2} />
+          </button>
+        </div>
       </div>
     </div>
   );
