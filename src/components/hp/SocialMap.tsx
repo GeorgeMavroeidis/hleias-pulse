@@ -832,7 +832,7 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   node.style.setProperty("--hp-map-pulse-hot-peak", (1.08 + farPulse * 0.14).toFixed(4));
   node.style.setProperty("--hp-map-pulse-live-peak", (1.12 + farPulse * 0.18).toFixed(4));
   node.style.setProperty("--hp-map-theme-detail", themeDetail.toFixed(4));
-  node.style.setProperty("--hp-map-effect-opacity", (0.58 + themeDetail * 0.42).toFixed(4));
+  node.style.setProperty("--hp-map-effect-opacity", (0.72 + themeDetail * 0.28).toFixed(4));
   node.style.setProperty("--hp-map-secondary-opacity", themeDetail.toFixed(4));
 }
 

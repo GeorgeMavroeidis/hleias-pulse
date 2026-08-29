@@ -157,11 +157,6 @@ const MARKER_ANIMATION_THEMES: {
   description: string;
 }[] = [
   {
-    id: "calm",
-    label: "Aegean Calm",
-    description: "A quiet selected-marker breath with a still map around it.",
-  },
-  {
     id: "pulse",
     label: "Pulse Coast",
     description: "Activity-aware pulses that keep the map lively and restrained.",
@@ -170,6 +165,11 @@ const MARKER_ANIMATION_THEMES: {
     id: "signal",
     label: "Night Signal",
     description: "A slower single signal with a more atmospheric rhythm.",
+  },
+  {
+    id: "calm",
+    label: "Aegean Calm",
+    description: "A quiet selected-marker breath with a still map around it.",
   },
 ];
 
@@ -380,7 +380,7 @@ function TopBar({
   const searchActive = showSearch || query.trim().length > 0;
   const activeAnimationTheme =
     MARKER_ANIMATION_THEMES.find((theme) => theme.id === animationTheme) ??
-    MARKER_ANIMATION_THEMES[1];
+    MARKER_ANIMATION_THEMES[0];
   const appearanceButtonRef = useRef<HTMLButtonElement>(null);
   const appearanceMenuRef = useRef<HTMLDivElement>(null);
 
