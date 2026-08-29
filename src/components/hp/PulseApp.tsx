@@ -378,6 +378,9 @@ function TopBar({
 }: TopBarProps) {
   const { language, t } = useI18n();
   const searchActive = showSearch || query.trim().length > 0;
+  const activeAnimationTheme =
+    MARKER_ANIMATION_THEMES.find((theme) => theme.id === animationTheme) ??
+    MARKER_ANIMATION_THEMES[1];
   const appearanceButtonRef = useRef<HTMLButtonElement>(null);
   const appearanceMenuRef = useRef<HTMLDivElement>(null);
 
@@ -451,6 +454,7 @@ function TopBar({
             aria-label={t(appearanceOpen ? "Close appearance menu" : "Open appearance menu")}
             aria-expanded={appearanceOpen}
             aria-controls="hp-appearance-menu"
+            data-active-theme={animationTheme}
           >
             <Palette size={16} strokeWidth={2.2} />
           </button>
@@ -491,7 +495,12 @@ function TopBar({
             </div>
 
             <div className="hp-appearance-section">
-              <span className="hp-appearance-label">{t("Marker animation")}</span>
+              <div className="hp-appearance-section-heading">
+                <span className="hp-appearance-label">{t("Marker animation")}</span>
+                <span className="hp-animation-theme-current" aria-live="polite">
+                  {t("Current: {theme}", { theme: activeAnimationTheme.label })}
+                </span>
+              </div>
               <div
                 className="hp-animation-theme-options"
                 role="radiogroup"
