@@ -31,6 +31,8 @@ import {
   ExternalLink,
   LockKeyhole,
   RefreshCw,
+  Palette,
+  Check,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -111,6 +113,7 @@ import {
 type Tab = "map" | "pulse" | "routes" | "meet" | "saved";
 type NavTab = Exclude<Tab, "saved">;
 type ComposerMode = "post" | "place" | "story" | "event";
+type MarkerAnimationTheme = "calm" | "pulse" | "signal";
 type CreateStoryInput = {
   placeId: string;
   caption: string;
@@ -147,6 +150,38 @@ const HP_TRANSITION = {
   tab: { duration: 0.18, ease: HP_EASE_OUT },
   sheetContent: { duration: 0.19, ease: HP_EASE_OUT },
 } as const;
+const MARKER_ANIMATION_THEME_STORAGE_KEY = "hp.marker-animation-theme.v1";
+const MARKER_ANIMATION_THEMES: {
+  id: MarkerAnimationTheme;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "calm",
+    label: "Aegean Calm",
+    description: "A quiet selected-marker breath with a still map around it.",
+  },
+  {
+    id: "pulse",
+    label: "Pulse Coast",
+    description: "Activity-aware pulses that keep the map lively and restrained.",
+  },
+  {
+    id: "signal",
+    label: "Night Signal",
+    description: "A slower single signal with a more atmospheric rhythm.",
+  },
+];
+
+function initialMarkerAnimationTheme(): MarkerAnimationTheme {
+  if (typeof window === "undefined") return "pulse";
+  try {
+    const stored = window.localStorage.getItem(MARKER_ANIMATION_THEME_STORAGE_KEY);
+    return stored === "calm" || stored === "signal" || stored === "pulse" ? stored : "pulse";
+  } catch {
+    return "pulse";
+  }
+}
 type ShareTarget = {
   type: "app" | "place" | "post" | "route" | "story";
   id?: string;
@@ -315,7 +350,11 @@ function Toast({ msg }: { msg: string | null }) {
 interface TopBarProps {
   query: string;
   setQuery: (query: string) => void;
-  onToggleLanguage: () => void;
+  onSetLanguage: (language: "GR" | "EN") => void;
+  animationTheme: MarkerAnimationTheme;
+  onSetAnimationTheme: (theme: MarkerAnimationTheme) => void;
+  appearanceOpen: boolean;
+  setAppearanceOpen: Dispatch<SetStateAction<boolean>>;
   showSearch: boolean;
   setShowSearch: Dispatch<SetStateAction<boolean>>;
   account: PulseAccountState;
@@ -326,7 +365,11 @@ interface TopBarProps {
 function TopBar({
   query,
   setQuery,
-  onToggleLanguage,
+  onSetLanguage,
+  animationTheme,
+  onSetAnimationTheme,
+  appearanceOpen,
+  setAppearanceOpen,
   showSearch,
   setShowSearch,
   account,
@@ -335,8 +378,39 @@ function TopBar({
 }: TopBarProps) {
   const { language, t } = useI18n();
   const searchActive = showSearch || query.trim().length > 0;
+  const appearanceButtonRef = useRef<HTMLButtonElement>(null);
+  const appearanceMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!appearanceOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (
+        target &&
+        (appearanceButtonRef.current?.contains(target) ||
+          appearanceMenuRef.current?.contains(target))
+      ) {
+        return;
+      }
+      setAppearanceOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setAppearanceOpen(false);
+      appearanceButtonRef.current?.focus();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [appearanceOpen, setAppearanceOpen]);
+
   return (
-    <div className="relative z-30 border-b border-hp-ink/10 bg-hp-paper/95">
+    <div className="relative z-[60] border-b border-hp-ink/10 bg-hp-paper/95">
       <div className="hp-safe-px flex items-center justify-between pt-2.5">
         <div className="flex items-center gap-2.5" aria-label="ΗΛΕΙΑ PULSE">
           <img
@@ -355,7 +429,10 @@ function TopBar({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setShowSearch((s) => !s)}
+            onClick={() => {
+              setAppearanceOpen(false);
+              setShowSearch((s) => !s);
+            }}
             className={`hp-icon-button hp-topbar-search h-9 w-9 ${searchActive ? "is-active" : ""} ${query.trim() ? "has-query" : ""}`}
             aria-label={t(showSearch ? "Close search" : "Open search")}
             aria-expanded={showSearch}
@@ -364,12 +441,18 @@ function TopBar({
             <Search size={16} strokeWidth={2.2} />
           </button>
           <button
+            ref={appearanceButtonRef}
             type="button"
-            onClick={onToggleLanguage}
-            className="hp-chip hp-language-chip text-[11px] tracking-wider"
-            aria-label={t("Toggle language")}
+            onClick={() => {
+              setShowSearch(false);
+              setAppearanceOpen((open) => !open);
+            }}
+            className={`hp-icon-button hp-appearance-trigger h-9 w-9 ${appearanceOpen ? "is-active" : ""}`}
+            aria-label={t(appearanceOpen ? "Close appearance menu" : "Open appearance menu")}
+            aria-expanded={appearanceOpen}
+            aria-controls="hp-appearance-menu"
           >
-            {language === "GR" ? "GR / en" : "gr / EN"}
+            <Palette size={16} strokeWidth={2.2} />
           </button>
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
@@ -377,6 +460,73 @@ function TopBar({
       <div className="hp-safe-px pb-1.5 pt-0.5">
         <p className="text-[12px] text-hp-muted">{t("Local spots, routes, and tips.")}</p>
       </div>
+      <AnimatePresence>
+        {appearanceOpen && (
+          <motion.div
+            ref={appearanceMenuRef}
+            id="hp-appearance-menu"
+            role="dialog"
+            aria-label={t("Appearance")}
+            initial={{ opacity: 0, y: -4, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -3, scale: 0.99 }}
+            transition={HP_TRANSITION.state}
+            className="hp-appearance-menu"
+          >
+            <div className="hp-appearance-section">
+              <span className="hp-appearance-label">{t("Language")}</span>
+              <div className="hp-appearance-language" role="group" aria-label={t("Language")}>
+                {(["GR", "EN"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => onSetLanguage(option)}
+                    className="hp-appearance-language-option"
+                    aria-pressed={language === option}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="hp-appearance-section">
+              <span className="hp-appearance-label">{t("Marker animation")}</span>
+              <div
+                className="hp-animation-theme-options"
+                role="radiogroup"
+                aria-label={t("Marker animation")}
+              >
+                {MARKER_ANIMATION_THEMES.map((theme) => {
+                  const selected = animationTheme === theme.id;
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => onSetAnimationTheme(theme.id)}
+                      className="hp-animation-theme-option"
+                      data-theme-preview={theme.id}
+                    >
+                      <span className="hp-animation-theme-preview" aria-hidden="true">
+                        <span />
+                      </span>
+                      <span className="hp-animation-theme-copy">
+                        <strong>{theme.label}</strong>
+                        <small>{t(theme.description)}</small>
+                      </span>
+                      <span className="hp-animation-theme-check" aria-hidden="true">
+                        {selected && <Check size={15} strokeWidth={2.7} />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {showSearch && (
           <motion.div
@@ -3787,6 +3937,10 @@ export function PulseApp() {
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [markerAnimationTheme, setMarkerAnimationTheme] = useState<MarkerAnimationTheme>(
+    initialMarkerAnimationTheme,
+  );
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
@@ -4087,8 +4241,8 @@ export function PulseApp() {
     }
   }, [setLanguage]);
 
-  const toggleAppLanguage = () => {
-    const next = language === "GR" ? "EN" : "GR";
+  const setAppLanguage = (next: "GR" | "EN") => {
+    if (next === language) return;
     setLanguage(next);
     if (account.status === "ready" || account.status === "needsProfile") {
       void savePulseLanguage(account.userId, next).catch((error) => {
@@ -4096,6 +4250,19 @@ export function PulseApp() {
       });
     }
   };
+
+  const updateMarkerAnimationTheme = (next: MarkerAnimationTheme) => {
+    setMarkerAnimationTheme(next);
+    try {
+      window.localStorage.setItem(MARKER_ANIMATION_THEME_STORAGE_KEY, next);
+    } catch (error) {
+      console.warn("Could not save marker animation preference.", error);
+    }
+  };
+
+  useEffect(() => {
+    setAppearanceOpen(false);
+  }, [tab]);
 
   const requireProfile = (action = "post") => {
     if (account.status === "ready") return true;
@@ -5071,7 +5238,10 @@ export function PulseApp() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10">
+      <div
+        className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10"
+        data-marker-animation-theme={markerAnimationTheme}
+      >
         <div
           className="flex min-h-0 flex-1 flex-col"
           inert={modalOpen ? true : undefined}
@@ -5080,7 +5250,11 @@ export function PulseApp() {
           <TopBar
             query={query}
             setQuery={setQuery}
-            onToggleLanguage={toggleAppLanguage}
+            onSetLanguage={setAppLanguage}
+            animationTheme={markerAnimationTheme}
+            onSetAnimationTheme={updateMarkerAnimationTheme}
+            appearanceOpen={appearanceOpen}
+            setAppearanceOpen={setAppearanceOpen}
             showSearch={showSearch}
             setShowSearch={setShowSearch}
             account={account}
