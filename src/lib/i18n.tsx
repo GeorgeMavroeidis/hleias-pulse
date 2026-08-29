@@ -18,6 +18,17 @@ const EL: Record<string, string> = {
   "Open search": "Άνοιγμα αναζήτησης",
   "Close search": "Κλείσιμο αναζήτησης",
   "Toggle language": "Αλλαγή γλώσσας",
+  Appearance: "Εμφάνιση",
+  Language: "Γλώσσα",
+  "Marker animation": "Κίνηση σημείων χάρτη",
+  "Open appearance menu": "Άνοιγμα επιλογών εμφάνισης",
+  "Close appearance menu": "Κλείσιμο επιλογών εμφάνισης",
+  "A quiet selected-marker breath with a still map around it.":
+    "Ήρεμη αναπνοή στο επιλεγμένο σημείο, με σταθερό τον υπόλοιπο χάρτη.",
+  "Activity-aware pulses that keep the map lively and restrained.":
+    "Παλμοί ανάλογα με τη δραστηριότητα, ζωντανοί αλλά διακριτικοί.",
+  "A slower single signal with a more atmospheric rhythm.":
+    "Πιο αργό μονό σήμα, με ατμοσφαιρικό ρυθμό.",
   Map: "Χάρτης",
   Pulse: "Ροή",
   Routes: "Διαδρομές",
