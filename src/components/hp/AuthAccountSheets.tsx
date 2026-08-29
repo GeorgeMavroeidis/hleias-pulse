@@ -371,12 +371,14 @@ export function AuthSheet({
 function OrganizerSection({
   status,
   myEventsCount,
+  identityEligible,
   onApply,
   onOpenComposer,
   onOpenMyEvents,
 }: {
   status: OrganizerStatus | null;
   myEventsCount: number;
+  identityEligible: boolean;
   onApply: () => Promise<void>;
   onOpenComposer: () => void;
   onOpenMyEvents: () => void;
@@ -439,6 +441,10 @@ function OrganizerSection({
     );
   }
 
+  // Applying only makes sense for Local / Guide identities. An already-verified
+  // or pending standing is handled by the returns above and stays visible.
+  if (!identityEligible) return null;
+
   return (
     <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
       <div className="text-[13px] font-black text-hp-ink">{t("Do you organize events?")}</div>
@@ -455,7 +461,7 @@ function OrganizerSection({
         type="button"
         onClick={() => void apply()}
         disabled={applying}
-        className="mt-2 w-full rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper disabled:opacity-60"
+        className="mt-2 w-full rounded-full border border-hp-ink/15 bg-transparent py-2 text-[12px] font-bold text-hp-ink transition active:scale-[0.98] disabled:opacity-60"
       >
         {applying ? t("Submitting…") : t("Become an organizer")}
       </button>
@@ -466,11 +472,13 @@ function OrganizerSection({
 function BusinessSection({
   status,
   myPlacesCount,
+  identityEligible,
   onApply,
   onOpenPlaces,
 }: {
   status: BusinessStatus | null;
   myPlacesCount: number;
+  identityEligible: boolean;
   onApply: () => Promise<void>;
   onOpenPlaces: () => void;
 }) {
@@ -534,6 +542,10 @@ function BusinessSection({
     );
   }
 
+  // Applying only makes sense for Local / Guide identities. An already-verified
+  // or pending standing is handled by the returns above and stays visible.
+  if (!identityEligible) return null;
+
   return (
     <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
       <div className="text-[13px] font-black text-hp-ink">{t("Do you run a local business?")}</div>
@@ -550,7 +562,7 @@ function BusinessSection({
         type="button"
         onClick={() => void apply()}
         disabled={applying}
-        className="mt-2 w-full rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper disabled:opacity-60"
+        className="mt-2 w-full rounded-full border border-hp-ink/15 bg-transparent py-2 text-[12px] font-bold text-hp-ink transition active:scale-[0.98] disabled:opacity-60"
       >
         {applying ? t("Submitting…") : t("Register a business")}
       </button>
@@ -689,6 +701,19 @@ export function AccountSheet({
 
   const avatarUrl = avatarPreview ?? profileAvatarUrl(profile);
 
+  // Live picker value (not the persisted profile) so the community-roles group
+  // reacts the moment the identity toggle changes, before a save.
+  const identityEligible = identity !== "TOURIST";
+  const identityLabel =
+    PROFILE_IDENTITIES.find((option) => option.id === identity)?.label ?? identity;
+  const hasOrganizerStanding =
+    organizerStatus?.verificationStatus === "verified" ||
+    organizerStatus?.verificationStatus === "pending";
+  const hasBusinessStanding =
+    businessStatus?.verificationStatus === "verified" ||
+    businessStatus?.verificationStatus === "pending";
+  const showCommunityRolesNote = !identityEligible && !hasOrganizerStanding && !hasBusinessStanding;
+
   return (
     <AnimatePresence>
       {open && (
@@ -775,25 +800,6 @@ export function AccountSheet({
                     </span>
                   </button>
 
-                  {adminRole && (
-                    <button
-                      type="button"
-                      onClick={onOpenAdmin}
-                      className="flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
-                    >
-                      <span className="grid h-10 w-10 place-items-center rounded-full bg-hp-sunset text-hp-paper">
-                        <ShieldCheck size={16} />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] font-black text-hp-ink">
-                          {t("Admin workspace")}
-                        </span>
-                        <span className="block text-[11px] text-hp-muted">
-                          Open team tools · {adminRole}
-                        </span>
-                      </span>
-                    </button>
-                  )}
                   <input
                     ref={fileRef}
                     type="file"
@@ -817,26 +823,31 @@ export function AccountSheet({
                     <div className="truncate text-[11.5px] font-bold text-hp-muted">
                       {email ?? "Signed in"}
                     </div>
-                    <div className="mt-1 inline-flex rounded-full bg-hp-sunset/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-hp-sunset">
-                      {identity}
+                    <div className="mt-1 block w-fit max-w-full truncate rounded-full bg-hp-sunset/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-hp-sunset">
+                      {t(identityLabel)}
                     </div>
                   </div>
                 </div>
 
-                <OrganizerSection
-                  status={organizerStatus}
-                  myEventsCount={organizerEventCount}
-                  onApply={onApplyOrganizer}
-                  onOpenComposer={onOpenOrganizerComposer}
-                  onOpenMyEvents={onOpenOrganizerEvents}
-                />
-
-                <BusinessSection
-                  status={businessStatus}
-                  myPlacesCount={businessPlaceCount}
-                  onApply={onApplyBusiness}
-                  onOpenPlaces={onOpenBusinessPlaces}
-                />
+                {adminRole && (
+                  <button
+                    type="button"
+                    onClick={onOpenAdmin}
+                    className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
+                  >
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+                      <ShieldCheck size={16} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-black text-hp-ink">
+                        {t("Admin workspace")}
+                      </span>
+                      <span className="block text-[11px] text-hp-muted">
+                        Open team tools · {adminRole}
+                      </span>
+                    </span>
+                  </button>
+                )}
 
                 <form onSubmit={submit} className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
@@ -909,6 +920,32 @@ export function AccountSheet({
                       className={`${fieldClass()} resize-none`}
                     />
                   </Field>
+
+                  <div className="rounded-2xl border border-hp-ink/10 bg-hp-paper/40 p-2.5 [&>*:last-child]:mb-0">
+                    <div className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                      {t("Community roles")}
+                    </div>
+                    <OrganizerSection
+                      status={organizerStatus}
+                      myEventsCount={organizerEventCount}
+                      identityEligible={identityEligible}
+                      onApply={onApplyOrganizer}
+                      onOpenComposer={onOpenOrganizerComposer}
+                      onOpenMyEvents={onOpenOrganizerEvents}
+                    />
+                    <BusinessSection
+                      status={businessStatus}
+                      myPlacesCount={businessPlaceCount}
+                      identityEligible={identityEligible}
+                      onApply={onApplyBusiness}
+                      onOpenPlaces={onOpenBusinessPlaces}
+                    />
+                    {showCommunityRolesNote && (
+                      <p className="rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-[12px] font-semibold text-hp-muted">
+                        {t("Community roles are available for Local and Guide accounts.")}
+                      </p>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-4 gap-2">
                     {[
