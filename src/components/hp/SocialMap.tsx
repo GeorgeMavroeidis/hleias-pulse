@@ -21,6 +21,15 @@ type InteractiveMarkerElement = HTMLElement & {
   __hpKeyHandler?: EventListener;
 };
 
+type MarkerRuntimeState = {
+  lat: number;
+  lng: number;
+  opacity: number;
+  selected: boolean;
+  visible: boolean;
+  zIndexOffset: number;
+};
+
 const ILIA_CENTER: LatLngTuple = [37.68, 21.52];
 // Generous pan bounds: maxBounds only keeps users roughly around Ilia. It must
 // never wall in a zoomed region (South Coast ~37.41 used to hit the south edge
@@ -469,7 +478,6 @@ function resolveUrl(resolve: (url: string) => string, url: string) {
 function createAreaIcon(
   L: LeafletModule,
   cluster: MapAreaCluster,
-  selected: boolean,
   resolve: (url: string) => string,
 ) {
   const size = clusterSize(cluster.status);
@@ -494,7 +502,7 @@ function createAreaIcon(
     className: "hp-area-marker",
     html: `
       <div
-        class="hp-area-marker__shell is-pulse-${cluster.status} ${selected ? "is-selected" : ""} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
+        class="hp-area-marker__shell is-pulse-${cluster.status} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, cluster.id)}"
       >
         <span class="hp-marker-aura"></span>
@@ -522,7 +530,6 @@ function createChildIcon(
   place: Place,
   eventCount: number,
   tier: PulseTier,
-  selected: boolean,
   hasStories = false,
   solo = false,
   resolve: (url: string) => string = (url) => url,
@@ -544,7 +551,7 @@ function createChildIcon(
     className: "hp-child-marker",
     html: `
       <div
-        class="hp-child-marker__shell is-pulse-${tier} ${selected ? "is-selected" : ""} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${tier === "live" ? "is-live" : ""} ${tier === "hot" ? "is-hot" : ""}"
+        class="hp-child-marker__shell is-pulse-${tier} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${tier === "live" ? "is-live" : ""} ${tier === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, place.id)}"
       >
         <span class="hp-marker-aura"></span>
@@ -596,7 +603,7 @@ function createActivityClusterIcon(
     className: "hp-activity-cluster",
     html: `
       <div
-        class="hp-area-marker__shell hp-area-marker__shell--activity is-pulse-${node.tier} ${node.selected ? "is-selected" : ""} ${node.tier === "live" ? "is-live" : ""} ${node.tier === "hot" ? "is-hot" : ""}"
+        class="hp-area-marker__shell hp-area-marker__shell--activity is-pulse-${node.tier} ${node.tier === "live" ? "is-live" : ""} ${node.tier === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, node.id)}"
       >
         <span class="hp-marker-aura"></span>
@@ -633,12 +640,86 @@ function smoothstep(start: number, end: number, value: number) {
   return t * t * (3 - 2 * t);
 }
 
+type ZoomAnchor = readonly [zoom: number, value: number];
+
+function interpolateZoomAnchors(zoom: number, anchors: readonly ZoomAnchor[]) {
+  const first = anchors[0];
+  const last = anchors[anchors.length - 1];
+  if (!first || !last) return 0;
+  if (zoom <= first[0]) return first[1];
+  if (zoom >= last[0]) return last[1];
+
+  for (let index = 1; index < anchors.length; index += 1) {
+    const previous = anchors[index - 1];
+    const next = anchors[index];
+    if (!previous || !next || zoom > next[0]) continue;
+    const progress = smoothstep(previous[0], next[0], zoom);
+    return previous[1] + (next[1] - previous[1]) * progress;
+  }
+
+  return last[1];
+}
+
 function markerZoomProfile(zoom: number) {
+  const childScale = interpolateZoomAnchors(zoom, [
+    [MIN_ZOOM, 0.24],
+    [OVERVIEW_ZOOM, 0.24],
+    [11.5, 0.52],
+    [12.5, 0.68],
+    [PLACE_FOCUS_ZOOM, 0.9],
+    [ALL_MARKERS_RICH_ZOOM, 1],
+  ]);
+  const soloScale = interpolateZoomAnchors(zoom, [
+    [MIN_ZOOM, 0.38],
+    [OVERVIEW_ZOOM, 0.38],
+    [11.5, 0.58],
+    [12.5, 0.68],
+    [PLACE_FOCUS_ZOOM, 0.9],
+    [ALL_MARKERS_RICH_ZOOM, 1],
+  ]);
+
   return {
     medium: smoothstep(PLACE_REVEAL_START, MEDIUM_VISUAL_END, zoom),
     detail: smoothstep(DETAIL_VISUAL_START, PLACE_FOCUS_ZOOM, zoom),
     rich: smoothstep(RICH_VISUAL_START, PLACE_FOCUS_ZOOM, zoom),
     ultra: smoothstep(PLACE_FOCUS_ZOOM, ALL_MARKERS_RICH_ZOOM, zoom),
+    childScale,
+    soloScale,
+    areaScale: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.38],
+      [OVERVIEW_ZOOM, 0.38],
+      [11.5, 0.52],
+      [AREA_FADE_END, 0.62],
+    ]),
+    activityScale: interpolateZoomAnchors(zoom, [
+      [ACTIVITY_CLUSTER_START, 0.58],
+      [ACTIVITY_CLUSTER_FULL, 0.75],
+      [DETAIL_CLUSTER_MAX_ZOOM, 0.84],
+      [PLACE_FOCUS_ZOOM, 0.9],
+    ]),
+    surfaceOpacity: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.74],
+      [OVERVIEW_ZOOM, 0.78],
+      [11.5, 0.86],
+      [12.5, 0.92],
+      [PLACE_FOCUS_ZOOM, 0.98],
+      [ALL_MARKERS_RICH_ZOOM, 1],
+    ]),
+    auraOpacity: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.3],
+      [OVERVIEW_ZOOM, 0.34],
+      [11.5, 0.42],
+      [12.5, 0.48],
+      [PLACE_FOCUS_ZOOM, 0.58],
+      [ALL_MARKERS_RICH_ZOOM, 0.6],
+    ]),
+    ringOpacity: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.68],
+      [OVERVIEW_ZOOM, 0.72],
+      [12.5, 0.86],
+      [PLACE_FOCUS_ZOOM, 0.96],
+      [ALL_MARKERS_RICH_ZOOM, 1],
+    ]),
   };
 }
 
@@ -646,28 +727,38 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   if (!node) return;
   const profile = markerZoomProfile(zoom);
   const farPulse = 1 - smoothstep(OVERVIEW_ZOOM, PLACE_FOCUS_ZOOM, zoom);
-  const childScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.35;
-  const nearbyScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.07 + profile.ultra * 0.28;
-  const soloScale = 0.32 + profile.medium * (nearbyScale - 0.32);
   node.style.setProperty("--hp-map-medium", profile.medium.toFixed(4));
   node.style.setProperty("--hp-map-detail", profile.detail.toFixed(4));
   node.style.setProperty("--hp-map-rich", profile.rich.toFixed(4));
   node.style.setProperty("--hp-map-ultra", profile.ultra.toFixed(4));
-  node.style.setProperty("--hp-map-child-scale", childScale.toFixed(4));
-  node.style.setProperty("--hp-map-nearby-scale", nearbyScale.toFixed(4));
-  node.style.setProperty("--hp-map-area-scale", (0.34 + profile.medium * 0.3).toFixed(4));
-  node.style.setProperty(
-    "--hp-map-activity-scale",
-    (0.46 + profile.medium * 0.2 + profile.detail * 0.24).toFixed(4),
-  );
+  node.style.setProperty("--hp-map-child-scale", profile.childScale.toFixed(4));
+  node.style.setProperty("--hp-map-nearby-scale", profile.childScale.toFixed(4));
+  node.style.setProperty("--hp-map-solo-scale", profile.soloScale.toFixed(4));
+  node.style.setProperty("--hp-map-area-scale", profile.areaScale.toFixed(4));
+  node.style.setProperty("--hp-map-activity-scale", profile.activityScale.toFixed(4));
+  node.style.setProperty("--hp-map-surface-opacity", profile.surfaceOpacity.toFixed(4));
+  node.style.setProperty("--hp-map-aura-opacity", profile.auraOpacity.toFixed(4));
+  node.style.setProperty("--hp-map-ring-opacity", profile.ringOpacity.toFixed(4));
   node.style.setProperty(
     "--hp-map-media-opacity",
-    (0.78 + profile.medium * 0.14 + profile.detail * 0.08).toFixed(4),
+    interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.82],
+      [11.5, 0.86],
+      [12.5, 0.92],
+      [PLACE_FOCUS_ZOOM, 0.98],
+      [ALL_MARKERS_RICH_ZOOM, 1],
+    ]).toFixed(4),
   );
-  node.style.setProperty("--hp-map-media-scale", (0.92 + profile.medium * 0.08).toFixed(4));
+  node.style.setProperty(
+    "--hp-map-media-scale",
+    interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.94],
+      [12.5, 0.97],
+      [PLACE_FOCUS_ZOOM, 1],
+    ]).toFixed(4),
+  );
   node.style.setProperty("--hp-map-rich-scale", (0.8 + profile.rich * 0.2).toFixed(4));
   node.style.setProperty("--hp-map-dot-opacity", (0.35 + profile.medium * 0.65).toFixed(4));
-  node.style.setProperty("--hp-map-solo-scale", soloScale.toFixed(4));
   node.style.setProperty("--hp-map-copy-offset", `${((1 - profile.rich) * 0.2).toFixed(4)}rem`);
   node.style.setProperty("--hp-map-pulse-moving-peak", (1.04 + farPulse * 0.08).toFixed(4));
   node.style.setProperty("--hp-map-pulse-hot-peak", (1.08 + farPulse * 0.14).toFixed(4));
@@ -784,6 +875,10 @@ export function SocialMap({
   const leafletRef = useRef<LeafletModule | null>(null);
   const markersRef = useRef<Map<string, LeafletMarker>>(new Map());
   const markerSigRef = useRef<Map<string, string>>(new Map());
+  const markerRuntimeRef = useRef<Map<string, MarkerRuntimeState>>(new Map());
+  const markerClickHandlerRef = useRef<Map<string, () => void>>(new Map());
+  const renderNodesRef = useRef<Map<string, RenderNode>>(new Map());
+  const activateMarkerByIdRef = useRef<(id: string) => void>(() => undefined);
   const userMarkerRef = useRef<LeafletMarker | null>(null);
   const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const onMapLongPressRef = useRef(onMapLongPress);
@@ -794,6 +889,8 @@ export function SocialMap({
     areaId: null,
     placeId: null,
   });
+  const lastFocusedPlaceIdRef = useRef<string | null>(null);
+  const selectionMotionUntilRef = useRef(0);
   const lastZoomRef = useRef(OVERVIEW_ZOOM);
   const [mapReady, setMapReady] = useState(false);
   const [zoom, setZoom] = useState(OVERVIEW_ZOOM);
@@ -908,13 +1005,19 @@ export function SocialMap({
       if (areaOpacity > 0.001) {
         clusters.forEach((cluster) => {
           if (cluster.places.length < 2) return;
+          const selected = Boolean(
+            selectedAreaId &&
+            !selectedPlaceId &&
+            zoom < ACTIVITY_CLUSTER_FULL &&
+            cluster.id === selectedAreaId,
+          );
           nodes.push({
             id: `cluster-${cluster.id}`,
             kind: "cluster",
             cluster,
             latLng: [cluster.lat, cluster.lng],
-            opacity: cluster.id === selectedAreaId ? Math.max(areaOpacity, 0.6) : areaOpacity,
-            selected: cluster.id === selectedAreaId,
+            opacity: selected ? 1 : areaOpacity,
+            selected,
             tier: cluster.status,
           });
         });
@@ -971,13 +1074,56 @@ export function SocialMap({
           eventCount: activity.eventCount,
           postCount: activity.postCount,
           hotness: activity.hotness,
-          selected: Boolean(
-            selectedAreaId && leaves.some((place) => clusterIdForPlace(place) === selectedAreaId),
-          ),
+          selected: false,
           tone: dominantCluster.tone,
           tier: activity.tier,
         });
       });
+    }
+
+    if (selectedAreaId && !selectedPlaceId && zoom >= ACTIVITY_CLUSTER_FULL) {
+      const selectedArea = clusterById.get(selectedAreaId);
+      const candidates = nodes.filter(
+        (node): node is ActivityClusterRenderNode =>
+          node.kind === "activity-cluster" &&
+          node.leaves.some((place) => clusterIdForPlace(place) === selectedAreaId),
+      );
+      candidates.sort((first, second) => {
+        if (!selectedArea) return second.hotness - first.hotness;
+        const firstDistance =
+          (first.latLng[0] - selectedArea.lat) ** 2 + (first.latLng[1] - selectedArea.lng) ** 2;
+        const secondDistance =
+          (second.latLng[0] - selectedArea.lat) ** 2 + (second.latLng[1] - selectedArea.lng) ** 2;
+        return firstDistance - secondDistance || second.hotness - first.hotness;
+      });
+      if (candidates[0]) {
+        candidates[0].selected = true;
+        candidates[0].opacity = 1;
+      }
+
+      // Dense activity bubbles disappear once their children fully separate.
+      // Keep one area representative selected at those close zooms so the
+      // current area never loses its visual anchor while the sheet is open.
+      if (selectedArea && !candidates[0]) {
+        const existingAreaNode = nodes.find(
+          (node): node is ClusterRenderNode =>
+            node.kind === "cluster" && node.cluster.id === selectedArea.id,
+        );
+        if (existingAreaNode) {
+          existingAreaNode.opacity = 1;
+          existingAreaNode.selected = true;
+        } else {
+          nodes.push({
+            id: `cluster-${selectedArea.id}`,
+            kind: "cluster",
+            cluster: selectedArea,
+            latLng: [selectedArea.lat, selectedArea.lng],
+            opacity: 1,
+            selected: true,
+            tier: selectedArea.status,
+          });
+        }
+      }
     }
 
     return nodes;
@@ -992,6 +1138,10 @@ export function SocialMap({
     selectedPlaceId,
     zoom,
   ]);
+
+  renderNodesRef.current = new Map(renderNodes.map((node) => [node.id, node]));
+  const primarySelectedNode = renderNodes.find((node) => node.selected) ?? null;
+  const hasPrimaryMarkerSelection = Boolean(primarySelectedNode);
 
   const summaryText = useMemo(() => {
     if (selectedPlaceNode) return selectedPlaceNode.place.name;
@@ -1012,6 +1162,8 @@ export function SocialMap({
 
       const places = cluster.childPlaces;
       const bottomPadding = Math.min(430, Math.max(190, areaFocusBottomPadding));
+      map.stop();
+      selectionMotionUntilRef.current = Date.now() + 440;
 
       if (places.length <= 1) {
         const focus: LatLngTuple = places[0]
@@ -1024,7 +1176,7 @@ export function SocialMap({
           targetZoom,
         );
         map.flyTo([shifted.lat, shifted.lng], targetZoom, {
-          duration: 0.6,
+          duration: 0.4,
           easeLinearity: 0.25,
         });
         return;
@@ -1039,7 +1191,7 @@ export function SocialMap({
       ).pad(0.25);
       map.fitBounds(bounds, {
         animate: true,
-        duration: 0.62,
+        duration: 0.4,
         easeLinearity: 0.25,
         maxZoom: AREA_FOCUS_MAX_ZOOM,
         paddingTopLeft: [56, 120],
@@ -1056,8 +1208,10 @@ export function SocialMap({
 
       const expansionZoom = placeClusterIndex.getClusterExpansionZoom(node.clusterId);
       const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(map.getZoom() + 0.75, expansionZoom));
+      map.stop();
+      selectionMotionUntilRef.current = Date.now() + 420;
       map.flyTo(node.latLng, targetZoom, {
-        duration: 0.55,
+        duration: 0.38,
         easeLinearity: 0.25,
       });
     },
@@ -1067,6 +1221,26 @@ export function SocialMap({
   const flyToOverview = useCallback(() => {
     mapRef.current?.flyTo(ILIA_CENTER, OVERVIEW_ZOOM, { duration: 0.45, easeLinearity: 0.25 });
   }, []);
+
+  activateMarkerByIdRef.current = (id: string) => {
+    const node = renderNodesRef.current.get(id);
+    if (!node) return;
+
+    const now = Date.now();
+    const previousActivation = lastMarkerActivationRef.current;
+    if (previousActivation && now - previousActivation.at < 420) return;
+    lastMarkerActivationRef.current = { id, at: now };
+
+    if (node.kind === "cluster") {
+      onSelectArea(node.cluster);
+      zoomIntoCluster(node.cluster);
+    } else if (node.kind === "activity-cluster") {
+      onSelectArea(node.dominantCluster);
+      zoomIntoActivityCluster(node);
+    } else {
+      onSelectPlace(node.place, node.cluster);
+    }
+  };
 
   useEffect(() => {
     const previous = previousSelectionRef.current;
@@ -1093,6 +1267,8 @@ export function SocialMap({
     const cleanupFns: Array<() => void> = [];
     const markers = markersRef.current;
     const markerSigs = markerSigRef.current;
+    const markerRuntimes = markerRuntimeRef.current;
+    const markerClickHandlers = markerClickHandlerRef.current;
 
     import("leaflet").then((L) => {
       if (cancelled || !mapNodeRef.current) return;
@@ -1234,8 +1410,11 @@ export function SocialMap({
       }
       cleanupFns.forEach((cleanup) => cleanup());
       setMapReady(false);
+      markerClickHandlers.forEach((handler, id) => markers.get(id)?.off("click", handler));
       markers.clear();
       markerSigs.clear();
+      markerRuntimes.clear();
+      markerClickHandlers.clear();
       map?.remove();
       mapRef.current = null;
       leafletRef.current = null;
@@ -1261,57 +1440,27 @@ export function SocialMap({
     const nodeIds = new Set(renderNodes.map((node) => node.id));
     markersRef.current.forEach((marker, id) => {
       if (nodeIds.has(id)) return;
+      const clickHandler = markerClickHandlerRef.current.get(id);
+      if (clickHandler) marker.off("click", clickHandler);
       marker.remove();
       markersRef.current.delete(id);
       markerSigRef.current.delete(id);
+      markerRuntimeRef.current.delete(id);
+      markerClickHandlerRef.current.delete(id);
     });
 
     renderNodes.forEach((node) => {
-      const icon =
-        node.kind === "cluster"
-          ? createAreaIcon(L, node.cluster, node.selected, resolveImg)
+      const zIndexOffset = node.selected
+        ? 2400
+        : node.kind === "child"
+          ? 1400
           : node.kind === "activity-cluster"
-            ? createActivityClusterIcon(L, node, resolveImg)
-            : createChildIcon(
-                L,
-                node.place,
-                node.eventCount,
-                node.tier,
-                node.selected,
-                storyPlaceIds?.has(node.place.id) ?? false,
-                node.solo,
-                resolveImg,
-              );
-      let marker = markersRef.current.get(node.id);
-      const activateMarker = () => {
-        const now = Date.now();
-        const previousActivation = lastMarkerActivationRef.current;
-        if (previousActivation && now - previousActivation.at < 420) return;
-        lastMarkerActivationRef.current = { id: node.id, at: now };
-
-        if (node.kind === "cluster") {
-          onSelectArea(node.cluster);
-          zoomIntoCluster(node.cluster);
-        } else if (node.kind === "activity-cluster") {
-          onSelectArea(node.dominantCluster);
-          zoomIntoActivityCluster(node);
-        } else {
-          onSelectPlace(node.place, node.cluster);
-        }
-      };
-
-      const zIndexOffset =
-        node.kind === "child"
-          ? node.selected
-            ? 1700
-            : 1400
-          : node.kind === "activity-cluster"
-            ? (node.selected ? 1100 : 900) + Math.round(node.hotness * 10)
-            : (node.selected ? 1200 : 700) + Math.round(node.cluster.hotness * 10);
+            ? 900 + Math.round(node.hotness * 10)
+            : 700 + Math.round(node.cluster.hotness * 10);
 
       // Signature captures only what changes the icon's *visual content*.
-      // Opacity & position are applied cheaply below, so a pure zoom step no
-      // longer rebuilds every marker's DOM (this was the zoom stutter).
+      // Interaction state is applied directly to the existing DOM and never
+      // rebuilds image/collage content.
       const hasStory = node.kind === "child" && (storyPlaceIds?.has(node.place.id) ?? false);
       // The image token makes a marker rebuild the moment its cached thumbnail
       // resolves (placeholder -> blob URL), without rebuilding on pure zoom.
@@ -1334,78 +1483,92 @@ export function SocialMap({
       const sig = [
         node.kind,
         node.kind === "cluster"
-          ? `${node.cluster.id}:${node.cluster.status}:${node.selected ? 1 : 0}:${imageToken}`
+          ? `${node.cluster.id}:${node.cluster.status}:${imageToken}`
           : node.kind === "activity-cluster"
-            ? `${node.clusterId}:${node.pointCount}:${node.tier}:${node.selected ? 1 : 0}:${node.tone}:${imageToken}`
-            : `${node.place.id}:${node.tier}:${node.selected ? 1 : 0}:${hasStory ? 1 : 0}:${node.solo ? 1 : 0}:${node.eventCount}:${imageToken}`,
+            ? `${node.clusterId}:${node.pointCount}:${node.tier}:${node.tone}:${imageToken}`
+            : `${node.place.id}:${node.tier}:${hasStory ? 1 : 0}:${node.solo ? 1 : 0}:${node.eventCount}:${imageToken}`,
       ].join("|");
+      let marker = markersRef.current.get(node.id);
       const needsRebuild = markerSigRef.current.get(node.id) !== sig;
+      const createIcon = () =>
+        node.kind === "cluster"
+          ? createAreaIcon(L, node.cluster, resolveImg)
+          : node.kind === "activity-cluster"
+            ? createActivityClusterIcon(L, node, resolveImg)
+            : createChildIcon(
+                L,
+                node.place,
+                node.eventCount,
+                node.tier,
+                hasStory,
+                node.solo,
+                resolveImg,
+              );
 
       if (!marker) {
         marker = L.marker(node.latLng, {
-          icon,
+          icon: createIcon(),
           riseOnHover: true,
           zIndexOffset,
         }).addTo(map);
         markersRef.current.set(node.id, marker);
+        const clickHandler = () => activateMarkerByIdRef.current(node.id);
+        marker.on("click", clickHandler);
+        markerClickHandlerRef.current.set(node.id, clickHandler);
+      } else if (needsRebuild) {
+        marker.setIcon(createIcon());
       }
 
-      // Cheap every-frame updates (no DOM rebuild):
-      marker.off("click");
-      marker.on("click", activateMarker);
-      marker.setLatLng(node.latLng);
-      marker.setOpacity(node.opacity);
-      marker.setZIndexOffset(zIndexOffset);
+      if (needsRebuild) markerSigRef.current.set(node.id, sig);
 
-      const visibleForInteraction = node.opacity > 0.08;
-      const currentMarkerElement = marker.getElement();
-      if (currentMarkerElement) {
-        currentMarkerElement.style.pointerEvents = visibleForInteraction ? "auto" : "none";
-        currentMarkerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
-        currentMarkerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
-        currentMarkerElement.tabIndex = visibleForInteraction ? 0 : -1;
-        const markerShell = currentMarkerElement.firstElementChild as HTMLElement | null;
-        markerShell?.style.setProperty(
-          "--hp-marker-motion-state",
-          visibleForInteraction && !document.hidden ? "running" : "paused",
-        );
+      const previousRuntime = markerRuntimeRef.current.get(node.id);
+      const isPassiveAreaAnchor =
+        node.kind !== "child" && node.selected && placeOpacityForZoom(zoom) > 0.08;
+      const visuallyVisible = node.opacity > 0.08;
+      const visibleForInteraction = visuallyVisible && !isPassiveAreaAnchor;
+      if (
+        !previousRuntime ||
+        previousRuntime.lat !== node.latLng[0] ||
+        previousRuntime.lng !== node.latLng[1]
+      ) {
+        marker.setLatLng(node.latLng);
+      }
+      if (!previousRuntime || Math.abs(previousRuntime.opacity - node.opacity) > 0.0001) {
+        marker.setOpacity(node.opacity);
+      }
+      if (!previousRuntime || previousRuntime.zIndexOffset !== zIndexOffset) {
+        marker.setZIndexOffset(zIndexOffset);
       }
 
-      // Rebuild icon + re-wire DOM only when the content actually changed.
-      if (needsRebuild) {
-        marker.setIcon(icon);
-        markerSigRef.current.set(node.id, sig);
+      const markerElement = marker.getElement() as InteractiveMarkerElement | null;
+      if (markerElement) {
+        const markerShell = markerElement.firstElementChild as HTMLElement | null;
+        const shouldSyncInteraction =
+          needsRebuild ||
+          !previousRuntime ||
+          previousRuntime.selected !== node.selected ||
+          previousRuntime.visible !== visibleForInteraction;
 
-        const markerElement = marker.getElement();
-        if (markerElement) {
-          const interactiveElement = markerElement as InteractiveMarkerElement;
+        if (shouldSyncInteraction) {
           markerElement.style.pointerEvents = visibleForInteraction ? "auto" : "none";
           markerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
-          markerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
-          const markerShell = markerElement.firstElementChild as HTMLElement | null;
+          markerElement.setAttribute("aria-hidden", visuallyVisible ? "false" : "true");
+          markerElement.setAttribute("aria-pressed", node.selected ? "true" : "false");
+          markerElement.tabIndex = visibleForInteraction ? 0 : -1;
+          markerElement.classList.toggle("is-selection-anchor", isPassiveAreaAnchor);
+          markerShell?.classList.toggle("is-selected", node.selected);
           markerShell?.style.setProperty(
             "--hp-marker-motion-state",
-            visibleForInteraction && !document.hidden ? "running" : "paused",
+            visuallyVisible && !document.hidden ? "running" : "paused",
           );
-          if (interactiveElement.__hpClickHandler) {
-            interactiveElement.removeEventListener(
-              "click",
-              interactiveElement.__hpClickHandler,
-              true,
-            );
-          }
-          if (interactiveElement.__hpKeyHandler) {
-            interactiveElement.removeEventListener(
-              "keydown",
-              interactiveElement.__hpKeyHandler,
-              true,
-            );
-          }
+        }
+
+        if (needsRebuild) {
           const activateFromEvent: EventListener = (event) => {
             event.preventDefault();
             event.stopImmediatePropagation();
             event.stopPropagation();
-            activateMarker();
+            activateMarkerByIdRef.current(node.id);
           };
           const keyHandler: EventListener = (event) => {
             const keyEvent = event as KeyboardEvent;
@@ -1413,7 +1576,7 @@ export function SocialMap({
             keyEvent.preventDefault();
             keyEvent.stopImmediatePropagation();
             keyEvent.stopPropagation();
-            activateMarker();
+            activateMarkerByIdRef.current(node.id);
           };
 
           markerElement.setAttribute("role", "button");
@@ -1426,31 +1589,37 @@ export function SocialMap({
                 : `Open ${node.place.name}`,
           );
           markerElement.dataset.hpNodeId = node.id;
-          markerElement.tabIndex = visibleForInteraction ? 0 : -1;
           markerElement.addEventListener("click", activateFromEvent, true);
           markerElement.addEventListener("keydown", keyHandler, true);
           markerShell?.addEventListener("click", activateFromEvent, true);
-          interactiveElement.__hpClickHandler = activateFromEvent;
-          interactiveElement.__hpKeyHandler = keyHandler;
+          markerElement.__hpClickHandler = activateFromEvent;
+          markerElement.__hpKeyHandler = keyHandler;
         }
       }
+
+      markerRuntimeRef.current.set(node.id, {
+        lat: node.latLng[0],
+        lng: node.latLng[1],
+        opacity: node.opacity,
+        selected: node.selected,
+        visible: visibleForInteraction,
+        zIndexOffset,
+      });
     });
-  }, [
-    mapReady,
-    onSelectArea,
-    onSelectPlace,
-    renderNodes,
-    resolveImg,
-    storyPlaceIds,
-    zoomIntoActivityCluster,
-    zoomIntoCluster,
-  ]);
+  }, [mapReady, renderNodes, resolveImg, storyPlaceIds, zoom]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || !selectedPlaceId) return;
+    if (!selectedPlaceId) {
+      lastFocusedPlaceIdRef.current = null;
+      return;
+    }
+    if (!map || !mapReady || lastFocusedPlaceIdRef.current === selectedPlaceId) return;
 
     if (!selectedPlaceNode) return;
+
+    lastFocusedPlaceIdRef.current = selectedPlaceId;
+    selectionMotionUntilRef.current = Date.now() + 460;
 
     const latLng: LatLngTuple = [selectedPlaceNode.place.lat, selectedPlaceNode.place.lng];
     const bottomPadding = Math.min(460, Math.max(220, selectedBottomPadding));
@@ -1478,6 +1647,38 @@ export function SocialMap({
       easeLinearity: 0.24,
     });
   }, [mapReady, selectedBottomPadding, selectedPlaceId, selectedPlaceNode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = mapNodeRef.current;
+    if (!map || !container || !mapReady || !primarySelectedNode || selectedBottomPadding <= 0) {
+      return;
+    }
+
+    let frame: number | null = null;
+    let timer: number | null = null;
+    const keepSelectionVisible = () => {
+      const remainingMotion = selectionMotionUntilRef.current - Date.now();
+      if (remainingMotion > 0) {
+        timer = window.setTimeout(() => {
+          frame = window.requestAnimationFrame(keepSelectionVisible);
+        }, remainingMotion + 16);
+        return;
+      }
+
+      const point = map.latLngToContainerPoint(primarySelectedNode.latLng);
+      const visibleBottom = Math.max(20, container.clientHeight - selectedBottomPadding - 20);
+      if (point.y > visibleBottom) {
+        map.panBy([0, point.y - visibleBottom], { animate: false });
+      }
+    };
+
+    frame = window.requestAnimationFrame(keepSelectionVisible);
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [mapReady, primarySelectedNode, selectedBottomPadding]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1566,7 +1767,9 @@ export function SocialMap({
   };
 
   return (
-    <div className="hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper">
+    <div
+      className={`hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""}`}
+    >
       <div ref={mapNodeRef} className="h-full w-full" aria-label={t("Interactive map of Ilia")} />
 
       {!mapReady && (
