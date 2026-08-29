@@ -16,6 +16,7 @@ import {
   CULTURAL_EVENTS_STRINGS,
   CULTURAL_EVENT_TYPE_META,
   tr,
+  isEventPast,
   type CulturalEvent,
   type CulturalEventType,
   type Lang,
@@ -47,6 +48,7 @@ export function CulturalEventCard({ event, lang, onOpenDetail }: Props) {
   const meta = CULTURAL_EVENT_TYPE_META[event.eventType];
   const TypeIcon = TYPE_ICONS[event.eventType];
   const hasTicketUrl = Boolean(event.ticketUrl);
+  const past = isEventPast(event);
   const title = lang === "EN" ? event.title : event.greekTitle;
   const description =
     lang === "EN" ? (event.descriptionEn ?? event.descriptionEl) : event.descriptionEl;
@@ -59,7 +61,7 @@ export function CulturalEventCard({ event, lang, onOpenDetail }: Props) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
       className={`overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper text-left shadow-[0_8px_22px_rgba(23,20,17,0.07)] transition active:scale-[0.99] ${
-        event.isPastEvent ? "opacity-70 grayscale-[0.3]" : ""
+        past ? "opacity-70 grayscale-[0.3]" : ""
       }`}
       onClick={() => onOpenDetail(event)}
       role="button"
@@ -86,7 +88,7 @@ export function CulturalEventCard({ event, lang, onOpenDetail }: Props) {
           >
             <TypeIcon size={10} strokeWidth={2.6} /> {tr(lang, meta.label)}
           </span>
-          {event.isPastEvent && (
+          {past && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-hp-ink/70 px-1.5 py-1 text-[9px] font-black uppercase tracking-wide text-hp-paper shadow">
               {tr(lang, s.completed)}
             </span>

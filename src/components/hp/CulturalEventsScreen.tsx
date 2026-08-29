@@ -6,6 +6,7 @@ import {
   CULTURAL_EVENT_TYPES,
   CULTURAL_EVENT_TYPE_META,
   tr,
+  isEventPast,
   type CulturalEvent,
   type CulturalEventType,
   type Lang,
@@ -36,8 +37,8 @@ export function CulturalEventsScreen({ events, lang, onOpenDetail, canCreate, on
   const filtered = useMemo(() => {
     return events
       .filter((e) => {
-        if (filter === "upcoming") return !e.isPastEvent;
-        if (filter === "past") return e.isPastEvent;
+        if (filter === "upcoming") return !isEventPast(e);
+        if (filter === "past") return isEventPast(e);
         return e.eventType === filter;
       })
       .sort((a, b) =>

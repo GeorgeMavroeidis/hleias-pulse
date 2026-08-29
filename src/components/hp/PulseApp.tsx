@@ -4301,9 +4301,6 @@ export function PulseApp() {
   const [dealCodeModal, setDealCodeModal] = useState<DealCode | null>(null);
   const [issuingDealCode, setIssuingDealCode] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
-  // Tourist-only "Must-see today" overlay on the Map tab. Starts open on every
-  // page load (a "welcome" moment); the X dismisses it for the session only.
-  const [showStartHere, setShowStartHere] = useState(true);
   const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
   const [activeRouteStopIndex, setActiveRouteStopIndex] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
@@ -5723,37 +5720,6 @@ export function PulseApp() {
             claimedPlaceIds={pulseData.claimedPlaceIds}
             dealPlaceIds={pulseData.dealPlaceIds}
           />
-          {/* Tourist-only orientation: the "Must-see today" deck floats over the
-              live map. The map underneath stays fully loaded; the X just hides
-              this for the session. */}
-          <AnimatePresence>
-            {showStartHere && readyProfile(account)?.defaultIdentity === "TOURIST" && (
-              <motion.div
-                key="tourist-start-here"
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 14 }}
-                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                role="region"
-                aria-label={t("Must-see today")}
-                className="absolute inset-x-3 top-3 z-[50] flex max-h-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper/97 shadow-[0_20px_50px_rgba(23,20,17,0.22)] backdrop-blur"
-              >
-                <div className="flex justify-end px-3 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowStartHere(false)}
-                    aria-label={t("Close")}
-                    className="grid h-8 w-8 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-                  <MustSeeTodayDeck places={places} onOpenPlace={setOpenPlace} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       );
     }

@@ -34,6 +34,22 @@ export interface CulturalEvent {
   createdAt: string;
 }
 
+/**
+ * Whether an event should be treated as "past" for the Upcoming / Past filter
+ * and the completed styling. Computed dynamically from `eventDate` rather than
+ * the stored `isPastEvent` column, which is a static flag that is never flipped
+ * after insert (organizer submissions ship with `is_past_event: false`).
+ *
+ * Grace period: an event stays "upcoming" for the whole of its calendar day and
+ * only becomes past from the next day onwards — a 21:00 show today is still
+ * upcoming at 22:00 today.
+ */
+export const isEventPast = (event: Pick<CulturalEvent, "eventDate">): boolean => {
+  const endOfEventDay = new Date(event.eventDate);
+  endOfEventDay.setHours(23, 59, 59, 999);
+  return endOfEventDay.getTime() < Date.now();
+};
+
 export interface CreateCulturalEventInput {
   title: string;
   greekTitle: string;

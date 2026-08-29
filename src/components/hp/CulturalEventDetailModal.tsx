@@ -23,6 +23,7 @@ import {
   CULTURAL_EVENTS_STRINGS,
   CULTURAL_EVENT_TYPE_META,
   tr,
+  isEventPast,
   type CulturalEvent,
   type CulturalEventType,
   type Lang,
@@ -80,6 +81,7 @@ export function CulturalEventDetailModal({
           const description =
             lang === "EN" ? (event.descriptionEn ?? event.descriptionEl) : event.descriptionEl;
           const hasTicketUrl = Boolean(event.ticketUrl);
+          const past = isEventPast(event);
 
           return (
             <motion.div
@@ -127,7 +129,7 @@ export function CulturalEventDetailModal({
                     >
                       <TypeIcon size={10} strokeWidth={2.6} /> {tr(lang, meta.label)}
                     </span>
-                    {event.isPastEvent && (
+                    {past && (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-hp-ink/70 px-1.5 py-1 text-[9px] font-black uppercase tracking-wide text-hp-paper shadow">
                         {tr(lang, s.completed)}
                       </span>
