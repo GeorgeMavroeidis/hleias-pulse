@@ -266,9 +266,35 @@
   cursor: pointer;
   outline: none;
   overflow: visible !important;
-  pointer-events: auto !important;
+  pointer-events: auto;
   touch-action: manipulation;
   user-select: none;
+}
+
+.hp-area-marker::before,
+.hp-activity-cluster::before,
+.hp-child-marker::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+:is(.hp-area-marker, .hp-activity-cluster).is-selection-anchor::before {
+  pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  .hp-area-marker::before,
+  .hp-activity-cluster::before,
+  .hp-child-marker::before {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 .hp-area-marker:focus,
@@ -332,8 +358,7 @@
 .hp-child-marker__shell.is-selected {
   --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.08));
   opacity: 1;
-  transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1))
-    scale(1.06);
+  transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1)) scale(1.055);
   transition-duration: 140ms;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform, opacity;
@@ -341,7 +366,8 @@
 
 .hp-real-map.has-marker-selection
   :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
-  opacity: max(0.7, calc(var(--hp-map-surface-opacity, 1) - 0.12));
+  --hp-marker-aura-opacity: max(0.22, calc(var(--hp-map-aura-opacity) - 0.08));
+  opacity: max(0.76, calc(var(--hp-map-surface-opacity, 1) - 0.08));
   transition-duration: 140ms;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -349,12 +375,59 @@
 @media (hover: hover) {
   :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):hover
     :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
-    transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1))
-      scale(1.025);
+    --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
+    opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
+    transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1)) scale(1.02);
     transition-duration: 110ms;
     transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
-    will-change: transform;
+    will-change: transform, opacity;
   }
+
+  :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):hover
+    :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected)
+    :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+    opacity: min(1, calc(var(--hp-map-ring-opacity, 1) + 0.06));
+  }
+}
+
+@media (hover: none) {
+  :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):active
+    :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
+    --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
+    opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
+    transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1)) scale(1.02);
+    transition-duration: 70ms;
+    transition-timing-function: linear;
+    will-change: transform, opacity;
+  }
+
+  :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):active
+    :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected)
+    :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+    opacity: min(1, calc(var(--hp-map-ring-opacity, 1) + 0.06));
+  }
+}
+
+:is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker)[aria-pressed="true"] {
+  z-index: 2400 !important;
+}
+
+:is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):focus-visible:not(
+    [aria-pressed="true"]
+  ) {
+  z-index: 2300 !important;
+}
+
+:is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):focus-visible:not(
+    [aria-pressed="true"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell) {
+  --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
+  opacity: max(0.94, var(--hp-map-surface-opacity, 1));
+  transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1)) scale(1.02);
+  transition-duration: 110ms;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform, opacity;
 }
 
 .hp-real-map .leaflet-zoom-anim :is(.hp-area-marker__shell, .hp-child-marker__shell) {
