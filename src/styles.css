@@ -266,6 +266,9 @@
   --hp-map-pulse-moving-peak: 1.12;
   --hp-map-pulse-hot-peak: 1.22;
   --hp-map-pulse-live-peak: 1.3;
+  --hp-map-theme-detail: 0;
+  --hp-map-effect-opacity: 0.58;
+  --hp-map-secondary-opacity: 0;
 }
 
 .hp-area-marker,
@@ -444,181 +447,524 @@
   will-change: transform, opacity;
 }
 
-.hp-marker-aura {
-  --hp-pulse-core-alpha: 0.065;
-  --hp-pulse-mid-alpha: 0.04;
-  --hp-pulse-edge-alpha: 0.015;
+.hp-marker-core,
+.hp-marker-effects,
+.hp-marker-field,
+.hp-marker-wave,
+.hp-marker-sweep {
   position: absolute;
-  inset: calc(var(--marker-size) * -0.1);
-  z-index: 0;
+  inset: 0;
   border-radius: 9999px;
-  background: radial-gradient(
-    circle,
-    rgb(224 106 50 / var(--hp-pulse-core-alpha)) 0 58%,
-    rgb(224 106 50 / var(--hp-pulse-mid-alpha)) 74%,
-    rgb(224 106 50 / var(--hp-pulse-edge-alpha)) 88%,
-    transparent 100%
-  );
-  opacity: var(--hp-marker-aura-opacity);
-  transform: scale(1);
-  transform-origin: center;
-  transition: opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
 }
 
-.is-pulse-moving .hp-marker-aura,
-.is-pulse-hot .hp-marker-aura,
-.is-pulse-live .hp-marker-aura {
-  animation-delay: var(--hp-pulse-delay, 0s);
-  animation-iteration-count: infinite;
-  animation-play-state: var(--hp-marker-motion-state, running);
+.hp-marker-core {
+  z-index: 1;
+  transform: translateZ(0) scale(var(--hp-theme-core-scale, 1));
   transform-origin: center;
-  will-change: transform, opacity;
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.is-pulse-moving .hp-marker-aura {
-  --hp-pulse-core-alpha: 0.085;
-  --hp-pulse-mid-alpha: 0.052;
-  --hp-pulse-edge-alpha: 0.022;
-  --hp-pulse-peak: var(--hp-map-pulse-moving-peak);
-  animation-name: hp-marker-aura-pulse;
-  animation-duration: 5.4s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+.hp-marker-effects {
+  z-index: 0;
+  opacity: var(--hp-map-effect-opacity, 1);
+  transition: opacity 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.is-pulse-hot .hp-marker-aura {
-  --hp-pulse-core-alpha: 0.11;
-  --hp-pulse-mid-alpha: 0.068;
-  --hp-pulse-edge-alpha: 0.028;
-  --hp-pulse-peak: var(--hp-map-pulse-hot-peak);
-  animation-name: hp-marker-aura-pulse;
-  animation-duration: 3.6s;
-  animation-timing-function: cubic-bezier(0.34, 0, 0.2, 1);
+.hp-marker-field,
+.hp-marker-wave,
+.hp-marker-sweep {
+  transform: translateZ(0);
+  transform-origin: center;
 }
 
-.is-pulse-live .hp-marker-aura {
-  --hp-pulse-core-alpha: 0.14;
-  --hp-pulse-mid-alpha: 0.086;
-  --hp-pulse-edge-alpha: 0.036;
-  --hp-pulse-peak: var(--hp-map-pulse-live-peak);
-  animation-name: hp-marker-aura-double-pulse;
-  animation-duration: 2.4s;
-  animation-timing-function: ease-out;
+.hp-marker-wave::before,
+.hp-marker-wave::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  content: "";
+  opacity: 0;
+  transform: scale(0.88);
+  transform-origin: center;
+}
+
+.hp-marker-sweep {
+  opacity: 0;
+}
+
+.hp-app-shell[data-marker-animation-theme="calm"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell) {
+  --hp-theme-core-scale: 0.96;
+}
+
+.hp-app-shell[data-marker-animation-theme="calm"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell)
+  .hp-marker-field {
+  inset: -38%;
+  background: radial-gradient(
+    circle,
+    rgb(255 240 216 / 0.28) 0 28%,
+    rgb(224 106 50 / 0.13) 42%,
+    rgb(224 106 50 / 0.055) 64%,
+    rgb(224 106 50 / 0.018) 78%,
+    transparent 100%
+  );
+  opacity: calc(var(--hp-marker-aura-opacity) * 0.84);
+  transform: scale(1);
 }
 
 .hp-app-shell[data-marker-animation-theme="calm"]
   :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live)
-  .hp-marker-aura {
-  animation-name: none;
-  opacity: calc(var(--hp-marker-aura-opacity) * 0.28);
-  transform: scale(0.9);
-  will-change: auto;
-}
-
-.hp-app-shell[data-marker-animation-theme="calm"]
-  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
-  .hp-marker-aura {
+  .hp-marker-field {
   animation-delay: var(--hp-pulse-delay, 0s);
-  animation-duration: 3.2s;
+  animation-duration: 8s;
   animation-iteration-count: infinite;
-  animation-name: hp-marker-calm-breathe;
+  animation-name: hp-marker-calm-field;
   animation-play-state: var(--hp-marker-motion-state, running);
   animation-timing-function: ease-in-out;
   will-change: transform, opacity;
 }
 
-.hp-app-shell[data-marker-animation-theme="signal"]
-  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live)
-  .hp-marker-aura {
-  animation-name: hp-marker-night-signal;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+.hp-app-shell[data-marker-animation-theme="calm"] .is-pulse-hot .hp-marker-field {
+  animation-duration: 7.2s;
 }
 
-.hp-app-shell[data-marker-animation-theme="signal"] .is-pulse-moving .hp-marker-aura {
-  --hp-signal-peak: 1.32;
+.hp-app-shell[data-marker-animation-theme="calm"] .is-pulse-live .hp-marker-field {
   animation-duration: 6.4s;
 }
 
-.hp-app-shell[data-marker-animation-theme="signal"] .is-pulse-hot .hp-marker-aura {
-  --hp-signal-peak: 1.42;
-  animation-duration: 4.8s;
+.hp-app-shell[data-marker-animation-theme="calm"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  .hp-marker-field {
+  animation-delay: 0s;
+  animation-duration: 5.4s;
+  animation-iteration-count: infinite;
+  animation-name: hp-marker-calm-selected;
+  animation-play-state: var(--hp-marker-motion-state, running);
+  animation-timing-function: ease-in-out;
+  opacity: var(--hp-marker-aura-opacity);
+  will-change: transform, opacity;
 }
 
-.hp-app-shell[data-marker-animation-theme="signal"] .is-pulse-live .hp-marker-aura {
-  --hp-signal-peak: 1.5;
-  animation-duration: 3.2s;
+.hp-app-shell[data-marker-animation-theme="calm"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell)
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-paper) 44%, transparent);
+  background: color-mix(in srgb, var(--hp-paper) 12%, transparent);
+  box-shadow: 0 0.08rem 0.28rem rgba(16, 36, 61, 0.075);
 }
 
-.hp-pulse-paused .hp-marker-aura {
+.hp-app-shell[data-marker-animation-theme="calm"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-sunset) 38%, var(--hp-paper));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--hp-paper) 70%, transparent),
+    0 0 0.62rem rgb(224 106 50 / 0.09);
+}
+
+.hp-app-shell[data-marker-animation-theme="calm"]
+  :is(.hp-area-marker__collage, .hp-child-marker__media) {
+  opacity: calc(var(--hp-map-media-opacity) * 0.92);
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell) {
+  --hp-theme-core-scale: 1;
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-field {
+  inset: -13%;
+  background: radial-gradient(
+    circle,
+    rgb(255 236 215 / 0.24) 0 48%,
+    rgb(224 106 50 / 0.14) 62%,
+    transparent 82%
+  );
+  opacity: calc(var(--hp-marker-aura-opacity) * 0.9);
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-wave {
+  inset: -12%;
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-wave::before,
+.hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-wave::after {
+  border-color: rgb(224 106 50 / 0.5);
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live)
+  .hp-marker-wave::before,
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  :is(.is-pulse-hot, .is-pulse-live)
+  .hp-marker-wave::after {
+  animation-delay: var(--hp-pulse-delay, 0s);
+  animation-duration: var(--hp-pulse-cycle, 5.2s);
+  animation-iteration-count: infinite;
+  animation-name: hp-marker-coast-wave;
+  animation-play-state: var(--hp-marker-motion-state, running);
+  animation-timing-function: cubic-bezier(0.2, 0.72, 0.24, 1);
+  will-change: transform, opacity;
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"] .is-pulse-moving {
+  --hp-pulse-cycle: 5.2s;
+  --hp-pulse-wave-peak: 1.3;
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"] .is-pulse-hot {
+  --hp-pulse-cycle: 3.6s;
+  --hp-pulse-wave-peak: 1.4;
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"] .is-pulse-live {
+  --hp-pulse-cycle: 2.4s;
+  --hp-pulse-wave-peak: 1.48;
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  :is(.is-pulse-hot, .is-pulse-live)
+  .hp-marker-wave::after {
+  animation-name: hp-marker-coast-secondary-wave;
+  opacity: calc(var(--hp-map-secondary-opacity) * 0.72);
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"] .is-pulse-hot .hp-marker-wave::after {
+  animation-delay: calc(var(--hp-pulse-delay, 0s) - 1.8s);
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"] .is-pulse-live .hp-marker-wave::after {
+  animation-delay: calc(var(--hp-pulse-delay, 0s) - 1.2s);
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  .hp-marker-wave {
+  animation: hp-marker-coast-selected 900ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+  will-change: transform, opacity;
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell)
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-paper) 72%, transparent);
+  box-shadow:
+    0 0.1rem 0.24rem rgba(16, 36, 61, 0.14),
+    0 0 0.46rem rgb(224 106 50 / 0.08);
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-sunset) 62%, var(--hp-paper));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--hp-sunset) 40%, var(--hp-paper)),
+    0 0 0.54rem rgb(224 106 50 / 0.16),
+    0 0.12rem 0.3rem rgba(16, 36, 61, 0.15);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell) {
+  --hp-theme-core-scale: 0.84;
+  --hp-signal-sweep-opacity: calc(var(--hp-map-theme-detail) * 0.84);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"] .hp-marker-field {
+  inset: -11%;
+  background: radial-gradient(
+    circle,
+    rgb(224 106 50 / 0.22) 0 48%,
+    rgb(224 106 50 / 0.08) 58%,
+    transparent 74%
+  );
+  opacity: calc(var(--hp-marker-aura-opacity) * 0.92);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"] .hp-marker-wave {
+  inset: -17%;
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"] .hp-marker-wave::before {
+  border-color: rgb(224 106 50 / 0.58);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"] .hp-marker-sweep {
+  inset: -8%;
+  border: 1px solid transparent;
+  border-right-color: rgb(255 220 186 / 0.78);
+  border-top-color: rgb(224 106 50 / 0.88);
+  opacity: var(--hp-signal-sweep-opacity);
+  transform: rotate(-42deg);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live) {
+  --hp-signal-cycle: 8s;
+  --hp-signal-peak: 1.34;
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"] .is-pulse-hot {
+  --hp-signal-cycle: 6.4s;
+  --hp-signal-peak: 1.4;
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"] .is-pulse-live {
+  --hp-signal-cycle: 4.8s;
+  --hp-signal-peak: 1.46;
+  --hp-signal-sweep-opacity: max(0.68, calc(var(--hp-map-theme-detail) * 0.84));
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live)
+  .hp-marker-wave::before {
+  animation: hp-marker-signal-beacon var(--hp-signal-cycle) cubic-bezier(0.2, 0.7, 0.3, 1)
+    var(--hp-pulse-delay, 0s) infinite;
+  animation-play-state: var(--hp-marker-motion-state, running);
+  will-change: transform, opacity;
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live)
+  .hp-marker-sweep {
+  animation: hp-marker-signal-sweep var(--hp-signal-cycle) cubic-bezier(0.2, 0.7, 0.3, 1)
+    var(--hp-pulse-delay, 0s) infinite;
+  animation-play-state: var(--hp-marker-motion-state, running);
+  will-change: transform, opacity;
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  .hp-marker-field {
+  animation: hp-marker-signal-flash 880ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+  will-change: transform, opacity;
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  .hp-marker-wave::before {
+  animation: hp-marker-signal-selected-beacon 1.1s cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  .hp-marker-sweep {
+  animation: hp-marker-signal-selected-sweep 1.1s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  opacity: 1;
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell)
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-ink) 54%, var(--hp-sunset));
+  background: color-mix(in srgb, var(--hp-ink) 48%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--hp-ink) 72%, transparent),
+    0 0.08rem 0.18rem rgba(16, 19, 31, 0.28),
+    0 0 0.34rem rgb(224 106 50 / 0.1);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-sunset) 78%, var(--hp-paper));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--hp-ink) 70%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--hp-sunset) 48%, transparent),
+    0 0 0.42rem rgb(224 106 50 / 0.16);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__collage, .hp-child-marker__media)::after {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hp-ink) 55%, transparent);
+}
+
+.hp-marker-density-high
+  :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected)
+  .hp-marker-effects {
+  opacity: calc(var(--hp-map-effect-opacity, 1) * 0.72);
+}
+
+.hp-marker-density-high
+  :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected)
+  .hp-marker-wave::after {
+  display: none;
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  .hp-map-identity-far
+  :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected)
+  .hp-marker-wave::after,
+.hp-app-shell[data-marker-animation-theme="signal"]
+  .hp-map-identity-far
+  :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected, .is-live)
+  .hp-marker-sweep {
+  animation: none;
+  opacity: 0;
+}
+
+.hp-marker-density-high
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  .hp-marker-effects {
+  opacity: 1;
+}
+
+.hp-map-is-moving .hp-marker-effects {
+  opacity: calc(var(--hp-map-effect-opacity, 1) * 0.28);
+}
+
+.hp-map-is-moving
+  :is(
+    .hp-marker-field,
+    .hp-marker-wave,
+    .hp-marker-wave::before,
+    .hp-marker-wave::after,
+    .hp-marker-sweep
+  ),
+.hp-pulse-paused
+  :is(
+    .hp-marker-field,
+    .hp-marker-wave,
+    .hp-marker-wave::before,
+    .hp-marker-wave::after,
+    .hp-marker-sweep
+  ) {
   animation-play-state: paused !important;
 }
 
-@keyframes hp-marker-aura-pulse {
+@keyframes hp-marker-calm-field {
   0%,
   100% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.58);
+    opacity: calc(var(--hp-marker-aura-opacity) * 0.62);
     transform: scale(1);
   }
-  46% {
-    opacity: var(--hp-marker-aura-opacity);
-    transform: scale(var(--hp-pulse-peak));
-  }
-  72% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.68);
-    transform: scale(1.025);
+  50% {
+    opacity: calc(var(--hp-marker-aura-opacity) * 0.9);
+    transform: scale(1.08);
   }
 }
 
-@keyframes hp-marker-aura-double-pulse {
+@keyframes hp-marker-calm-selected {
   0%,
   100% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.58);
+    opacity: calc(var(--hp-marker-aura-opacity) * 0.72);
     transform: scale(1);
-  }
-  12% {
-    opacity: var(--hp-marker-aura-opacity);
-    transform: scale(var(--hp-pulse-peak));
-  }
-  21% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.68);
-    transform: scale(1.035);
-  }
-  31% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.94);
-    transform: scale(var(--hp-pulse-peak));
-  }
-  46%,
-  82% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.58);
-    transform: scale(1);
-  }
-}
-
-@keyframes hp-marker-calm-breathe {
-  0%,
-  100% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.5);
-    transform: scale(0.94);
   }
   50% {
     opacity: var(--hp-marker-aura-opacity);
-    transform: scale(1.16);
+    transform: scale(1.14);
   }
 }
 
-@keyframes hp-marker-night-signal {
+@keyframes hp-marker-coast-wave {
   0% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.72);
-    transform: scale(0.82);
+    opacity: 0;
+    transform: scale(0.88);
   }
-  18% {
-    opacity: var(--hp-marker-aura-opacity);
-    transform: scale(0.96);
+  10% {
+    opacity: calc(var(--hp-marker-aura-opacity) * 0.88);
   }
-  72%,
+  62%,
   100% {
     opacity: 0;
-    transform: scale(var(--hp-signal-peak, 1.055));
+    transform: scale(var(--hp-pulse-wave-peak, 1.3));
+  }
+}
+
+@keyframes hp-marker-coast-secondary-wave {
+  0% {
+    border-color: transparent;
+    transform: scale(0.88);
+  }
+  10% {
+    border-color: rgb(224 106 50 / 0.5);
+  }
+  62%,
+  100% {
+    border-color: transparent;
+    transform: scale(var(--hp-pulse-wave-peak, 1.3));
+  }
+}
+
+@keyframes hp-marker-coast-selected {
+  0% {
+    opacity: 1;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 0.68;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes hp-marker-signal-beacon {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  4% {
+    opacity: calc(var(--hp-marker-aura-opacity) * 0.88);
+  }
+  22% {
+    opacity: 0;
+    transform: scale(var(--hp-signal-peak, 1.34));
+  }
+  100% {
+    opacity: 0;
+    transform: scale(var(--hp-signal-peak, 1.34));
+  }
+}
+
+@keyframes hp-marker-signal-sweep {
+  0% {
+    opacity: 0;
+    transform: rotate(-42deg);
+  }
+  3% {
+    opacity: var(--hp-signal-sweep-opacity, 0.84);
+  }
+  24% {
+    opacity: 0;
+    transform: rotate(318deg);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(318deg);
+  }
+}
+
+@keyframes hp-marker-signal-flash {
+  0% {
+    opacity: 1;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: var(--hp-marker-aura-opacity);
+    transform: scale(1.06);
+  }
+}
+
+@keyframes hp-marker-signal-selected-beacon {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes hp-marker-signal-selected-sweep {
+  0% {
+    opacity: 1;
+    transform: rotate(-42deg);
+  }
+  100% {
+    opacity: 0.28;
+    transform: rotate(318deg);
   }
 }
 
@@ -1310,21 +1656,20 @@ select:focus-visible {
   border-radius: 9999px;
 }
 
-.hp-animation-theme-preview::before {
+.hp-animation-theme-preview__field,
+.hp-animation-theme-preview__wave,
+.hp-animation-theme-preview__sweep,
+.hp-animation-theme-preview__core {
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: rgb(224 106 50 / 0.15);
-  content: "";
-  transform: scale(0.86);
+  border-radius: 9999px;
+  pointer-events: none;
 }
 
-.hp-animation-theme-preview > span {
-  position: relative;
+.hp-animation-theme-preview__core {
+  z-index: 2;
   width: 1.55rem;
   height: 1.55rem;
   border: 2px solid color-mix(in srgb, var(--hp-paper) 88%, transparent);
-  border-radius: inherit;
   background: linear-gradient(
     145deg,
     var(--hp-sunset),
@@ -1333,16 +1678,70 @@ select:focus-visible {
   box-shadow: 0 0.25rem 0.55rem rgba(93, 46, 27, 0.2);
 }
 
-.hp-animation-theme-option[data-theme-preview="calm"] .hp-animation-theme-preview::before {
-  animation: hp-animation-preview-calm 3.2s ease-in-out infinite;
+.hp-animation-theme-option[data-theme-preview="calm"] .hp-animation-theme-preview__field {
+  inset: -0.12rem;
+  background: radial-gradient(
+    circle,
+    rgb(255 238 216 / 0.34) 0 28%,
+    rgb(224 106 50 / 0.15) 46%,
+    rgb(224 106 50 / 0.035) 70%,
+    transparent 100%
+  );
+  animation: hp-animation-preview-calm 6.4s ease-in-out infinite;
 }
 
-.hp-animation-theme-option[data-theme-preview="pulse"] .hp-animation-theme-preview::before {
-  animation: hp-animation-preview-pulse 3.6s cubic-bezier(0.34, 0, 0.2, 1) infinite;
+.hp-animation-theme-option[data-theme-preview="calm"] .hp-animation-theme-preview__core {
+  opacity: 0.86;
+  transform: scale(0.9);
 }
 
-.hp-animation-theme-option[data-theme-preview="signal"] .hp-animation-theme-preview::before {
-  animation: hp-animation-preview-signal 4.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+.hp-animation-theme-option[data-theme-preview="pulse"] .hp-animation-theme-preview__field {
+  inset: 0.28rem;
+  background: rgb(224 106 50 / 0.18);
+}
+
+.hp-animation-theme-option[data-theme-preview="pulse"] .hp-animation-theme-preview__wave {
+  inset: 0.18rem;
+  border: 1px solid rgb(224 106 50 / 0.62);
+  box-shadow: 0 0 0 4px rgb(224 106 50 / 0.13);
+  animation: hp-animation-preview-pulse 3.6s cubic-bezier(0.2, 0.72, 0.24, 1) infinite;
+}
+
+.hp-animation-theme-option[data-theme-preview="pulse"] .hp-animation-theme-preview__core {
+  box-shadow:
+    0 0.25rem 0.55rem rgba(93, 46, 27, 0.24),
+    0 0 0 1px rgb(224 106 50 / 0.12);
+}
+
+.hp-animation-theme-option[data-theme-preview="signal"] .hp-animation-theme-preview__field {
+  inset: 0.38rem;
+  background: radial-gradient(circle, rgb(224 106 50 / 0.26), transparent 72%);
+}
+
+.hp-animation-theme-option[data-theme-preview="signal"] .hp-animation-theme-preview__wave {
+  inset: 0.24rem;
+  border: 1px solid color-mix(in srgb, var(--hp-ink) 48%, var(--hp-sunset));
+}
+
+.hp-animation-theme-option[data-theme-preview="signal"] .hp-animation-theme-preview__sweep {
+  inset: 0.2rem;
+  border: 1px solid transparent;
+  border-right-color: color-mix(in srgb, var(--hp-paper) 70%, var(--hp-sunset));
+  border-top-color: var(--hp-sunset);
+  animation: hp-animation-preview-signal 4.8s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+}
+
+.hp-animation-theme-option[data-theme-preview="signal"] .hp-animation-theme-preview__core {
+  border-color: color-mix(in srgb, var(--hp-ink) 56%, var(--hp-sunset));
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--hp-sunset) 70%, var(--hp-ink)),
+    var(--hp-ink)
+  );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--hp-paper) 18%, transparent),
+    0 0.18rem 0.42rem rgba(23, 20, 17, 0.3);
+  transform: scale(0.72);
 }
 
 @media (hover: hover) {
@@ -1370,40 +1769,36 @@ select:focus-visible {
 @keyframes hp-animation-preview-calm {
   0%,
   100% {
-    opacity: 0.45;
-    transform: scale(0.86);
+    opacity: 0.64;
+    transform: scale(0.94);
   }
   50% {
-    opacity: 0.78;
-    transform: scale(1.03);
+    opacity: 0.92;
+    transform: scale(1.06);
   }
 }
 
 @keyframes hp-animation-preview-pulse {
-  0%,
+  0% {
+    opacity: 0.82;
+    transform: scale(0.78);
+  }
+  62%,
   100% {
-    opacity: 0.38;
-    transform: scale(0.82);
-  }
-  46% {
-    opacity: 0.9;
-    transform: scale(1.14);
-  }
-  72% {
-    opacity: 0.5;
-    transform: scale(0.9);
+    opacity: 0;
+    transform: scale(1.28);
   }
 }
 
 @keyframes hp-animation-preview-signal {
   0% {
-    opacity: 0.75;
-    transform: scale(0.72);
+    opacity: 0.92;
+    transform: rotate(-42deg);
   }
-  70%,
+  26%,
   100% {
     opacity: 0;
-    transform: scale(1.45);
+    transform: rotate(318deg);
   }
 }
 
@@ -1636,17 +2031,60 @@ select:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .is-pulse-moving .hp-marker-aura,
-  .is-pulse-hot .hp-marker-aura,
-  .is-pulse-live .hp-marker-aura,
-  .hp-app-shell[data-marker-animation-theme="calm"]
-    :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
-    .hp-marker-aura,
-  .hp-animation-theme-preview::before {
-    animation: none;
-    opacity: 1;
-    transform: scale(1);
+  :is(
+    .hp-marker-field,
+    .hp-marker-wave,
+    .hp-marker-wave::before,
+    .hp-marker-wave::after,
+    .hp-marker-sweep
+  ),
+  :is(
+    .hp-animation-theme-preview__field,
+    .hp-animation-theme-preview__wave,
+    .hp-animation-theme-preview__sweep
+  ) {
+    animation: none !important;
     will-change: auto;
+  }
+
+  .hp-app-shell[data-marker-animation-theme="calm"] .hp-marker-field {
+    opacity: calc(var(--hp-marker-aura-opacity) * 0.82);
+    transform: scale(1.04);
+  }
+
+  .hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-wave::before {
+    opacity: 0.52;
+    transform: scale(1.16);
+  }
+
+  .hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-wave::after {
+    opacity: calc(var(--hp-map-secondary-opacity) * 0.38);
+    transform: scale(1.32);
+  }
+
+  .hp-app-shell[data-marker-animation-theme="signal"] .hp-marker-wave::before {
+    opacity: 0.46;
+    transform: scale(1.18);
+  }
+
+  .hp-app-shell[data-marker-animation-theme="signal"] .hp-marker-sweep {
+    opacity: 0.86;
+    transform: rotate(-42deg);
+  }
+
+  .hp-animation-theme-option[data-theme-preview="calm"] .hp-animation-theme-preview__field {
+    opacity: 0.82;
+    transform: scale(1.02);
+  }
+
+  .hp-animation-theme-option[data-theme-preview="pulse"] .hp-animation-theme-preview__wave {
+    opacity: 0.58;
+    transform: scale(1.08);
+  }
+
+  .hp-animation-theme-option[data-theme-preview="signal"] .hp-animation-theme-preview__sweep {
+    opacity: 0.9;
+    transform: rotate(-42deg);
   }
 
   *,
