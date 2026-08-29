@@ -602,8 +602,8 @@ const EL: Record<string, string> = {
   "Open deal at {place}": "Άνοιγμα προσφοράς στο {place}",
   // Account sheet — community roles grouping
   "Community roles": "Κοινοτικοί ρόλοι",
-  "Community roles are available for Local and Guide accounts.":
-    "Οι κοινοτικοί ρόλοι είναι διαθέσιμοι για λογαριασμούς Local και Guide.",
+  "Registering a business is available for Local and Guide accounts.":
+    "Η καταχώρηση επιχείρησης είναι διαθέσιμη για λογαριασμούς Local και Guide.",
 };
 
 function interpolate(message: string, params?: TranslationParams) {

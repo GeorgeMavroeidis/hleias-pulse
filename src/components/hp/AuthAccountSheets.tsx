@@ -371,14 +371,12 @@ export function AuthSheet({
 function OrganizerSection({
   status,
   myEventsCount,
-  identityEligible,
   onApply,
   onOpenComposer,
   onOpenMyEvents,
 }: {
   status: OrganizerStatus | null;
   myEventsCount: number;
-  identityEligible: boolean;
   onApply: () => Promise<void>;
   onOpenComposer: () => void;
   onOpenMyEvents: () => void;
@@ -441,10 +439,8 @@ function OrganizerSection({
     );
   }
 
-  // Applying only makes sense for Local / Guide identities. An already-verified
-  // or pending standing is handled by the returns above and stays visible.
-  if (!identityEligible) return null;
-
+  // Open to every identity: helping a local festival / society is a plausible
+  // one-off contribution for a visitor, not a claim of permanent presence.
   return (
     <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
       <div className="text-[13px] font-black text-hp-ink">{t("Do you organize events?")}</div>
@@ -701,18 +697,17 @@ export function AccountSheet({
 
   const avatarUrl = avatarPreview ?? profileAvatarUrl(profile);
 
-  // Live picker value (not the persisted profile) so the community-roles group
-  // reacts the moment the identity toggle changes, before a save.
-  const identityEligible = identity !== "TOURIST";
+  // Live picker value (not the persisted profile) so the business gate reacts
+  // the moment the identity toggle changes, before a save. Organizer stays open
+  // to every identity; only claiming a business (permanent physical presence) is
+  // gated away from Tourist.
+  const businessEligible = identity !== "TOURIST";
   const identityLabel =
     PROFILE_IDENTITIES.find((option) => option.id === identity)?.label ?? identity;
-  const hasOrganizerStanding =
-    organizerStatus?.verificationStatus === "verified" ||
-    organizerStatus?.verificationStatus === "pending";
   const hasBusinessStanding =
     businessStatus?.verificationStatus === "verified" ||
     businessStatus?.verificationStatus === "pending";
-  const showCommunityRolesNote = !identityEligible && !hasOrganizerStanding && !hasBusinessStanding;
+  const showBusinessGateNote = !businessEligible && !hasBusinessStanding;
 
   return (
     <AnimatePresence>
@@ -928,7 +923,6 @@ export function AccountSheet({
                     <OrganizerSection
                       status={organizerStatus}
                       myEventsCount={organizerEventCount}
-                      identityEligible={identityEligible}
                       onApply={onApplyOrganizer}
                       onOpenComposer={onOpenOrganizerComposer}
                       onOpenMyEvents={onOpenOrganizerEvents}
@@ -936,13 +930,13 @@ export function AccountSheet({
                     <BusinessSection
                       status={businessStatus}
                       myPlacesCount={businessPlaceCount}
-                      identityEligible={identityEligible}
+                      identityEligible={businessEligible}
                       onApply={onApplyBusiness}
                       onOpenPlaces={onOpenBusinessPlaces}
                     />
-                    {showCommunityRolesNote && (
+                    {showBusinessGateNote && (
                       <p className="rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-[12px] font-semibold text-hp-muted">
-                        {t("Community roles are available for Local and Guide accounts.")}
+                        {t("Registering a business is available for Local and Guide accounts.")}
                       </p>
                     )}
                   </div>
