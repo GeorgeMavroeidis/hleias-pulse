@@ -267,7 +267,7 @@
   --hp-map-pulse-hot-peak: 1.22;
   --hp-map-pulse-live-peak: 1.3;
   --hp-map-theme-detail: 0;
-  --hp-map-effect-opacity: 0.58;
+  --hp-map-effect-opacity: 0.72;
   --hp-map-secondary-opacity: 0;
 }
 
@@ -511,7 +511,7 @@
     rgb(224 106 50 / 0.018) 78%,
     transparent 100%
   );
-  opacity: calc(var(--hp-marker-aura-opacity) * 0.84);
+  opacity: min(0.4, calc(var(--hp-marker-aura-opacity) + 0.06));
   transform: scale(1);
 }
 
@@ -573,6 +573,7 @@
 .hp-app-shell[data-marker-animation-theme="pulse"]
   :is(.hp-area-marker__shell, .hp-child-marker__shell) {
   --hp-theme-core-scale: 1;
+  --hp-pulse-visible-peak: min(0.62, calc(var(--hp-marker-aura-opacity) + 0.18));
 }
 
 .hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-field {
@@ -592,7 +593,7 @@
 
 .hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-wave::before,
 .hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-wave::after {
-  border-color: rgb(224 106 50 / 0.5);
+  border-color: rgb(224 106 50 / 0.58);
 }
 
 .hp-app-shell[data-marker-animation-theme="pulse"]
@@ -629,7 +630,7 @@
   :is(.is-pulse-hot, .is-pulse-live)
   .hp-marker-wave::after {
   animation-name: hp-marker-coast-secondary-wave;
-  opacity: calc(var(--hp-map-secondary-opacity) * 0.72);
+  opacity: calc(var(--hp-map-secondary-opacity) * 0.82);
 }
 
 .hp-app-shell[data-marker-animation-theme="pulse"] .is-pulse-hot .hp-marker-wave::after {
@@ -643,6 +644,7 @@
 .hp-app-shell[data-marker-animation-theme="pulse"]
   :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
   .hp-marker-wave {
+  --hp-pulse-visible-peak: min(0.72, calc(var(--hp-marker-aura-opacity) + 0.28));
   animation: hp-marker-coast-selected 900ms cubic-bezier(0.22, 1, 0.36, 1) 1;
   will-change: transform, opacity;
 }
@@ -669,7 +671,7 @@
 .hp-app-shell[data-marker-animation-theme="signal"]
   :is(.hp-area-marker__shell, .hp-child-marker__shell) {
   --hp-theme-core-scale: 0.84;
-  --hp-signal-sweep-opacity: calc(var(--hp-map-theme-detail) * 0.84);
+  --hp-signal-sweep-opacity: calc(var(--hp-map-theme-detail) * 0.92);
 }
 
 .hp-app-shell[data-marker-animation-theme="signal"] .hp-marker-field {
@@ -714,7 +716,7 @@
 .hp-app-shell[data-marker-animation-theme="signal"] .is-pulse-live {
   --hp-signal-cycle: 4.8s;
   --hp-signal-peak: 1.46;
-  --hp-signal-sweep-opacity: max(0.68, calc(var(--hp-map-theme-detail) * 0.84));
+  --hp-signal-sweep-opacity: max(0.76, calc(var(--hp-map-theme-detail) * 0.92));
 }
 
 .hp-app-shell[data-marker-animation-theme="signal"]
@@ -837,11 +839,11 @@
 @keyframes hp-marker-calm-field {
   0%,
   100% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.62);
+    opacity: min(0.42, calc(var(--hp-marker-aura-opacity) + 0.06));
     transform: scale(1);
   }
   50% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.9);
+    opacity: min(0.48, calc(var(--hp-marker-aura-opacity) + 0.12));
     transform: scale(1.08);
   }
 }
@@ -849,11 +851,11 @@
 @keyframes hp-marker-calm-selected {
   0%,
   100% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.72);
+    opacity: min(0.48, calc(var(--hp-marker-aura-opacity) + 0.08));
     transform: scale(1);
   }
   50% {
-    opacity: var(--hp-marker-aura-opacity);
+    opacity: min(0.56, calc(var(--hp-marker-aura-opacity) + 0.14));
     transform: scale(1.14);
   }
 }
@@ -864,7 +866,7 @@
     transform: scale(0.88);
   }
   10% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.88);
+    opacity: var(--hp-pulse-visible-peak, min(0.62, calc(var(--hp-marker-aura-opacity) + 0.18)));
   }
   62%,
   100% {
@@ -879,7 +881,7 @@
     transform: scale(0.88);
   }
   10% {
-    border-color: rgb(224 106 50 / 0.5);
+    border-color: rgb(224 106 50 / 0.58);
   }
   62%,
   100% {
@@ -905,7 +907,7 @@
     transform: scale(0.9);
   }
   4% {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.88);
+    opacity: min(0.58, calc(var(--hp-marker-aura-opacity) + 0.16));
   }
   22% {
     opacity: 0;
@@ -2048,27 +2050,27 @@ select:focus-visible {
   }
 
   .hp-app-shell[data-marker-animation-theme="calm"] .hp-marker-field {
-    opacity: calc(var(--hp-marker-aura-opacity) * 0.82);
+    opacity: min(0.4, calc(var(--hp-marker-aura-opacity) + 0.06));
     transform: scale(1.04);
   }
 
   .hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-wave::before {
-    opacity: 0.52;
+    opacity: 0.6;
     transform: scale(1.16);
   }
 
   .hp-app-shell[data-marker-animation-theme="pulse"] .hp-marker-wave::after {
-    opacity: calc(var(--hp-map-secondary-opacity) * 0.38);
+    opacity: calc(var(--hp-map-secondary-opacity) * 0.46);
     transform: scale(1.32);
   }
 
   .hp-app-shell[data-marker-animation-theme="signal"] .hp-marker-wave::before {
-    opacity: 0.46;
+    opacity: 0.56;
     transform: scale(1.18);
   }
 
   .hp-app-shell[data-marker-animation-theme="signal"] .hp-marker-sweep {
-    opacity: 0.86;
+    opacity: 0.92;
     transform: rotate(-42deg);
   }
 
