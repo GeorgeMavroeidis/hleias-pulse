@@ -1448,6 +1448,9 @@ export function SocialMap({
           interactive: false,
           stroke: false,
           fillOpacity: 1,
+          // Ring 0 (sea rectangle) fills; every following ring is a real land
+          // mass that punches a hole — see src/lib/hp/sea-shimmer.ts.
+          fillRule: "evenodd",
         });
       }
       seaLayerRef.current.addTo(map);

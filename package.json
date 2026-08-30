@@ -19,7 +19,8 @@
     "smoke:auth-profile": "tsx scripts/smoke-auth-profile.ts",
     "smoke:live-surfaces": "tsx scripts/smoke-live-surfaces.ts",
     "smoke:post-write": "tsx scripts/smoke-post-write.ts",
-    "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql"
+    "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",
+    "build:ionian-land": "tsx scripts/build-ionian-land.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.0",
@@ -104,6 +105,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
+    "mapshaper": "^0.7.56",
     "nitro": "3.0.260603-beta",
     "pg": "^8.21.0",
     "prettier": "^3.7.3",

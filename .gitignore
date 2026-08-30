@@ -34,3 +34,6 @@ cloudflare-static-dist
 *.njsproj
 *.sln
 *.sw?
+
+# Generated-asset build cache (scripts/build-ionian-land.ts)
+scripts/.cache/
