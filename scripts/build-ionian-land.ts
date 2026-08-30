@@ -35,17 +35,20 @@ const SOURCE_URL =
 // pannable area. [west, south, east, north].
 const CLIP_BBOX = [19.1, 35.9, 23.8, 39.2] as const;
 
-// Visvalingam retention. 18% keeps bays readable at overview zoom while landing
-// the baked file around ~7 KB / ~2 KB gzip.
-const SIMPLIFY_PERCENT = 18;
+// Visvalingam retention. 40% keeps bays and headlands close enough to the real
+// shore that the wave edge doesn't chord across inlets or clip peninsulas at
+// the shimmer's upper zoom band; the baked file is still ~15 KB / ~4 KB gzip.
+// (Higher would only start to matter past zoom 12, where the layer is hidden.)
+const SIMPLIFY_PERCENT = 40;
 
 // Drop any land part below this area. Ithaca (~90 km²) is the smallest of the
 // four islands we keep (Zakynthos, Kefalonia, Ithaca, Lefkada); everything
 // smaller renders as a pinhole speck in the wave fill. `this.area` is m².
 const MIN_LAND_AREA_M2 = 8e7;
 
-// Coordinate rounding: 1e-3° ≈ 90 m ≈ 3 px at zoom 12 (the shimmer's max).
-const COORD_PRECISION = 0.001;
+// Coordinate rounding: 5e-4° ≈ 45 m ≈ 1.5 px at zoom 12 (the shimmer's max),
+// fine enough that the wave edge reads as a smooth line rather than steps.
+const COORD_PRECISION = 0.0005;
 
 type Ring = [number, number][];
 type Polygon = Ring[];
