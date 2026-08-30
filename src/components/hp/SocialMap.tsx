@@ -4,10 +4,7 @@ import Supercluster from "supercluster";
 import "leaflet/dist/leaflet.css";
 import { type EventItem, type Place } from "@/lib/hp-model";
 import { useImageUrls } from "@/lib/hp/image-cache";
-import {
-  SEA_SHIMMER_LATLNGS,
-  SEA_SHIMMER_MAX_ZOOM,
-} from "@/lib/hp/sea-shimmer";
+import { SEA_SHIMMER_LATLNGS, SEA_SHIMMER_MAX_ZOOM } from "@/lib/hp/sea-shimmer";
 import { useI18n } from "@/lib/i18n";
 
 type LeafletModule = typeof import("leaflet");
@@ -341,20 +338,58 @@ function typeColorToken(place: Place) {
   return "var(--hp-sunset)";
 }
 
-function clusterSize(status: AreaStatus, selected: boolean, compact: boolean) {
-  if (compact) return selected ? 54 : 42;
-  const base = status === "live" ? 82 : status === "hot" ? 70 : status === "moving" ? 58 : 48;
-  return Math.round(base * (selected ? 1.08 : 1));
+// ── Bubble size & animation, tied to a live-activity proxy ──────────────────
+// There is no real-time presence data yet, so `activityScore` blends the
+// place's pulse score with how many recent posts it carries and whether it has
+// a live signal (a story / an event) into a 0..1 "how alive right now". That
+// one number drives both the bubble's size and which animation tier it gets,
+// so LIVE/HOT spots read as only slightly bigger + livelier, not dramatically.
+const BUBBLE_BASE_PX = 34;
+const BUBBLE_SPAN_PX = 12;
+
+function activityScore(hotness: number, recentPostCount: number, liveSignal: boolean) {
+  return (
+    0.6 * clamp01(hotness / 10) + 0.3 * clamp01(recentPostCount / 8) + 0.1 * (liveSignal ? 1 : 0)
+  );
 }
 
-function childSize(place: Place, selected: boolean) {
-  const base = place.hotness >= 8 ? 60 : place.hotness >= 6 ? 54 : 48;
-  return Math.round(base * (selected ? 1.1 : 1));
+// "calm" gets no glow; a → b → c are progressively livelier (see styles.css).
+type BubbleTier = "calm" | "a" | "b" | "c";
+function bubbleTier(activity: number): BubbleTier {
+  if (activity >= 0.85) return "c";
+  if (activity >= 0.65) return "b";
+  if (activity >= 0.45) return "a";
+  return "calm";
 }
 
-function activityClusterSize(pointCount: number, selected: boolean) {
-  const base = pointCount >= 8 ? 72 : pointCount >= 5 ? 64 : pointCount >= 3 ? 56 : 50;
-  return Math.round(base * (selected ? 1.06 : 1));
+function bubbleSize(activity: number, statusBump: boolean, selected: boolean) {
+  const raw = BUBBLE_BASE_PX + BUBBLE_SPAN_PX * clamp01(activity) + (statusBump ? 2 : 0);
+  return Math.round(raw * (selected ? 1.06 : 1));
+}
+
+function clusterActivity(cluster: MapAreaCluster) {
+  const avgPosts = cluster.postCount / Math.max(cluster.places.length, 1);
+  const liveSignal = cluster.eventCount > 0 || cluster.status === "live";
+  return activityScore(cluster.hotness, avgPosts, liveSignal);
+}
+
+function clusterSize(cluster: MapAreaCluster, selected: boolean, compact: boolean) {
+  const statusBump = cluster.status === "live" || cluster.status === "hot";
+  const size = bubbleSize(clusterActivity(cluster), statusBump, selected);
+  // "compact" (lower-ranked, label-less) bubbles are trimmed a touch, not shrunk
+  // to a dot — they still read their activity size and animation tier.
+  return compact && !selected ? Math.round(size * 0.86) : size;
+}
+
+function childSize(place: Place, selected: boolean, liveSignal: boolean) {
+  const activity = activityScore(place.hotness, place.recentPostCount, liveSignal);
+  return bubbleSize(activity, place.hotness >= 8, selected);
+}
+
+function activityClusterSize(node: ActivityClusterRenderNode, selected: boolean) {
+  const avgPosts = node.postCount / Math.max(node.pointCount, 1);
+  const activity = activityScore(node.hotness, avgPosts, node.eventCount > 0);
+  return bubbleSize(activity, node.hotness >= 8, selected);
 }
 
 function uniqueAvatars(places: Place[]) {
@@ -474,7 +509,7 @@ function createAreaIcon(
   resolve: (url: string) => string,
 ) {
   const compact = !selected && cluster.status !== "live" && rank > 1;
-  const size = clusterSize(cluster.status, selected, compact);
+  const size = clusterSize(cluster, selected, compact);
   const labelOffsetPx = selected ? 0 : cluster.labelOffsetPx;
   const color = toneColor(cluster.tone);
   const images = cluster.places.slice(0, 3);
@@ -499,20 +534,30 @@ function createAreaIcon(
         ? cluster.status
         : "";
 
-  const glows = cluster.status === "live" || cluster.status === "hot";
-  const glowSize = Math.round(size * 1.9);
-  const glow = glows
-    ? `<span class="hp-marker-glow" style="width:${glowSize}px;height:${glowSize}px;--glow-color:${color};"></span>`
-    : "";
+  // Animation tier from the same live-activity proxy that sized the bubble.
+  // calm → nothing · a → soft breathing glow · b → glow + pulsing ring ·
+  // c → also emits ripple rings ("live pulse"). Compact (lower-ranked) bubbles
+  // still glow/pulse by tier, but the ripple is reserved for full bubbles.
+  const rawTier = bubbleTier(clusterActivity(cluster));
+  const tier: BubbleTier = compact && rawTier === "c" ? "b" : rawTier;
+  const glowSize = Math.round(size * (tier === "a" ? 1.5 : 1.8));
+  const glow =
+    tier === "calm"
+      ? ""
+      : `<span class="hp-marker-glow${tier === "a" ? " hp-marker-glow--soft" : ""}" style="width:${glowSize}px;height:${glowSize}px;--glow-color:${color};"></span>`;
+  const ripple =
+    tier === "c"
+      ? `<span class="hp-marker-ripple"></span><span class="hp-marker-ripple hp-marker-ripple--offset"></span>`
+      : "";
 
   return L.divIcon({
     className: "hp-area-marker",
     html: `
       <div
-        class="hp-area-marker__shell ${selected ? "is-selected" : ""} ${cluster.status === "live" ? "is-live" : ""} ${compact ? "is-compact" : ""}"
+        class="hp-area-marker__shell ${selected ? "is-selected" : ""} ${tier === "b" || tier === "c" ? "is-pulsing" : ""} ${compact ? "is-compact" : ""}"
         style="--marker-size:${size}px;--marker-color:${color};"
       >
-        ${glow}<span class="hp-area-marker__ring"></span>
+        ${glow}${ripple}<span class="hp-area-marker__ring"></span>
         <span class="hp-area-marker__collage">${collage}</span>
         <span class="hp-area-marker__shade"></span>
         <span class="hp-area-marker__initial">${escapeHtml(cluster.name.slice(0, 1))}</span>
@@ -551,7 +596,7 @@ function createChildIcon(
     });
   }
 
-  const size = childSize(place, selected);
+  const size = childSize(place, selected, hasStories || eventCount > 0);
   const line =
     eventCount > 0
       ? `${eventCount} event${eventCount === 1 ? "" : "s"}`
@@ -589,7 +634,7 @@ function createActivityClusterIcon(
   node: ActivityClusterRenderNode,
   resolve: (url: string) => string,
 ) {
-  const size = activityClusterSize(node.pointCount, node.selected);
+  const size = activityClusterSize(node, node.selected);
   const color = toneColor(node.tone);
   const images = node.leaves.slice(0, 3);
   const collage = images
@@ -1280,13 +1325,16 @@ export function SocialMap({
                 .map((p) => resolveImg(p.imageUrl))
                 .join(",")
             : resolveImg(node.place.imageUrl);
+      // `act*` buckets fold the live-activity inputs (hotness / recent posts /
+      // events) into the signature, so a data refresh that shifts a bubble's
+      // size or animation tier rebuilds its icon even if status/count held.
       const sig = [
         node.kind,
         node.kind === "cluster"
-          ? `${node.cluster.id}:${node.cluster.status}:${node.selected ? 1 : 0}:${node.rank}:${imageToken}`
+          ? `${node.cluster.id}:${node.cluster.status}:${node.selected ? 1 : 0}:${node.rank}:${Math.round(clusterActivity(node.cluster) * 100)}:${imageToken}`
           : node.kind === "activity-cluster"
-            ? `${node.clusterId}:${node.pointCount}:${node.selected ? 1 : 0}:${node.tone}:${imageToken}`
-            : `${node.place.id}:${node.selected ? 1 : 0}:${hasStory ? 1 : 0}:${node.eventCount}:${node.compact ? 1 : 0}:${imageToken}`,
+            ? `${node.clusterId}:${node.pointCount}:${node.selected ? 1 : 0}:${node.tone}:${Math.round(node.hotness * 10)}:${node.eventCount}:${Math.round(node.postCount)}:${imageToken}`
+            : `${node.place.id}:${node.selected ? 1 : 0}:${hasStory ? 1 : 0}:${node.eventCount}:${node.compact ? 1 : 0}:${Math.round(node.place.hotness * 10)}:${node.place.recentPostCount}:${imageToken}`,
       ].join("|");
       const needsRebuild = markerSigRef.current.get(node.id) !== sig;
 
