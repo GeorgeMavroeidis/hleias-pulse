@@ -1431,6 +1431,188 @@ h3 {
   background: var(--hp-olive);
 }
 
+/* ── Coupon code ticket (DealCodeModal) ─────────────────────────────────
+   Same "printed" language as the premium coupon: a head band, a
+   perforation row with notch cut-outs (in hp-paper — the modal sheet is
+   hp-paper), then a redemption zone with the QR + numeric code. */
+.hp-ticket {
+  position: relative;
+  margin: 0 auto;
+  max-width: 19rem;
+  background: var(--hp-paper);
+  border-radius: 1.15rem;
+  text-align: left;
+  overflow: hidden;
+  box-shadow:
+    0 1px 1px rgba(23, 20, 17, 0.05),
+    0 3px 8px rgba(23, 20, 17, 0.06),
+    0 22px 42px -20px rgba(23, 20, 17, 0.35);
+}
+.hp-ticket__head {
+  position: relative;
+  padding: 0.85rem 0.9rem 0.75rem;
+  background: linear-gradient(
+    118deg,
+    color-mix(in srgb, var(--hp-sunset) 12%, transparent),
+    color-mix(in srgb, var(--hp-night) 6%, transparent)
+  );
+}
+.hp-ticket__chip {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.55rem;
+  background: var(--hp-sunset);
+  color: var(--hp-paper);
+  display: grid;
+  place-items: center;
+}
+.hp-ticket__deal {
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.18;
+  letter-spacing: -0.005em;
+  margin: 0.6rem 0 0;
+  color: var(--hp-ink);
+}
+.hp-ticket__seal {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.75rem;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 999px;
+  background: var(--hp-paper);
+  color: var(--hp-sunset);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  transform: rotate(-7deg);
+  box-shadow:
+    0 3px 8px rgba(23, 20, 17, 0.25),
+    inset 0 0 0 2px var(--hp-sunset),
+    inset 0 0 0 3.5px var(--hp-paper),
+    inset 0 0 0 4.5px color-mix(in srgb, var(--hp-sunset) 40%, transparent);
+}
+.hp-ticket__seal b {
+  display: block;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.75rem;
+  line-height: 0.85;
+}
+.hp-ticket__seal small {
+  display: block;
+  font-size: 0.32rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.hp-ticket__perf {
+  position: relative;
+  height: 1rem;
+}
+.hp-ticket__perf i {
+  position: absolute;
+  left: 0.9rem;
+  right: 0.9rem;
+  top: 50%;
+  border-top: 1.5px dashed var(--hp-border);
+}
+.hp-ticket__perf::before,
+.hp-ticket__perf::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: var(--hp-bg);
+  transform: translateY(-50%);
+}
+.hp-ticket__perf::before {
+  left: -0.55rem;
+}
+.hp-ticket__perf::after {
+  right: -0.55rem;
+}
+.hp-ticket__body {
+  padding: 0.15rem 0.9rem 0.95rem;
+}
+.hp-ticket__redeem {
+  position: relative;
+  border-radius: 0.9rem;
+  padding: 0.85rem 0.8rem 0.8rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--hp-sunset) 4.5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hp-sunset) 16%, transparent);
+}
+.hp-ticket__qr {
+  width: 9.25rem;
+  height: 9.25rem;
+  margin: 0 auto;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(23, 20, 17, 0.06),
+    inset 0 0 0 1px rgba(23, 20, 17, 0.06);
+}
+.hp-ticket__qr img,
+.hp-ticket__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hp-ticket__code {
+  margin-top: 0.7rem;
+  font-family: var(--hp-font-mono, ui-monospace, monospace);
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: 0.3em;
+  color: var(--hp-ink);
+}
+.hp-ticket__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--hp-muted);
+}
+.hp-ticket__meta .hp-ticket__tag {
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid var(--hp-border);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+.hp-ticket.is-expired .hp-ticket__qr {
+  filter: grayscale(1) opacity(0.35);
+}
+.hp-ticket__stamp {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.hp-ticket__stamp span {
+  transform: rotate(-11deg);
+  border: 2.5px solid var(--hp-muted);
+  color: var(--hp-muted);
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  padding: 0.3rem 0.8rem;
+  border-radius: 0.4rem;
+  box-shadow: inset 0 0 0 2px var(--hp-paper);
+  background: color-mix(in srgb, var(--hp-paper) 72%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hp-live-ping,
   .hp-marker-glow,

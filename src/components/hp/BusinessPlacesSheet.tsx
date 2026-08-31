@@ -391,8 +391,8 @@ export function BusinessPlacesSheet({
                                   autoCapitalize="characters"
                                   autoCorrect="off"
                                   spellCheck={false}
-                                  placeholder={"".padEnd(DEAL_CODE_LENGTH, "X")}
-                                  className={`${fieldClass()} font-mono tracking-[0.3em]`}
+                                  placeholder={"".padEnd(DEAL_CODE_LENGTH, "•")}
+                                  className={`${fieldClass()} text-center font-mono text-[15px] font-bold tracking-[0.4em] focus:border-hp-sunset/60`}
                                 />
                                 <button
                                   type="button"
@@ -414,20 +414,28 @@ export function BusinessPlacesSheet({
                                   {feedback.text}
                                 </p>
                               )}
-                              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                              <div className="mt-2.5 grid grid-cols-3 gap-1.5">
                                 <div className="rounded-xl bg-hp-sunset/10 p-2 text-center">
                                   <div className="hp-num text-[16px] font-black leading-none text-hp-sunset">
-                                    {stats?.redeemedTotal ?? 0}
+                                    {stats?.redeemedThisMonth ?? 0}
                                   </div>
-                                  <div className="mt-0.5 text-[7.5px] font-bold uppercase tracking-wide text-hp-muted">
-                                    {t("redemptions")}
+                                  <div className="mt-0.5 text-[7px] font-bold uppercase tracking-wide text-hp-muted">
+                                    {t("this month")}
                                   </div>
                                 </div>
                                 <div className="rounded-xl bg-hp-ink/5 p-2 text-center">
                                   <div className="hp-num text-[16px] font-black leading-none text-hp-ink">
+                                    {stats?.redeemedTotal ?? 0}
+                                  </div>
+                                  <div className="mt-0.5 text-[7px] font-bold uppercase tracking-wide text-hp-muted">
+                                    {t("total")}
+                                  </div>
+                                </div>
+                                <div className="rounded-xl bg-hp-sea/15 p-2 text-center">
+                                  <div className="hp-num text-[16px] font-black leading-none text-hp-deep">
                                     {stats?.issuedLive ?? 0}
                                   </div>
-                                  <div className="mt-0.5 text-[7.5px] font-bold uppercase tracking-wide text-hp-muted">
+                                  <div className="mt-0.5 text-[7px] font-bold uppercase tracking-wide text-hp-muted">
                                     {t("pending")}
                                   </div>
                                 </div>
