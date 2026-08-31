@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BadgeCheck,
@@ -14,12 +14,12 @@ import {
   UserCircle2,
   Users,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import type { AdminRole } from "@/lib/admin-api";
 import type { OrganizerStatus } from "@/lib/hp/cultural-events-types";
 import type { BusinessStatus } from "@/lib/hp/business-types";
 import { useI18n } from "@/lib/i18n";
+import { Field, IdentitySegments, SectionHeader, fieldClass } from "./blend-ui";
 import {
   normalizeHandle,
   profileAvatarUrl,
@@ -51,97 +51,6 @@ function accountUserId(account: PulseAccountState) {
 
 function accountEmail(account: PulseAccountState) {
   return account.status === "ready" || account.status === "needsProfile" ? account.email : null;
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function fieldClass() {
-  return "w-full rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none transition placeholder:text-hp-muted focus:border-hp-sunset/45 focus:bg-white/85";
-}
-
-/* Shared 3-way identity segmented control (Account + Auth sign-up). */
-function IdentitySegments({
-  identity,
-  onChange,
-}: {
-  identity: AccountIdentity;
-  onChange: (id: AccountIdentity) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-      {PROFILE_IDENTITIES.map((option) => {
-        const active = identity === option.id;
-        return (
-          <button
-            key={option.id}
-            type="button"
-            onClick={() => onChange(option.id)}
-            aria-pressed={active}
-            className={`rounded-xl px-2 py-2 text-left transition ${
-              active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
-            }`}
-          >
-            <span className="block text-[11px] font-black">{t(option.label)}</span>
-            <span
-              className={`block truncate text-[9px] font-semibold ${
-                active ? "text-hp-paper/65" : "text-hp-muted"
-              }`}
-            >
-              {t(option.helper)}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/* Section eyebrow: a tinted icon chip, a mono-ish label, and a fading rule.
-   The three tones map to the three zones of the sheet. */
-const SECTION_TONES: Record<"sunset" | "deep" | "olive", { chip: string; token: string }> = {
-  sunset: { chip: "bg-hp-sunset", token: "--hp-sunset" },
-  deep: { chip: "bg-hp-deep", token: "--hp-deep" },
-  olive: { chip: "bg-hp-olive", token: "--hp-olive" },
-};
-
-function SectionHeader({
-  icon: Icon,
-  label,
-  tone,
-}: {
-  icon: LucideIcon;
-  label: string;
-  tone: keyof typeof SECTION_TONES;
-}) {
-  const { chip, token } = SECTION_TONES[tone];
-  return (
-    <div className="mb-3 flex items-center gap-2">
-      <span
-        className={`grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[9px] text-hp-paper ${chip}`}
-      >
-        <Icon size={14} strokeWidth={2.2} />
-      </span>
-      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-hp-muted">
-        {label}
-      </span>
-      <span
-        className="h-px flex-1 rounded-full"
-        style={{
-          background: `linear-gradient(90deg, color-mix(in srgb, var(${token}) 42%, transparent), transparent)`,
-        }}
-      />
-    </div>
-  );
 }
 
 function authErrorMessage(error: unknown) {
@@ -341,7 +250,7 @@ export function AuthSheet({
               ))}
             </div>
 
-            <form onSubmit={submit} className="hp-acct-stagger space-y-3">
+            <form onSubmit={submit} className="hp-stagger space-y-3">
               {mode === "signUp" && (
                 <>
                   <Field label={t("Display name")}>
@@ -366,7 +275,11 @@ export function AuthSheet({
                     <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
                       {t("Default identity")}
                     </div>
-                    <IdentitySegments identity={identity} onChange={setIdentity} />
+                    <IdentitySegments
+                      options={PROFILE_IDENTITIES}
+                      value={identity}
+                      onChange={setIdentity}
+                    />
                   </div>
                 </>
               )}
@@ -855,7 +768,7 @@ export function AccountSheet({
                 </button>
               </div>
             ) : (
-              <form onSubmit={submit} className="hp-acct-stagger space-y-6">
+              <form onSubmit={submit} className="hp-stagger space-y-6">
                 {/* ── Identity: gradient hero + the one identity control ── */}
                 <section>
                   <SectionHeader icon={UserCircle2} label={t("Identity")} tone="sunset" />
@@ -907,7 +820,11 @@ export function AccountSheet({
                       <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
                         {t("Default identity")}
                       </div>
-                      <IdentitySegments identity={identity} onChange={setIdentity} />
+                      <IdentitySegments
+                        options={PROFILE_IDENTITIES}
+                        value={identity}
+                        onChange={setIdentity}
+                      />
                     </div>
                   </div>
                 </section>
