@@ -11,6 +11,7 @@ import {
   type PulseTier,
 } from "@/lib/hp/pulse-activity";
 import { useI18n } from "@/lib/i18n";
+import { childMarkerSize, markerPresenceScale } from "@/lib/hp/map-visuals";
 
 type LeafletModule = typeof import("leaflet");
 type LeafletMap = import("leaflet").Map;
@@ -68,7 +69,7 @@ const MAP_EASE_LINEARITY = 0.25;
 const RICH_VISUAL_ZOOM = 13.25;
 const MIN_UTILITY_RAIL_HEIGHT = 248;
 const MIN_MAP_CHROME_HEIGHT = 188;
-const SAFE_MARKER_RADIUS = 36;
+const SAFE_MARKER_RADIUS = 48;
 
 type SafeMapRect = { left: number; right: number; top: number; bottom: number };
 
@@ -79,22 +80,20 @@ function safeMapRect(
   container: HTMLElement,
   bottomOverlayHeight: number,
   availableMapHeight: number,
+  markerRadius = SAFE_MARKER_RADIUS,
 ): SafeMapRect {
   const railVisible = availableMapHeight >= MIN_UTILITY_RAIL_HEIGHT;
   const chromeVisible = availableMapHeight >= MIN_MAP_CHROME_HEIGHT;
-  const edgeInset = 20 + SAFE_MARKER_RADIUS;
+  const edgeInset = 20 + markerRadius;
   const rawBottom = Math.max(
     edgeInset + 32,
-    container.clientHeight - bottomOverlayHeight - 20 - SAFE_MARKER_RADIUS,
+    container.clientHeight - bottomOverlayHeight - 20 - markerRadius,
   );
-  const desiredTop = (chromeVisible ? 108 : 20) + SAFE_MARKER_RADIUS;
+  const desiredTop = (chromeVisible ? 108 : 20) + markerRadius;
   const top = Math.max(edgeInset, Math.min(desiredTop, rawBottom - 32));
   return {
     left: edgeInset,
-    right: Math.max(
-      edgeInset + 32,
-      container.clientWidth - (railVisible ? 64 : 20) - SAFE_MARKER_RADIUS,
-    ),
+    right: Math.max(edgeInset + 32, container.clientWidth - (railVisible ? 64 : 20) - markerRadius),
     top,
     bottom: Math.max(top + 32, rawBottom),
   };
@@ -406,11 +405,6 @@ function clusterSize(status: AreaStatus) {
   return base;
 }
 
-function childSize(place: Place) {
-  const base = place.hotness >= 8 ? 60 : place.hotness >= 6 ? 54 : 48;
-  return base;
-}
-
 function activityClusterSize(pointCount: number) {
   const base = pointCount >= 8 ? 72 : pointCount >= 5 ? 64 : pointCount >= 3 ? 56 : 50;
   return base;
@@ -521,7 +515,7 @@ function escapeHtml(value: string) {
 // reads as a calm placeholder rather than a broken image.
 const PLACEHOLDER_IMG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=";
-const MARKER_EFFECTS_VERSION = "2";
+const MARKER_EFFECTS_VERSION = "3";
 const MARKER_EFFECTS_HTML = `
   <span class="hp-marker-effects" data-effects-version="${MARKER_EFFECTS_VERSION}">
     <span class="hp-marker-field"></span>
@@ -596,7 +590,7 @@ function createChildIcon(
   solo = false,
   resolve: (url: string) => string = (url) => url,
 ) {
-  const size = childSize(place);
+  const size = childMarkerSize(tier);
   const line =
     eventCount > 0
       ? `${eventCount} event${eventCount === 1 ? "" : "s"}`
@@ -629,8 +623,8 @@ function createChildIcon(
               <strong>${escapeHtml(shortPlaceName(place.name))}</strong>
               <em>${escapeHtml(line)}</em>
             </span>
-            ${place.recentPostCount > 0 ? '<span class="hp-child-marker__dot"></span>' : ""}
           </span>
+          ${tier !== "quiet" ? '<span class="hp-child-marker__dot"></span>' : ""}
           ${statusLabel ? `<span class="hp-child-marker__status">${statusLabel}</span>` : ""}
           ${avatars ? `<span class="hp-child-marker__avatars">${avatars}</span>` : ""}
         </span>
@@ -679,6 +673,7 @@ function createActivityClusterIcon(
             <strong>${escapeHtml(node.dominantCluster.name)}</strong>
             <em>${escapeHtml(line)}</em>
           </span>
+          ${node.tier !== "quiet" ? '<span class="hp-area-marker__dot"></span>' : ""}
         </span>
       </div>
     `,
@@ -794,6 +789,9 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   const profile = markerZoomProfile(zoom);
   const farPulse = 1 - smoothstep(OVERVIEW_ZOOM, PLACE_FOCUS_ZOOM, zoom);
   const themeDetail = smoothstep(10.5, RICH_VISUAL_START, zoom);
+  for (const tier of ["quiet", "moving", "hot", "live"] as const) {
+    node.style.setProperty(`--hp-presence-${tier}`, markerPresenceScale(zoom, tier).toFixed(4));
+  }
   node.classList.toggle("hp-map-identity-far", zoom < 10.5);
   node.style.setProperty("--hp-map-medium", profile.medium.toFixed(4));
   node.style.setProperty("--hp-map-detail", profile.detail.toFixed(4));
@@ -834,6 +832,27 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   node.style.setProperty("--hp-map-theme-detail", themeDetail.toFixed(4));
   node.style.setProperty("--hp-map-effect-opacity", (0.72 + themeDetail * 0.28).toFixed(4));
   node.style.setProperty("--hp-map-secondary-opacity", themeDetail.toFixed(4));
+}
+
+// Conservative theme-independent radius: Pulse is the largest core. Include
+// the rim/dot, but not the decorative wave, to avoid unnecessary camera pans.
+function markerCoreRadius(node: RenderNode, zoom: number) {
+  const profile = markerZoomProfile(zoom);
+  const size =
+    node.kind === "child"
+      ? childMarkerSize(node.tier)
+      : node.kind === "cluster"
+        ? clusterSize(node.tier)
+        : activityClusterSize(node.pointCount);
+  const scale =
+    node.kind === "cluster"
+      ? profile.areaScale
+      : node.kind === "activity-cluster"
+        ? profile.activityScale
+        : node.solo && !node.selected
+          ? profile.soloScale
+          : profile.childScale;
+  return (size * scale * markerPresenceScale(zoom, node.tier) * (node.selected ? 1.1 : 1)) / 2 + 6;
 }
 
 function centroidOfPlaces(places: Place[], fallback: LatLngTuple): LatLngTuple {
@@ -1310,6 +1329,7 @@ export function SocialMap({
         container,
         bottomOverlayHeightRef.current,
         availableMapHeightRef.current,
+        markerCoreRadius({ ...node, selected: true }, targetZoom),
       );
       const desiredPoint = {
         x: (viewport.left + viewport.right) / 2,
@@ -1851,7 +1871,14 @@ export function SocialMap({
     lastFocusedPlaceIdRef.current = selectedPlaceId;
 
     const latLng: LatLngTuple = [selectedPlaceNode.place.lat, selectedPlaceNode.place.lng];
-    const viewport = safeMapRect(container, bottomOverlayHeight, availableMapHeight);
+    const viewport = safeMapRect(
+      container,
+      bottomOverlayHeight,
+      availableMapHeight,
+      primarySelectedNode
+        ? markerCoreRadius(primarySelectedNode, map.getZoom())
+        : SAFE_MARKER_RADIUS,
+    );
     const currentPoint = map.latLngToContainerPoint(latLng);
     const currentZoom = map.getZoom();
 
@@ -1890,7 +1917,14 @@ export function SocialMap({
         easeLinearity: MAP_EASE_LINEARITY,
       });
     }
-  }, [availableMapHeight, bottomOverlayHeight, mapReady, selectedPlaceId, selectedPlaceNode]);
+  }, [
+    availableMapHeight,
+    bottomOverlayHeight,
+    mapReady,
+    primarySelectedNode,
+    selectedPlaceId,
+    selectedPlaceNode,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1912,7 +1946,12 @@ export function SocialMap({
       }
 
       const point = map.latLngToContainerPoint(primarySelectedNode.latLng);
-      const viewport = safeMapRect(container, bottomOverlayHeight, availableMapHeight);
+      const viewport = safeMapRect(
+        container,
+        bottomOverlayHeight,
+        availableMapHeight,
+        markerCoreRadius(primarySelectedNode, map.getZoom()),
+      );
       const delta = panDeltaIntoSafeRect(point, viewport);
       if (delta.x !== 0 || delta.y !== 0) {
         map.panBy([delta.x, delta.y], { animate: false });

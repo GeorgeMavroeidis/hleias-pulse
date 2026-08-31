@@ -319,6 +319,18 @@
 .hp-area-marker__shell,
 .hp-child-marker__shell {
   --hp-marker-aura-opacity: var(--hp-map-aura-opacity);
+  --hp-marker-core-opacity: var(--hp-map-surface-opacity, 1);
+  --hp-marker-tier-presence: var(--hp-presence-quiet, 1);
+  --hp-marker-presence: min(var(--hp-marker-tier-presence), var(--hp-marker-presence-cap, 2));
+  --hp-marker-interaction-scale: 1;
+  --hp-marker-render-scale: calc(
+    var(--hp-marker-zoom-scale, 1) * var(--hp-marker-presence) * var(--hp-marker-interaction-scale)
+  );
+  --hp-marker-core-render-scale: calc(
+    var(--hp-marker-render-scale) * var(--hp-theme-core-scale, 1)
+  );
+  --hp-marker-rim-size: 1.25px;
+  --hp-marker-rim-width: calc(var(--hp-marker-rim-size) / var(--hp-marker-core-render-scale));
   position: absolute;
   left: 50%;
   top: 50%;
@@ -333,13 +345,26 @@
   box-sizing: border-box;
   border-radius: 9999px;
   overflow: visible;
-  opacity: var(--hp-map-surface-opacity, 1);
-  transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1));
+  transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-render-scale));
   transform-origin: center;
-  transition:
-    opacity 80ms linear,
-    transform 80ms linear;
+  transition: transform 80ms linear;
   will-change: auto;
+}
+
+.is-pulse-moving {
+  --hp-marker-tier-presence: var(--hp-presence-moving, 1);
+}
+
+.is-pulse-hot {
+  --hp-marker-tier-presence: var(--hp-presence-hot, 1);
+}
+
+.is-pulse-live {
+  --hp-marker-tier-presence: var(--hp-presence-live, 1);
+}
+
+:is(.hp-area-marker__shell, .hp-child-marker__shell):is(.is-hot, .is-live, .is-selected) {
+  --hp-marker-rim-size: 1.5px;
 }
 
 .hp-area-marker__shell {
@@ -370,8 +395,8 @@
 .hp-area-marker__shell.is-selected,
 .hp-child-marker__shell.is-selected {
   --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.08));
-  opacity: 1;
-  transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1)) scale(1.055);
+  --hp-marker-core-opacity: 1;
+  --hp-marker-interaction-scale: 1.1;
   transition-duration: 140ms;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform, opacity;
@@ -380,7 +405,7 @@
 .hp-real-map.has-marker-selection
   :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
   --hp-marker-aura-opacity: max(0.22, calc(var(--hp-map-aura-opacity) - 0.08));
-  opacity: max(0.76, calc(var(--hp-map-surface-opacity, 1) - 0.08));
+  --hp-marker-core-opacity: max(0.76, calc(var(--hp-map-surface-opacity, 1) - 0.08));
   transition-duration: 140ms;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -389,8 +414,8 @@
   :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):hover
     :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
     --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
-    opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
-    transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1)) scale(1.02);
+    --hp-marker-core-opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
+    --hp-marker-interaction-scale: 1.02;
     transition-duration: 110ms;
     transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
     will-change: transform, opacity;
@@ -407,8 +432,8 @@
   :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):active
     :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
     --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
-    opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
-    transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1)) scale(1.02);
+    --hp-marker-core-opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
+    --hp-marker-interaction-scale: 1.02;
     transition-duration: 70ms;
     transition-timing-function: linear;
     will-change: transform, opacity;
@@ -436,8 +461,8 @@
   )
   :is(.hp-area-marker__shell, .hp-child-marker__shell) {
   --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
-  opacity: max(0.94, var(--hp-map-surface-opacity, 1));
-  transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1)) scale(1.02);
+  --hp-marker-core-opacity: max(0.94, var(--hp-map-surface-opacity, 1));
+  --hp-marker-interaction-scale: 1.02;
   transition-duration: 110ms;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform, opacity;
@@ -460,9 +485,12 @@
 
 .hp-marker-core {
   z-index: 1;
+  opacity: var(--hp-marker-core-opacity, 1);
   transform: translateZ(0) scale(var(--hp-theme-core-scale, 1));
   transform-origin: center;
-  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition:
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .hp-marker-effects {
@@ -670,7 +698,7 @@
 
 .hp-app-shell[data-marker-animation-theme="signal"]
   :is(.hp-area-marker__shell, .hp-child-marker__shell) {
-  --hp-theme-core-scale: 0.84;
+  --hp-theme-core-scale: 0.92;
   --hp-signal-sweep-opacity: calc(var(--hp-map-theme-detail) * 0.92);
 }
 
@@ -985,8 +1013,8 @@
 .hp-area-marker__ring,
 .hp-child-marker__ring {
   z-index: 0;
-  inset: -0.14rem;
-  border: 1px solid color-mix(in srgb, var(--hp-paper) 58%, transparent);
+  inset: calc(-1 * var(--hp-marker-rim-width));
+  border: var(--hp-marker-rim-width) solid color-mix(in srgb, var(--hp-paper) 78%, transparent);
   background: color-mix(in srgb, var(--hp-paper) 18%, transparent);
   box-shadow:
     0 0.08rem 0.2rem rgba(16, 36, 61, 0.11),
@@ -994,7 +1022,6 @@
   opacity: var(--hp-map-ring-opacity, 1);
   transition:
     border-color 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 150ms cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -1008,7 +1035,9 @@
   opacity: 1;
 }
 
-:is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):focus-visible
+.hp-app-shell
+  :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):focus-visible
+  .hp-marker-core
   :is(.hp-area-marker__ring, .hp-child-marker__ring) {
   border-color: color-mix(in srgb, var(--hp-sunset) 64%, var(--hp-paper));
   box-shadow:
@@ -1295,15 +1324,16 @@
 
 .hp-area-marker__dot,
 .hp-child-marker__dot {
+  --hp-dot-size: calc(6px / var(--hp-marker-core-render-scale));
   position: absolute;
   z-index: 5;
-  right: 0.25rem;
-  bottom: 0.28rem;
-  height: 0.58rem;
-  width: 0.58rem;
+  right: calc(14.65% - var(--hp-dot-size) / 2);
+  bottom: calc(14.65% - var(--hp-dot-size) / 2);
+  height: var(--hp-dot-size);
+  width: var(--hp-dot-size);
   border-radius: 9999px;
   background: var(--hp-sunset);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hp-paper) 82%, transparent);
+  box-shadow: 0 0 0 var(--hp-marker-rim-width) color-mix(in srgb, var(--hp-paper) 92%, transparent);
   opacity: var(--hp-map-dot-opacity);
   transition: opacity 90ms linear;
 }
