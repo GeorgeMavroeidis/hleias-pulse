@@ -8,6 +8,9 @@ const PRESENCE: Record<PulseTier, readonly number[]> = {
 };
 const PRESENCE_ZOOMS = [9.25, 11.5, 12.5, 14.25, 15.5] as const;
 
+// Largest decorative core beat (Pulse selected); used for safe viewport margins.
+export const MAX_MARKER_CORE_BEAT = 1.055;
+
 export function markerPresenceScale(zoom: number, tier: PulseTier) {
   const values = PRESENCE[tier];
   if (zoom <= PRESENCE_ZOOMS[0]) return values[0];
@@ -27,6 +30,10 @@ export function childMarkerSize(tier: PulseTier) {
 export function markerMotionPhase(id: string) {
   let hash = 0;
   for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  // Avalanche adjacent IDs so place-1 / place-2 do not pulse almost in unison.
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  hash = (hash ^ (hash >>> 16)) >>> 0;
   return (hash % 10000) / 10000;
 }
 
