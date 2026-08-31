@@ -11,7 +11,12 @@ import {
   type PulseTier,
 } from "@/lib/hp/pulse-activity";
 import { useI18n } from "@/lib/i18n";
-import { childMarkerSize, markerPresenceScale } from "@/lib/hp/map-visuals";
+import {
+  childMarkerSize,
+  markerPresenceScale,
+  markerMotionPhase,
+  markerViewportDensity,
+} from "@/lib/hp/map-visuals";
 
 type LeafletModule = typeof import("leaflet");
 type LeafletMap = import("leaflet").Map;
@@ -397,7 +402,7 @@ function markerStyle(size: number, id: string) {
     hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
   }
   const delaySeconds = ((hash % 5400) / 1000).toFixed(3);
-  return `--marker-size:${size}px;--hp-pulse-delay:-${delaySeconds}s`;
+  return `--marker-size:${size}px;--hp-pulse-delay:-${delaySeconds}s;--hp-signal-phase:${markerMotionPhase(id)}`;
 }
 
 function clusterSize(status: AreaStatus) {
@@ -970,6 +975,9 @@ export function SocialMap({
   const markerRuntimeRef = useRef<Map<string, MarkerRuntimeState>>(new Map());
   const markerClickHandlerRef = useRef<Map<string, () => void>>(new Map());
   const renderNodesRef = useRef<Map<string, RenderNode>>(new Map());
+  const scheduleMarkerViewportSyncRef = useRef<() => void>(() => {});
+  const activitySnapshotRef = useRef(activitySnapshot);
+  activitySnapshotRef.current = activitySnapshot;
   const activateMarkerByIdRef = useRef<(id: string) => void>(() => undefined);
   const userMarkerRef = useRef<LeafletMarker | null>(null);
   const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
@@ -1587,32 +1595,18 @@ export function SocialMap({
         }
         mapNodeRef.current?.classList.add("hp-map-is-moving");
       };
-      const syncMarkerViewportMotion = () => {
-        if (!map) return;
-        const motionBounds = map.getBounds().pad(0.15);
-        markerRuntimes.forEach((runtime, id) => {
-          const markerElement = markers.get(id)?.getElement();
-          const markerShell = markerElement?.firstElementChild as HTMLElement | null;
-          markerShell?.style.setProperty(
-            "--hp-marker-motion-state",
-            runtime.opacity > 0.08 && motionBounds.contains([runtime.lat, runtime.lng])
-              ? "running"
-              : "paused",
-          );
-        });
-      };
       const resumeMarkerEffects = (kind: "move" | "zoom") => {
         activeMapMotion.delete(kind);
         if (activeMapMotion.size > 0) return;
         effectsResumeFrame = window.requestAnimationFrame(() => {
           effectsResumeFrame = null;
           mapNodeRef.current?.classList.remove("hp-map-is-moving");
+          scheduleMarkerViewportSyncRef.current();
         });
       };
       const onMoveStart = () => pauseMarkerEffects("move");
       const onZoomStart = () => pauseMarkerEffects("zoom");
       const onMoveEnd = () => {
-        syncMarkerViewportMotion();
         resumeMarkerEffects("move");
       };
       const onZoomEnd = () => resumeMarkerEffects("zoom");
@@ -1662,24 +1656,77 @@ export function SocialMap({
   }, []);
 
   useEffect(() => {
-    const syncPageVisibility = () => {
-      mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    let frame: number | null = null;
+    const schedule = () => {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        // The settle event schedules a fresh pass; do not re-grid each zoom frame.
+        if (mapNodeRef.current?.classList.contains("hp-map-is-moving")) return;
+        const size = map.getSize();
+        const height = Math.max(
+          0,
+          Math.min(size.y - bottomOverlayHeightRef.current, availableMapHeightRef.current),
+        );
+        const nodes = [...renderNodesRef.current.values()].map((node) => {
+          const point = map.latLngToContainerPoint(node.latLng);
+          const score =
+            node.kind === "child"
+              ? scorePlace(node.place, activitySnapshotRef.current, node.eventCount)
+              : node.kind === "cluster"
+                ? node.cluster.activityScore
+                : node.leaves.reduce(
+                    (sum, place) => sum + scorePlace(place, activitySnapshotRef.current),
+                    0,
+                  );
+          return {
+            id: node.id,
+            x: point.x,
+            y: point.y,
+            opacity: node.opacity,
+            tier: node.tier,
+            selected: node.selected,
+            score,
+          };
+        });
+        const density = markerViewportDensity(nodes, size.x, height);
+        mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
+        markersRef.current.forEach((marker, id) => {
+          const shell = marker.getElement()?.firstElementChild as HTMLElement | null;
+          if (!shell) return;
+          shell.classList.toggle("is-viewport-paused", document.hidden || !density.visible.has(id));
+          shell.classList.toggle("is-marker-dense", density.dense.has(id));
+          shell.classList.toggle("is-signal-suppressed", density.suppressed.has(id));
+        });
+      });
     };
-    syncPageVisibility();
-    document.addEventListener("visibilitychange", syncPageVisibility);
-    return () => document.removeEventListener("visibilitychange", syncPageVisibility);
-  }, []);
+    const onVisibilityChange = () => {
+      // A hidden document may suspend rAF, so pause its animations immediately.
+      mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
+      schedule();
+    };
+    scheduleMarkerViewportSyncRef.current = schedule;
+    map.on("moveend zoomend resize", schedule);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    schedule();
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      scheduleMarkerViewportSyncRef.current = () => {};
+      map.off("moveend zoomend resize", schedule);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [mapReady]);
+
+  useEffect(() => {
+    scheduleMarkerViewportSyncRef.current();
+  }, [bottomOverlayHeight, availableMapHeight, activitySnapshot]);
 
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
     if (!L || !map || !mapReady) return;
-
-    const visibleRenderNodeCount = renderNodes.reduce(
-      (count, node) => count + (node.opacity > 0.08 ? 1 : 0),
-      0,
-    );
-    mapNodeRef.current?.classList.toggle("hp-marker-density-high", visibleRenderNodeCount > 36);
 
     const nodeIds = new Set(renderNodes.map((node) => node.id));
     markersRef.current.forEach((marker, id) => {
@@ -1803,15 +1850,14 @@ export function SocialMap({
           markerElement.tabIndex = visibleForInteraction ? 0 : -1;
           markerElement.classList.toggle("is-selection-anchor", isPassiveAreaAnchor);
           markerShell?.classList.toggle("is-selected", node.selected);
-          markerShell?.style.setProperty(
-            "--hp-marker-motion-state",
-            visuallyVisible && !document.hidden && map.getBounds().pad(0.15).contains(node.latLng)
-              ? "running"
-              : "paused",
-          );
         }
 
         if (needsRebuild) {
+          // Leaflet can reuse the outer icon element when replacing its content.
+          if (markerElement.__hpClickHandler)
+            markerElement.removeEventListener("click", markerElement.__hpClickHandler, true);
+          if (markerElement.__hpKeyHandler)
+            markerElement.removeEventListener("keydown", markerElement.__hpKeyHandler, true);
           const activateFromEvent: EventListener = (event) => {
             event.preventDefault();
             event.stopImmediatePropagation();
@@ -1854,6 +1900,7 @@ export function SocialMap({
         zIndexOffset,
       });
     });
+    scheduleMarkerViewportSyncRef.current();
   }, [mapReady, renderNodes, resolveImg, storyPlaceIds, zoom]);
 
   useEffect(() => {
