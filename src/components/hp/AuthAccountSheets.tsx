@@ -468,13 +468,11 @@ function OrganizerSection({
 function BusinessSection({
   status,
   myPlacesCount,
-  identityEligible,
   onApply,
   onOpenPlaces,
 }: {
   status: BusinessStatus | null;
   myPlacesCount: number;
-  identityEligible: boolean;
   onApply: () => Promise<void>;
   onOpenPlaces: () => void;
 }) {
@@ -537,10 +535,6 @@ function BusinessSection({
       </div>
     );
   }
-
-  // Applying only makes sense for Local / Guide identities. An already-verified
-  // or pending standing is handled by the returns above and stays visible.
-  if (!identityEligible) return null;
 
   return (
     <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
@@ -697,17 +691,13 @@ export function AccountSheet({
 
   const avatarUrl = avatarPreview ?? profileAvatarUrl(profile);
 
-  // Live picker value (not the persisted profile) so the business gate reacts
-  // the moment the identity toggle changes, before a save. Organizer stays open
-  // to every identity; only claiming a business (permanent physical presence) is
-  // gated away from Tourist.
-  const businessEligible = identity !== "TOURIST";
+  // Live picker value (not the persisted profile) so the section reacts the
+  // moment the identity toggle changes, before a save. Tourists never see the
+  // Community roles section — not the apply CTAs, not an existing pending or
+  // verified standing. Switching to Tourist hides it wholesale, by design.
+  const showCommunityRoles = identity !== "TOURIST";
   const identityLabel =
     PROFILE_IDENTITIES.find((option) => option.id === identity)?.label ?? identity;
-  const hasBusinessStanding =
-    businessStatus?.verificationStatus === "verified" ||
-    businessStatus?.verificationStatus === "pending";
-  const showBusinessGateNote = !businessEligible && !hasBusinessStanding;
 
   return (
     <AnimatePresence>
@@ -916,30 +906,26 @@ export function AccountSheet({
                     />
                   </Field>
 
-                  <div className="rounded-2xl border border-hp-ink/10 bg-hp-paper/40 p-2.5 [&>*:last-child]:mb-0">
-                    <div className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Community roles")}
+                  {showCommunityRoles && (
+                    <div className="rounded-2xl border border-hp-ink/10 bg-hp-paper/40 p-2.5 [&>*:last-child]:mb-0">
+                      <div className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                        {t("Community roles")}
+                      </div>
+                      <OrganizerSection
+                        status={organizerStatus}
+                        myEventsCount={organizerEventCount}
+                        onApply={onApplyOrganizer}
+                        onOpenComposer={onOpenOrganizerComposer}
+                        onOpenMyEvents={onOpenOrganizerEvents}
+                      />
+                      <BusinessSection
+                        status={businessStatus}
+                        myPlacesCount={businessPlaceCount}
+                        onApply={onApplyBusiness}
+                        onOpenPlaces={onOpenBusinessPlaces}
+                      />
                     </div>
-                    <OrganizerSection
-                      status={organizerStatus}
-                      myEventsCount={organizerEventCount}
-                      onApply={onApplyOrganizer}
-                      onOpenComposer={onOpenOrganizerComposer}
-                      onOpenMyEvents={onOpenOrganizerEvents}
-                    />
-                    <BusinessSection
-                      status={businessStatus}
-                      myPlacesCount={businessPlaceCount}
-                      identityEligible={businessEligible}
-                      onApply={onApplyBusiness}
-                      onOpenPlaces={onOpenBusinessPlaces}
-                    />
-                    {showBusinessGateNote && (
-                      <p className="rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-[12px] font-semibold text-hp-muted">
-                        {t("Registering a business is available for Local and Guide accounts.")}
-                      </p>
-                    )}
-                  </div>
+                  )}
 
                   <div className="grid grid-cols-4 gap-2">
                     {[
