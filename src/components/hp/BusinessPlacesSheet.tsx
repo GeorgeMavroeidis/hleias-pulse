@@ -11,6 +11,7 @@ import {
 } from "@/lib/hp/business-types";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
+import { SectionHeader } from "./blend-ui";
 
 interface Props {
   open: boolean;
@@ -262,9 +263,12 @@ export function BusinessPlacesSheet({
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-h-[85%] max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-bg p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-lg font-black text-hp-ink">
-                <Store size={18} /> {t("My places")}
+            <div className="mb-4 flex items-center justify-between border-b border-hp-ink/10 pb-3">
+              <h3 className="flex items-center gap-2 text-xl font-black text-hp-ink">
+                <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[9px] bg-hp-sunset text-hp-paper">
+                  <Store size={14} strokeWidth={2.2} />
+                </span>
+                {t("My places")}
               </h3>
               <button
                 type="button"
@@ -287,7 +291,7 @@ export function BusinessPlacesSheet({
                 {t("You haven't claimed a place yet.")}
               </p>
             ) : (
-              <ul className="flex flex-col gap-2.5">
+              <ul className="hp-stagger flex flex-col gap-2.5">
                 {claims.map((entry) => {
                   const place = placeById.get(entry.placeId);
                   const editable = entry.status === "pending";
@@ -295,7 +299,7 @@ export function BusinessPlacesSheet({
                   return (
                     <li
                       key={entry.id}
-                      className="rounded-2xl border border-hp-ink/10 bg-hp-paper p-3"
+                      className="hp-card-lift rounded-2xl border border-hp-ink/10 bg-hp-paper p-3"
                     >
                       <div className="flex items-center gap-2">
                         <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-hp-ink">
@@ -320,10 +324,8 @@ export function BusinessPlacesSheet({
                         (() => {
                           const dealDraft = dealDraftFor(entry);
                           return (
-                            <div className="mt-3 rounded-2xl border border-hp-sunset/25 bg-hp-sunset/5 p-2.5">
-                              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-sunset">
-                                <Gift size={12} /> {t("Deal")}
-                              </div>
+                            <div className="hp-card-lift mt-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/5 p-2.5">
+                              <SectionHeader icon={Gift} label={t("Deal")} tone="sunset" />
                               <textarea
                                 value={dealDraft.text}
                                 onChange={(event) =>
@@ -356,7 +358,7 @@ export function BusinessPlacesSheet({
                                 type="button"
                                 onClick={() => void saveDeal(entry)}
                                 disabled={savingDealId === entry.id}
-                                className="mt-2 w-full rounded-full bg-hp-sunset py-2 text-[12px] font-bold text-hp-paper disabled:opacity-50"
+                                className="mt-2 w-full rounded-full bg-hp-sunset py-2 text-[12px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-50 disabled:shadow-none"
                               >
                                 {savingDealId === entry.id ? t("Saving…") : t("Save deal")}
                               </button>
@@ -371,10 +373,8 @@ export function BusinessPlacesSheet({
                           const feedback = redeemFeedback[entry.id];
                           const draft = codeDrafts[entry.id] ?? "";
                           return (
-                            <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
-                              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                                <Ticket size={12} /> {t("Verify a code")}
-                              </div>
+                            <div className="hp-card-lift mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
+                              <SectionHeader icon={Ticket} label={t("Verify a code")} tone="sea" />
                               <div className="mt-1.5 flex gap-2">
                                 <input
                                   value={draft}
@@ -414,10 +414,24 @@ export function BusinessPlacesSheet({
                                   {feedback.text}
                                 </p>
                               )}
-                              <p className="mt-2 text-[11px] font-semibold text-hp-muted">
-                                🎟️ {stats?.redeemedTotal ?? 0} {t("redemptions")} ·{" "}
-                                {stats?.issuedLive ?? 0} {t("pending")}
-                              </p>
+                              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                                <div className="rounded-xl bg-hp-sunset/10 p-2 text-center">
+                                  <div className="hp-num text-[16px] font-black leading-none text-hp-sunset">
+                                    {stats?.redeemedTotal ?? 0}
+                                  </div>
+                                  <div className="mt-0.5 text-[7.5px] font-bold uppercase tracking-wide text-hp-muted">
+                                    {t("redemptions")}
+                                  </div>
+                                </div>
+                                <div className="rounded-xl bg-hp-ink/5 p-2 text-center">
+                                  <div className="hp-num text-[16px] font-black leading-none text-hp-ink">
+                                    {stats?.issuedLive ?? 0}
+                                  </div>
+                                  <div className="mt-0.5 text-[7.5px] font-bold uppercase tracking-wide text-hp-muted">
+                                    {t("pending")}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           );
                         })()}

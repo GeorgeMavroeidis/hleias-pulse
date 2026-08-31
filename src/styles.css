@@ -1248,6 +1248,189 @@ h3 {
   }
 }
 
+/* ── Premium deal coupon (DealsScreen / DealCard) ────────────────────────
+   An editorial, "printed" coupon: photo, then a perforation row (dashed
+   rule + notch cut-outs in the sheet colour), then the body. A wax-stamp
+   seal for the offer size, a business monogram, a low Gift watermark and
+   a warm layered shadow. Sits on the hp-bg screen; the notches are cut in
+   hp-bg. No new tokens. */
+.hp-coupon {
+  position: relative;
+  background: var(--hp-paper);
+  border-radius: 1.15rem;
+  overflow: hidden;
+  box-shadow:
+    0 1px 1px rgba(23, 20, 17, 0.05),
+    0 3px 8px rgba(23, 20, 17, 0.06),
+    0 22px 42px -20px rgba(23, 20, 17, 0.35);
+}
+.hp-coupon__photo {
+  position: relative;
+  height: 7.25rem;
+}
+.hp-coupon--featured .hp-coupon__photo {
+  height: 9.25rem;
+}
+.hp-coupon__photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    0deg,
+    rgba(20, 16, 12, 0.62),
+    rgba(20, 16, 12, 0.05) 46%,
+    transparent
+  );
+}
+.hp-coupon__name {
+  position: absolute;
+  left: 0.85rem;
+  bottom: 0.6rem;
+  z-index: 1;
+  color: var(--hp-paper);
+}
+.hp-coupon__name strong {
+  display: block;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.005em;
+}
+.hp-coupon--featured .hp-coupon__name strong {
+  font-size: 1.15rem;
+}
+.hp-coupon__name span {
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+.hp-coupon__seal {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.8rem;
+  z-index: 1;
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 999px;
+  background: var(--hp-paper);
+  color: var(--hp-sunset);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  transform: rotate(-8deg);
+  box-shadow:
+    0 3px 8px rgba(23, 20, 17, 0.3),
+    inset 0 0 0 2px var(--hp-sunset),
+    inset 0 0 0 4px var(--hp-paper),
+    inset 0 0 0 5px color-mix(in srgb, var(--hp-sunset) 40%, transparent);
+}
+.hp-coupon__seal b {
+  display: block;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  line-height: 0.85;
+}
+.hp-coupon__seal small {
+  display: block;
+  font-size: 0.36rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.hp-coupon__perf {
+  position: relative;
+  height: 1rem;
+}
+.hp-coupon__perf i {
+  position: absolute;
+  left: 0.85rem;
+  right: 0.85rem;
+  top: 50%;
+  border-top: 1.5px dashed var(--hp-border);
+}
+.hp-coupon__perf::before,
+.hp-coupon__perf::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: var(--hp-bg);
+  transform: translateY(-50%);
+}
+.hp-coupon__perf::before {
+  left: -0.55rem;
+}
+.hp-coupon__perf::after {
+  right: -0.55rem;
+}
+.hp-coupon__body {
+  position: relative;
+  padding: 0.2rem 0.9rem 0.9rem;
+}
+.hp-coupon__watermark {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.3rem;
+  color: color-mix(in srgb, var(--hp-sunset) 9%, transparent);
+  pointer-events: none;
+}
+.hp-coupon__mono {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+.hp-coupon__mono i {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--hp-ink);
+  color: var(--hp-paper);
+  display: grid;
+  place-items: center;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.62rem;
+  flex: none;
+}
+.hp-coupon__mono span {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--hp-muted);
+}
+.hp-coupon__deal {
+  position: relative;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+.hp-coupon--featured .hp-coupon__deal {
+  font-size: 1.15rem;
+}
+.hp-coupon__foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--hp-muted);
+}
+.hp-coupon__foot .hp-coupon__dot {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--hp-olive);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hp-live-ping,
   .hp-marker-glow,

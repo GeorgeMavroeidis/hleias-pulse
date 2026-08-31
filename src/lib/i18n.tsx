@@ -614,6 +614,9 @@ const EL: Record<string, string> = {
   // Discovery layer — browsable Deals screen
   Deals: "Προσφορές",
   "Open deals": "Άνοιγμα προσφορών",
+  "Local offers": "Τοπικές προσφορές",
+  "{n} active": "{n} ενεργές",
+  "Active offer": "Ενεργή προσφορά",
   "Active offers from local businesses.": "Ενεργές προσφορές από τοπικές επιχειρήσεις.",
   "No active deals": "Δεν υπάρχουν ενεργές προσφορές",
   "Check back soon — local businesses add deals here.":

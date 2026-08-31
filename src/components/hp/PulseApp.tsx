@@ -2197,20 +2197,26 @@ function PlaceDetailModal({
               </div>
 
               {businessProfile?.dealActive && businessProfile.dealText && (
-                <div className="mt-4 rounded-2xl border-2 border-hp-sunset/40 bg-hp-sunset/10 p-3">
-                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-hp-sunset">
-                    🎁 {t("App deal")}
+                <div className="hp-card-lift mt-4 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[7px] bg-hp-sunset text-hp-paper">
+                      <Gift size={12} strokeWidth={2.4} />
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-hp-sunset">
+                      {t("App deal")}
+                    </span>
                   </div>
-                  <p className="mt-1.5 text-[14px] font-bold leading-snug text-hp-ink">
+                  <p className="mt-2 text-[14px] font-bold leading-snug text-hp-ink">
                     {businessProfile.dealText}
                   </p>
                   <button
                     type="button"
                     onClick={onGetDealCode}
                     disabled={gettingDealCode}
-                    className="mt-2.5 w-full rounded-full bg-hp-sunset py-2.5 text-[12px] font-bold text-hp-paper disabled:opacity-50"
+                    className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-full bg-hp-sunset py-2.5 text-[12px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-50 disabled:shadow-none"
                   >
-                    {gettingDealCode ? t("Working...") : `🎟️ ${t("Get code")}`}
+                    <Ticket size={13} strokeWidth={2.4} />
+                    {gettingDealCode ? t("Working...") : t("Get code")}
                   </button>
                 </div>
               )}
