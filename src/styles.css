@@ -1150,6 +1150,29 @@ h3 {
   }
 }
 
+/* TopBar "Deals" pill: a subtle, periodic attention pulse — a soft sunset
+   glow plus a micro-bounce that rests for most of the cycle, so it draws
+   the eye toward offers without nagging. */
+.hp-deals-pill {
+  animation: hp-deals-pulse 3.4s ease-in-out infinite;
+}
+@keyframes hp-deals-pulse {
+  0%,
+  68%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--hp-sunset) 0%, transparent);
+  }
+  78% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--hp-sunset) 22%, transparent);
+  }
+  88% {
+    transform: scale(0.99);
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--hp-sunset) 0%, transparent);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hp-live-ping,
   .hp-marker-glow,
@@ -1159,6 +1182,7 @@ h3 {
   .hp-real-map .hp-route-line,
   .hp-sea-shimmer__waves,
   .hp-pin-target,
+  .hp-deals-pill,
   .hp-shimmer::after {
     animation: none;
   }

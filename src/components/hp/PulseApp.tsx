@@ -391,7 +391,7 @@ function TopBar({
           <button
             type="button"
             onClick={onOpenDeals}
-            className="inline-flex items-center gap-1 rounded-full border border-hp-sunset/30 bg-hp-sunset/10 px-2.5 py-1.5 text-[11px] font-bold text-hp-sunset"
+            className="hp-deals-pill inline-flex items-center gap-1 rounded-full border border-hp-sunset/30 bg-hp-sunset/10 px-2.5 py-1.5 text-[11px] font-bold text-hp-sunset"
             aria-label={t("Open deals")}
           >
             <Gift size={13} strokeWidth={2.6} />
