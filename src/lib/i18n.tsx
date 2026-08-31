@@ -604,6 +604,13 @@ const EL: Record<string, string> = {
   "Community roles": "Κοινοτικοί ρόλοι",
   "Registering a business is available for Local and Guide accounts.":
     "Η καταχώρηση επιχείρησης είναι διαθέσιμη για λογαριασμούς Local και Guide.",
+  // Account sheet — section headers (Blend redesign)
+  Identity: "Ταυτότητα",
+  "Profile details": "Στοιχεία προφίλ",
+  "Roles & activity": "Ρόλοι & δραστηριότητα",
+  // Account sheet — activity stat tiles
+  Tips: "Συμβουλές",
+  Going: "Συμμετοχές",
 };
 
 function interpolate(message: string, params?: TranslationParams) {

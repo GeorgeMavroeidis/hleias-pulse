@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   BadgeCheck,
   Camera,
+  FileText,
   LockKeyhole,
   LogOut,
   Mail,
@@ -11,7 +12,9 @@ import {
   Store,
   Ticket,
   UserCircle2,
+  Users,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import type { AdminRole } from "@/lib/admin-api";
 import type { OrganizerStatus } from "@/lib/hp/cultural-events-types";
@@ -53,7 +56,7 @@ function accountEmail(account: PulseAccountState) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+      <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
         {label}
       </span>
       {children}
@@ -62,7 +65,83 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function fieldClass() {
-  return "w-full rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none placeholder:text-hp-muted";
+  return "w-full rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none transition placeholder:text-hp-muted focus:border-hp-sunset/45 focus:bg-white/85";
+}
+
+/* Shared 3-way identity segmented control (Account + Auth sign-up). */
+function IdentitySegments({
+  identity,
+  onChange,
+}: {
+  identity: AccountIdentity;
+  onChange: (id: AccountIdentity) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
+      {PROFILE_IDENTITIES.map((option) => {
+        const active = identity === option.id;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(option.id)}
+            aria-pressed={active}
+            className={`rounded-xl px-2 py-2 text-left transition ${
+              active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
+            }`}
+          >
+            <span className="block text-[11px] font-black">{t(option.label)}</span>
+            <span
+              className={`block truncate text-[9px] font-semibold ${
+                active ? "text-hp-paper/65" : "text-hp-muted"
+              }`}
+            >
+              {t(option.helper)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* Section eyebrow: a tinted icon chip, a mono-ish label, and a fading rule.
+   The three tones map to the three zones of the sheet. */
+const SECTION_TONES: Record<"sunset" | "deep" | "olive", { chip: string; token: string }> = {
+  sunset: { chip: "bg-hp-sunset", token: "--hp-sunset" },
+  deep: { chip: "bg-hp-deep", token: "--hp-deep" },
+  olive: { chip: "bg-hp-olive", token: "--hp-olive" },
+};
+
+function SectionHeader({
+  icon: Icon,
+  label,
+  tone,
+}: {
+  icon: LucideIcon;
+  label: string;
+  tone: keyof typeof SECTION_TONES;
+}) {
+  const { chip, token } = SECTION_TONES[tone];
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <span
+        className={`grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[9px] text-hp-paper ${chip}`}
+      >
+        <Icon size={14} strokeWidth={2.2} />
+      </span>
+      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-hp-muted">
+        {label}
+      </span>
+      <span
+        className="h-px flex-1 rounded-full"
+        style={{
+          background: `linear-gradient(90deg, color-mix(in srgb, var(${token}) 42%, transparent), transparent)`,
+        }}
+      />
+    </div>
+  );
 }
 
 function authErrorMessage(error: unknown) {
@@ -222,7 +301,7 @@ export function AuthSheet({
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-black text-hp-ink">
+                <h3 className="text-xl font-black text-hp-ink">
                   {t(mode === "signIn" ? "Sign in" : "Create profile")}
                 </h3>
                 <p className="mt-0.5 text-[11px] text-hp-muted">
@@ -262,7 +341,7 @@ export function AuthSheet({
               ))}
             </div>
 
-            <form onSubmit={submit} className="space-y-3">
+            <form onSubmit={submit} className="hp-acct-stagger space-y-3">
               {mode === "signUp" && (
                 <>
                   <Field label={t("Display name")}>
@@ -284,34 +363,10 @@ export function AuthSheet({
                     />
                   </Field>
                   <div>
-                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
                       {t("Default identity")}
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                      {PROFILE_IDENTITIES.map((option) => {
-                        const active = identity === option.id;
-                        return (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => setIdentity(option.id)}
-                            aria-pressed={active}
-                            className={`rounded-xl px-2 py-2 text-left transition ${
-                              active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
-                            }`}
-                          >
-                            <span className="block text-[11px] font-black">{t(option.label)}</span>
-                            <span
-                              className={`block truncate text-[9px] font-semibold ${
-                                active ? "text-hp-paper/65" : "text-hp-muted"
-                              }`}
-                            >
-                              {t(option.helper)}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <IdentitySegments identity={identity} onChange={setIdentity} />
                   </div>
                 </>
               )}
@@ -356,7 +411,7 @@ export function AuthSheet({
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+                className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
               >
                 {saving ? t("Working...") : t(mode === "signIn" ? "Sign in" : "Create account")}
               </button>
@@ -399,10 +454,10 @@ function OrganizerSection({
 
   if (status?.verificationStatus === "verified") {
     return (
-      <div className="mb-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3">
+      <div className="hp-card-lift rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3">
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-hp-sunset text-hp-paper">
-            <Ticket size={16} />
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+            <Ticket size={15} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[13px] font-black text-hp-ink">
@@ -433,8 +488,13 @@ function OrganizerSection({
 
   if (status?.verificationStatus === "pending") {
     return (
-      <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-[12px] font-semibold text-hp-muted">
-        {t("Your request to become an events organizer is pending approval.")}
+      <div className="hp-card-lift flex items-center gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-olive/12 text-hp-olive">
+          <Ticket size={15} />
+        </span>
+        <span className="text-[12px] font-semibold text-hp-muted">
+          {t("Your request to become an events organizer is pending approval.")}
+        </span>
       </div>
     );
   }
@@ -442,22 +502,31 @@ function OrganizerSection({
   // Open to every identity: helping a local festival / society is a plausible
   // one-off contribution for a visitor, not a claim of permanent presence.
   return (
-    <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
-      <div className="text-[13px] font-black text-hp-ink">{t("Do you organize events?")}</div>
-      <p className="mt-0.5 text-[11px] text-hp-muted">
-        {t("Become an organizer to submit theater shows, concerts, and festivals.")}
-      </p>
+    <div className="hp-card-lift rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
+      <div className="flex items-center gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-olive/12 text-hp-olive">
+          <Ticket size={15} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13px] font-black text-hp-ink">
+            {t("Do you organize events?")}
+          </span>
+          <span className="block text-[11px] text-hp-muted">
+            {t("Become an organizer to submit theater shows, concerts, and festivals.")}
+          </span>
+        </span>
+      </div>
       {status?.verificationStatus === "rejected" && (
-        <p className="mt-1 text-[11px] font-semibold text-red-600">
+        <p className="mt-2 text-[11px] font-semibold text-red-600">
           {t("Your previous request was rejected.")}
         </p>
       )}
-      {error && <p className="mt-1 text-[11px] font-semibold text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-[11px] font-semibold text-red-600">{error}</p>}
       <button
         type="button"
         onClick={() => void apply()}
         disabled={applying}
-        className="mt-2 w-full rounded-full border border-hp-ink/15 bg-transparent py-2 text-[12px] font-bold text-hp-ink transition active:scale-[0.98] disabled:opacity-60"
+        className="mt-2.5 w-full rounded-full border border-hp-ink/15 bg-transparent py-2 text-[12px] font-bold text-hp-ink transition active:scale-[0.98] disabled:opacity-60"
       >
         {applying ? t("Submitting…") : t("Become an organizer")}
       </button>
@@ -494,10 +563,10 @@ function BusinessSection({
 
   if (status?.verificationStatus === "verified") {
     return (
-      <div className="mb-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3">
+      <div className="hp-card-lift rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3">
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-hp-sunset text-hp-paper">
-            <Store size={16} />
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+            <Store size={15} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[13px] font-black text-hp-ink">
@@ -530,29 +599,43 @@ function BusinessSection({
 
   if (status?.verificationStatus === "pending") {
     return (
-      <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-[12px] font-semibold text-hp-muted">
-        {t("Your request to register a business is pending approval.")}
+      <div className="hp-card-lift flex items-center gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-olive/12 text-hp-olive">
+          <Store size={15} />
+        </span>
+        <span className="text-[12px] font-semibold text-hp-muted">
+          {t("Your request to register a business is pending approval.")}
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
-      <div className="text-[13px] font-black text-hp-ink">{t("Do you run a local business?")}</div>
-      <p className="mt-0.5 text-[11px] text-hp-muted">
-        {t("Register to claim your place on the map and keep its details up to date.")}
-      </p>
+    <div className="hp-card-lift rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
+      <div className="flex items-center gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-olive/12 text-hp-olive">
+          <Store size={15} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13px] font-black text-hp-ink">
+            {t("Do you run a local business?")}
+          </span>
+          <span className="block text-[11px] text-hp-muted">
+            {t("Register to claim your place on the map and keep its details up to date.")}
+          </span>
+        </span>
+      </div>
       {status?.verificationStatus === "rejected" && (
-        <p className="mt-1 text-[11px] font-semibold text-red-600">
+        <p className="mt-2 text-[11px] font-semibold text-red-600">
           {t("Your previous request was rejected.")}
         </p>
       )}
-      {error && <p className="mt-1 text-[11px] font-semibold text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-[11px] font-semibold text-red-600">{error}</p>}
       <button
         type="button"
         onClick={() => void apply()}
         disabled={applying}
-        className="mt-2 w-full rounded-full border border-hp-ink/15 bg-transparent py-2 text-[12px] font-bold text-hp-ink transition active:scale-[0.98] disabled:opacity-60"
+        className="mt-2.5 w-full rounded-full border border-hp-ink/15 bg-transparent py-2 text-[12px] font-bold text-hp-ink transition active:scale-[0.98] disabled:opacity-60"
       >
         {applying ? t("Submitting…") : t("Register a business")}
       </button>
@@ -696,8 +779,13 @@ export function AccountSheet({
   // Community roles section — not the apply CTAs, not an existing pending or
   // verified standing. Switching to Tourist hides it wholesale, by design.
   const showCommunityRoles = identity !== "TOURIST";
-  const identityLabel =
-    PROFILE_IDENTITIES.find((option) => option.id === identity)?.label ?? identity;
+
+  const statTiles = [
+    { n: stats.posts, l: "Posts", wash: "bg-hp-sunset/10", ink: "text-hp-sunset" },
+    { n: stats.tips, l: "Tips", wash: "bg-hp-olive/12", ink: "text-hp-olive" },
+    { n: stats.rsvps, l: "Going", wash: "bg-hp-sea/15", ink: "text-hp-deep" },
+    { n: stats.routesSaved, l: "Routes", wash: "bg-hp-purple/12", ink: "text-hp-purple" },
+  ];
 
   return (
     <AnimatePresence>
@@ -725,9 +813,9 @@ export function AccountSheet({
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-bg p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between border-b border-hp-ink/10 pb-3">
               <div>
-                <h3 className="text-lg font-black text-hp-ink">
+                <h3 className="text-xl font-black text-hp-ink">
                   {t(account.status === "needsProfile" ? "Complete profile" : "Account settings")}
                 </h3>
                 <p className="mt-0.5 text-[11px] text-hp-muted">
@@ -767,58 +855,68 @@ export function AccountSheet({
                 </button>
               </div>
             ) : (
-              <>
-                <div className="mb-3 flex items-center gap-3 rounded-3xl border border-hp-ink/10 bg-hp-paper p-3.5">
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border border-hp-ink/10 bg-hp-ink text-hp-paper"
-                    aria-label={t("Upload profile image")}
-                  >
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-[15px] font-black">{profileInitials(profile)}</span>
-                    )}
-                    <span className="absolute bottom-0 right-0 grid h-6 w-6 place-items-center rounded-full border-2 border-hp-paper bg-hp-sunset">
-                      <Camera size={12} />
-                    </span>
-                  </button>
+              <form onSubmit={submit} className="hp-acct-stagger space-y-6">
+                {/* ── Identity: gradient hero + the one identity control ── */}
+                <section>
+                  <SectionHeader icon={UserCircle2} label={t("Identity")} tone="sunset" />
+                  <div className="hp-card-lift overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper">
+                    <div className="hp-acct-hero__banner h-[70px]" />
+                    <div className="flex items-start gap-3 px-3.5 pb-3.5">
+                      <button
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        className="relative -mt-7 grid h-[68px] w-[68px] shrink-0 place-items-center overflow-hidden rounded-full border-[3px] border-hp-paper bg-hp-ink text-hp-paper"
+                        aria-label={t("Upload profile image")}
+                      >
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-[16px] font-black">{profileInitials(profile)}</span>
+                        )}
+                        <span className="absolute bottom-0 right-0 grid h-6 w-6 place-items-center rounded-full border-2 border-hp-paper bg-hp-sunset">
+                          <Camera size={12} />
+                        </span>
+                      </button>
 
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null;
-                      setAvatarFile(file);
-                      setAvatarPreview(file ? URL.createObjectURL(file) : null);
-                    }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1">
-                      <span className="truncate text-[15px] font-black text-hp-ink">
-                        {profileDisplayName(profile)}
-                      </span>
-                      {account.status === "ready" && (
-                        <BadgeCheck size={15} className="shrink-0 text-hp-sea" />
-                      )}
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          setAvatarFile(file);
+                          setAvatarPreview(file ? URL.createObjectURL(file) : null);
+                        }}
+                      />
+                      <div className="min-w-0 flex-1 pt-3">
+                        <div className="flex items-center gap-1">
+                          <span className="truncate text-[15px] font-black text-hp-ink">
+                            {profileDisplayName(profile)}
+                          </span>
+                          {account.status === "ready" && (
+                            <BadgeCheck size={14} className="shrink-0 text-hp-sea" />
+                          )}
+                        </div>
+                        <div className="hp-num truncate text-[11px] font-medium text-hp-muted">
+                          {email ?? "Signed in"}
+                        </div>
+                      </div>
                     </div>
-                    <div className="truncate text-[11.5px] font-bold text-hp-muted">
-                      {email ?? "Signed in"}
-                    </div>
-                    <div className="mt-1 block w-fit max-w-full truncate rounded-full bg-hp-sunset/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-hp-sunset">
-                      {t(identityLabel)}
+                    <div className="border-t border-hp-ink/10 p-3">
+                      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                        {t("Default identity")}
+                      </div>
+                      <IdentitySegments identity={identity} onChange={setIdentity} />
                     </div>
                   </div>
-                </div>
+                </section>
 
                 {adminRole && (
                   <button
                     type="button"
                     onClick={onOpenAdmin}
-                    className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
+                    className="hp-card-lift flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
                   >
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hp-sunset text-hp-paper">
                       <ShieldCheck size={16} />
@@ -834,164 +932,134 @@ export function AccountSheet({
                   </button>
                 )}
 
-                <form onSubmit={submit} className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label={t("Display name")}>
+                {/* ── Profile details ── */}
+                <section>
+                  <SectionHeader icon={FileText} label={t("Profile details")} tone="deep" />
+                  <div className="hp-card-lift space-y-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3.5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label={t("Display name")}>
+                        <input
+                          value={displayName}
+                          onChange={(event) => setDisplayName(event.target.value)}
+                          autoComplete="name"
+                          className={fieldClass()}
+                        />
+                      </Field>
+                      <Field label={t("Handle")}>
+                        <input
+                          value={handle}
+                          onChange={(event) => setHandle(normalizeHandle(event.target.value))}
+                          autoComplete="username"
+                          className={fieldClass()}
+                        />
+                      </Field>
+                    </div>
+
+                    <Field label={t("Home area")}>
                       <input
-                        value={displayName}
-                        onChange={(event) => setDisplayName(event.target.value)}
-                        autoComplete="name"
+                        value={homeArea}
+                        onChange={(event) => setHomeArea(event.target.value)}
+                        autoComplete="address-level2"
+                        placeholder={t("Pyrgos, Katakolo, Ancient Olympia…")}
                         className={fieldClass()}
                       />
                     </Field>
-                    <Field label={t("Handle")}>
-                      <input
-                        value={handle}
-                        onChange={(event) => setHandle(normalizeHandle(event.target.value))}
-                        autoComplete="username"
-                        className={fieldClass()}
+
+                    <Field label={t("Bio")}>
+                      <textarea
+                        value={bio}
+                        onChange={(event) => setBio(event.target.value)}
+                        rows={3}
+                        maxLength={240}
+                        placeholder={t("One line about your Ilia taste.")}
+                        className={`${fieldClass()} resize-none`}
                       />
                     </Field>
                   </div>
+                </section>
 
-                  <div>
-                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Default identity")}
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                      {PROFILE_IDENTITIES.map((option) => {
-                        const active = identity === option.id;
-                        return (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => setIdentity(option.id)}
-                            aria-pressed={active}
-                            className={`rounded-xl px-2 py-2 text-left transition ${
-                              active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
-                            }`}
-                          >
-                            <span className="block text-[11px] font-black">{t(option.label)}</span>
-                            <span
-                              className={`block truncate text-[9px] font-semibold ${
-                                active ? "text-hp-paper/65" : "text-hp-muted"
-                              }`}
-                            >
-                              {t(option.helper)}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <Field label={t("Home area")}>
-                    <input
-                      value={homeArea}
-                      onChange={(event) => setHomeArea(event.target.value)}
-                      autoComplete="address-level2"
-                      placeholder={t("Pyrgos, Katakolo, Ancient Olympia…")}
-                      className={fieldClass()}
-                    />
-                  </Field>
-
-                  <Field label={t("Bio")}>
-                    <textarea
-                      value={bio}
-                      onChange={(event) => setBio(event.target.value)}
-                      rows={3}
-                      maxLength={240}
-                      placeholder={t("One line about your Ilia taste.")}
-                      className={`${fieldClass()} resize-none`}
-                    />
-                  </Field>
-
-                  {showCommunityRoles && (
-                    <div className="rounded-2xl border border-hp-ink/10 bg-hp-paper/40 p-2.5 [&>*:last-child]:mb-0">
-                      <div className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                        {t("Community roles")}
+                {/* ── Roles & activity ── */}
+                <section>
+                  <SectionHeader icon={Users} label={t("Roles & activity")} tone="olive" />
+                  <div className="space-y-3">
+                    {showCommunityRoles && (
+                      <div className="space-y-2">
+                        <OrganizerSection
+                          status={organizerStatus}
+                          myEventsCount={organizerEventCount}
+                          onApply={onApplyOrganizer}
+                          onOpenComposer={onOpenOrganizerComposer}
+                          onOpenMyEvents={onOpenOrganizerEvents}
+                        />
+                        <BusinessSection
+                          status={businessStatus}
+                          myPlacesCount={businessPlaceCount}
+                          onApply={onApplyBusiness}
+                          onOpenPlaces={onOpenBusinessPlaces}
+                        />
                       </div>
-                      <OrganizerSection
-                        status={organizerStatus}
-                        myEventsCount={organizerEventCount}
-                        onApply={onApplyOrganizer}
-                        onOpenComposer={onOpenOrganizerComposer}
-                        onOpenMyEvents={onOpenOrganizerEvents}
-                      />
-                      <BusinessSection
-                        status={businessStatus}
-                        myPlacesCount={businessPlaceCount}
-                        onApply={onApplyBusiness}
-                        onOpenPlaces={onOpenBusinessPlaces}
-                      />
+                    )}
+
+                    <div className="grid grid-cols-4 gap-2">
+                      {statTiles.map((stat) => (
+                        <div key={stat.l} className={`rounded-2xl ${stat.wash} p-2.5 text-center`}>
+                          <div className={`hp-num text-[20px] font-black leading-none ${stat.ink}`}>
+                            {stat.n}
+                          </div>
+                          <div className="mt-1 text-[9px] font-bold uppercase tracking-wide text-hp-muted">
+                            {t(stat.l)}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  )}
 
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { n: stats.posts, l: "Posts" },
-                      { n: stats.tips, l: "Tips" },
-                      { n: stats.rsvps, l: "Going" },
-                      { n: stats.routesSaved, l: "Routes" },
-                    ].map((stat) => (
-                      <div
-                        key={stat.l}
-                        className="rounded-2xl border border-hp-ink/10 bg-hp-paper p-2.5 text-center"
-                      >
-                        <div className="text-[18px] font-black leading-none text-hp-ink">
-                          {stat.n}
-                        </div>
-                        <div className="mt-1 text-[9.5px] font-bold uppercase tracking-wide text-hp-muted">
-                          {t(stat.l)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={saved.onOpenSaved}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-left transition active:scale-[0.99]"
-                  >
-                    <span className="grid h-10 w-10 place-items-center rounded-full bg-hp-ink/5 text-hp-ink">
-                      <Save size={16} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-black text-hp-ink">{t("Saved")}</span>
-                      <span className="block text-[11px] text-hp-muted">
-                        {saved.placeCount} places · {saved.postCount} posts · {saved.routeCount}{" "}
-                        routes
-                      </span>
-                    </span>
-                  </button>
-
-                  {message && (
-                    <p className="rounded-2xl bg-hp-olive/10 px-3 py-2 text-[12px] font-semibold text-hp-olive">
-                      {message}
-                    </p>
-                  )}
-                  {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
-
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
-                    >
-                      {saving ? t("Working...") : t("Save profile")}
-                    </button>
                     <button
                       type="button"
-                      onClick={signOut}
-                      disabled={saving}
-                      className="grid h-11 w-11 place-items-center rounded-full border border-hp-ink/15 text-hp-ink disabled:opacity-45"
-                      aria-label={t("Sign out")}
+                      onClick={saved.onOpenSaved}
+                      className="hp-card-lift flex w-full items-center gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-left transition active:scale-[0.99]"
                     >
-                      <LogOut size={15} />
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink">
+                        <Save size={16} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-black text-hp-ink">
+                          {t("Saved")}
+                        </span>
+                        <span className="block text-[11px] text-hp-muted">
+                          {saved.placeCount} places · {saved.postCount} posts · {saved.routeCount}{" "}
+                          routes
+                        </span>
+                      </span>
                     </button>
                   </div>
-                </form>
-              </>
+                </section>
+
+                {message && (
+                  <p className="rounded-2xl bg-hp-olive/10 px-3 py-2 text-[12px] font-semibold text-hp-olive">
+                    {message}
+                  </p>
+                )}
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
+
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
+                  >
+                    {saving ? t("Working...") : t("Save profile")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={signOut}
+                    disabled={saving}
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-hp-ink/15 text-hp-ink disabled:opacity-45"
+                    aria-label={t("Sign out")}
+                  >
+                    <LogOut size={15} />
+                  </button>
+                </div>
+              </form>
             )}
           </motion.div>
         </motion.div>
