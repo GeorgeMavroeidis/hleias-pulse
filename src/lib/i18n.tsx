@@ -137,6 +137,25 @@ const EL: Record<string, string> = {
   "Could not load pulse data.": "Δεν ήταν δυνατή η φόρτωση των δεδομένων.",
   "Try again": "Δοκιμή ξανά",
   "Add to ΗΛΕΙΑ PULSE": "Πρόσθεσε στο ΗΛΕΙΑ PULSE",
+  // Create composer — Blend redesign
+  "Posting as": "Δημοσίευση ως",
+  "Posting as {name}": "Δημοσίευση ως {name}",
+  "Profile identity will be stored with this contribution":
+    "Η ταυτότητα του προφίλ σου θα αποθηκευτεί με αυτή την καταχώριση",
+  "Sign in to post": "Συνδέσου για να δημοσιεύσεις",
+  "Saves can be private, public posts need a profile":
+    "Τα αποθηκευμένα μένουν ιδιωτικά· οι δημόσιες δημοσιεύσεις θέλουν προφίλ",
+  "Using {place} image": "Με την εικόνα του {place}",
+  "Story photo · using {place} image": "Φωτό story · με την εικόνα του {place}",
+  "Shows full-screen, 9:16. Swap in your own photo later — this previews with the place image.":
+    "Εμφανίζεται σε πλήρη οθόνη, 9:16. Άλλαξέ τη με δική σου φωτό αργότερα — εδώ βλέπεις προεπισκόπηση με την εικόνα του σημείου.",
+  Basics: "Βασικά",
+  "Place on the map": "Θέση στον χάρτη",
+  Details: "Λεπτομέρειες",
+  "What & where": "Τι & πού",
+  "When & kind": "Πότε & είδος",
+  "Photo & caption": "Φωτό & λεζάντα",
+  "Visibility & place": "Ορατότητα & θέση",
   "What's happening at this place?…": "Τι συμβαίνει σε αυτό το μέρος;…",
   "What should locals know?…": "Τι πρέπει να γνωρίζουν οι ντόπιοι;…",
   "What's happening here right now?…": "Τι συμβαίνει εδώ τώρα;…",

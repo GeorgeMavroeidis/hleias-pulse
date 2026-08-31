@@ -39,6 +39,9 @@ import {
   UtensilsCrossed,
   BadgeCheck,
   Gift,
+  Camera,
+  Info,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -134,6 +137,7 @@ import type {
 import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet } from "./AuthAccountSheets";
+import { IdentitySegments, SectionHeader, fieldClass } from "./blend-ui";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { type StreakState } from "@/lib/hp/meet-store";
 import {
@@ -171,6 +175,12 @@ const POSTING_IDENTITIES: { id: PostingIdentity; label: string; helper: string }
   { id: "TOURIST", label: "Tourist", helper: "I am visiting" },
   { id: "GUIDE", label: "Guide", helper: "I can recommend" },
 ];
+const COMPOSER_MODE_ICONS: Record<ComposerMode, LucideIcon> = {
+  post: MessageCircle,
+  place: MapPin,
+  story: Camera,
+  event: CalendarHeart,
+};
 const ROUTE_FILTERS = ["All", "Beach", "Nature", "Culture", "No car", "Free"] as const;
 type RouteFilter = (typeof ROUTE_FILTERS)[number];
 
@@ -3414,8 +3424,13 @@ function CreateComposerModal({
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-black text-hp-ink">{t("Add to ΗΛΕΙΑ PULSE")}</h3>
+            <div className="mb-4 flex items-center justify-between border-b border-hp-ink/10 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[9px] bg-hp-sunset text-hp-paper">
+                  <Plus size={14} strokeWidth={2.6} />
+                </span>
+                <h3 className="text-xl font-black text-hp-ink">{t("Add to ΗΛΕΙΑ PULSE")}</h3>
+              </div>
               <button
                 type="button"
                 onClick={onClose}
@@ -3426,76 +3441,84 @@ function CreateComposerModal({
               </button>
             </div>
 
-            <div className="mb-3 grid grid-cols-4 rounded-full border border-hp-ink/10 bg-white/50 p-1">
-              {(["post", "place", "story", "event"] as ComposerMode[]).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  data-testid={`composer-mode-${option}`}
-                  onClick={() => {
-                    setMode(option);
-                    setError(null);
-                  }}
-                  aria-pressed={mode === option}
-                  className={`rounded-full px-3 py-2 text-[12px] font-bold capitalize ${
-                    mode === option ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
-                  }`}
-                >
-                  {t(option[0].toUpperCase() + option.slice(1))}
-                </button>
-              ))}
+            <div className="mb-4 grid grid-cols-4 gap-1 rounded-full border border-hp-ink/10 bg-white/50 p-1">
+              {(["post", "place", "story", "event"] as ComposerMode[]).map((option) => {
+                const ModeIcon = COMPOSER_MODE_ICONS[option];
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    data-testid={`composer-mode-${option}`}
+                    onClick={() => {
+                      setMode(option);
+                      setError(null);
+                    }}
+                    aria-pressed={mode === option}
+                    className={`flex flex-col items-center gap-1 rounded-full px-2 py-1.5 text-[11px] font-bold capitalize transition ${
+                      mode === option ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
+                    }`}
+                  >
+                    <ModeIcon size={14} strokeWidth={2.2} />
+                    {t(option[0].toUpperCase() + option.slice(1))}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="mb-3 flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/55 px-3 py-2.5">
+            <div className="hp-card-lift mb-4 flex items-center gap-2.5 rounded-2xl border border-hp-ink/10 bg-hp-paper px-3 py-2.5">
               {profile ? (
                 <>
                   {profileAvatarUrl(profile) ? (
                     <img
                       src={profileAvatarUrl(profile) ?? ""}
                       alt=""
-                      className="h-8 w-8 rounded-full border border-hp-ink/10 object-cover"
+                      className="h-8 w-8 shrink-0 rounded-full border border-hp-ink/10 object-cover"
                     />
                   ) : (
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-hp-ink text-[10px] font-black text-hp-paper">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-hp-ink text-[10px] font-black text-hp-paper">
                       {profileDisplayName(profile).slice(0, 2).toUpperCase()}
                     </span>
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12px] font-black text-hp-ink">
-                      Posting as {profileDisplayName(profile)}
+                      {t("Posting as {name}", { name: profileDisplayName(profile) })}
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      Profile identity will be stored with this contribution
+                      {t("Profile identity will be stored with this contribution")}
                     </span>
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-hp-sunset/10 text-hp-sunset">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-hp-sunset/10 text-hp-sunset">
                     <LockKeyhole size={14} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[12px] font-black text-hp-ink">
-                      Sign in to post
+                      {t("Sign in to post")}
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      Saves can be private, public posts need a profile
+                      {t("Saves can be private, public posts need a profile")}
                     </span>
                   </span>
                   <button
                     type="button"
                     onClick={onRequireAccount}
-                    className="rounded-full bg-hp-ink px-3 py-1.5 text-[11px] font-bold text-hp-paper"
+                    className="shrink-0 rounded-full bg-hp-ink px-3 py-1.5 text-[11px] font-bold text-hp-paper"
                   >
-                    Sign in
+                    {t("Sign in")}
                   </button>
                 </>
               )}
             </div>
 
             {mode === "post" ? (
-              <form data-testid="composer-post-form" onSubmit={handlePostSubmit}>
-                <div className="relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+              <form
+                data-testid="composer-post-form"
+                onSubmit={handlePostSubmit}
+                className="hp-stagger space-y-3"
+              >
+                <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
                   <ImageBox
                     src={selectedPlace.imageUrl}
                     alt={selectedPlace.name}
@@ -3503,10 +3526,10 @@ function CreateComposerModal({
                     rounded="rounded-2xl"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 text-hp-paper">
-                    <ImagePlus size={18} />
-                    <span className="text-[12px] font-bold">Using {selectedPlace.name} image</span>
-                  </div>
+                  <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
+                    <ImagePlus size={12} />
+                    {t("Using {place} image", { place: selectedPlace.name })}
+                  </span>
                 </div>
                 <label htmlFor="create-post-text" className="sr-only">
                   Post text
@@ -3519,42 +3542,22 @@ function CreateComposerModal({
                   onChange={(e) => setText(e.target.value)}
                   autoComplete="off"
                   placeholder={t("What's happening at this place?…")}
-                  className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
+                  className={`${fieldClass()} resize-none`}
                   rows={3}
                 />
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Posting as
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    {t("Posting as")}
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                    {POSTING_IDENTITIES.map((option) => {
-                      const active = identity === option.id;
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setIdentity(option.id)}
-                          aria-pressed={active}
-                          className={`rounded-xl px-2 py-2 text-left transition ${
-                            active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
-                          }`}
-                        >
-                          <span className="block text-[11px] font-black">{option.label}</span>
-                          <span
-                            className={`block truncate text-[9px] font-semibold ${
-                              active ? "text-hp-paper/65" : "text-hp-muted"
-                            }`}
-                          >
-                            {option.helper}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <IdentitySegments
+                    options={POSTING_IDENTITIES}
+                    value={identity}
+                    onChange={setIdentity}
+                  />
                 </div>
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Location
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    {t("Location")}
                   </div>
                   <input
                     type="hidden"
@@ -3572,9 +3575,9 @@ function CreateComposerModal({
                     setQuery={setPlaceQuery}
                   />
                 </div>
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Vibe
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    {t("Vibe")}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {vibeChips.map((v) => {
@@ -3599,271 +3602,295 @@ function CreateComposerModal({
                     })}
                   </div>
                 </div>
-                {error && <p className="mt-3 text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
                 <button
                   type="submit"
                   data-testid="composer-post-submit"
                   disabled={!text.trim() || saving}
-                  className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+                  className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {saving ? t("Saving…") : t("Post")}
                 </button>
               </form>
             ) : mode === "place" ? (
-              <form data-testid="composer-place-form" onSubmit={handlePlaceSubmit}>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-place-name"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Place name")}
-                    </label>
-                    <input
-                      id="create-place-name"
-                      name="create-place-name"
-                      data-testid="composer-place-name"
-                      value={placeName}
-                      onChange={(e) => setPlaceName(e.target.value)}
-                      autoComplete="off"
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
+              <form
+                data-testid="composer-place-form"
+                onSubmit={handlePlaceSubmit}
+                className="hp-stagger space-y-4"
+              >
+                <section>
+                  <SectionHeader icon={Info} label={t("Basics")} tone="deep" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-place-name"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Place name")}
+                      </label>
+                      <input
+                        id="create-place-name"
+                        name="create-place-name"
+                        data-testid="composer-place-name"
+                        value={placeName}
+                        onChange={(e) => setPlaceName(e.target.value)}
+                        autoComplete="off"
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-area"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Area")}
+                      </label>
+                      <input
+                        id="create-place-area"
+                        name="create-place-area"
+                        data-testid="composer-place-area"
+                        value={placeArea}
+                        onChange={(e) => setPlaceArea(e.target.value)}
+                        autoComplete="off"
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-type"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Type")}
+                      </label>
+                      <select
+                        id="create-place-type"
+                        name="create-place-type"
+                        data-testid="composer-place-type"
+                        value={placeType}
+                        onChange={(e) => setPlaceType(e.target.value as Place["type"])}
+                        className={fieldClass()}
+                      >
+                        {placeTypeOptions.map((type) => (
+                          <option key={type} value={type}>
+                            {t(PLACE_TYPE_LABEL_KEYS[type])}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-area"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Area")}
-                    </label>
-                    <input
-                      id="create-place-area"
-                      name="create-place-area"
-                      data-testid="composer-place-area"
-                      value={placeArea}
-                      onChange={(e) => setPlaceArea(e.target.value)}
-                      autoComplete="off"
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
+                </section>
+
+                <section>
+                  <SectionHeader icon={MapPin} label={t("Place on the map")} tone="sea" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label
+                        htmlFor="create-place-lat"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Lat")}
+                      </label>
+                      <input
+                        id="create-place-lat"
+                        name="create-place-lat"
+                        data-testid="composer-place-lat"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.000001"
+                        value={placeLat}
+                        onChange={(e) => setPlaceLat(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-lng"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Lng")}
+                      </label>
+                      <input
+                        id="create-place-lng"
+                        name="create-place-lng"
+                        data-testid="composer-place-lng"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.000001"
+                        value={placeLng}
+                        onChange={(e) => setPlaceLng(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-place-image"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Photo URL")}
+                      </label>
+                      <input
+                        id="create-place-image"
+                        name="create-place-image"
+                        data-testid="composer-place-image"
+                        type="url"
+                        value={placeImageUrl}
+                        onChange={(e) => setPlaceImageUrl(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-type"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Type")}
-                    </label>
-                    <select
-                      id="create-place-type"
-                      name="create-place-type"
-                      data-testid="composer-place-type"
-                      value={placeType}
-                      onChange={(e) => setPlaceType(e.target.value as Place["type"])}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
-                    >
-                      {placeTypeOptions.map((type) => (
-                        <option key={type} value={type}>
-                          {t(PLACE_TYPE_LABEL_KEYS[type])}
-                        </option>
-                      ))}
-                    </select>
+                </section>
+
+                <section>
+                  <SectionHeader icon={ListChecks} label={t("Details")} tone="olive" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <label htmlFor="create-place-short" className="sr-only">
+                        {t("Description")}
+                      </label>
+                      <textarea
+                        id="create-place-short"
+                        name="create-place-short"
+                        data-testid="composer-place-short"
+                        value={placeShort}
+                        onChange={(e) => setPlaceShort(e.target.value)}
+                        placeholder={t("What should locals know?…")}
+                        className={`${fieldClass()} resize-none`}
+                        rows={3}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-place-tags"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Tags")}
+                      </label>
+                      <input
+                        id="create-place-tags"
+                        name="create-place-tags"
+                        data-testid="composer-place-tags"
+                        value={placeTags}
+                        onChange={(e) => setPlaceTags(e.target.value)}
+                        placeholder={t("beach, quiet, sunset")}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-crowd"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Crowd")}
+                      </label>
+                      <select
+                        id="create-place-crowd"
+                        name="create-place-crowd"
+                        data-testid="composer-place-crowd"
+                        value={placeCrowd}
+                        onChange={(e) => setPlaceCrowd(e.target.value)}
+                        className={fieldClass()}
+                      >
+                        <option value="low">{t("low")}</option>
+                        <option value="medium">{t("medium")}</option>
+                        <option value="high">{t("high")}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-budget"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Budget")}
+                      </label>
+                      <select
+                        id="create-place-budget"
+                        name="create-place-budget"
+                        data-testid="composer-place-budget"
+                        value={placeBudget}
+                        onChange={(e) => setPlaceBudget(e.target.value)}
+                        className={fieldClass()}
+                      >
+                        <option value="free">{t("Free")}</option>
+                        <option value="€">€</option>
+                        <option value="€€">€€</option>
+                        <option value="€€€">€€€</option>
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-place-best-time"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Best time")}
+                      </label>
+                      <input
+                        id="create-place-best-time"
+                        name="create-place-best-time"
+                        data-testid="composer-place-best-time"
+                        value={placeBestTime}
+                        onChange={(e) => setPlaceBestTime(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-lat"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Lat")}
-                    </label>
-                    <input
-                      id="create-place-lat"
-                      name="create-place-lat"
-                      data-testid="composer-place-lat"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.000001"
-                      value={placeLat}
-                      onChange={(e) => setPlaceLat(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-lng"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Lng")}
-                    </label>
-                    <input
-                      id="create-place-lng"
-                      name="create-place-lng"
-                      data-testid="composer-place-lng"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.000001"
-                      value={placeLng}
-                      onChange={(e) => setPlaceLng(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-place-image"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Photo URL")}
-                    </label>
-                    <input
-                      id="create-place-image"
-                      name="create-place-image"
-                      data-testid="composer-place-image"
-                      type="url"
-                      value={placeImageUrl}
-                      onChange={(e) => setPlaceImageUrl(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label htmlFor="create-place-short" className="sr-only">
-                      {t("Description")}
-                    </label>
-                    <textarea
-                      id="create-place-short"
-                      name="create-place-short"
-                      data-testid="composer-place-short"
-                      value={placeShort}
-                      onChange={(e) => setPlaceShort(e.target.value)}
-                      placeholder={t("What should locals know?…")}
-                      className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-place-tags"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Tags")}
-                    </label>
-                    <input
-                      id="create-place-tags"
-                      name="create-place-tags"
-                      data-testid="composer-place-tags"
-                      value={placeTags}
-                      onChange={(e) => setPlaceTags(e.target.value)}
-                      placeholder={t("beach, quiet, sunset")}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-crowd"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Crowd")}
-                    </label>
-                    <select
-                      id="create-place-crowd"
-                      name="create-place-crowd"
-                      data-testid="composer-place-crowd"
-                      value={placeCrowd}
-                      onChange={(e) => setPlaceCrowd(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
-                    >
-                      <option value="low">{t("low")}</option>
-                      <option value="medium">{t("medium")}</option>
-                      <option value="high">{t("high")}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-budget"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Budget")}
-                    </label>
-                    <select
-                      id="create-place-budget"
-                      name="create-place-budget"
-                      data-testid="composer-place-budget"
-                      value={placeBudget}
-                      onChange={(e) => setPlaceBudget(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
-                    >
-                      <option value="free">{t("Free")}</option>
-                      <option value="€">€</option>
-                      <option value="€€">€€</option>
-                      <option value="€€€">€€€</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-place-best-time"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Best time")}
-                    </label>
-                    <input
-                      id="create-place-best-time"
-                      name="create-place-best-time"
-                      data-testid="composer-place-best-time"
-                      value={placeBestTime}
-                      onChange={(e) => setPlaceBestTime(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                </div>
-                {error && <p className="mt-3 text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                </section>
+
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
                 <button
                   type="submit"
                   data-testid="composer-place-submit"
                   disabled={saving}
-                  className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+                  className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {saving ? t("Saving…") : t("Save place")}
                 </button>
               </form>
             ) : mode === "story" ? (
-              <form data-testid="composer-story-form" onSubmit={handleStorySubmit}>
-                <div className="relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                  <ImageBox
-                    src={selectedPlace.imageUrl}
-                    alt={selectedPlace.name}
-                    className="h-full w-full"
-                    rounded="rounded-2xl"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 text-hp-paper">
-                    <ImagePlus size={18} />
-                    <span className="text-[12px] font-bold">
-                      Story photo · using {selectedPlace.name} image
+              <form
+                data-testid="composer-story-form"
+                onSubmit={handleStorySubmit}
+                className="hp-stagger space-y-4"
+              >
+                <section>
+                  <SectionHeader icon={Camera} label={t("Photo & caption")} tone="sunset" />
+                  <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+                    <ImageBox
+                      src={selectedPlace.imageUrl}
+                      alt={selectedPlace.name}
+                      className="h-full w-full"
+                      rounded="rounded-2xl"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
+                    <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
+                      <ImagePlus size={12} />
+                      {t("Story photo · using {place} image", { place: selectedPlace.name })}
                     </span>
                   </div>
-                </div>
-                <p className="mt-2 text-[11px] text-hp-muted">
-                  Shows full-screen, 9:16. Swap in your own photo later — this previews with the
-                  place image.
-                </p>
+                  <p className="mt-2 text-[11px] text-hp-muted">
+                    {t(
+                      "Shows full-screen, 9:16. Swap in your own photo later — this previews with the place image.",
+                    )}
+                  </p>
 
-                <label htmlFor="create-story-caption" className="sr-only">
-                  {t("Story caption")}
-                </label>
-                <textarea
-                  id="create-story-caption"
-                  name="create-story-caption"
-                  data-testid="composer-story-caption"
-                  value={storyCaption}
-                  onChange={(e) => setStoryCaption(e.target.value)}
-                  autoComplete="off"
-                  placeholder={t("What's happening here right now?…")}
-                  className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
-                  rows={3}
-                />
+                  <label htmlFor="create-story-caption" className="sr-only">
+                    {t("Story caption")}
+                  </label>
+                  <textarea
+                    id="create-story-caption"
+                    name="create-story-caption"
+                    data-testid="composer-story-caption"
+                    value={storyCaption}
+                    onChange={(e) => setStoryCaption(e.target.value)}
+                    autoComplete="off"
+                    placeholder={t("What's happening here right now?…")}
+                    className={`${fieldClass()} mt-3 resize-none`}
+                    rows={3}
+                  />
+                </section>
 
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {t("Type")}
-                  </div>
+                <section>
+                  <SectionHeader icon={Info} label={t("Type")} tone="deep" />
                   <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                     {(["photo", "report"] as const).map((option) => {
                       const active = storyKind === option;
@@ -3883,311 +3910,337 @@ function CreateComposerModal({
                       );
                     })}
                   </div>
-                </div>
 
-                {storyKind === "report" && (
-                  <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/50 p-2.5">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          {t("Crowd")}
+                  {storyKind === "report" && (
+                    <div className="mt-2 rounded-2xl border border-hp-ink/10 bg-white/50 p-2.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                            {t("Crowd")}
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
+                            {(["low", "medium", "high"] as const).map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                aria-pressed={storyCrowd === c}
+                                onClick={() => setStoryCrowd(c)}
+                                className={`rounded-lg px-1 py-1.5 text-[10px] font-bold capitalize ${
+                                  storyCrowd === c
+                                    ? "bg-hp-ink text-hp-paper"
+                                    : "bg-hp-paper text-hp-ink/65"
+                                }`}
+                              >
+                                {t(c)}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          {(["low", "medium", "high"] as const).map((c) => (
-                            <button
-                              key={c}
-                              type="button"
-                              aria-pressed={storyCrowd === c}
-                              onClick={() => setStoryCrowd(c)}
-                              className={`rounded-lg px-1 py-1.5 text-[10px] font-bold capitalize ${
-                                storyCrowd === c
-                                  ? "bg-hp-ink text-hp-paper"
-                                  : "bg-hp-paper text-hp-ink/65"
-                              }`}
-                            >
-                              {t(c)}
-                            </button>
-                          ))}
+                        <div>
+                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                            {t("Parking")}
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
+                            {(["easy", "tight", "full"] as const).map((p) => (
+                              <button
+                                key={p}
+                                type="button"
+                                aria-pressed={storyParking === p}
+                                onClick={() => setStoryParking(p)}
+                                className={`rounded-lg px-1 py-1.5 text-[10px] font-bold capitalize ${
+                                  storyParking === p
+                                    ? "bg-hp-ink text-hp-paper"
+                                    : "bg-hp-paper text-hp-ink/65"
+                                }`}
+                              >
+                                {t(p)}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                      <div>
+                      <div className="mt-2">
                         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          {t("Parking")}
+                          {t("Condition")}
                         </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          {(["easy", "tight", "full"] as const).map((p) => (
-                            <button
-                              key={p}
-                              type="button"
-                              aria-pressed={storyParking === p}
-                              onClick={() => setStoryParking(p)}
-                              className={`rounded-lg px-1 py-1.5 text-[10px] font-bold capitalize ${
-                                storyParking === p
-                                  ? "bg-hp-ink text-hp-paper"
-                                  : "bg-hp-paper text-hp-ink/65"
-                              }`}
-                            >
-                              {t(p)}
-                            </button>
-                          ))}
+                        <div className="flex flex-wrap gap-1.5">
+                          {STORY_CONDITION_OPTIONS.map((cond) => {
+                            const on = storyCondition.includes(cond);
+                            return (
+                              <button
+                                key={cond}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() =>
+                                  setStoryCondition((arr) =>
+                                    on ? arr.filter((x) => x !== cond) : [...arr, cond],
+                                  )
+                                }
+                                className={`rounded-full px-2.5 py-1 text-[10px] font-bold capitalize ${
+                                  on
+                                    ? "bg-hp-ink text-hp-paper"
+                                    : "border border-hp-ink/10 text-hp-ink/70"
+                                }`}
+                              >
+                                {t(cond[0].toUpperCase() + cond.slice(1))}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
-                    <div className="mt-2">
-                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                        {t("Condition")}
+                  )}
+                </section>
+
+                <section>
+                  <SectionHeader icon={Clock} label={t("Visibility & place")} tone="olive" />
+                  <div className="space-y-3">
+                    <div>
+                      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                        {t("Visible for")}
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {STORY_CONDITION_OPTIONS.map((cond) => {
-                          const on = storyCondition.includes(cond);
+                      <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
+                        {(
+                          [
+                            { h: 6, label: "6h" },
+                            { h: 24, label: "24h" },
+                            { h: undefined, label: t("Keep tip") },
+                          ] as const
+                        ).map((opt) => {
+                          const active = storyVisibility === opt.h;
                           return (
                             <button
-                              key={cond}
+                              key={opt.label}
                               type="button"
-                              aria-pressed={on}
-                              onClick={() =>
-                                setStoryCondition((arr) =>
-                                  on ? arr.filter((x) => x !== cond) : [...arr, cond],
-                                )
-                              }
-                              className={`rounded-full px-2.5 py-1 text-[10px] font-bold capitalize ${
-                                on
-                                  ? "bg-hp-ink text-hp-paper"
-                                  : "border border-hp-ink/10 text-hp-ink/70"
+                              aria-pressed={active}
+                              onClick={() => setStoryVisibility(opt.h)}
+                              className={`rounded-xl px-2 py-2 text-[11px] font-bold transition ${
+                                active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                               }`}
                             >
-                              {t(cond[0].toUpperCase() + cond.slice(1))}
+                              {opt.label}
                             </button>
                           );
                         })}
                       </div>
                     </div>
-                  </div>
-                )}
 
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {t("Visible for")}
+                    <div>
+                      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                        {t("Location")}
+                      </div>
+                      <SearchablePlacePicker
+                        places={places}
+                        value={place}
+                        onChange={setPlace}
+                        query={placeQuery}
+                        setQuery={setPlaceQuery}
+                      />
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                    {(
-                      [
-                        { h: 6, label: "6h" },
-                        { h: 24, label: "24h" },
-                        { h: undefined, label: t("Keep tip") },
-                      ] as const
-                    ).map((opt) => {
-                      const active = storyVisibility === opt.h;
-                      return (
-                        <button
-                          key={opt.label}
-                          type="button"
-                          aria-pressed={active}
-                          onClick={() => setStoryVisibility(opt.h)}
-                          className={`rounded-xl px-2 py-2 text-[11px] font-bold transition ${
-                            active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                </section>
 
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {t("Location")}
-                  </div>
-                  <SearchablePlacePicker
-                    places={places}
-                    value={place}
-                    onChange={setPlace}
-                    query={placeQuery}
-                    setQuery={setPlaceQuery}
-                  />
-                </div>
-
-                {error && <p className="mt-3 text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
                 <button
                   type="submit"
                   data-testid="composer-story-submit"
                   disabled={!storyCaption.trim()}
-                  className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+                  className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {t("Post story")}
                 </button>
               </form>
             ) : (
-              <form data-testid="composer-event-form" onSubmit={handleEventSubmit}>
-                <div className="relative h-36 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                  <ImageBox
-                    src={selectedPlace.imageUrl}
-                    alt={selectedPlace.name}
-                    className="h-full w-full"
-                    rounded="rounded-2xl"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3 text-hp-paper">
-                    <div className="text-[10px] font-bold uppercase">{t("Hosting at")}</div>
-                    <div className="text-[15px] font-black leading-tight">{selectedPlace.name}</div>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-event-title"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Gathering title")}
-                    </label>
-                    <input
-                      id="create-event-title"
-                      name="create-event-title"
-                      value={eventTitle}
-                      onChange={(e) => setEventTitle(e.target.value)}
-                      autoComplete="off"
-                      placeholder={t("Sunset swim, coffee tips, live music...")}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
+              <form
+                data-testid="composer-event-form"
+                onSubmit={handleEventSubmit}
+                className="hp-stagger space-y-4"
+              >
+                <section>
+                  <SectionHeader icon={Store} label={t("What & where")} tone="sunset" />
+                  <div className="hp-card-lift relative h-36 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+                    <ImageBox
+                      src={selectedPlace.imageUrl}
+                      alt={selectedPlace.name}
+                      className="h-full w-full"
+                      rounded="rounded-2xl"
                     />
-                  </div>
-                  <div className="col-span-2">
-                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Location")}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                    <div className="absolute bottom-3 left-3 right-3 text-hp-paper">
+                      <div className="text-[10px] font-bold uppercase">{t("Hosting at")}</div>
+                      <div className="text-[15px] font-black leading-tight">
+                        {selectedPlace.name}
+                      </div>
                     </div>
-                    <SearchablePlacePicker
-                      places={places}
-                      value={place}
-                      onChange={setPlace}
-                      query={placeQuery}
-                      setQuery={setPlaceQuery}
-                    />
                   </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-when"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("When")}
-                    </label>
-                    <input
-                      id="create-event-when"
-                      name="create-event-when"
-                      type="datetime-local"
-                      value={eventWhen}
-                      onChange={(e) => setEventWhen(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[12px] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-category"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Type")}
-                    </label>
-                    <select
-                      id="create-event-category"
-                      name="create-event-category"
-                      value={eventCategory}
-                      onChange={(e) => setEventCategory(e.target.value as MeetCategory)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[12px]"
-                    >
-                      {MEET_CATEGORIES.map((category) => (
-                        <option key={category} value={category}>
-                          {t(MEET_CATEGORY_META[category].label)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-vibe"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Vibe")}
-                    </label>
-                    <input
-                      id="create-event-vibe"
-                      name="create-event-vibe"
-                      value={eventVibe}
-                      onChange={(e) => setEventVibe(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-price"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Price")}
-                    </label>
-                    <input
-                      id="create-event-price"
-                      name="create-event-price"
-                      value={eventPrice}
-                      onChange={(e) => setEventPrice(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-capacity"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Capacity")}
-                    </label>
-                    <input
-                      id="create-event-capacity"
-                      name="create-event-capacity"
-                      type="number"
-                      inputMode="numeric"
-                      min={2}
-                      value={eventCapacity}
-                      onChange={(e) => setEventCapacity(e.target.value)}
-                      placeholder={t("Optional")}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-tags"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Tags")}
-                    </label>
-                    <input
-                      id="create-event-tags"
-                      name="create-event-tags"
-                      value={eventTags}
-                      onChange={(e) => setEventTags(e.target.value)}
-                      placeholder={t("sunset, local, free")}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label htmlFor="create-event-description" className="sr-only">
-                      {t("Gathering description")}
-                    </label>
-                    <textarea
-                      id="create-event-description"
-                      name="create-event-description"
-                      value={eventDescription}
-                      onChange={(e) => setEventDescription(e.target.value)}
-                      placeholder={t("What should people know before they join?")}
-                      className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
-                      rows={3}
-                    />
-                  </div>
-                </div>
 
-                {error && <p className="mt-3 text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-event-title"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Gathering title")}
+                      </label>
+                      <input
+                        id="create-event-title"
+                        name="create-event-title"
+                        value={eventTitle}
+                        onChange={(e) => setEventTitle(e.target.value)}
+                        autoComplete="off"
+                        placeholder={t("Sunset swim, coffee tips, live music...")}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                        {t("Location")}
+                      </div>
+                      <SearchablePlacePicker
+                        places={places}
+                        value={place}
+                        onChange={setPlace}
+                        query={placeQuery}
+                        setQuery={setPlaceQuery}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <SectionHeader icon={Clock} label={t("When & kind")} tone="deep" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label
+                        htmlFor="create-event-when"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("When")}
+                      </label>
+                      <input
+                        id="create-event-when"
+                        name="create-event-when"
+                        type="datetime-local"
+                        value={eventWhen}
+                        onChange={(e) => setEventWhen(e.target.value)}
+                        className={`${fieldClass()} text-[12px]`}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-event-category"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Type")}
+                      </label>
+                      <select
+                        id="create-event-category"
+                        name="create-event-category"
+                        value={eventCategory}
+                        onChange={(e) => setEventCategory(e.target.value as MeetCategory)}
+                        className={`${fieldClass()} text-[12px]`}
+                      >
+                        {MEET_CATEGORIES.map((category) => (
+                          <option key={category} value={category}>
+                            {t(MEET_CATEGORY_META[category].label)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-event-vibe"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Vibe")}
+                      </label>
+                      <input
+                        id="create-event-vibe"
+                        name="create-event-vibe"
+                        value={eventVibe}
+                        onChange={(e) => setEventVibe(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <SectionHeader icon={ListChecks} label={t("Details")} tone="olive" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label
+                        htmlFor="create-event-price"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Price")}
+                      </label>
+                      <input
+                        id="create-event-price"
+                        name="create-event-price"
+                        value={eventPrice}
+                        onChange={(e) => setEventPrice(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-event-capacity"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Capacity")}
+                      </label>
+                      <input
+                        id="create-event-capacity"
+                        name="create-event-capacity"
+                        type="number"
+                        inputMode="numeric"
+                        min={2}
+                        value={eventCapacity}
+                        onChange={(e) => setEventCapacity(e.target.value)}
+                        placeholder={t("Optional")}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-event-tags"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Tags")}
+                      </label>
+                      <input
+                        id="create-event-tags"
+                        name="create-event-tags"
+                        value={eventTags}
+                        onChange={(e) => setEventTags(e.target.value)}
+                        placeholder={t("sunset, local, free")}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label htmlFor="create-event-description" className="sr-only">
+                        {t("Gathering description")}
+                      </label>
+                      <textarea
+                        id="create-event-description"
+                        name="create-event-description"
+                        value={eventDescription}
+                        onChange={(e) => setEventDescription(e.target.value)}
+                        placeholder={t("What should people know before they join?")}
+                        className={`${fieldClass()} resize-none`}
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
                 <button
                   type="submit"
                   data-testid="composer-event-submit"
                   disabled={!eventTitle.trim() || !eventDescription.trim() || saving}
-                  className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+                  className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {saving ? t("Hosting…") : t("Host gathering")}
                 </button>
