@@ -835,6 +835,7 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   node.style.setProperty("--hp-map-pulse-hot-peak", (1.08 + farPulse * 0.14).toFixed(4));
   node.style.setProperty("--hp-map-pulse-live-peak", (1.12 + farPulse * 0.18).toFixed(4));
   node.style.setProperty("--hp-map-theme-detail", themeDetail.toFixed(4));
+  node.style.setProperty("--hp-map-signal-strength", smoothstep(MIN_ZOOM, 11.5, zoom).toFixed(4));
   node.style.setProperty("--hp-map-effect-opacity", (0.72 + themeDetail * 0.28).toFixed(4));
   node.style.setProperty("--hp-map-secondary-opacity", themeDetail.toFixed(4));
 }
@@ -2168,10 +2169,10 @@ export function SocialMap({
                   tabIndex={mapChromeHidden ? -1 : undefined}
                   className={`hp-chip hp-map-chip ${selected ? "is-active" : ""}`}
                 >
-                  <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
-                  {cluster.name}
-                  <span className={selected ? "ml-1 text-hp-paper/70" : "ml-1 text-hp-muted"}>
-                    {cluster.places.length}
+                  <span className="hp-map-chip__face">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
+                    {cluster.name}
+                    <span className="text-hp-muted">{cluster.places.length}</span>
                   </span>
                 </button>
               );

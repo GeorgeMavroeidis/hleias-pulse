@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   childMarkerSize,
   markerPresenceScale,
@@ -80,4 +81,36 @@ for (const id of ["a", "place-123", "Πύργος", "cluster-99"]) {
 }
 console.log(
   "Marker density: viewport clipping, 1/12/36/37/80 nodes, tier priority, stable ties and selected exemption passed.",
+);
+
+// Source contracts complement (not replace) real browser visual/DOM checks.
+const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+const mapSource = readFileSync(
+  new URL("../src/components/hp/SocialMap.tsx", import.meta.url),
+  "utf8",
+);
+const markerKeyframes = [...css.matchAll(/@keyframes (hp-marker-[\w-]+)\s*\{([\s\S]*?)\n\}/g)];
+assert.ok(markerKeyframes.length >= 10);
+for (const [, name, body] of markerKeyframes) {
+  for (const [, property] of body.matchAll(/([\w-]+)\s*:/g)) {
+    assert.ok(["opacity", "transform"].includes(property), `${name} animates ${property}`);
+  }
+}
+assert.ok(
+  !/:is\([^)]*::(?:before|after)/s.test(css),
+  "Pseudo-elements must not appear inside :is()",
+);
+const signature = mapSource.match(/const sig = \[([\s\S]*?)\]\.join\("\|"\)/)?.[1];
+assert.ok(signature);
+assert.ok(!/selected|theme/i.test(signature), "Selection/theme must not rebuild image content");
+for (const layer of ["beacon", "sweep", "core"]) {
+  const idle = markerKeyframes.find(([, name]) => name === `hp-marker-signal-${layer}`)?.[2];
+  const selected = markerKeyframes.find(
+    ([, name]) => name === `hp-marker-signal-selected-${layer}`,
+  )?.[2];
+  assert.ok(idle);
+  assert.equal(idle, selected, "Selected restarts the same coordinated sequence");
+}
+console.log(
+  "Source contracts: compositor-only marker animations, valid pseudo-element selectors and content-only icon signatures passed.",
 );
