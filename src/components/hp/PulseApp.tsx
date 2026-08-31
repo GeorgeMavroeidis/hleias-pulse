@@ -159,17 +159,17 @@ const MARKER_ANIMATION_THEMES: {
   {
     id: "pulse",
     label: "Pulse Coast",
-    description: "Activity-aware pulses that keep the map lively and restrained.",
+    description: "Coral and amber ripples with a lively heartbeat.",
   },
   {
     id: "signal",
     label: "Night Signal",
-    description: "A slower single signal with a more atmospheric rhythm.",
+    description: "Violet and cyan signals with a pulsing core.",
   },
   {
     id: "calm",
     label: "Aegean Calm",
-    description: "A quiet selected-marker breath with a still map around it.",
+    description: "Aqua light and a slow, calm breath.",
   },
 ];
 
@@ -518,11 +518,13 @@ function TopBar({
                       className="hp-animation-theme-option"
                       data-theme-preview={theme.id}
                     >
-                      <span className="hp-animation-theme-preview" aria-hidden="true">
-                        <span className="hp-animation-theme-preview__field" />
-                        <span className="hp-animation-theme-preview__wave" />
-                        <span className="hp-animation-theme-preview__sweep" />
-                        <span className="hp-animation-theme-preview__core" />
+                      <span className="hp-animation-theme-preview is-pulse-hot" aria-hidden="true">
+                        <span className="hp-marker-effects">
+                          <span className="hp-marker-field" />
+                          <span className="hp-marker-wave" />
+                          <span className="hp-marker-sweep" />
+                        </span>
+                        <span className="hp-marker-core hp-animation-theme-preview__core" />
                       </span>
                       <span className="hp-animation-theme-copy">
                         <strong>{theme.label}</strong>

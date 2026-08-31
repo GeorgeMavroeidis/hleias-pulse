@@ -24,12 +24,10 @@ const EL: Record<string, string> = {
   "Current: {theme}": "Ενεργό: {theme}",
   "Open appearance menu": "Άνοιγμα επιλογών εμφάνισης",
   "Close appearance menu": "Κλείσιμο επιλογών εμφάνισης",
-  "A quiet selected-marker breath with a still map around it.":
-    "Ήρεμη αναπνοή στο επιλεγμένο σημείο, με σταθερό τον υπόλοιπο χάρτη.",
-  "Activity-aware pulses that keep the map lively and restrained.":
-    "Παλμοί ανάλογα με τη δραστηριότητα, ζωντανοί αλλά διακριτικοί.",
-  "A slower single signal with a more atmospheric rhythm.":
-    "Πιο αργό μονό σήμα, με ατμοσφαιρικό ρυθμό.",
+  "Aqua light and a slow, calm breath.": "Θαλασσί φως και αργή, ήρεμη αναπνοή.",
+  "Coral and amber ripples with a lively heartbeat.":
+    "Κοραλλί και κεχριμπαρένια κύματα με ζωντανό παλμό.",
+  "Violet and cyan signals with a pulsing core.": "Μωβ και κυανά σήματα με πυρήνα που πάλλεται.",
   Map: "Χάρτης",
   Pulse: "Ροή",
   Routes: "Διαδρομές",

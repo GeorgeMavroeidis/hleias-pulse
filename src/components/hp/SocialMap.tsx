@@ -16,6 +16,9 @@ import {
   markerPresenceScale,
   markerMotionPhase,
   markerViewportDensity,
+  MAX_MARKER_CORE_BEAT,
+  markerWaveStrength,
+  markerMapFillScale,
 } from "@/lib/hp/map-visuals";
 
 type LeafletModule = typeof import("leaflet");
@@ -397,12 +400,7 @@ function activityLineForCluster(
 }
 
 function markerStyle(size: number, id: string) {
-  let hash = 0;
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
-  }
-  const delaySeconds = ((hash % 5400) / 1000).toFixed(3);
-  return `--marker-size:${size}px;--hp-pulse-delay:-${delaySeconds}s;--hp-signal-phase:${markerMotionPhase(id)}`;
+  return `--marker-size:${size}px;--hp-motion-phase:${markerMotionPhase(id)}`;
 }
 
 function clusterSize(status: AreaStatus) {
@@ -520,7 +518,7 @@ function escapeHtml(value: string) {
 // reads as a calm placeholder rather than a broken image.
 const PLACEHOLDER_IMG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=";
-const MARKER_EFFECTS_VERSION = "3";
+const MARKER_EFFECTS_VERSION = "4";
 const MARKER_EFFECTS_HTML = `
   <span class="hp-marker-effects" data-effects-version="${MARKER_EFFECTS_VERSION}">
     <span class="hp-marker-field"></span>
@@ -794,6 +792,7 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   const profile = markerZoomProfile(zoom);
   const farPulse = 1 - smoothstep(OVERVIEW_ZOOM, PLACE_FOCUS_ZOOM, zoom);
   const themeDetail = smoothstep(10.5, RICH_VISUAL_START, zoom);
+  node.style.setProperty("--hp-map-fill-scale", markerMapFillScale(zoom).toFixed(4));
   for (const tier of ["quiet", "moving", "hot", "live"] as const) {
     node.style.setProperty(`--hp-presence-${tier}`, markerPresenceScale(zoom, tier).toFixed(4));
   }
@@ -835,9 +834,7 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   node.style.setProperty("--hp-map-pulse-hot-peak", (1.08 + farPulse * 0.14).toFixed(4));
   node.style.setProperty("--hp-map-pulse-live-peak", (1.12 + farPulse * 0.18).toFixed(4));
   node.style.setProperty("--hp-map-theme-detail", themeDetail.toFixed(4));
-  node.style.setProperty("--hp-map-signal-strength", smoothstep(MIN_ZOOM, 11.5, zoom).toFixed(4));
-  node.style.setProperty("--hp-map-effect-opacity", (0.72 + themeDetail * 0.28).toFixed(4));
-  node.style.setProperty("--hp-map-secondary-opacity", themeDetail.toFixed(4));
+  node.style.setProperty("--hp-map-wave-strength", markerWaveStrength(zoom).toFixed(4));
 }
 
 // Conservative theme-independent radius: Pulse is the largest core. Include
@@ -858,7 +855,16 @@ function markerCoreRadius(node: RenderNode, zoom: number) {
         : node.solo && !node.selected
           ? profile.soloScale
           : profile.childScale;
-  return (size * scale * markerPresenceScale(zoom, node.tier) * (node.selected ? 1.1 : 1)) / 2 + 6;
+  return (
+    (size *
+      scale *
+      markerPresenceScale(zoom, node.tier) *
+      markerMapFillScale(zoom) *
+      (node.selected ? 1.1 : 1) *
+      MAX_MARKER_CORE_BEAT) /
+      2 +
+    6
+  );
 }
 
 function centroidOfPlaces(places: Place[], fallback: LatLngTuple): LatLngTuple {
@@ -1699,7 +1705,7 @@ export function SocialMap({
           if (!shell) return;
           shell.classList.toggle("is-viewport-paused", document.hidden || !density.visible.has(id));
           shell.classList.toggle("is-marker-dense", density.dense.has(id));
-          shell.classList.toggle("is-signal-suppressed", density.suppressed.has(id));
+          shell.classList.toggle("is-motion-suppressed", density.suppressed.has(id));
         });
       });
     };

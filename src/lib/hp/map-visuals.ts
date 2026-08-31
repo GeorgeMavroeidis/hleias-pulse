@@ -7,9 +7,17 @@ const PRESENCE: Record<PulseTier, readonly number[]> = {
   live: [1, 1.26, 1.28, 1.28, 1.26],
 };
 const PRESENCE_ZOOMS = [9.25, 11.5, 12.5, 14.25, 15.5] as const;
+const MAP_FILL_SCALE = [1.4, 1.38, 1.35, 1.3, 1.25] as const;
 
-export function markerPresenceScale(zoom: number, tier: PulseTier) {
-  const values = PRESENCE[tier];
+// Largest decorative core beat (Pulse selected); used for safe viewport margins.
+export const MAX_MARKER_CORE_BEAT = 1.055;
+
+export function markerWaveStrength(zoom: number) {
+  const t = Math.max(0, Math.min(1, (zoom - 9.25) / (11.5 - 9.25)));
+  return t * t * (3 - 2 * t);
+}
+
+function interpolateMarkerScale(zoom: number, values: readonly number[]) {
   if (zoom <= PRESENCE_ZOOMS[0]) return values[0];
   for (let index = 1; index < PRESENCE_ZOOMS.length; index += 1) {
     if (zoom > PRESENCE_ZOOMS[index]) continue;
@@ -20,6 +28,16 @@ export function markerPresenceScale(zoom: number, tier: PulseTier) {
   return values[values.length - 1];
 }
 
+export function markerPresenceScale(zoom: number, tier: PulseTier) {
+  return interpolateMarkerScale(zoom, PRESENCE[tier]);
+}
+
+// Shared by the core, field, waves and sweep. Keep it outside the tier-density
+// cap so crowded areas retain the requested increase in visual presence.
+export function markerMapFillScale(zoom: number) {
+  return interpolateMarkerScale(zoom, MAP_FILL_SCALE);
+}
+
 export function childMarkerSize(tier: PulseTier) {
   return tier === "quiet" ? 48 : tier === "moving" ? 54 : 60;
 }
@@ -27,6 +45,10 @@ export function childMarkerSize(tier: PulseTier) {
 export function markerMotionPhase(id: string) {
   let hash = 0;
   for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  // Avalanche adjacent IDs so place-1 / place-2 do not pulse almost in unison.
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  hash = (hash ^ (hash >>> 16)) >>> 0;
   return (hash % 10000) / 10000;
 }
 
