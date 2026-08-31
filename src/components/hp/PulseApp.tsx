@@ -157,11 +157,6 @@ const MARKER_ANIMATION_THEMES: {
   description: string;
 }[] = [
   {
-    id: "calm",
-    label: "Aegean Calm",
-    description: "A quiet selected-marker breath with a still map around it.",
-  },
-  {
     id: "pulse",
     label: "Pulse Coast",
     description: "Activity-aware pulses that keep the map lively and restrained.",
@@ -170,6 +165,11 @@ const MARKER_ANIMATION_THEMES: {
     id: "signal",
     label: "Night Signal",
     description: "A slower single signal with a more atmospheric rhythm.",
+  },
+  {
+    id: "calm",
+    label: "Aegean Calm",
+    description: "A quiet selected-marker breath with a still map around it.",
   },
 ];
 
@@ -380,7 +380,7 @@ function TopBar({
   const searchActive = showSearch || query.trim().length > 0;
   const activeAnimationTheme =
     MARKER_ANIMATION_THEMES.find((theme) => theme.id === animationTheme) ??
-    MARKER_ANIMATION_THEMES[1];
+    MARKER_ANIMATION_THEMES[0];
   const appearanceButtonRef = useRef<HTMLButtonElement>(null);
   const appearanceMenuRef = useRef<HTMLDivElement>(null);
 
@@ -620,6 +620,7 @@ function MapBottomSheet({
   half,
   full,
   onSetSnap,
+  onIdleHeightMeasured,
   onOpenDetails,
   onSavePlace,
   onSharePlace,
@@ -635,6 +636,7 @@ function MapBottomSheet({
   half: number;
   full: number;
   onSetSnap: (h: number) => void;
+  onIdleHeightMeasured: (height: number) => void;
   onOpenDetails: (p: Place) => void;
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
@@ -642,6 +644,23 @@ function MapBottomSheet({
 }) {
   const { t } = useI18n();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
+  const handleRef = useRef<HTMLDivElement>(null);
+  const idleContentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (cluster) return;
+    const handle = handleRef.current;
+    const content = idleContentRef.current;
+    if (!handle || !content) return;
+    // Measure intrinsic children, not the animated/constrained sheet height.
+    // This also responds to translated wrapping, font loading and text zoom.
+    const measure = () =>
+      onIdleHeightMeasured(Math.max(72, Math.ceil(handle.offsetHeight + content.offsetHeight + 1)));
+    const observer = new ResizeObserver(measure);
+    observer.observe(handle);
+    observer.observe(content);
+    measure();
+    return () => observer.disconnect();
+  }, [cluster, onIdleHeightMeasured]);
   const isSelectedCollapsed = Boolean(cluster) && height <= peek + 8;
   const isExpanded = Boolean(cluster) && height >= full - 24;
   const dragState = useRef<{
@@ -740,10 +759,11 @@ function MapBottomSheet({
       style={{ height }}
       animate={{ height }}
       transition={isDraggingSheet ? { duration: 0 } : HP_TRANSITION.panel}
-      className="hp-map-sheet absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper/98 shadow-[0_-12px_40px_rgba(23,20,17,0.18)]"
+      className={`hp-map-sheet ${!cluster ? "is-idle" : ""} absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper/98 shadow-[0_-12px_40px_rgba(23,20,17,0.18)]`}
     >
       {/* Drag handle */}
       <div
+        ref={handleRef}
         {...sheetDragHandlers}
         className="hp-map-sheet-handle touch-none select-none cursor-grab pt-2 pb-1 active:cursor-grabbing"
       >
@@ -775,6 +795,7 @@ function MapBottomSheet({
       <AnimatePresence initial={false} mode="popLayout">
         {!isSelectedCollapsed && (
           <motion.div
+            ref={cluster ? undefined : idleContentRef}
             key={
               selectedPlace ? `place-${selectedPlace.id}` : cluster ? `area-${cluster.id}` : "idle"
             }
@@ -782,10 +803,10 @@ function MapBottomSheet({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -3 }}
             transition={HP_TRANSITION.sheetContent}
-            className={`hp-safe-px min-h-0 pt-0 ${cluster ? "pb-5" : "pb-3"} ${
+            className={`hp-safe-px min-h-0 pt-0 ${cluster ? "pb-5" : "hp-map-sheet__idle-content"} ${
               cluster
                 ? `flex flex-1 overscroll-contain ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`
-                : "overflow-y-auto overscroll-contain"
+                : "overscroll-contain"
             }`}
           >
             {cluster ? (
@@ -814,13 +835,9 @@ function MapBottomSheet({
 function TonightPulseContent() {
   const { t } = useI18n();
   return (
-    <div>
-      <div>
-        <div className="mb-2">
-          <h3 className="text-[16px] font-black text-hp-ink">{t("Tonight's pulse")}</h3>
-        </div>
-        <p className="text-[12px] text-hp-muted">{t("Tap a bubble to see what's happening.")}</p>
-      </div>
+    <div className="hp-map-sheet__idle-copy">
+      <h3 className="text-[16px] font-black text-hp-ink">{t("Tonight's pulse")}</h3>
+      <p className="text-[12px] text-hp-muted">{t("Tap a bubble to see what's happening.")}</p>
     </div>
   );
 }
@@ -4066,7 +4083,7 @@ export function PulseApp() {
   }, [tab]);
   const safeMapAreaH = mapAreaH > 120 ? mapAreaH : 560;
   const full = Math.round(safeMapAreaH * 0.85);
-  const idlePeek = 92;
+  const [idlePeek, setIdlePeek] = useState(72);
   const selectedPeek = 44;
   const compactMap = safeMapAreaH < 460;
   const areaPreview = Math.min(
@@ -4085,6 +4102,7 @@ export function PulseApp() {
   useEffect(() => {
     const previous = previousSheetGeometryRef.current;
     setSheetH((currentHeight) => {
+      if (!hasMapFocus) return idlePeek;
       if (previous.mapAreaH !== safeMapAreaH) {
         const previousSnaps = [
           { id: "peek", value: previous.peek },
@@ -4102,7 +4120,7 @@ export function PulseApp() {
       return Math.min(full, Math.max(peek, currentHeight));
     });
     previousSheetGeometryRef.current = { mapAreaH: safeMapAreaH, peek, half, full };
-  }, [full, half, peek, safeMapAreaH]);
+  }, [full, half, peek, safeMapAreaH, hasMapFocus, idlePeek]);
   useEffect(() => {
     if (!hasMapFocus) {
       setSheetH(idlePeek);
@@ -5145,6 +5163,7 @@ export function PulseApp() {
             half={half}
             full={full}
             onSetSnap={setSheetH}
+            onIdleHeightMeasured={setIdlePeek}
             onOpenDetails={(p) => setOpenPlace(p)}
             onSavePlace={toggleSave}
             onSharePlace={sharePlace}
