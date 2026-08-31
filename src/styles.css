@@ -246,6 +246,7 @@
 }
 
 .hp-real-map {
+  --hp-map-fill-scale: 1.4;
   --hp-map-medium: 0;
   --hp-map-detail: 0;
   --hp-map-rich: 0;
@@ -322,7 +323,8 @@
   --hp-marker-presence: min(var(--hp-marker-tier-presence), var(--hp-marker-presence-cap, 2));
   --hp-marker-interaction-scale: 1;
   --hp-marker-render-scale: calc(
-    var(--hp-marker-zoom-scale, 1) * var(--hp-marker-presence) * var(--hp-marker-interaction-scale)
+    var(--hp-marker-zoom-scale, 1) * var(--hp-marker-presence) *
+      var(--hp-marker-interaction-scale) * var(--hp-map-fill-scale, 1)
   );
   --hp-marker-core-render-scale: calc(
     var(--hp-marker-render-scale) * var(--hp-theme-core-scale, 1)
@@ -343,6 +345,9 @@
   box-sizing: border-box;
   border-radius: 9999px;
   overflow: visible;
+  /* The entire enlarged core remains clickable; decorative descendants never
+     intercept the map outside the core. The outer icon retains its 32/44px minimum. */
+  pointer-events: inherit;
   transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-render-scale));
   transform-origin: center;
   transition: transform 80ms linear;

@@ -18,6 +18,7 @@ import {
   markerViewportDensity,
   MAX_MARKER_CORE_BEAT,
   markerWaveStrength,
+  markerMapFillScale,
 } from "@/lib/hp/map-visuals";
 
 type LeafletModule = typeof import("leaflet");
@@ -791,6 +792,7 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   const profile = markerZoomProfile(zoom);
   const farPulse = 1 - smoothstep(OVERVIEW_ZOOM, PLACE_FOCUS_ZOOM, zoom);
   const themeDetail = smoothstep(10.5, RICH_VISUAL_START, zoom);
+  node.style.setProperty("--hp-map-fill-scale", markerMapFillScale(zoom).toFixed(4));
   for (const tier of ["quiet", "moving", "hot", "live"] as const) {
     node.style.setProperty(`--hp-presence-${tier}`, markerPresenceScale(zoom, tier).toFixed(4));
   }
@@ -857,6 +859,7 @@ function markerCoreRadius(node: RenderNode, zoom: number) {
     (size *
       scale *
       markerPresenceScale(zoom, node.tier) *
+      markerMapFillScale(zoom) *
       (node.selected ? 1.1 : 1) *
       MAX_MARKER_CORE_BEAT) /
       2 +

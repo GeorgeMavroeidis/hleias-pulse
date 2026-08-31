@@ -6,6 +6,7 @@ import {
   markerMotionPhase,
   markerViewportDensity,
   markerWaveStrength,
+  markerMapFillScale,
   MAX_MARKER_CORE_BEAT,
   type ScreenMarker,
 } from "../src/lib/hp/map-visuals";
@@ -33,6 +34,42 @@ for (const tier of tiers) {
 }
 assert.deepEqual(tiers.map(childMarkerSize), [48, 54, 60, 60]);
 console.log("Map visual profiles: zoom anchors, continuity and tier sizes passed.");
+
+const fillAnchors = [
+  [9.25, 1.4],
+  [11.5, 1.38],
+  [12.5, 1.35],
+  [14.25, 1.3],
+  [15.5, 1.25],
+];
+for (const [zoom, gain] of fillAnchors) {
+  assert.equal(markerMapFillScale(zoom), gain);
+  assert.ok(
+    Math.abs(markerMapFillScale(zoom - 0.001) - markerMapFillScale(zoom + 0.001)) < 0.00001,
+  );
+  for (const tier of tiers) {
+    for (const dense of [false, true]) {
+      for (const selected of [false, true]) {
+        const presence =
+          dense && !selected
+            ? Math.min(1.08, markerPresenceScale(zoom, tier))
+            : markerPresenceScale(zoom, tier);
+        const oldScale = presence * (selected ? 1.1 : 1);
+        const newScale = oldScale * markerMapFillScale(zoom);
+        assert.ok(newScale / oldScale >= 1.25 - 1e-9, "Density must not cancel the map-fill gain");
+        assert.ok((newScale / oldScale) ** 2 >= 1.5625 - 1e-9);
+      }
+    }
+  }
+}
+assert.equal(markerMapFillScale(8), 1.4);
+assert.equal(markerMapFillScale(18), 1.25);
+for (let zoom = 8; zoom <= 18; zoom += 0.05) {
+  assert.ok(markerMapFillScale(zoom) >= markerMapFillScale(zoom + 0.01));
+}
+console.log(
+  "Map fill: +25–40% diameter, +56–96% footprint, smooth zoom curve and dense/selected invariants passed.",
+);
 
 const pin = (id: string, overrides: Partial<ScreenMarker> = {}): ScreenMarker => ({
   id,
@@ -118,7 +155,39 @@ console.log(
 );
 
 // Audit the real stylesheet tokens, not a second copy of implementation values.
-const cssRules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+const cssRules = [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+const renderScaleRule = cssRules.find(([, , body]) =>
+  body.includes("--hp-marker-render-scale: calc("),
+);
+assert.ok(renderScaleRule);
+const renderScaleExpression = renderScaleRule[2].match(
+  /--hp-marker-render-scale:\s*calc\(([^;]+)\);/,
+)?.[1];
+assert.ok(renderScaleExpression?.includes("var(--hp-map-fill-scale, 1)"));
+assert.ok(!renderScaleExpression?.includes("min("), "Fill belongs outside the density cap");
+assert.ok(
+  renderScaleRule[2].includes("pointer-events: inherit;"),
+  "The enlarged core must retain pointer input",
+);
+assert.ok(
+  mapSource.includes(
+    'node.style.setProperty("--hp-map-fill-scale", markerMapFillScale(zoom).toFixed(4))',
+  ),
+);
+assert.match(mapSource, /function markerCoreRadius[\s\S]*?markerMapFillScale\(zoom\) \*/);
+assert.equal(
+  cssRules.filter(([, , body]) => /--hp-map-fill-scale\s*:/.test(body)).length,
+  1,
+  "Density/theme/selection must not reset the common fill scale",
+);
+assert.ok(
+  cssRules.find(
+    ([, selector, body]) =>
+      selector.trim() === ".hp-animation-theme-preview" &&
+      body.includes("--hp-marker-render-scale: 1;"),
+  ),
+  "Menu previews must stay compact",
+);
 const themeTokens = (theme: string) => {
   const rule = cssRules.find(
     ([, selector, body]) =>
