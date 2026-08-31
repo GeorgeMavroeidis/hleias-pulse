@@ -11,6 +11,11 @@ const PRESENCE_ZOOMS = [9.25, 11.5, 12.5, 14.25, 15.5] as const;
 // Largest decorative core beat (Pulse selected); used for safe viewport margins.
 export const MAX_MARKER_CORE_BEAT = 1.055;
 
+export function markerWaveStrength(zoom: number) {
+  const t = Math.max(0, Math.min(1, (zoom - 9.25) / (11.5 - 9.25)));
+  return t * t * (3 - 2 * t);
+}
+
 export function markerPresenceScale(zoom: number, tier: PulseTier) {
   const values = PRESENCE[tier];
   if (zoom <= PRESENCE_ZOOMS[0]) return values[0];
