@@ -19,6 +19,7 @@
     "smoke:auth-profile": "tsx scripts/smoke-auth-profile.ts",
     "smoke:live-surfaces": "tsx scripts/smoke-live-surfaces.ts",
     "smoke:post-write": "tsx scripts/smoke-post-write.ts",
+    "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql"
   },
   "dependencies": {

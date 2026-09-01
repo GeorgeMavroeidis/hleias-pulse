@@ -100,6 +100,12 @@ import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet, PasswordRecoverySheet } from "./AuthAccountSheets";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { buildPulseActivitySnapshot, type PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
+import {
+  deriveAreaIntelligenceSnapshot,
+  type AreaState,
+  type AreaIntelligenceSnapshot,
+  type SignalQuality,
+} from "@/lib/hp/area-intelligence";
 import { type StreakState } from "@/lib/hp/meet-store";
 import {
   MEET_CATEGORIES,
@@ -122,6 +128,21 @@ type CreateStoryInput = {
   parking?: "easy" | "tight" | "full";
   condition?: string[];
   visibilityHours?: number;
+};
+
+const AREA_STATE_LABEL: Record<AreaState, string> = {
+  calm: "Calm",
+  rising: "Rising",
+  active: "Active",
+  hot: "Hot",
+  cooling: "Cooling",
+};
+
+const SIGNAL_QUALITY_LABEL: Record<SignalQuality, string> = {
+  confirmed: "Confirmed",
+  stable: "Stable",
+  fading: "Fading",
+  uncertain: "Uncertain",
 };
 type PostingIdentity = Extract<Author["type"], "LOCAL" | "TOURIST" | "GUIDE">;
 
@@ -873,6 +894,7 @@ function AreaSheetContent({
   const areaStoryGroups = storyGroups.filter((group) => placeIds.has(group.placeId));
 
   if (!isPlaceSheet) {
+    const intelligence = cluster.intelligence;
     return (
       <div className="flex h-full min-h-0 w-full flex-col">
         <div className="flex gap-3">
@@ -893,6 +915,24 @@ function AreaSheetContent({
               <span>{cluster.activityLine}</span>
             </div>
             <h3 className="mt-1 text-[16px] font-black text-hp-ink">{cluster.name}</h3>
+            {intelligence && (
+              <div
+                className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-hp-ink/65"
+                data-area-state={intelligence.state}
+                data-signal-quality={intelligence.signalQuality}
+                data-emerging={intelligence.emerging ? "true" : "false"}
+              >
+                <span>
+                  {t(AREA_STATE_LABEL[intelligence.state])} ·{" "}
+                  {t(SIGNAL_QUALITY_LABEL[intelligence.signalQuality])}
+                </span>
+                {intelligence.emerging && (
+                  <span className="rounded-full border border-hp-sunset/25 bg-hp-sunset/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-hp-sunset">
+                    {t("Emerging")}
+                  </span>
+                )}
+              </div>
+            )}
             <p className="text-[11px] text-hp-muted">
               {language === "GR"
                 ? `${cluster.places.length} σημεία σε αυτή την περιοχή`
@@ -3957,6 +3997,7 @@ export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [activitySnapshot, setActivitySnapshot] = useState<PulseActivitySnapshot>({});
+  const [areaIntelligence, setAreaIntelligence] = useState<AreaIntelligenceSnapshot>({});
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -4360,6 +4401,7 @@ export function PulseApp() {
       const data = await loadPulseData();
       setPulseData(data);
       setActivitySnapshot(buildPulseActivitySnapshot(data));
+      setAreaIntelligence(deriveAreaIntelligenceSnapshot(data));
       lastActivityRefreshAtRef.current = Date.now();
       setPlaceComments(data.placeComments);
       setRouteComments(data.routeComments);
@@ -4396,6 +4438,7 @@ export function PulseApp() {
     try {
       const data = await loadPulseData();
       setActivitySnapshot(buildPulseActivitySnapshot(data));
+      setAreaIntelligence(deriveAreaIntelligenceSnapshot(data));
       lastActivityRefreshAtRef.current = Date.now();
     } catch (error) {
       console.warn("Could not refresh the map activity snapshot.", error);
@@ -5050,8 +5093,8 @@ export function PulseApp() {
     return first ?? null;
   }, [filteredPlaces]);
   const mapClusters = useMemo(
-    () => buildAreaClusters(filteredPlaces, events, activitySnapshot),
-    [activitySnapshot, events, filteredPlaces],
+    () => buildAreaClusters(filteredPlaces, events, activitySnapshot, areaIntelligence),
+    [activitySnapshot, areaIntelligence, events, filteredPlaces],
   );
   const filteredPlaceIdSet = useMemo(
     () => new Set(filteredPlaces.map((place) => place.id)),
