@@ -43,6 +43,8 @@ import {
   Camera,
   Info,
   ListChecks,
+  ChevronRight,
+  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -104,12 +106,13 @@ import { useI18n } from "@/lib/i18n";
 import { getAdminRole, type AdminRole } from "@/lib/admin-api";
 import { ImageBox } from "./ImageBox";
 import {
+  areaTier,
   buildAreaClusters,
   getMapAreaIdForPlace,
   SocialMap,
   type MapAreaCluster,
 } from "./SocialMap";
-import { MapAreaInsights } from "./MapAreaInsights";
+import { MapAreaInsights, AREA_TIER_META } from "./MapAreaInsights";
 import { PlaceStoryRail } from "./PlaceStoryRail";
 import { PlaceStoryViewer } from "./PlaceStoryViewer";
 import {
@@ -645,12 +648,17 @@ function MapBottomSheet({
   };
 
   return (
-    <motion.div
-      style={{ height }}
-      animate={{ height }}
-      transition={
-        isDraggingSheet ? { duration: 0 } : { type: "spring", stiffness: 260, damping: 30 }
-      }
+    // Plain element + CSS height transition rather than framer's animate — a
+    // framer height animation here gets dropped when another motion element
+    // (the Explore areas panel) unmounts in the same commit, leaving the sheet
+    // stuck collapsed after picking an area from that panel.
+    <div
+      style={{
+        height,
+        transition: isDraggingSheet
+          ? "none"
+          : "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
       className="hp-map-sheet absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overscroll-contain rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper/98 shadow-[0_-12px_40px_rgba(23,20,17,0.18)] backdrop-blur"
     >
       {/* Drag handle */}
@@ -696,6 +704,7 @@ function MapBottomSheet({
               claimedPlaceIds={claimedPlaceIds}
               dealPlaceIds={dealPlaceIds}
               storyGroups={storyGroups}
+              onViewArea={() => onSetSnap(full)}
               onOpenStory={onOpenStory}
               onSavePlace={onSavePlace}
               onSharePlace={onSharePlace}
@@ -706,7 +715,7 @@ function MapBottomSheet({
           )}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -724,6 +733,18 @@ function TonightPulseContent() {
   );
 }
 
+// Place type -> category chip label (English source key; Greek via i18n).
+const CATEGORY_LABEL: Record<Place["type"], string> = {
+  beach: "Beach",
+  culture: "Culture",
+  nature: "Nature",
+  food: "Food",
+  local: "Town",
+  village: "Village",
+  night: "Nightlife",
+  sunset: "Sunset",
+};
+
 function AreaSheetContent({
   cluster,
   selectedPlace,
@@ -733,6 +754,7 @@ function AreaSheetContent({
   claimedPlaceIds,
   dealPlaceIds,
   storyGroups,
+  onViewArea,
   onOpenStory,
   onSavePlace,
   onSharePlace,
@@ -746,6 +768,7 @@ function AreaSheetContent({
   claimedPlaceIds: string[];
   dealPlaceIds: string[];
   storyGroups: PlaceStoryGroup[];
+  onViewArea: () => void;
   onOpenStory: (placeId: string) => void;
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
@@ -757,105 +780,169 @@ function AreaSheetContent({
   const areaStoryGroups = storyGroups.filter((group) => placeIds.has(group.placeId));
 
   if (!isPlaceSheet) {
+    // One unified area card for every entry point (map bubble, the on-map chip
+    // rail, and the Explore areas panel all land here). Compact first glance;
+    // "View area" expands the same sheet to the full detail (places + stories).
+    const tier = areaTier(cluster);
+    const meta = AREA_TIER_META[tier];
+    const TierIcon = meta.Icon;
+    const signals = cluster.postCount + cluster.eventCount;
+    const categories = [...new Set(cluster.places.map((place) => place.type))];
+
     return (
       <motion.div
         key={`area-${cluster.id}`}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex h-full min-h-0 w-full flex-col"
+        className={expanded ? "w-full" : "flex h-full min-h-0 w-full flex-col"}
       >
         <div className="flex gap-3">
-          <div className="grid h-16 w-16 shrink-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-ink/5">
-            {cluster.places.slice(0, 4).map((place) => (
-              <ImageBox
-                key={place.id}
-                src={place.imageUrl}
-                alt=""
-                className="h-8 w-full"
-                rounded="rounded-none"
-              />
-            ))}
-          </div>
+          <ImageBox
+            src={cluster.leadPlace.imageUrl}
+            alt=""
+            className="h-16 w-16 shrink-0"
+            rounded="rounded-2xl"
+          />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-[11px] font-bold text-hp-ink/70">
-              <span className="inline-block h-2 w-2 rounded-full bg-hp-sunset" />
-              <span>{cluster.activityLine}</span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h3 className="text-[16px] font-black text-hp-ink">{cluster.name}</h3>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${meta.badge}`}
+              >
+                <TierIcon size={10} />
+                {t(meta.label)}
+              </span>
             </div>
-            <h3 className="mt-1 text-[16px] font-black text-hp-ink">{cluster.name}</h3>
-            <p className="text-[11px] text-hp-muted">
-              {language === "GR"
-                ? `${cluster.places.length} σημεία σε αυτή την περιοχή`
-                : `${cluster.places.length} clustered places in this area`}
-            </p>
-            <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
+            <p className="mt-0.5 text-[12px] text-hp-ink/75">{t(meta.blurb)}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-hp-ink/60">
               <span className="inline-flex items-center gap-0.5">
                 <Radio size={11} />
-                {cluster.postCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
+                {t("{count} signals", { count: signals })}
               </span>
-              <span className="inline-flex items-center gap-0.5">
-                <Clock size={11} />
-                {cluster.eventCount} {language === "GR" ? "εκδηλώσεις" : "events"}
-              </span>
+              <span aria-hidden="true">·</span>
+              <span>{t("{count} places", { count: cluster.places.length })}</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-            {language === "GR" ? "Σημεία της περιοχής" : "Clustered elements"}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {cluster.places.map((place) => (
+        {categories.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {categories.slice(0, 4).map((category) => (
               <span
-                key={place.id}
-                className="rounded-full bg-hp-ink/5 px-2 py-1 text-[11px] font-bold text-hp-ink/75"
+                key={category}
+                className="rounded-full bg-hp-ink/5 px-2 py-1 text-[10px] font-bold text-hp-ink/65"
               >
-                {place.name}
+                {t(CATEGORY_LABEL[category])}
               </span>
             ))}
+            {categories.length > 4 && (
+              <span className="rounded-full bg-hp-ink/5 px-2 py-1 text-[10px] font-bold text-hp-ink/65">
+                +{categories.length - 4}
+              </span>
+            )}
           </div>
-        </div>
+        )}
 
-        {areaStoryGroups.length > 0 && (
-          <div className="mt-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                {language === "GR" ? `Stories από ${cluster.name}` : `Stories from ${cluster.name}`}
-              </span>
-              <span className="text-[10px] font-semibold text-hp-muted">
-                {areaStoryGroups.length}
-              </span>
-            </div>
-            <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              {areaStoryGroups.map((group) => {
-                const tone = toneStyle(group.hasUnseen ? group.tone : "muted");
-                return (
+        {!expanded ? (
+          <button
+            type="button"
+            onClick={onViewArea}
+            className="mt-auto flex items-center justify-center gap-1.5 rounded-full bg-hp-ink py-2.5 text-[13px] font-black text-hp-paper transition active:scale-[0.99]"
+          >
+            {t("View area")}
+            <ArrowRight size={14} />
+          </button>
+        ) : (
+          <div className="mt-3 flex flex-col gap-3">
+            <div>
+              <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                {t("Places in this area")}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {cluster.places.map((place) => (
                   <button
-                    key={group.placeId}
+                    key={place.id}
                     type="button"
-                    onClick={() => onOpenStory(group.placeId)}
-                    aria-label={
-                      language === "GR"
-                        ? `Άνοιγμα stories για ${group.placeName}`
-                        : `Open stories for ${group.placeName}`
-                    }
-                    className="flex w-14 shrink-0 flex-col items-center gap-1"
+                    onClick={() => onOpenDetails(place)}
+                    className="flex items-center gap-2.5 rounded-xl border border-hp-ink/10 bg-white/50 p-2 text-left transition active:bg-hp-ink/[0.03]"
                   >
-                    <div className="rounded-full p-[2px]" style={{ background: tone.gradient }}>
-                      <ImageBox
-                        src={group.stories[0].mediaUrl}
-                        alt={group.placeName}
-                        className="h-12 w-12"
-                        rounded="rounded-full"
-                      />
-                    </div>
-                    <span className="block w-full truncate text-center text-[9px] font-bold text-hp-ink/80">
-                      {group.placeName}
+                    <ImageBox
+                      src={place.imageUrl}
+                      alt=""
+                      className="h-9 w-9 shrink-0"
+                      rounded="rounded-lg"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12px] font-black text-hp-ink">
+                        {place.name}
+                      </span>
+                      <span className="block truncate text-[10px] text-hp-muted">
+                        {place.recentPostCount}{" "}
+                        {language === "GR" ? "δημοσιεύσεις" : "posts"}
+                      </span>
                     </span>
+                    {(savedPlaceIds.includes(place.id) ||
+                      claimedPlaceIds.includes(place.id) ||
+                      dealPlaceIds.includes(place.id)) && (
+                      <span className="flex shrink-0 items-center gap-1 text-hp-sunset">
+                        {savedPlaceIds.includes(place.id) && <Bookmark size={12} />}
+                        {claimedPlaceIds.includes(place.id) && <BadgeCheck size={12} />}
+                        {dealPlaceIds.includes(place.id) && <Gift size={12} />}
+                      </span>
+                    )}
+                    <ChevronRight size={14} className="shrink-0 text-hp-ink/30" />
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
+
+            {areaStoryGroups.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    {language === "GR"
+                      ? `Stories από ${cluster.name}`
+                      : `Stories from ${cluster.name}`}
+                  </span>
+                  <span className="text-[10px] font-semibold text-hp-muted">
+                    {areaStoryGroups.length}
+                  </span>
+                </div>
+                <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                  {areaStoryGroups.map((group) => {
+                    const tone = toneStyle(group.hasUnseen ? group.tone : "muted");
+                    return (
+                      <button
+                        key={group.placeId}
+                        type="button"
+                        onClick={() => onOpenStory(group.placeId)}
+                        aria-label={
+                          language === "GR"
+                            ? `Άνοιγμα stories για ${group.placeName}`
+                            : `Open stories for ${group.placeName}`
+                        }
+                        className="flex w-14 shrink-0 flex-col items-center gap-1"
+                      >
+                        <div
+                          className="rounded-full p-[2px]"
+                          style={{ background: tone.gradient }}
+                        >
+                          <ImageBox
+                            src={group.stories[0].mediaUrl}
+                            alt={group.placeName}
+                            className="h-12 w-12"
+                            rounded="rounded-full"
+                          />
+                        </div>
+                        <span className="block w-full truncate text-center text-[9px] font-bold text-hp-ink/80">
+                          {group.placeName}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </motion.div>
@@ -4566,7 +4653,7 @@ export function PulseApp() {
   const full = Math.round(safeMapAreaH * 0.85);
   const idlePeek = 92;
   const selectedPeek = 44;
-  const areaPreview = Math.min(full, Math.min(276, Math.max(248, Math.round(safeMapAreaH * 0.34))));
+  const areaPreview = Math.min(full, Math.min(268, Math.max(244, Math.round(safeMapAreaH * 0.33))));
   const placePreview = Math.min(
     full,
     Math.min(228, Math.max(210, Math.round(safeMapAreaH * 0.28))),
@@ -4583,6 +4670,23 @@ export function PulseApp() {
       setSheetH(idlePeek);
     }
   }, [hasMapFocus, idlePeek]);
+  // Whenever an area (no specific place) becomes the focus, open the sheet to
+  // its preview height. Edge-triggered and only bumps up, so it never fights a
+  // drag — it just guarantees the area card is visible no matter which entry
+  // point set the selection (map bubble, on-map chip, or the Explore panel).
+  const areaFocusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = areaFocusRef.current;
+    areaFocusRef.current = selectedAreaId;
+    if (
+      selectedAreaId &&
+      selectedAreaId !== previous &&
+      !selectedPlace &&
+      sheetH < areaPreview
+    ) {
+      setSheetH(areaPreview);
+    }
+  }, [selectedAreaId, selectedPlace, areaPreview, sheetH]);
 
   const sameMapSnapshot = (a: MapViewSnapshot, b: MapViewSnapshot) =>
     a.areaId === b.areaId && a.placeId === b.placeId;

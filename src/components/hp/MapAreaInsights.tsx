@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ChevronDown,
   ChevronRight,
@@ -15,11 +15,12 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { areaTier, clusterActivity, type AreaTier, type MapAreaCluster } from "./SocialMap";
 
-// Per-tier presentation. Labels/blurbs are English source keys — Greek comes
-// from the i18n dictionary, same pattern as the rest of the app.
-const TIER_META: Record<
+// Per-tier presentation, shared with the Map-tab area card in PulseApp so the
+// badge/blurb reads identically everywhere an area is selected. Labels/blurbs
+// are English source keys — Greek comes from the i18n dictionary.
+export const AREA_TIER_META: Record<
   AreaTier,
-  { label: string; blurb: string; Icon: LucideIcon; badge: string; dot: string; solid: string }
+  { label: string; blurb: string; Icon: LucideIcon; badge: string; dot: string }
 > = {
   hot: {
     label: "Hot",
@@ -27,7 +28,6 @@ const TIER_META: Record<
     Icon: Flame,
     badge: "bg-hp-sunset/15 text-hp-sunset",
     dot: "bg-hp-sunset",
-    solid: "bg-hp-sunset",
   },
   active: {
     label: "Active",
@@ -35,7 +35,6 @@ const TIER_META: Record<
     Icon: Zap,
     badge: "bg-hp-sea/25 text-hp-deep",
     dot: "bg-hp-deep",
-    solid: "bg-hp-deep",
   },
   calm: {
     label: "Calm",
@@ -43,7 +42,6 @@ const TIER_META: Record<
     Icon: Moon,
     badge: "bg-hp-ink/8 text-hp-muted",
     dot: "bg-hp-muted",
-    solid: "bg-hp-muted",
   },
 };
 
@@ -89,9 +87,12 @@ export function MapAreaInsights({ clusters, selectedCluster, onSelectArea, onDis
   }, []);
 
   // A selected area takes over the map — close the panel and show "Viewing X".
+  // `hasSelection` (a stable boolean) is the dep, not `selectedCluster` (the
+  // parent hands a fresh object every render).
+  const hasSelection = Boolean(selectedCluster);
   useEffect(() => {
-    if (selectedCluster) setPanelOpen(false);
-  }, [selectedCluster]);
+    if (hasSelection) setPanelOpen(false);
+  }, [hasSelection]);
 
   const ranked = useMemo(
     () => [...clusters].sort((a, b) => clusterActivity(b) - clusterActivity(a)),
@@ -167,7 +168,7 @@ export function MapAreaInsights({ clusters, selectedCluster, onSelectArea, onDis
   const MsgIcon = activeMsg ? INSIGHT_ICON[activeMsg.icon] : Flame;
 
   const selTier = selectedCluster ? areaTier(selectedCluster) : null;
-  const SelIcon = selTier ? TIER_META[selTier].Icon : Flame;
+  const SelIcon = selTier ? AREA_TIER_META[selTier].Icon : Flame;
 
   return (
     <>
@@ -184,7 +185,7 @@ export function MapAreaInsights({ clusters, selectedCluster, onSelectArea, onDis
               </span>
               <span className="block truncate text-[10px] text-hp-paper/60">
                 {t("{tier} · {count} recent signals", {
-                  tier: t(TIER_META[selTier].label),
+                  tier: t(AREA_TIER_META[selTier].label),
                   count: signalCount(selectedCluster),
                 })}
               </span>
@@ -258,107 +259,107 @@ export function MapAreaInsights({ clusters, selectedCluster, onSelectArea, onDis
         )}
       </div>
 
-      {/* ── Explore areas panel ── */}
-      <AnimatePresence>
-        {panelOpen && (
-          <>
-            <motion.div
-              className="absolute inset-0 z-40 bg-hp-ink/25"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setPanelOpen(false)}
-            />
-            <motion.div
-              className="absolute inset-x-0 bottom-0 top-16 z-40 flex flex-col overflow-hidden rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper shadow-[0_-16px_44px_rgba(23,20,17,0.26)]"
-              role="dialog"
-              aria-label={t("Explore areas near you")}
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={
-                reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 260, damping: 30 }
-              }
-            >
-              <div className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-hp-ink/15" />
-              <div className="flex shrink-0 items-start gap-2 border-b border-hp-ink/10 px-4 pb-3 pt-1.5">
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-[16px] font-black text-hp-ink">
-                    {t("Explore areas near you")}
-                  </h3>
-                  <p className="text-[10px] text-hp-muted">
-                    {t("Based on live activity and signals")}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPanelOpen(false)}
-                  aria-label={t("Close")}
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink transition active:scale-90"
-                >
-                  <X size={13} />
-                </button>
+      {/* ── Explore areas panel ──
+          Plain conditional render (no AnimatePresence). An exiting
+          AnimatePresence child in the same commit as the area selection makes
+          framer drop the map bottom-sheet's height animation, so the sheet
+          stays collapsed after picking an area here. Enter animation only. */}
+      {panelOpen && (
+        <>
+          <motion.div
+            className="absolute inset-0 z-40 bg-hp-ink/25"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setPanelOpen(false)}
+          />
+          <motion.div
+            className="absolute inset-x-0 bottom-0 top-16 z-40 flex flex-col overflow-hidden rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper shadow-[0_-16px_44px_rgba(23,20,17,0.26)]"
+            role="dialog"
+            aria-label={t("Explore areas near you")}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            transition={
+              reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 260, damping: 30 }
+            }
+          >
+            <div className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-hp-ink/15" />
+            <div className="flex shrink-0 items-start gap-2 border-b border-hp-ink/10 px-4 pb-3 pt-1.5">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[16px] font-black text-hp-ink">
+                  {t("Explore areas near you")}
+                </h3>
+                <p className="text-[10px] text-hp-muted">
+                  {t("Based on live activity and signals")}
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setPanelOpen(false)}
+                aria-label={t("Close")}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink transition active:scale-90"
+              >
+                <X size={13} />
+              </button>
+            </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-1">
-                {ranked.map((cluster) => {
-                  const tier = areaTier(cluster);
-                  const meta = TIER_META[tier];
-                  const BadgeIcon = meta.Icon;
-                  return (
-                    <button
-                      key={cluster.id}
-                      type="button"
-                      onClick={() => {
-                        onSelectArea(cluster);
-                        setPanelOpen(false);
-                      }}
-                      className="flex w-full items-center gap-3 border-t border-hp-ink/[0.06] px-1 py-2.5 text-left transition first:border-t-0 active:bg-hp-ink/[0.03]"
-                    >
-                      <span className="grid h-9 w-9 shrink-0 overflow-hidden rounded-full border border-hp-ink/10 bg-hp-ink/5">
-                        {cluster.leadPlace.imageUrl && (
-                          <img
-                            src={cluster.leadPlace.imageUrl}
-                            alt=""
-                            loading="lazy"
-                            className="h-full w-full object-cover"
-                          />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-1.5">
-                          <span className="truncate text-[13px] font-black text-hp-ink">
-                            {cluster.name}
-                          </span>
-                          <span
-                            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-[2px] text-[8.5px] font-black uppercase tracking-wide ${meta.badge}`}
-                          >
-                            <BadgeIcon size={9} />
-                            {t(meta.label)}
-                          </span>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-1">
+              {ranked.map((cluster) => {
+                const tier = areaTier(cluster);
+                const meta = AREA_TIER_META[tier];
+                const BadgeIcon = meta.Icon;
+                return (
+                  <button
+                    key={cluster.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectArea(cluster);
+                      setPanelOpen(false);
+                    }}
+                    className="flex w-full items-center gap-3 border-t border-hp-ink/[0.06] px-1 py-2.5 text-left transition first:border-t-0 active:bg-hp-ink/[0.03]"
+                  >
+                    <span className="grid h-9 w-9 shrink-0 overflow-hidden rounded-full border border-hp-ink/10 bg-hp-ink/5">
+                      {cluster.leadPlace.imageUrl && (
+                        <img
+                          src={cluster.leadPlace.imageUrl}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-[13px] font-black text-hp-ink">
+                          {cluster.name}
                         </span>
-                        <span className="mt-0.5 block truncate text-[10px] text-hp-muted">
-                          {t("{count} signals", { count: signalCount(cluster) })}
-                        </span>
-                        <span className="block truncate text-[10.5px] text-hp-ink/70">
-                          {t(meta.blurb)}
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-[2px] text-[8.5px] font-black uppercase tracking-wide ${meta.badge}`}
+                        >
+                          <BadgeIcon size={9} />
+                          {t(meta.label)}
                         </span>
                       </span>
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
-                    </button>
-                  );
-                })}
-              </div>
+                      <span className="mt-0.5 block truncate text-[10px] text-hp-muted">
+                        {t("{count} signals", { count: signalCount(cluster) })}
+                      </span>
+                      <span className="block truncate text-[10.5px] text-hp-ink/70">
+                        {t(meta.blurb)}
+                      </span>
+                    </span>
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
+                  </button>
+                );
+              })}
+            </div>
 
-              <div className="flex shrink-0 items-center gap-1.5 border-t border-hp-ink/10 px-4 py-3 text-[10.5px] text-hp-muted">
-                <Lightbulb size={13} className="shrink-0 text-hp-sunset" />
-                {t("Tap any area to focus the map there")}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            <div className="flex shrink-0 items-center gap-1.5 border-t border-hp-ink/10 px-4 py-3 text-[10.5px] text-hp-muted">
+              <Lightbulb size={13} className="shrink-0 text-hp-sunset" />
+              {t("Tap any area to focus the map there")}
+            </div>
+          </motion.div>
+        </>
+      )}
     </>
   );
 }

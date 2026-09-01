@@ -670,6 +670,12 @@ const EL: Record<string, string> = {
   "Viewing {area}": "Προβολή: {area}",
   "{tier} · {count} recent signals": "{tier} · {count} πρόσφατα σήματα",
   "Clear area focus": "Καθαρισμός εστίασης περιοχής",
+  // Map tab — unified area card
+  "View area": "Δες την περιοχή",
+  "{count} places": "{count} σημεία",
+  "Places in this area": "Σημεία σε αυτή την περιοχή",
+  Town: "Πόλη",
+  Nightlife: "Νυχτερινή ζωή",
 };
 
 function interpolate(message: string, params?: TranslationParams) {
