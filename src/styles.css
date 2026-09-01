@@ -322,9 +322,13 @@
   --hp-marker-tier-presence: var(--hp-presence-quiet, 1);
   --hp-marker-presence: min(var(--hp-marker-tier-presence), var(--hp-marker-presence-cap, 2));
   --hp-marker-interaction-scale: 1;
+  --hp-marker-lens-opacity-target: 1;
+  --hp-marker-lens-opacity: var(--hp-marker-lens-opacity-target);
+  --hp-marker-lens-scale-target: 1;
+  --hp-marker-lens-scale: var(--hp-marker-lens-scale-target);
   --hp-marker-render-scale: calc(
     var(--hp-marker-zoom-scale, 1) * var(--hp-marker-presence) *
-      var(--hp-marker-interaction-scale) * var(--hp-map-fill-scale, 1)
+      var(--hp-marker-interaction-scale) * var(--hp-marker-lens-scale) * var(--hp-map-fill-scale, 1)
   );
   --hp-marker-core-render-scale: calc(
     var(--hp-marker-render-scale) * var(--hp-theme-core-scale, 1)
@@ -348,9 +352,12 @@
   /* The entire enlarged core remains clickable; decorative descendants never
      intercept the map outside the core. The outer icon retains its 32/44px minimum. */
   pointer-events: inherit;
+  opacity: var(--hp-marker-lens-opacity);
   transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-render-scale));
   transform-origin: center;
-  transition: transform 80ms linear;
+  transition:
+    transform var(--hp-motion-state, 160ms) var(--hp-ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    opacity var(--hp-motion-state, 160ms) var(--hp-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
   will-change: auto;
 }
 
@@ -400,6 +407,8 @@
   --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.08));
   --hp-marker-core-opacity: 1;
   --hp-marker-interaction-scale: 1.1;
+  --hp-marker-lens-opacity: 1 !important;
+  --hp-marker-lens-scale: 1;
   transition-duration: 140ms;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform, opacity;
@@ -418,6 +427,7 @@
     :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
     --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
     --hp-marker-core-opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
+    --hp-marker-lens-opacity: max(0.9, var(--hp-marker-lens-opacity-target));
     --hp-marker-interaction-scale: 1.02;
     transition-duration: 110ms;
     transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -436,6 +446,7 @@
     :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
     --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
     --hp-marker-core-opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
+    --hp-marker-lens-opacity: max(0.9, var(--hp-marker-lens-opacity-target));
     --hp-marker-interaction-scale: 1.02;
     transition-duration: 70ms;
     transition-timing-function: linear;
@@ -465,6 +476,7 @@
   :is(.hp-area-marker__shell, .hp-child-marker__shell) {
   --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
   --hp-marker-core-opacity: max(0.94, var(--hp-map-surface-opacity, 1));
+  --hp-marker-lens-opacity: max(0.9, var(--hp-marker-lens-opacity-target));
   --hp-marker-interaction-scale: 1.02;
   transition-duration: 110ms;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -965,6 +977,7 @@
 
 .hp-app-shell .is-marker-dense:not(.is-selected) {
   --hp-marker-presence-cap: 1.08;
+  --hp-marker-lens-scale: clamp(0.98, var(--hp-marker-lens-scale-target), 1.02);
   --hp-wave-extent-cap: 1.6;
 }
 .hp-app-shell .is-marker-dense:not(.is-selected) .hp-marker-field {
@@ -1702,6 +1715,16 @@ select:focus-visible {
   color: var(--hp-paper);
 }
 
+.hp-discovery-lens-rail {
+  scrollbar-width: none;
+}
+
+.hp-discovery-lens.is-active,
+.hp-discovery-lens[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--hp-sunset) 68%, var(--hp-ink));
+  background: color-mix(in srgb, var(--hp-sunset) 88%, var(--hp-ink));
+}
+
 @media (hover: hover) {
   .hp-icon-button:not(:disabled):hover,
   .hp-chip:not(:disabled):hover {
@@ -2205,6 +2228,59 @@ select:focus-visible {
   display: grid;
   gap: 2px;
   overflow-wrap: anywhere;
+}
+
+.hp-discovery-empty-state {
+  gap: 0.35rem;
+}
+
+.hp-discovery-recommendation {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--hp-sunset) 28%, transparent);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--hp-sunset) 9%, var(--hp-paper));
+  color: var(--hp-ink);
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.25;
+  transition:
+    background-color var(--hp-motion-state) var(--hp-ease-standard),
+    border-color var(--hp-motion-state) var(--hp-ease-standard),
+    transform var(--hp-motion-press) var(--hp-ease-standard);
+}
+
+.hp-discovery-recommendation svg {
+  flex: none;
+  color: var(--hp-sunset);
+}
+
+.hp-discovery-empty-action {
+  width: fit-content;
+  border-radius: 9999px;
+  color: var(--hp-sunset);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .hp-discovery-recommendation:hover {
+    border-color: color-mix(in srgb, var(--hp-sunset) 42%, transparent);
+    background: color-mix(in srgb, var(--hp-sunset) 14%, var(--hp-paper));
+    transform: translateY(-1px);
+  }
+}
+
+:is(.hp-discovery-recommendation, .hp-discovery-empty-action):focus-visible {
+  outline: 2px solid var(--hp-paper);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--hp-sunset) 78%, transparent);
 }
 
 .hp-sheet-snap-button {

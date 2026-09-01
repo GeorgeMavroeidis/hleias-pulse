@@ -35,6 +35,21 @@ const EL: Record<string, string> = {
   Saved: "Αποθηκευμένα",
   "Tonight's pulse": "Ο παλμός της βραδιάς",
   "Tap a bubble to see what's happening.": "Πάτησε ένα σημείο για να δεις τι συμβαίνει.",
+  "Map discovery lenses": "Φίλτρα ανακάλυψης χάρτη",
+  Chill: "Χαλάρωση",
+  "Quiet here right now": "Ήσυχα εδώ αυτή τη στιγμή",
+  "Activity is rising near {area} · {distance} km":
+    "Η δραστηριότητα ανεβαίνει κοντά στο {area} · {distance} χλμ.",
+  "{area} is active now · {distance} km": "Το {area} είναι ενεργό τώρα · {distance} χλμ.",
+  "{area} is becoming more active · {distance} km":
+    "Το {area} γίνεται πιο ενεργό · {distance} χλμ.",
+  "No strong nearby signal yet. Try another lens or explore the map.":
+    "Δεν υπάρχει ακόμη ισχυρό κοντινό σήμα. Δοκίμασε άλλο φίλτρο ή εξερεύνησε τον χάρτη.",
+  "Clear lens": "Καθαρισμός φίλτρου",
+  "No matching places here": "Δεν βρέθηκαν σχετικά σημεία εδώ",
+  "Clear the search to see nearby activity again.":
+    "Καθάρισε την αναζήτηση για να δεις ξανά την κοντινή δραστηριότητα.",
+  "Clear search": "Καθαρισμός αναζήτησης",
   Calm: "Ήρεμη",
   Rising: "Ανοδική",
   Active: "Ενεργή",

@@ -83,6 +83,7 @@ import {
   getMapAreaIdForPlace,
   SocialMap,
   type MapAreaCluster,
+  type MapDiscoveryViewport,
 } from "./SocialMap";
 import { PlaceStoryRail } from "./PlaceStoryRail";
 import { PlaceStoryViewer } from "./PlaceStoryViewer";
@@ -106,6 +107,16 @@ import {
   type AreaIntelligenceSnapshot,
   type SignalQuality,
 } from "@/lib/hp/area-intelligence";
+import {
+  DISCOVERY_LENSES,
+  areaNeedsDiscoveryRecommendation,
+  deriveDiscoverySnapshot,
+  rankDiscoveryRecommendations,
+  viewportNeedsDiscoveryRecommendation,
+  type DiscoveryLens,
+  type DiscoveryRecommendation,
+  type DiscoverySnapshot,
+} from "@/lib/hp/discovery";
 import { type StreakState } from "@/lib/hp/meet-store";
 import {
   MEET_CATEGORIES,
@@ -153,6 +164,14 @@ const POSTING_IDENTITIES: { id: PostingIdentity; label: string; helper: string }
 ];
 const ROUTE_FILTERS = ["All", "Beach", "Nature", "Culture", "No car", "Free"] as const;
 type RouteFilter = (typeof ROUTE_FILTERS)[number];
+
+const DISCOVERY_LENS_LABEL: Record<DiscoveryLens, string> = {
+  chill: "Chill",
+  social: "Social",
+  music: "Music",
+  beach: "Beach",
+  food: "Food",
+};
 
 const TAB_ITEMS: { id: NavTab; label: string; Icon: LucideIcon }[] = [
   { id: "map", label: "Map", Icon: MapIcon },
@@ -624,12 +643,49 @@ function VibeChips({
   );
 }
 
+function DiscoveryLensRail({
+  active,
+  onChange,
+}: {
+  active: DiscoveryLens | null;
+  onChange: (lens: DiscoveryLens | null) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="hp-discovery-lens-rail hp-no-scrollbar hp-safe-px flex gap-2 overflow-x-auto border-b border-hp-ink/10 bg-hp-paper py-2"
+      role="group"
+      aria-label={t("Map discovery lenses")}
+    >
+      {DISCOVERY_LENSES.map((lens) => {
+        const selected = lens === active;
+        return (
+          <button
+            key={lens}
+            type="button"
+            onClick={() => onChange(selected ? null : lens)}
+            aria-pressed={selected}
+            className={`hp-chip hp-discovery-lens shrink-0 text-[12px] ${selected ? "is-active" : ""}`}
+          >
+            {t(DISCOVERY_LENS_LABEL[lens])}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ============== Map Bottom Sheet (snap states) ============== */
 type SheetDragHandlers = {
   onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+};
+
+type DiscoverySuggestion = {
+  recommendation: DiscoveryRecommendation;
+  cluster: MapAreaCluster;
 };
 
 function MapBottomSheet({
@@ -648,6 +704,13 @@ function MapBottomSheet({
   onSavePlace,
   onSharePlace,
   savedPlaceIds,
+  activeLens,
+  searchQuery,
+  showDiscoveryEmptyState,
+  discoverySuggestion,
+  onOpenDiscoverySuggestion,
+  onClearLens,
+  onClearSearch,
 }: {
   cluster: MapAreaCluster | null;
   selectedPlace: Place | null;
@@ -664,6 +727,13 @@ function MapBottomSheet({
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
   savedPlaceIds: string[];
+  activeLens: DiscoveryLens | null;
+  searchQuery: string;
+  showDiscoveryEmptyState: boolean;
+  discoverySuggestion: DiscoverySuggestion | null;
+  onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
+  onClearLens: () => void;
+  onClearSearch: () => void;
 }) {
   const { t } = useI18n();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
@@ -844,9 +914,22 @@ function MapBottomSheet({
                 onSavePlace={onSavePlace}
                 onSharePlace={onSharePlace}
                 onOpenDetails={onOpenDetails}
+                showDiscoveryEmptyState={showDiscoveryEmptyState}
+                discoverySuggestion={discoverySuggestion}
+                onOpenDiscoverySuggestion={onOpenDiscoverySuggestion}
+                activeLens={activeLens}
+                onClearLens={onClearLens}
               />
             ) : (
-              <TonightPulseContent />
+              <TonightPulseContent
+                searchQuery={searchQuery}
+                activeLens={activeLens}
+                showDiscoveryEmptyState={showDiscoveryEmptyState}
+                discoverySuggestion={discoverySuggestion}
+                onOpenDiscoverySuggestion={onOpenDiscoverySuggestion}
+                onClearLens={onClearLens}
+                onClearSearch={onClearSearch}
+              />
             )}
           </motion.div>
         )}
@@ -855,12 +938,108 @@ function MapBottomSheet({
   );
 }
 
-function TonightPulseContent() {
+function TonightPulseContent({
+  searchQuery,
+  activeLens,
+  showDiscoveryEmptyState,
+  discoverySuggestion,
+  onOpenDiscoverySuggestion,
+  onClearLens,
+  onClearSearch,
+}: {
+  searchQuery: string;
+  activeLens: DiscoveryLens | null;
+  showDiscoveryEmptyState: boolean;
+  discoverySuggestion: DiscoverySuggestion | null;
+  onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
+  onClearLens: () => void;
+  onClearSearch: () => void;
+}) {
   const { t } = useI18n();
+  if (searchQuery.trim()) {
+    return (
+      <div className="hp-map-sheet__idle-copy hp-discovery-empty-state">
+        <h3 className="text-[16px] font-black text-hp-ink">{t("No matching places here")}</h3>
+        <p className="text-[12px] text-hp-muted">
+          {t("Clear the search to see nearby activity again.")}
+        </p>
+        <button type="button" onClick={onClearSearch} className="hp-discovery-empty-action">
+          {t("Clear search")}
+        </button>
+      </div>
+    );
+  }
+
+  if (showDiscoveryEmptyState) {
+    return (
+      <DiscoveryEmptyState
+        activeLens={activeLens}
+        suggestion={discoverySuggestion}
+        onOpenSuggestion={onOpenDiscoverySuggestion}
+        onClearLens={onClearLens}
+      />
+    );
+  }
   return (
     <div className="hp-map-sheet__idle-copy">
       <h3 className="text-[16px] font-black text-hp-ink">{t("Tonight's pulse")}</h3>
       <p className="text-[12px] text-hp-muted">{t("Tap a bubble to see what's happening.")}</p>
+    </div>
+  );
+}
+
+function DiscoveryEmptyState({
+  activeLens,
+  suggestion,
+  onOpenSuggestion,
+  onClearLens,
+}: {
+  activeLens: DiscoveryLens | null;
+  suggestion: DiscoverySuggestion | null;
+  onOpenSuggestion: (cluster: MapAreaCluster) => void;
+  onClearLens: () => void;
+}) {
+  const { t } = useI18n();
+  const reason = suggestion?.recommendation.reason;
+  const message = suggestion
+    ? reason === "emerging" || reason === "rising"
+      ? t("Activity is rising near {area} · {distance} km", {
+          area: suggestion.cluster.name,
+          distance: Math.max(1, Math.round(suggestion.recommendation.distanceKm)),
+        })
+      : reason === "hot"
+        ? t("{area} is active now · {distance} km", {
+            area: suggestion.cluster.name,
+            distance: Math.max(1, Math.round(suggestion.recommendation.distanceKm)),
+          })
+        : t("{area} is becoming more active · {distance} km", {
+            area: suggestion.cluster.name,
+            distance: Math.max(1, Math.round(suggestion.recommendation.distanceKm)),
+          })
+    : null;
+
+  return (
+    <div className="hp-map-sheet__idle-copy hp-discovery-empty-state">
+      <h3 className="text-[16px] font-black text-hp-ink">{t("Quiet here right now")}</h3>
+      {message ? (
+        <button
+          type="button"
+          onClick={() => suggestion && onOpenSuggestion(suggestion.cluster)}
+          className="hp-discovery-recommendation"
+        >
+          <MapPin size={15} aria-hidden="true" />
+          <span>{message}</span>
+        </button>
+      ) : (
+        <p className="text-[12px] text-hp-muted">
+          {t("No strong nearby signal yet. Try another lens or explore the map.")}
+        </p>
+      )}
+      {activeLens && (
+        <button type="button" onClick={onClearLens} className="hp-discovery-empty-action">
+          {t("Clear lens")}
+        </button>
+      )}
     </div>
   );
 }
@@ -876,6 +1055,11 @@ function AreaSheetContent({
   onSavePlace,
   onSharePlace,
   onOpenDetails,
+  showDiscoveryEmptyState,
+  discoverySuggestion,
+  onOpenDiscoverySuggestion,
+  activeLens,
+  onClearLens,
 }: {
   cluster: MapAreaCluster;
   selectedPlace: Place | null;
@@ -887,6 +1071,11 @@ function AreaSheetContent({
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
   onOpenDetails: (p: Place) => void;
+  showDiscoveryEmptyState: boolean;
+  discoverySuggestion: DiscoverySuggestion | null;
+  onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
+  activeLens: DiscoveryLens | null;
+  onClearLens: () => void;
 }) {
   const { language, t } = useI18n();
   const placeIds = new Set(cluster.places.map((place) => place.id));
@@ -931,6 +1120,16 @@ function AreaSheetContent({
                     {t("Emerging")}
                   </span>
                 )}
+              </div>
+            )}
+            {showDiscoveryEmptyState && (
+              <div className="mt-2">
+                <DiscoveryEmptyState
+                  activeLens={activeLens}
+                  suggestion={discoverySuggestion}
+                  onOpenSuggestion={onOpenDiscoverySuggestion}
+                  onClearLens={onClearLens}
+                />
               </div>
             )}
             <p className="text-[11px] text-hp-muted">
@@ -4007,6 +4206,10 @@ export function PulseApp() {
   const [openPost, setOpenPost] = useState<Post | null>(null);
   const [openRoute, setOpenRoute] = useState<RouteItem | null>(null);
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
+  const [activeLens, setActiveLens] = useState<DiscoveryLens | null>(null);
+  const [mapDiscoveryViewport, setMapDiscoveryViewport] = useState<MapDiscoveryViewport | null>(
+    null,
+  );
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -4517,6 +4720,10 @@ export function PulseApp() {
   }, []);
 
   const allPosts = useMemo(() => [...userPosts, ...posts], [posts, userPosts]);
+  const discoverySnapshot = useMemo<DiscoverySnapshot>(
+    () => deriveDiscoverySnapshot({ ...pulseData, posts: allPosts }),
+    [allPosts, pulseData],
+  );
   const savedPostIds = useMemo(
     () =>
       Object.entries(savedPosts)
@@ -5088,27 +5295,83 @@ export function PulseApp() {
       ),
     [activeVibe, places, query],
   );
+  const mapPlaces = useMemo(
+    () => places.filter((place) => matchesPlaceQuery(place, query)),
+    [places, query],
+  );
   const trendingPlace = useMemo(() => {
     const [first] = [...filteredPlaces].sort((a, b) => b.hotness - a.hotness);
     return first ?? null;
   }, [filteredPlaces]);
   const mapClusters = useMemo(
-    () => buildAreaClusters(filteredPlaces, events, activitySnapshot, areaIntelligence),
-    [activitySnapshot, areaIntelligence, events, filteredPlaces],
+    () => buildAreaClusters(mapPlaces, events, activitySnapshot, areaIntelligence),
+    [activitySnapshot, areaIntelligence, events, mapPlaces],
   );
-  const filteredPlaceIdSet = useMemo(
-    () => new Set(filteredPlaces.map((place) => place.id)),
-    [filteredPlaces],
-  );
+  const mapPlaceIdSet = useMemo(() => new Set(mapPlaces.map((place) => place.id)), [mapPlaces]);
   const mapAreaIdSet = useMemo(
     () => new Set(mapClusters.map((cluster) => cluster.id)),
     [mapClusters],
   );
-  validMapPlaceIdsRef.current = filteredPlaceIdSet;
+  validMapPlaceIdsRef.current = mapPlaceIdSet;
   validMapAreaIdsRef.current = mapAreaIdSet;
   const selectedCluster = selectedAreaId
     ? (mapClusters.find((cluster) => cluster.id === selectedAreaId) ?? null)
     : null;
+  const selectedAreaNeedsRecommendation = Boolean(
+    selectedCluster &&
+    !selectedPlace &&
+    areaNeedsDiscoveryRecommendation(
+      selectedCluster.intelligence,
+      discoverySnapshot.areas[selectedCluster.id],
+      activeLens,
+    ),
+  );
+  const viewportNeedsRecommendation = Boolean(
+    !selectedCluster &&
+    mapDiscoveryViewport &&
+    viewportNeedsDiscoveryRecommendation(
+      mapDiscoveryViewport.visibleAreaIds,
+      activeLens,
+      discoverySnapshot,
+      areaIntelligence,
+    ),
+  );
+  const showDiscoveryEmptyState =
+    !query.trim() && (selectedAreaNeedsRecommendation || viewportNeedsRecommendation);
+  const discoverySuggestion = useMemo<DiscoverySuggestion | null>(() => {
+    if (!showDiscoveryEmptyState) return null;
+    const origin = selectedCluster
+      ? { lat: selectedCluster.lat, lng: selectedCluster.lng }
+      : mapDiscoveryViewport?.center;
+    if (!origin) return null;
+
+    const visibleAreas = new Set(mapDiscoveryViewport?.visibleAreaIds ?? []);
+    const candidateClusters = mapClusters.filter(
+      (cluster) => selectedCluster || !visibleAreas.has(cluster.id),
+    );
+    const [recommendation] = rankDiscoveryRecommendations(
+      candidateClusters.map((cluster) => ({
+        areaId: cluster.id,
+        lat: cluster.lat,
+        lng: cluster.lng,
+        intelligence: cluster.intelligence,
+      })),
+      origin,
+      activeLens,
+      discoverySnapshot,
+      { excludeAreaId: selectedCluster?.id ?? null },
+    );
+    if (!recommendation) return null;
+    const cluster = mapClusters.find((item) => item.id === recommendation.areaId);
+    return cluster ? { recommendation, cluster } : null;
+  }, [
+    activeLens,
+    discoverySnapshot,
+    mapClusters,
+    mapDiscoveryViewport,
+    selectedCluster,
+    showDiscoveryEmptyState,
+  ]);
   const availableMapHeight = Math.max(0, safeMapAreaH - sheetH);
   const utilityRailHidden = availableMapHeight < 248;
 
@@ -5117,12 +5380,12 @@ export function PulseApp() {
       const valid = stack.filter(
         (snapshot) =>
           (!snapshot.areaId || mapAreaIdSet.has(snapshot.areaId)) &&
-          (!snapshot.placeId || filteredPlaceIdSet.has(snapshot.placeId)),
+          (!snapshot.placeId || mapPlaceIdSet.has(snapshot.placeId)),
       );
       return valid.length === stack.length ? stack : valid;
     });
 
-    const selectedPlaceHidden = Boolean(selectedPlace && !filteredPlaceIdSet.has(selectedPlace.id));
+    const selectedPlaceHidden = Boolean(selectedPlace && !mapPlaceIdSet.has(selectedPlace.id));
     const selectedAreaHidden = Boolean(selectedAreaId && !mapAreaIdSet.has(selectedAreaId));
     if (!selectedPlaceHidden && !selectedAreaHidden) return;
 
@@ -5130,7 +5393,7 @@ export function PulseApp() {
     setSelectedAreaId(null);
     setSelectedPlace(null);
     setSheetH(idlePeek);
-  }, [filteredPlaceIdSet, idlePeek, mapAreaIdSet, selectedAreaId, selectedPlace]);
+  }, [idlePeek, mapAreaIdSet, mapPlaceIdSet, selectedAreaId, selectedPlace]);
 
   const filteredPosts = allPosts.filter((post) => {
     const place = findPlace(post.placeId);
@@ -5169,7 +5432,10 @@ export function PulseApp() {
             activitySnapshot={activitySnapshot}
             selectedAreaId={selectedAreaId}
             selectedPlaceId={sel?.id ?? null}
-            activeFilterLabel={activeVibe}
+            activeFilterLabel={activeLens ? t(DISCOVERY_LENS_LABEL[activeLens]) : null}
+            activeLens={activeLens}
+            discoverySnapshot={discoverySnapshot}
+            onDiscoveryViewportChange={setMapDiscoveryViewport}
             storyPlaceIds={storyPlaceIds}
             onSelectArea={selectAreaPreview}
             onSelectPlace={selectMapPlacePreview}
@@ -5213,6 +5479,13 @@ export function PulseApp() {
             onSavePlace={toggleSave}
             onSharePlace={sharePlace}
             savedPlaceIds={savedIds}
+            activeLens={activeLens}
+            searchQuery={mapClusters.length === 0 ? query : ""}
+            showDiscoveryEmptyState={showDiscoveryEmptyState}
+            discoverySuggestion={discoverySuggestion}
+            onOpenDiscoverySuggestion={selectAreaPreview}
+            onClearLens={() => setActiveLens(null)}
+            onClearSearch={() => setQuery("")}
           />
         </div>
       );
@@ -5337,7 +5610,11 @@ export function PulseApp() {
             onOpenAccount={() => setProfileOpen(true)}
             onOpenAuth={() => setAuthOpen(true)}
           />
-          <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
+          {tab === "map" ? (
+            <DiscoveryLensRail active={activeLens} onChange={setActiveLens} />
+          ) : (
+            <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
+          )}
 
           <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
             {dataStatus !== "ready" && (

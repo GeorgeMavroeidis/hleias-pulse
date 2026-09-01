@@ -141,7 +141,12 @@ assert.ok(
 );
 const signature = mapSource.match(/const sig = \[([\s\S]*?)\]\.join\("\|"\)/)?.[1];
 assert.ok(signature);
-assert.ok(!/selected|theme/i.test(signature), "Selection/theme must not rebuild image content");
+assert.ok(
+  !/selected|theme|lens|prominence/i.test(signature),
+  "Selection/theme/lens prominence must not rebuild image content",
+);
+assert.ok(mapSource.includes('"--hp-marker-lens-opacity-target"'));
+assert.ok(mapSource.includes('"--hp-marker-lens-scale-target"'));
 for (const layer of ["beacon", "sweep", "core", "core-beat"]) {
   const idle = markerKeyframes.find(([, name]) => name === `hp-marker-signal-${layer}`)?.[2];
   const selected = markerKeyframes.find(
