@@ -5,6 +5,18 @@ import "leaflet/dist/leaflet.css";
 import { type EventItem, type Place } from "@/lib/hp-model";
 import { useImageUrls } from "@/lib/hp/image-cache";
 import {
+  areaDefinitionForId,
+  areaIdForPlace,
+  groupPlacesByArea,
+  toneForPlace,
+  type AreaTone,
+} from "@/lib/hp/area-catalog";
+import {
+  getAreaIntelligence,
+  type AreaIntelligence,
+  type AreaIntelligenceSnapshot,
+} from "@/lib/hp/area-intelligence";
+import {
   aggregatePulseMetrics,
   pulseMetricForPlace,
   type PulseActivitySnapshot,
@@ -121,18 +133,7 @@ function pointIsInSafeRect(point: { x: number; y: number }, rect: SafeMapRect) {
   );
 }
 
-type AreaTone = "beach" | "culture" | "local" | "music" | "nature" | "village";
 type AreaStatus = PulseTier;
-
-type AreaDef = {
-  id: string;
-  name: string;
-  title: string;
-  tone: AreaTone;
-  /** Explicit, geographically-tight membership. Areas are real neighbourhoods,
-   * assembled from actual coordinates — not fuzzy string matching. */
-  placeIds: string[];
-};
 
 export type MapAreaCluster = {
   id: string;
@@ -151,6 +152,7 @@ export type MapAreaCluster = {
   commentCount: number;
   hotness: number;
   activityScore: number;
+  intelligence: AreaIntelligence | null;
   labelOffsetPx: number;
   avatars: string[];
 };
@@ -213,154 +215,6 @@ type ActivityClusterProperties = {
   commentCount: number;
   hotness: number;
 };
-
-// Curated from a proximity analysis of every place's real lat/lng
-// (scripts/hp-seed-data.ts). Each area is a genuine neighbourhood (max spread
-// ~6km) so clicking it can always frame its pins close & separated. Isolated
-// places are intentionally left out — they render as standalone pins, not
-// force-fit into a faraway bubble.
-const AREA_DEFS: AreaDef[] = [
-  {
-    id: "olympia",
-    name: "Ancient Olympia",
-    title: "Olympia pulse",
-    tone: "culture",
-    placeIds: ["ancient-olympia", "olympia-stadium", "olympia-museum", "olympic-games-museum"],
-  },
-  {
-    id: "ancient-elis",
-    name: "Ancient Elis",
-    title: "Ancient Elis",
-    tone: "culture",
-    placeIds: ["ancient-elis", "elis-agora"],
-  },
-  {
-    id: "katakolo",
-    name: "Katakolo",
-    title: "Katakolo sunset",
-    tone: "beach",
-    placeIds: [
-      "katakolo-port",
-      "katakolo-sunset",
-      "katakolo-kiani-akti",
-      "agios-andreas",
-      "lechaina-zacharo-flower",
-    ],
-  },
-  {
-    id: "skafidia",
-    name: "Skafidia",
-    title: "Skafidia coast",
-    tone: "beach",
-    placeIds: ["skafidia", "skafidia-monastery", "korakochori", "mercouri-estate"],
-  },
-  {
-    id: "kourouta",
-    name: "Kourouta",
-    title: "Kourouta tonight",
-    tone: "music",
-    placeIds: ["kourouta-beach", "kourouta-sunset", "palouki-beach", "amaliada-square"],
-  },
-  {
-    id: "kyllini",
-    name: "Kyllini",
-    title: "Kyllini harbor",
-    tone: "beach",
-    placeIds: ["kyllini-beach", "kyllini-harbor", "kyllini-old-beach"],
-  },
-  {
-    id: "chlemoutsi",
-    name: "Chlemoutsi",
-    title: "Chlemoutsi & Arkoudi",
-    tone: "culture",
-    placeIds: ["chlemoutsi", "chlemoutsi-sea-view", "loutra-kyllinis", "arkoudi-beach"],
-  },
-  {
-    id: "pyrgos",
-    name: "Pyrgos",
-    title: "Pyrgos is moving",
-    tone: "local",
-    placeIds: ["pyrgos-centre", "pyrgos-night"],
-  },
-  {
-    id: "pineios",
-    name: "Pineios",
-    title: "Pineios plain",
-    tone: "local",
-    placeIds: ["vartholomio", "gastouni"],
-  },
-  {
-    id: "zacharo",
-    name: "Zacharo",
-    title: "Zacharo sunset",
-    tone: "beach",
-    placeIds: ["zacharo-beach", "kaiafas-lake", "kaiafas-sunset"],
-  },
-  {
-    id: "kakovatos",
-    name: "Kakovatos",
-    title: "Kakovatos",
-    tone: "beach",
-    placeIds: ["kakovatos-beach", "kakovatos-inland"],
-  },
-  {
-    id: "south-coast",
-    name: "South Coast",
-    title: "South Coast pulse",
-    tone: "beach",
-    placeIds: ["giannitsochori", "tholo-beach"],
-  },
-  {
-    id: "foloi",
-    name: "Foloi Forest",
-    title: "Foloi tips",
-    tone: "nature",
-    placeIds: ["foloi-forest", "foloi-deep"],
-  },
-  {
-    id: "nemouta",
-    name: "Nemouta",
-    title: "Nemouta waterfalls",
-    tone: "nature",
-    placeIds: ["nemouta-waterfalls", "nemouta-village"],
-  },
-  {
-    id: "andritsaina",
-    name: "Andritsaina",
-    title: "Andritsaina village",
-    tone: "village",
-    placeIds: ["andritsaina", "andritsaina-streets"],
-  },
-  {
-    id: "bassae",
-    name: "Bassae",
-    title: "Temple of Bassae",
-    tone: "culture",
-    placeIds: ["bassae-temple", "bassae-inside"],
-  },
-];
-
-const PLACE_AREA_ID: Map<string, string> = new Map(
-  AREA_DEFS.flatMap((def) => def.placeIds.map((id) => [id, def.id] as const)),
-);
-
-function areaIdForPlace(place: Place): string {
-  // Known place -> its curated neighbourhood; otherwise a standalone area
-  // (renders as a lone pin, no bubble).
-  return PLACE_AREA_ID.get(place.id) ?? `solo-${place.id}`;
-}
-
-function areaDefForId(id: string): AreaDef | null {
-  return AREA_DEFS.find((def) => def.id === id) ?? null;
-}
-
-function toneForPlace(place: Place): AreaTone {
-  if (place.type === "beach" || place.type === "sunset") return "beach";
-  if (place.type === "culture") return "culture";
-  if (place.type === "nature") return "nature";
-  if (place.type === "village" || place.type === "night") return "village";
-  return "local";
-}
 
 function clusterIdForPlace(place: Place) {
   return areaIdForPlace(place);
@@ -449,22 +303,17 @@ export function buildAreaClusters(
   places: Place[],
   events: EventItem[],
   activitySnapshot: PulseActivitySnapshot = {},
+  intelligenceSnapshot: AreaIntelligenceSnapshot = {},
 ): MapAreaCluster[] {
   const eventCounts = eventCountForPlace(events);
 
   // Group by curated neighbourhood; places not in any def become standalone
   // single-pin "areas" (id `solo-<placeId>`) so they still render on the map.
-  const grouped = new Map<string, Place[]>();
-  places.forEach((place) => {
-    const id = areaIdForPlace(place);
-    const arr = grouped.get(id);
-    if (arr) arr.push(place);
-    else grouped.set(id, [place]);
-  });
+  const grouped = groupPlacesByArea(places);
 
   return [...grouped.entries()]
     .map(([id, areaPlaces]) => {
-      const def = areaDefForId(id);
+      const def = areaDefinitionForId(id);
       const sortedPlaces = [...areaPlaces].sort(
         (a, b) =>
           scorePlace(b, activitySnapshot, eventCounts.get(b.id) ?? 0) -
@@ -497,6 +346,7 @@ export function buildAreaClusters(
         commentCount: activity.commentCount,
         hotness,
         activityScore: activity.score,
+        intelligence: getAreaIntelligence(intelligenceSnapshot, id),
         labelOffsetPx: 0,
         avatars: uniqueAvatars(sortedPlaces).slice(0, 3),
       };
@@ -1821,6 +1671,19 @@ export function SocialMap({
       if (needsRebuild) markerSigRef.current.set(node.id, sig);
 
       const previousRuntime = markerRuntimeRef.current.get(node.id);
+      if (node.kind === "cluster") {
+        const shell = marker.getElement()?.querySelector<HTMLElement>(".hp-area-marker__shell");
+        const intelligence = node.cluster.intelligence;
+        if (shell && intelligence) {
+          shell.dataset.areaState = intelligence.state;
+          shell.dataset.signalQuality = intelligence.signalQuality;
+          shell.dataset.emerging = intelligence.emerging ? "true" : "false";
+        } else if (shell) {
+          delete shell.dataset.areaState;
+          delete shell.dataset.signalQuality;
+          delete shell.dataset.emerging;
+        }
+      }
       const isPassiveAreaAnchor =
         node.kind !== "child" && node.selected && placeOpacityForZoom(zoom) > 0.08;
       const visuallyVisible = node.opacity > 0.08;
