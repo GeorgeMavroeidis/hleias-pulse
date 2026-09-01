@@ -367,10 +367,25 @@ function bubbleSize(activity: number, statusBump: boolean, selected: boolean) {
   return Math.round(raw * (selected ? 1.06 : 1));
 }
 
-function clusterActivity(cluster: MapAreaCluster) {
+export function clusterActivity(cluster: MapAreaCluster) {
   const avgPosts = cluster.postCount / Math.max(cluster.places.length, 1);
   const liveSignal = cluster.eventCount > 0 || cluster.status === "live";
   return activityScore(cluster.hotness, avgPosts, liveSignal);
+}
+
+// Three display tiers for the "Explore areas" panel + smart-insight banner,
+// bucketed from the same 0..1 live-activity proxy that drives the bubbles.
+// The cuts sit a touch above the per-place bubbleTier cuts (0.45 / 0.65):
+// area scores are built from averages so they compress toward the middle.
+// Deliberately tunable — revisit after real usage.
+export type AreaTier = "hot" | "active" | "calm";
+
+export function areaTier(cluster: MapAreaCluster): AreaTier {
+  if (cluster.status === "live") return "hot";
+  const activity = clusterActivity(cluster);
+  if (activity >= 0.7) return "hot";
+  if (activity >= 0.48) return "active";
+  return "calm";
 }
 
 function clusterSize(cluster: MapAreaCluster, selected: boolean, compact: boolean) {
@@ -801,6 +816,10 @@ export function SocialMap({
   onMapLongPressRef.current = onMapLongPress;
   const didInitialFitRef = useRef(false);
   const lastMarkerActivationRef = useRef<{ id: string; at: number } | null>(null);
+  // Timestamp of the last explicit fly/fit call, so a selection that arrives
+  // from outside the map (Explore areas panel, deep link) can frame its area
+  // without double-animating when a marker/chip tap already did.
+  const lastProgrammaticFocusRef = useRef(0);
   const previousSelectionRef = useRef<{ areaId: string | null; placeId: string | null }>({
     areaId: null,
     placeId: null,
@@ -1007,6 +1026,7 @@ export function SocialMap({
       const L = leafletRef.current;
       const map = mapRef.current;
       if (!L || !map) return;
+      lastProgrammaticFocusRef.current = Date.now();
 
       const places = cluster.childPlaces;
       const bottomPadding = Math.min(430, Math.max(190, areaFocusBottomPadding));
@@ -1051,6 +1071,7 @@ export function SocialMap({
     (node: ActivityClusterRenderNode) => {
       const map = mapRef.current;
       if (!map) return;
+      lastProgrammaticFocusRef.current = Date.now();
 
       const expansionZoom = placeClusterIndex.getClusterExpansionZoom(node.clusterId);
       const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(map.getZoom() + 0.75, expansionZoom));
@@ -1076,6 +1097,17 @@ export function SocialMap({
     if (previous.placeId && !next.placeId && next.areaId) {
       const cluster = clusters.find((item) => item.id === next.areaId);
       if (cluster) zoomIntoCluster(cluster);
+      return;
+    }
+
+    // Area picked from outside the map (Explore areas panel, deep link) while
+    // nothing was focused — frame it. Skipped when an explicit zoom just ran,
+    // so a marker or chip tap doesn't animate there twice.
+    if (!previous.areaId && !previous.placeId && next.areaId && !next.placeId) {
+      if (Date.now() - lastProgrammaticFocusRef.current > 600) {
+        const cluster = clusters.find((item) => item.id === next.areaId);
+        if (cluster) zoomIntoCluster(cluster);
+      }
       return;
     }
 
