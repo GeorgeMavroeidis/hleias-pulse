@@ -1248,6 +1248,88 @@ h3 {
   }
 }
 
+/* ── PlaceDetailModal stats: typography-led byline (no tiles) ────────────
+   An activity byline (number in ink, rest muted, "·" separators) over a
+   no-box descriptor row, then a single "Best for" line. Monochrome only --
+   ink for values, muted for labels/icons. No new tokens. */
+.hp-pd-stats {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--hp-border);
+}
+.hp-pd-byline {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.75;
+  color: var(--hp-muted);
+}
+.hp-pd-byline b {
+  font-weight: 700;
+  color: var(--hp-ink);
+  font-variant-numeric: tabular-nums;
+}
+.hp-pd-byline svg {
+  display: inline;
+  width: 10px;
+  height: 10px;
+  margin-right: 0.22rem;
+  vertical-align: -0.09em;
+  opacity: 0.7;
+}
+.hp-pd-byline .hp-pd-sep {
+  margin: 0 0.4rem;
+  opacity: 0.35;
+}
+.hp-pd-desc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.15rem;
+  margin-top: 0.7rem;
+  font-size: 0.7rem;
+  color: var(--hp-muted);
+}
+.hp-pd-desc > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+.hp-pd-desc svg {
+  width: 11px;
+  height: 11px;
+  align-self: center;
+  opacity: 0.7;
+}
+.hp-pd-desc b {
+  font-weight: 600;
+  color: var(--hp-ink);
+}
+.hp-pd-bestfor {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin-top: 0.8rem;
+  font-size: 0.8rem;
+}
+.hp-pd-bestfor > i {
+  flex: none;
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hp-muted);
+}
+.hp-pd-bestfor > span {
+  font-weight: 600;
+  color: var(--hp-ink);
+  line-height: 1.4;
+}
+.hp-pd-rule {
+  margin-top: 1rem;
+  height: 1px;
+  background: var(--hp-border);
+}
+
 /* ── Premium deal coupon (DealsScreen / DealCard) ────────────────────────
    An editorial, "printed" coupon: photo, then a perforation row (dashed
    rule + notch cut-outs in the sheet colour), then the body. A wax-stamp

@@ -36,6 +36,7 @@ import {
   Store,
   Phone,
   Globe,
+  Users,
   UtensilsCrossed,
   BadgeCheck,
   Gift,
@@ -2069,6 +2070,15 @@ function PlaceDetailModal({
   const { language, t } = useI18n();
   const eventCount = place ? events.filter((event) => event.placeId === place.id).length : 0;
   const noteCount = place ? place.commentCount + comments.length : 0;
+  const hasBusinessDetail = Boolean(
+    businessProfile &&
+    ((businessProfile.dealActive && businessProfile.dealText) ||
+      businessProfile.hoursText ||
+      businessProfile.phone ||
+      businessProfile.websiteUrl ||
+      businessProfile.menuUrl ||
+      businessProfile.photos.length > 0),
+  );
   const placeStories = place
     ? (storyGroups.find((group) => group.placeId === place.id)?.stories ?? [])
     : [];
@@ -2181,20 +2191,17 @@ function PlaceDetailModal({
                   </span>
                 ))}
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <Stat label="posts today" value={String(place.recentPostCount)} />
-                <Stat label="events tonight" value={String(eventCount)} />
-                <Stat label="crowd" value={place.crowd} />
-                <Stat label="budget" value={place.budget} />
-                <Stat label="best time" value={place.bestTime} />
-                <Stat label="local notes" value={String(noteCount)} />
-              </div>
-              <div className="mt-4 rounded-2xl border border-hp-ink/10 bg-white/60 p-3">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                  Best for
-                </div>
-                <div className="mt-1 text-[13px] font-semibold text-hp-ink">{place.mood}</div>
-              </div>
+              <PlaceStats
+                postsToday={place.recentPostCount}
+                eventsTonight={eventCount}
+                notes={noteCount}
+                crowd={place.crowd}
+                budget={place.budget}
+                bestTime={place.bestTime}
+                mood={place.mood}
+              />
+
+              {hasBusinessDetail && <div className="hp-pd-rule" />}
 
               {businessProfile?.dealActive && businessProfile.dealText && (
                 <div className="hp-card-lift mt-4 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3">
@@ -2450,12 +2457,121 @@ function PlaceDetailModal({
     </AnimatePresence>
   );
 }
-function Stat({ label, value }: { label: string; value: string }) {
+// Typography-led place stats: an activity byline (only non-zero counts, joined
+// with "·") over a no-box descriptor row, then a single "Best for" line. No
+// tiles, no colour -- ink for the values, muted for everything else.
+function PlaceStats({
+  postsToday,
+  eventsTonight,
+  notes,
+  crowd,
+  budget,
+  bestTime,
+  mood,
+}: {
+  postsToday: number;
+  eventsTonight: number;
+  notes: number;
+  crowd: string;
+  budget: string;
+  bestTime: string;
+  mood: string;
+}) {
+  const { t } = useI18n();
+
+  const clauses: ReactNode[] = [];
+  if (postsToday > 0) {
+    clauses.push(
+      <span key="posts">
+        <MessageCircle strokeWidth={2.2} />
+        <b>{postsToday}</b> {t("posts today")}
+      </span>,
+    );
+  }
+  if (eventsTonight > 0) {
+    clauses.push(
+      <span key="events">
+        <CalendarHeart strokeWidth={2.2} />
+        <b>{eventsTonight}</b> {t("events tonight")}
+      </span>,
+    );
+  }
+  if (notes > 0) {
+    clauses.push(
+      <span key="notes">
+        <ListChecks strokeWidth={2.2} />
+        <b>{notes}</b> {t("local notes")}
+      </span>,
+    );
+  }
+
+  const descriptors: { key: string; icon: ReactNode; label: string; value: string }[] = [];
+  if (crowd.trim()) {
+    descriptors.push({
+      key: "crowd",
+      icon: <Users strokeWidth={2.2} />,
+      label: t("Crowd"),
+      value: t(crowd.trim()),
+    });
+  }
+  if (budget.trim()) {
+    descriptors.push({
+      key: "budget",
+      icon: <Wallet strokeWidth={2.2} />,
+      label: t("Budget"),
+      value: /^free$/i.test(budget.trim()) ? t("Free") : budget.trim(),
+    });
+  }
+  if (bestTime.trim()) {
+    descriptors.push({
+      key: "bestTime",
+      icon: <Clock strokeWidth={2.2} />,
+      label: t("Best time"),
+      value: bestTime.trim(),
+    });
+  }
+
+  const moodText = mood.trim();
+  const hasStats = clauses.length > 0 || descriptors.length > 0;
+  if (!hasStats && !moodText) return null;
+
   return (
-    <div className="rounded-2xl border border-hp-ink/10 bg-white/60 p-3">
-      <div className="text-[9px] font-bold uppercase tracking-wider text-hp-muted">{label}</div>
-      <div className="mt-1 text-[14px] font-bold text-hp-ink">{value}</div>
-    </div>
+    <>
+      {hasStats && (
+        <div className="hp-pd-stats">
+          <p className="hp-pd-byline">
+            {clauses.length > 0
+              ? clauses.flatMap((node, i) =>
+                  i === 0
+                    ? [node]
+                    : [
+                        <span key={`sep-${i}`} className="hp-pd-sep">
+                          ·
+                        </span>,
+                        node,
+                      ],
+                )
+              : t("Quiet here right now")}
+          </p>
+          {descriptors.length > 0 && (
+            <div className="hp-pd-desc">
+              {descriptors.map((d) => (
+                <span key={d.key}>
+                  {d.icon}
+                  {d.label} <b>{d.value}</b>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {moodText && (
+        <div className="hp-pd-bestfor">
+          <i>{t("Best for")}</i>
+          <span>{moodText}</span>
+        </div>
+      )}
+    </>
   );
 }
 
