@@ -20,6 +20,7 @@ export interface Author {
 export interface Comment {
   author: string;
   text: string;
+  createdAt?: string | null;
   userId?: string | null;
   profileId?: string | null;
   postingIdentity?: Author["type"];
@@ -61,6 +62,7 @@ export interface Post {
   placeId: string;
   kind: "spot" | "tip" | "event" | "photo";
   time: string;
+  createdAt?: string | null;
   text: string;
   tags: string[];
   likes: number;
@@ -77,6 +79,7 @@ export interface EventItem {
   title: string;
   placeId: string;
   time: string;
+  createdAt?: string | null;
   price: string;
   vibe: string;
   tags: string[];
