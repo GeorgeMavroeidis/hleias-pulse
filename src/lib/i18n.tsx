@@ -645,6 +645,31 @@ const EL: Record<string, string> = {
   // Account sheet — activity stat tiles
   Tips: "Συμβουλές",
   Going: "Συμμετοχές",
+  // Map tab — Explore areas panel + smart-insight banner
+  Areas: "Περιοχές",
+  "Open the areas panel": "Άνοιγμα πίνακα περιοχών",
+  "Explore areas near you": "Εξερεύνησε περιοχές κοντά σου",
+  "Based on live activity and signals": "Με βάση τη ζωντανή δραστηριότητα και τα σήματα",
+  "Tap any area to focus the map there": "Πάτησε μια περιοχή για να εστιάσει ο χάρτης εκεί",
+  "{count} signals": "{count} σήματα",
+  Hot: "Ζωντανή",
+  Active: "Ενεργή",
+  Calm: "Ήσυχη",
+  "Very lively right now": "Πολλή κίνηση αυτή τη στιγμή",
+  "Lots happening": "Αρκετή κίνηση",
+  "Quiet for now": "Ήσυχα προς το παρόν",
+  "{area} is tonight's hotspot": "Το {area} έχει την πιο έντονη κίνηση απόψε",
+  "{count} recent signals nearby": "{count} πρόσφατα σήματα εδώ κοντά",
+  "{area} is buzzing right now": "Το {area} έχει κίνηση αυτή τη στιγμή",
+  "{count} recent signals": "{count} πρόσφατα σήματα",
+  "The coast is wide awake": "Η ακτή έχει ξυπνήσει για τα καλά",
+  "A few areas are buzzing at once": "Αρκετές περιοχές έχουν κίνηση ταυτόχρονα",
+  "Several spots are showing signal right now": "Αρκετά σημεία δείχνουν κίνηση αυτή τη στιγμή",
+  "Quiet evening so far": "Ήσυχο βράδυ μέχρι στιγμής",
+  "Nothing strong nearby yet": "Τίποτα έντονο εδώ κοντά ακόμη",
+  "Viewing {area}": "Προβολή: {area}",
+  "{tier} · {count} recent signals": "{tier} · {count} πρόσφατα σήματα",
+  "Clear area focus": "Καθαρισμός εστίασης περιοχής",
 };
 
 function interpolate(message: string, params?: TranslationParams) {

@@ -109,6 +109,7 @@ import {
   SocialMap,
   type MapAreaCluster,
 } from "./SocialMap";
+import { MapAreaInsights } from "./MapAreaInsights";
 import { PlaceStoryRail } from "./PlaceStoryRail";
 import { PlaceStoryViewer } from "./PlaceStoryViewer";
 import {
@@ -5894,6 +5895,12 @@ export function PulseApp() {
             savedPlaceIds={savedIds}
             claimedPlaceIds={pulseData.claimedPlaceIds}
             dealPlaceIds={pulseData.dealPlaceIds}
+          />
+          <MapAreaInsights
+            clusters={mapClusters}
+            selectedCluster={selectedCluster}
+            onSelectArea={selectAreaPreview}
+            onDismiss={clearMapView}
           />
         </div>
       );
