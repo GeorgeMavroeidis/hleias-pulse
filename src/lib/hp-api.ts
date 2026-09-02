@@ -46,10 +46,11 @@ type CommentRow = Pick<
   | "profile_id"
   | "posting_identity"
   | "author_kind"
+  | "created_at"
 >;
 type EventRow = Pick<
   TableRow<"events">,
-  "id" | "title" | "place_id" | "display_time" | "price" | "vibe" | "tags"
+  "id" | "title" | "place_id" | "display_time" | "price" | "vibe" | "tags" | "created_at"
 >;
 type PlaceRow = Pick<
   TableRow<"places">,
@@ -95,6 +96,7 @@ type PostRow = Pick<
   | "tags"
   | "likes_count"
   | "image_url"
+  | "created_at"
 >;
 type RouteRow = Pick<
   TableRow<"routes">,
@@ -155,6 +157,7 @@ type MeetEventRow = Pick<
   | "maybe_count"
   | "hot"
   | "attendee_avatar_urls"
+  | "created_at"
 >;
 type CulturalEventRow = Pick<
   TableRow<"cultural_events">,
@@ -252,15 +255,15 @@ interface PulseDealRow {
 }
 
 const COMMENT_RETURN_COLUMNS =
-  "author_name,text,place_id,post_id,route_id,cultural_event_id,user_id,profile_id,posting_identity,author_kind";
+  "author_name,text,place_id,post_id,route_id,cultural_event_id,user_id,profile_id,posting_identity,author_kind,created_at";
 const PLACE_RETURN_COLUMNS =
   "id,name,greek_name,type,area,x,y,lat,lng,pulse,mood,crowd,budget,best_time,tags,short,image_url,hotness,comment_count,recent_post_count,status,user_id,profile_id,created_by_identity,moderation_status";
 const POST_RETURN_COLUMNS =
-  "id,author_id,author_kind,user_id,profile_id,posting_identity,place_id,kind,display_time,text,tags,likes_count,image_url";
+  "id,author_id,author_kind,user_id,profile_id,posting_identity,place_id,kind,display_time,text,tags,likes_count,image_url,created_at";
 const STORY_RETURN_COLUMNS =
   "id,label,place_id,user_id,profile_id,kind,author_name,author_type,author_avatar_url,media_url,caption,expires_after_hours,crowd,parking,condition,created_at";
 const MEET_EVENT_RETURN_COLUMNS =
-  "id,place_id,user_id,profile_id,title,host_name,host_avatar_url,host_type,starts_at,duration_min,category,vibe,price,capacity,description,cover_url,tags,going_count,maybe_count,hot,attendee_avatar_urls";
+  "id,place_id,user_id,profile_id,title,host_name,host_avatar_url,host_type,starts_at,duration_min,category,vibe,price,capacity,description,cover_url,tags,going_count,maybe_count,hot,attendee_avatar_urls,created_at";
 const CULTURAL_EVENT_RETURN_COLUMNS =
   "id,title,greek_title,event_type,venue_name,area,place_id,lat,lng,event_date,organizer_name,organizer_id,description_el,description_en,poster_url,ticket_url,is_past_event,is_official,likes_count,moderation_status,user_id,created_at";
 const ORGANIZER_RETURN_COLUMNS = "id,display_name,bio,verification_status";
@@ -528,6 +531,7 @@ function mapComment(row: CommentRow): Comment {
   return {
     author: row.author_name,
     text: row.text,
+    createdAt: row.created_at ?? null,
     userId: row.user_id,
     profileId: row.profile_id,
     postingIdentity: authorType(row.posting_identity),
@@ -595,6 +599,7 @@ function mapPost(row: PostRow, commentsByPost: Record<string, Comment[]>): Post 
     placeId: row.place_id,
     kind: row.kind as Post["kind"],
     time: row.display_time,
+    createdAt: row.created_at ?? null,
     text: row.text,
     tags: row.tags,
     likes: row.likes_count,
@@ -613,6 +618,7 @@ function mapEvent(row: EventRow): EventItem {
     title: row.title,
     placeId: row.place_id,
     time: row.display_time,
+    createdAt: row.created_at ?? null,
     price: row.price,
     vibe: row.vibe,
     tags: row.tags,
@@ -665,6 +671,7 @@ function mapMeetEvent(row: MeetEventRow, place?: Place): MeetEvent {
     hostAvatar: row.host_avatar_url,
     hostType: meetHostType(row.host_type),
     happensAt: row.starts_at,
+    createdAt: row.created_at ?? null,
     durationMin: row.duration_min,
     category: meetCategory(row.category),
     vibe: row.vibe,
