@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   Search,
   Map as MapIcon,
@@ -45,6 +45,7 @@ import {
   ListChecks,
   ChevronRight,
   ArrowRight,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -109,13 +110,12 @@ import { useI18n } from "@/lib/i18n";
 import { getAdminRole, type AdminRole } from "@/lib/admin-api";
 import { ImageBox } from "./ImageBox";
 import {
-  areaTier,
   buildAreaClusters,
   getMapAreaIdForPlace,
   SocialMap,
   type MapAreaCluster,
+  type MapDiscoveryViewport,
 } from "./SocialMap";
-import { MapAreaInsights, AREA_TIER_META } from "./MapAreaInsights";
 import { PlaceStoryRail } from "./PlaceStoryRail";
 import { PlaceStoryViewer } from "./PlaceStoryViewer";
 import {
@@ -148,6 +148,22 @@ import { AccountBubble, AccountSheet, AuthSheet, PasswordRecoverySheet } from ".
 import { IdentitySegments, SectionHeader, fieldClass } from "./blend-ui";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { buildPulseActivitySnapshot, type PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
+import {
+  deriveAreaIntelligenceSnapshot,
+  type AreaState,
+  type AreaIntelligenceSnapshot,
+  type SignalQuality,
+} from "@/lib/hp/area-intelligence";
+import {
+  DISCOVERY_LENSES,
+  areaNeedsDiscoveryRecommendation,
+  deriveDiscoverySnapshot,
+  rankDiscoveryRecommendations,
+  viewportNeedsDiscoveryRecommendation,
+  type DiscoveryLens,
+  type DiscoveryRecommendation,
+  type DiscoverySnapshot,
+} from "@/lib/hp/discovery";
 import { type StreakState } from "@/lib/hp/meet-store";
 import {
   MEET_CATEGORIES,
@@ -168,6 +184,7 @@ type Tab = "map" | "pulse" | "routes" | "meet" | "saved" | "deals";
 type NavTab = Exclude<Tab, "saved" | "deals">;
 type MeetSubTab = "community" | "events";
 type ComposerMode = "post" | "place" | "story" | "event";
+type MarkerAnimationTheme = "calm" | "pulse" | "signal";
 type CreateStoryInput = {
   placeId: string;
   caption: string;
@@ -178,6 +195,21 @@ type CreateStoryInput = {
   visibilityHours?: number;
 };
 type PostingIdentity = Extract<Author["type"], "LOCAL" | "TOURIST" | "GUIDE">;
+
+const AREA_STATE_LABEL: Record<AreaState, string> = {
+  calm: "Calm",
+  rising: "Rising",
+  active: "Active",
+  hot: "Hot",
+  cooling: "Cooling",
+};
+
+const SIGNAL_QUALITY_LABEL: Record<SignalQuality, string> = {
+  confirmed: "Confirmed",
+  stable: "Stable",
+  fading: "Fading",
+  uncertain: "Uncertain",
+};
 
 const POSTING_IDENTITIES: { id: PostingIdentity; label: string; helper: string }[] = [
   { id: "LOCAL", label: "Local", helper: "I know the area" },
@@ -193,12 +225,63 @@ const COMPOSER_MODE_ICONS: Record<ComposerMode, LucideIcon> = {
 const ROUTE_FILTERS = ["All", "Beach", "Nature", "Culture", "No car", "Free"] as const;
 type RouteFilter = (typeof ROUTE_FILTERS)[number];
 
+const DISCOVERY_LENS_LABEL: Record<DiscoveryLens, string> = {
+  chill: "Chill",
+  social: "Social",
+  music: "Music",
+  beach: "Beach",
+  food: "Food",
+};
+
 const TAB_ITEMS: { id: NavTab; label: string; Icon: LucideIcon }[] = [
   { id: "map", label: "Map", Icon: MapIcon },
   { id: "pulse", label: "Pulse", Icon: Radio },
   { id: "routes", label: "Routes", Icon: RouteIcon },
   { id: "meet", label: "Meet", Icon: CalendarHeart },
 ];
+const HP_EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const HP_EASE_STANDARD: [number, number, number, number] = [0.2, 0.8, 0.2, 1];
+const HP_TRANSITION = {
+  press: { duration: 0.08, ease: HP_EASE_STANDARD },
+  micro: { duration: 0.12, ease: HP_EASE_STANDARD },
+  state: { duration: 0.16, ease: HP_EASE_STANDARD },
+  panel: { duration: 0.24, ease: HP_EASE_OUT },
+  spatial: { duration: 0.32, ease: HP_EASE_OUT },
+  tab: { duration: 0.18, ease: HP_EASE_OUT },
+  sheetContent: { duration: 0.19, ease: HP_EASE_OUT },
+} as const;
+const MARKER_ANIMATION_THEME_STORAGE_KEY = "hp.marker-animation-theme.v1";
+const MARKER_ANIMATION_THEMES: {
+  id: MarkerAnimationTheme;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "pulse",
+    label: "Pulse Coast",
+    description: "Coral and amber ripples with a lively heartbeat.",
+  },
+  {
+    id: "signal",
+    label: "Night Signal",
+    description: "Violet and cyan signals with a pulsing core.",
+  },
+  {
+    id: "calm",
+    label: "Aegean Calm",
+    description: "Aqua light and a slow, calm breath.",
+  },
+];
+
+function initialMarkerAnimationTheme(): MarkerAnimationTheme {
+  if (typeof window === "undefined") return "pulse";
+  try {
+    const stored = window.localStorage.getItem(MARKER_ANIMATION_THEME_STORAGE_KEY);
+    return stored === "calm" || stored === "signal" || stored === "pulse" ? stored : "pulse";
+  } catch {
+    return "pulse";
+  }
+}
 type ShareTarget = {
   type: "app" | "place" | "post" | "route" | "story";
   id?: string;
@@ -368,7 +451,11 @@ function Toast({ msg }: { msg: string | null }) {
 interface TopBarProps {
   query: string;
   setQuery: (query: string) => void;
-  onToggleLanguage: () => void;
+  onSetLanguage: (language: "GR" | "EN") => void;
+  animationTheme: MarkerAnimationTheme;
+  onSetAnimationTheme: (theme: MarkerAnimationTheme) => void;
+  appearanceOpen: boolean;
+  setAppearanceOpen: Dispatch<SetStateAction<boolean>>;
   showSearch: boolean;
   setShowSearch: Dispatch<SetStateAction<boolean>>;
   account: PulseAccountState;
@@ -380,7 +467,11 @@ interface TopBarProps {
 function TopBar({
   query,
   setQuery,
-  onToggleLanguage,
+  onSetLanguage,
+  animationTheme,
+  onSetAnimationTheme,
+  appearanceOpen,
+  setAppearanceOpen,
   showSearch,
   setShowSearch,
   account,
@@ -389,9 +480,44 @@ function TopBar({
   onOpenDeals,
 }: TopBarProps) {
   const { language, t } = useI18n();
+  const searchActive = showSearch || query.trim().length > 0;
+  const activeAnimationTheme =
+    MARKER_ANIMATION_THEMES.find((theme) => theme.id === animationTheme) ??
+    MARKER_ANIMATION_THEMES[0];
+  const appearanceButtonRef = useRef<HTMLButtonElement>(null);
+  const appearanceMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!appearanceOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (
+        target &&
+        (appearanceButtonRef.current?.contains(target) ||
+          appearanceMenuRef.current?.contains(target))
+      ) {
+        return;
+      }
+      setAppearanceOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setAppearanceOpen(false);
+      appearanceButtonRef.current?.focus();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [appearanceOpen, setAppearanceOpen]);
+
   return (
-    <div className="relative z-30 border-b border-hp-ink/10 bg-hp-paper/95 backdrop-blur">
-      <div className="flex items-center justify-between px-4 pt-2.5">
+    <div className="relative z-[60] border-b border-hp-ink/10 bg-hp-paper/95">
+      <div className="hp-safe-px flex items-center justify-between pt-2.5">
         <div className="flex items-center gap-2.5" aria-label="ΗΛΕΙΑ PULSE">
           <img
             src="/brand/ilia-pulse-logo.png"
@@ -418,36 +544,125 @@ function TopBar({
           </button>
           <button
             type="button"
-            onClick={() => setShowSearch((s) => !s)}
-            className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+            onClick={() => {
+              setAppearanceOpen(false);
+              setShowSearch((s) => !s);
+            }}
+            className={`hp-icon-button hp-topbar-search h-9 w-9 ${searchActive ? "is-active" : ""} ${query.trim() ? "has-query" : ""}`}
             aria-label={t(showSearch ? "Close search" : "Open search")}
             aria-expanded={showSearch}
+            aria-pressed={searchActive}
           >
-            <Search size={16} />
+            <Search size={16} strokeWidth={2.2} />
           </button>
           <button
+            ref={appearanceButtonRef}
             type="button"
-            onClick={onToggleLanguage}
-            className="rounded-full border border-hp-ink/10 px-2.5 py-1.5 text-[11px] font-bold tracking-wider text-hp-ink/80"
-            aria-label={t("Toggle language")}
+            onClick={() => {
+              setShowSearch(false);
+              setAppearanceOpen((open) => !open);
+            }}
+            className={`hp-icon-button hp-appearance-trigger h-9 w-9 ${appearanceOpen ? "is-active" : ""}`}
+            aria-label={t(appearanceOpen ? "Close appearance menu" : "Open appearance menu")}
+            aria-expanded={appearanceOpen}
+            aria-controls="hp-appearance-menu"
+            data-active-theme={animationTheme}
           >
-            {language === "GR" ? "GR / en" : "gr / EN"}
+            <Palette size={16} strokeWidth={2.2} />
           </button>
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
-      <div className="px-4 pb-1.5 pt-0.5">
+      <div className="hp-safe-px pb-1.5 pt-0.5">
         <p className="text-[12px] text-hp-muted">{t("Local spots, routes, and tips.")}</p>
       </div>
+      <AnimatePresence>
+        {appearanceOpen && (
+          <motion.div
+            ref={appearanceMenuRef}
+            id="hp-appearance-menu"
+            role="dialog"
+            aria-label={t("Appearance")}
+            initial={{ opacity: 0, y: -4, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -3, scale: 0.99 }}
+            transition={HP_TRANSITION.state}
+            className="hp-appearance-menu"
+          >
+            <div className="hp-appearance-section">
+              <span className="hp-appearance-label">{t("Language")}</span>
+              <div className="hp-appearance-language" role="group" aria-label={t("Language")}>
+                {(["GR", "EN"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => onSetLanguage(option)}
+                    className="hp-appearance-language-option"
+                    aria-pressed={language === option}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="hp-appearance-section">
+              <div className="hp-appearance-section-heading">
+                <span className="hp-appearance-label">{t("Marker animation")}</span>
+                <span className="hp-animation-theme-current" aria-live="polite">
+                  {t("Current: {theme}", { theme: activeAnimationTheme.label })}
+                </span>
+              </div>
+              <div
+                className="hp-animation-theme-options"
+                role="radiogroup"
+                aria-label={t("Marker animation")}
+              >
+                {MARKER_ANIMATION_THEMES.map((theme) => {
+                  const selected = animationTheme === theme.id;
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => onSetAnimationTheme(theme.id)}
+                      className="hp-animation-theme-option"
+                      data-theme-preview={theme.id}
+                    >
+                      <span className="hp-animation-theme-preview is-pulse-hot" aria-hidden="true">
+                        <span className="hp-marker-effects">
+                          <span className="hp-marker-field" />
+                          <span className="hp-marker-wave" />
+                          <span className="hp-marker-sweep" />
+                        </span>
+                        <span className="hp-marker-core hp-animation-theme-preview__core" />
+                      </span>
+                      <span className="hp-animation-theme-copy">
+                        <strong>{theme.label}</strong>
+                        <small>{t(theme.description)}</small>
+                      </span>
+                      <span className="hp-animation-theme-check" aria-hidden="true">
+                        {selected && <Check size={15} strokeWidth={2.7} />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {showSearch && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden px-4"
+            transition={HP_TRANSITION.state}
+            className="hp-safe-px overflow-hidden"
           >
-            <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
+            <div className="hp-search-field mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 px-3 py-2">
               <Search size={14} className="text-hp-muted" />
               <input
                 name="hp-search"
@@ -481,25 +696,51 @@ function VibeChips({
   setActive: (v: string | null) => void;
 }) {
   return (
-    <div className="hp-no-scrollbar flex gap-2 overflow-x-auto border-b border-hp-ink/10 bg-hp-paper px-4 py-2">
+    <div className="hp-no-scrollbar hp-safe-px flex gap-2 overflow-x-auto border-b border-hp-ink/10 bg-hp-paper py-2">
       {chips.map((c) => {
         const on = active === c;
         return (
-          <motion.button
+          <button
             key={c}
             type="button"
             onClick={() => setActive(on ? null : c)}
             aria-pressed={on}
-            whileTap={{ scale: 0.94 }}
-            animate={{ scale: on ? 1.03 : 1 }}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold transition ${
-              on
-                ? "bg-hp-ink text-hp-paper shadow-sm"
-                : "border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
-            }`}
+            className={`hp-chip shrink-0 text-[12px] ${on ? "is-active" : ""}`}
           >
             {c}
-          </motion.button>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DiscoveryLensRail({
+  active,
+  onChange,
+}: {
+  active: DiscoveryLens | null;
+  onChange: (lens: DiscoveryLens | null) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="hp-discovery-lens-rail hp-no-scrollbar hp-safe-px flex gap-2 overflow-x-auto border-b border-hp-ink/10 bg-hp-paper py-2"
+      role="group"
+      aria-label={t("Map discovery lenses")}
+    >
+      {DISCOVERY_LENSES.map((lens) => {
+        const selected = lens === active;
+        return (
+          <button
+            key={lens}
+            type="button"
+            onClick={() => onChange(selected ? null : lens)}
+            aria-pressed={selected}
+            className={`hp-chip hp-discovery-lens shrink-0 text-[12px] ${selected ? "is-active" : ""}`}
+          >
+            {t(DISCOVERY_LENS_LABEL[lens])}
+          </button>
         );
       })}
     </div>
@@ -514,6 +755,11 @@ type SheetDragHandlers = {
   onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
 };
 
+type DiscoverySuggestion = {
+  recommendation: DiscoveryRecommendation;
+  cluster: MapAreaCluster;
+};
+
 function MapBottomSheet({
   cluster,
   selectedPlace,
@@ -525,12 +771,20 @@ function MapBottomSheet({
   half,
   full,
   onSetSnap,
+  onIdleHeightMeasured,
   onOpenDetails,
   onSavePlace,
   onSharePlace,
   savedPlaceIds,
   claimedPlaceIds,
   dealPlaceIds,
+  activeLens,
+  searchQuery,
+  showDiscoveryEmptyState,
+  discoverySuggestion,
+  onOpenDiscoverySuggestion,
+  onClearLens,
+  onClearSearch,
 }: {
   cluster: MapAreaCluster | null;
   selectedPlace: Place | null;
@@ -542,15 +796,40 @@ function MapBottomSheet({
   half: number;
   full: number;
   onSetSnap: (h: number) => void;
+  onIdleHeightMeasured: (height: number) => void;
   onOpenDetails: (p: Place) => void;
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
   savedPlaceIds: string[];
   claimedPlaceIds: string[];
   dealPlaceIds: string[];
+  activeLens: DiscoveryLens | null;
+  searchQuery: string;
+  showDiscoveryEmptyState: boolean;
+  discoverySuggestion: DiscoverySuggestion | null;
+  onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
+  onClearLens: () => void;
+  onClearSearch: () => void;
 }) {
   const { t } = useI18n();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
+  const handleRef = useRef<HTMLDivElement>(null);
+  const idleContentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (cluster) return;
+    const handle = handleRef.current;
+    const content = idleContentRef.current;
+    if (!handle || !content) return;
+    // Measure intrinsic children, not the animated/constrained sheet height.
+    // This also responds to translated wrapping, font loading and text zoom.
+    const measure = () =>
+      onIdleHeightMeasured(Math.max(72, Math.ceil(handle.offsetHeight + content.offsetHeight + 1)));
+    const observer = new ResizeObserver(measure);
+    observer.observe(handle);
+    observer.observe(content);
+    measure();
+    return () => observer.disconnect();
+  }, [cluster, onIdleHeightMeasured]);
   const isSelectedCollapsed = Boolean(cluster) && height <= peek + 8;
   const isExpanded = Boolean(cluster) && height >= full - 24;
   const dragState = useRef<{
@@ -572,25 +851,18 @@ function MapBottomSheet({
       Math.abs(point - height) < Math.abs(closest - height) ? point : closest,
     );
 
-    if (Math.abs(closestSnap - height) <= 24) {
-      onSetSnap(closestSnap);
-      return;
-    }
-
     if (!cluster) {
       onSetSnap(peek);
       return;
     }
 
-    if (Math.abs(velocityY) < 180) {
-      onSetSnap(height);
-      return;
+    if (velocityY < -180) {
+      onSetSnap(snapPoints.find((point) => point > height + 4) ?? full);
+    } else if (velocityY > 180) {
+      onSetSnap([...snapPoints].reverse().find((point) => point < height - 4) ?? peek);
+    } else {
+      onSetSnap(closestSnap);
     }
-
-    let snap = peek;
-    if (height > (half + full) / 2 || velocityY < -500) snap = full;
-    else if (height > (peek + half) / 2 || velocityY < -200) snap = half;
-    onSetSnap(snap);
   };
 
   const onHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -652,23 +924,17 @@ function MapBottomSheet({
   };
 
   return (
-    // Plain element + CSS height transition rather than framer's animate — a
-    // framer height animation here gets dropped when another motion element
-    // (the Explore areas panel) unmounts in the same commit, leaving the sheet
-    // stuck collapsed after picking an area from that panel.
-    <div
-      style={{
-        height,
-        transition: isDraggingSheet
-          ? "none"
-          : "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
-      }}
-      className="hp-map-sheet absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overscroll-contain rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper/98 shadow-[0_-12px_40px_rgba(23,20,17,0.18)] backdrop-blur"
+    <motion.div
+      style={{ height }}
+      animate={{ height }}
+      transition={isDraggingSheet ? { duration: 0 } : HP_TRANSITION.panel}
+      className={`hp-map-sheet ${!cluster ? "is-idle" : ""} absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper/98 shadow-[0_-12px_40px_rgba(23,20,17,0.18)]`}
     >
       {/* Drag handle */}
       <div
+        ref={handleRef}
         {...sheetDragHandlers}
-        className="touch-none select-none cursor-grab pt-2 pb-1 active:cursor-grabbing"
+        className="hp-map-sheet-handle touch-none select-none cursor-grab pt-2 pb-1 active:cursor-grabbing"
       >
         <div className="mx-auto h-1.5 w-12 rounded-full bg-hp-ink/15" />
         {cluster && !isSelectedCollapsed && (
@@ -683,71 +949,178 @@ function MapBottomSheet({
                 type="button"
                 onClick={() => onSetSnap(s.h)}
                 aria-label={t("Set sheet to {position}", { position: t(s.label) })}
-                className={`h-1 w-6 rounded-full transition ${Math.abs(height - s.h) < 4 ? "bg-hp-ink" : "bg-hp-ink/15"}`}
-              />
+                aria-pressed={Math.abs(height - s.h) < 4}
+                className="hp-sheet-snap-button"
+              >
+                <span
+                  className={`hp-sheet-snap-indicator ${Math.abs(height - s.h) < 4 ? "is-active" : ""}`}
+                />
+              </button>
             ))}
           </div>
         )}
       </div>
 
-      {!isSelectedCollapsed && (
-        <div
-          className={`min-h-0 px-4 pt-0 ${cluster ? "pb-5" : "pb-3"} ${
-            cluster
-              ? `flex flex-1 overscroll-contain ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`
-              : "overflow-y-auto overscroll-contain"
-          }`}
+      <AnimatePresence initial={false} mode="popLayout">
+        {!isSelectedCollapsed && (
+          <motion.div
+            ref={cluster ? undefined : idleContentRef}
+            key={
+              selectedPlace ? `place-${selectedPlace.id}` : cluster ? `area-${cluster.id}` : "idle"
+            }
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -3 }}
+            transition={HP_TRANSITION.sheetContent}
+            className={`hp-safe-px min-h-0 pt-0 ${cluster ? "pb-5" : "hp-map-sheet__idle-content"} ${
+              cluster
+                ? `flex flex-1 overscroll-contain ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`
+                : "overscroll-contain"
+            }`}
+          >
+            {cluster ? (
+              <AreaSheetContent
+                cluster={cluster}
+                selectedPlace={selectedPlace}
+                events={events}
+                expanded={isExpanded}
+                savedPlaceIds={savedPlaceIds}
+                claimedPlaceIds={claimedPlaceIds}
+                dealPlaceIds={dealPlaceIds}
+                storyGroups={storyGroups}
+                onOpenStory={onOpenStory}
+                onSavePlace={onSavePlace}
+                onSharePlace={onSharePlace}
+                onOpenDetails={onOpenDetails}
+                showDiscoveryEmptyState={showDiscoveryEmptyState}
+                discoverySuggestion={discoverySuggestion}
+                onOpenDiscoverySuggestion={onOpenDiscoverySuggestion}
+                activeLens={activeLens}
+                onClearLens={onClearLens}
+              />
+            ) : (
+              <TonightPulseContent
+                searchQuery={searchQuery}
+                activeLens={activeLens}
+                showDiscoveryEmptyState={showDiscoveryEmptyState}
+                discoverySuggestion={discoverySuggestion}
+                onOpenDiscoverySuggestion={onOpenDiscoverySuggestion}
+                onClearLens={onClearLens}
+                onClearSearch={onClearSearch}
+              />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function TonightPulseContent({
+  searchQuery,
+  activeLens,
+  showDiscoveryEmptyState,
+  discoverySuggestion,
+  onOpenDiscoverySuggestion,
+  onClearLens,
+  onClearSearch,
+}: {
+  searchQuery: string;
+  activeLens: DiscoveryLens | null;
+  showDiscoveryEmptyState: boolean;
+  discoverySuggestion: DiscoverySuggestion | null;
+  onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
+  onClearLens: () => void;
+  onClearSearch: () => void;
+}) {
+  const { t } = useI18n();
+  if (searchQuery.trim()) {
+    return (
+      <div className="hp-map-sheet__idle-copy hp-discovery-empty-state">
+        <h3 className="text-[16px] font-black text-hp-ink">{t("No matching places here")}</h3>
+        <p className="text-[12px] text-hp-muted">
+          {t("Clear the search to see nearby activity again.")}
+        </p>
+        <button type="button" onClick={onClearSearch} className="hp-discovery-empty-action">
+          {t("Clear search")}
+        </button>
+      </div>
+    );
+  }
+
+  if (showDiscoveryEmptyState) {
+    return (
+      <DiscoveryEmptyState
+        activeLens={activeLens}
+        suggestion={discoverySuggestion}
+        onOpenSuggestion={onOpenDiscoverySuggestion}
+        onClearLens={onClearLens}
+      />
+    );
+  }
+  return (
+    <div className="hp-map-sheet__idle-copy">
+      <h3 className="text-[16px] font-black text-hp-ink">{t("Tonight's pulse")}</h3>
+      <p className="text-[12px] text-hp-muted">{t("Tap a bubble to see what's happening.")}</p>
+    </div>
+  );
+}
+
+function DiscoveryEmptyState({
+  activeLens,
+  suggestion,
+  onOpenSuggestion,
+  onClearLens,
+}: {
+  activeLens: DiscoveryLens | null;
+  suggestion: DiscoverySuggestion | null;
+  onOpenSuggestion: (cluster: MapAreaCluster) => void;
+  onClearLens: () => void;
+}) {
+  const { t } = useI18n();
+  const reason = suggestion?.recommendation.reason;
+  const message = suggestion
+    ? reason === "emerging" || reason === "rising"
+      ? t("Activity is rising near {area} · {distance} km", {
+          area: suggestion.cluster.name,
+          distance: Math.max(1, Math.round(suggestion.recommendation.distanceKm)),
+        })
+      : reason === "hot"
+        ? t("{area} is active now · {distance} km", {
+            area: suggestion.cluster.name,
+            distance: Math.max(1, Math.round(suggestion.recommendation.distanceKm)),
+          })
+        : t("{area} is becoming more active · {distance} km", {
+            area: suggestion.cluster.name,
+            distance: Math.max(1, Math.round(suggestion.recommendation.distanceKm)),
+          })
+    : null;
+
+  return (
+    <div className="hp-map-sheet__idle-copy hp-discovery-empty-state">
+      <h3 className="text-[16px] font-black text-hp-ink">{t("Quiet here right now")}</h3>
+      {message ? (
+        <button
+          type="button"
+          onClick={() => suggestion && onOpenSuggestion(suggestion.cluster)}
+          className="hp-discovery-recommendation"
         >
-          {cluster ? (
-            <AreaSheetContent
-              cluster={cluster}
-              selectedPlace={selectedPlace}
-              events={events}
-              expanded={isExpanded}
-              savedPlaceIds={savedPlaceIds}
-              claimedPlaceIds={claimedPlaceIds}
-              dealPlaceIds={dealPlaceIds}
-              storyGroups={storyGroups}
-              onViewArea={() => onSetSnap(full)}
-              onOpenStory={onOpenStory}
-              onSavePlace={onSavePlace}
-              onSharePlace={onSharePlace}
-              onOpenDetails={onOpenDetails}
-            />
-          ) : (
-            <TonightPulseContent />
-          )}
-        </div>
+          <MapPin size={15} aria-hidden="true" />
+          <span>{message}</span>
+        </button>
+      ) : (
+        <p className="text-[12px] text-hp-muted">
+          {t("No strong nearby signal yet. Try another lens or explore the map.")}
+        </p>
+      )}
+      {activeLens && (
+        <button type="button" onClick={onClearLens} className="hp-discovery-empty-action">
+          {t("Clear lens")}
+        </button>
       )}
     </div>
   );
 }
-
-function TonightPulseContent() {
-  const { t } = useI18n();
-  return (
-    <div>
-      <div>
-        <div className="mb-2">
-          <h3 className="text-[16px] font-black text-hp-ink">{t("Tonight's pulse")}</h3>
-        </div>
-        <p className="text-[12px] text-hp-muted">{t("Tap a bubble to see what's happening.")}</p>
-      </div>
-    </div>
-  );
-}
-
-// Place type -> category chip label (English source key; Greek via i18n).
-const CATEGORY_LABEL: Record<Place["type"], string> = {
-  beach: "Beach",
-  culture: "Culture",
-  nature: "Nature",
-  food: "Food",
-  local: "Town",
-  village: "Village",
-  night: "Nightlife",
-  sunset: "Sunset",
-};
 
 function AreaSheetContent({
   cluster,
@@ -758,11 +1131,15 @@ function AreaSheetContent({
   claimedPlaceIds,
   dealPlaceIds,
   storyGroups,
-  onViewArea,
   onOpenStory,
   onSavePlace,
   onSharePlace,
   onOpenDetails,
+  showDiscoveryEmptyState,
+  discoverySuggestion,
+  onOpenDiscoverySuggestion,
+  activeLens,
+  onClearLens,
 }: {
   cluster: MapAreaCluster;
   selectedPlace: Place | null;
@@ -772,11 +1149,15 @@ function AreaSheetContent({
   claimedPlaceIds: string[];
   dealPlaceIds: string[];
   storyGroups: PlaceStoryGroup[];
-  onViewArea: () => void;
   onOpenStory: (placeId: string) => void;
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
   onOpenDetails: (p: Place) => void;
+  showDiscoveryEmptyState: boolean;
+  discoverySuggestion: DiscoverySuggestion | null;
+  onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
+  activeLens: DiscoveryLens | null;
+  onClearLens: () => void;
 }) {
   const { language, t } = useI18n();
   const placeIds = new Set(cluster.places.map((place) => place.id));
@@ -784,172 +1165,136 @@ function AreaSheetContent({
   const areaStoryGroups = storyGroups.filter((group) => placeIds.has(group.placeId));
 
   if (!isPlaceSheet) {
-    // One unified area card for every entry point (map bubble, the on-map chip
-    // rail, and the Explore areas panel all land here). Compact first glance;
-    // "View area" expands the same sheet to the full detail (places + stories).
-    const tier = areaTier(cluster);
-    const meta = AREA_TIER_META[tier];
-    const TierIcon = meta.Icon;
-    const signals = cluster.postCount + cluster.eventCount;
-    const categories = [...new Set(cluster.places.map((place) => place.type))];
-
+    const intelligence = cluster.intelligence;
     return (
-      <motion.div
-        key={`area-${cluster.id}`}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={expanded ? "w-full" : "flex h-full min-h-0 w-full flex-col"}
-      >
+      <div className="flex h-full min-h-0 w-full flex-col">
         <div className="flex gap-3">
-          <ImageBox
-            src={cluster.leadPlace.imageUrl}
-            alt=""
-            className="h-16 w-16 shrink-0"
-            rounded="rounded-2xl"
-          />
+          <div className="grid h-16 w-16 shrink-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-ink/5">
+            {cluster.places.slice(0, 4).map((place) => (
+              <ImageBox
+                key={place.id}
+                src={place.imageUrl}
+                alt=""
+                className="h-8 w-full"
+                rounded="rounded-none"
+              />
+            ))}
+          </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 className="text-[16px] font-black text-hp-ink">{cluster.name}</h3>
-              <span
-                className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${meta.badge}`}
-              >
-                <TierIcon size={10} />
-                {t(meta.label)}
-              </span>
+            <div className="flex items-center gap-2 text-[11px] font-bold text-hp-ink/70">
+              <span className="inline-block h-2 w-2 rounded-full bg-hp-sunset" />
+              <span>{cluster.activityLine}</span>
             </div>
-            <p className="mt-0.5 text-[12px] text-hp-ink/75">{t(meta.blurb)}</p>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-hp-ink/60">
+            <h3 className="mt-1 text-[16px] font-black text-hp-ink">{cluster.name}</h3>
+            {intelligence && (
+              <div
+                className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-hp-ink/65"
+                data-area-state={intelligence.state}
+                data-signal-quality={intelligence.signalQuality}
+                data-emerging={intelligence.emerging ? "true" : "false"}
+              >
+                <span>
+                  {t(AREA_STATE_LABEL[intelligence.state])} ·{" "}
+                  {t(SIGNAL_QUALITY_LABEL[intelligence.signalQuality])}
+                </span>
+                {intelligence.emerging && (
+                  <span className="rounded-full border border-hp-sunset/25 bg-hp-sunset/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-hp-sunset">
+                    {t("Emerging")}
+                  </span>
+                )}
+              </div>
+            )}
+            {showDiscoveryEmptyState && (
+              <div className="mt-2">
+                <DiscoveryEmptyState
+                  activeLens={activeLens}
+                  suggestion={discoverySuggestion}
+                  onOpenSuggestion={onOpenDiscoverySuggestion}
+                  onClearLens={onClearLens}
+                />
+              </div>
+            )}
+            <p className="text-[11px] text-hp-muted">
+              {language === "GR"
+                ? `${cluster.places.length} σημεία σε αυτή την περιοχή`
+                : `${cluster.places.length} clustered places in this area`}
+            </p>
+            <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
               <span className="inline-flex items-center gap-0.5">
                 <Radio size={11} />
-                {t("{count} signals", { count: signals })}
+                {cluster.postCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
               </span>
-              <span aria-hidden="true">·</span>
-              <span>{t("{count} places", { count: cluster.places.length })}</span>
+              <span className="inline-flex items-center gap-0.5">
+                <Clock size={11} />
+                {cluster.eventCount} {language === "GR" ? "εκδηλώσεις" : "events"}
+              </span>
             </div>
           </div>
         </div>
 
-        {categories.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {categories.slice(0, 4).map((category) => (
+        <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+            {language === "GR" ? "Σημεία της περιοχής" : "Clustered elements"}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {cluster.places.map((place) => (
               <span
-                key={category}
-                className="rounded-full bg-hp-ink/5 px-2 py-1 text-[10px] font-bold text-hp-ink/65"
+                key={place.id}
+                className="rounded-full bg-hp-ink/5 px-2 py-1 text-[11px] font-bold text-hp-ink/75"
               >
-                {t(CATEGORY_LABEL[category])}
+                {place.name}
+                {claimedPlaceIds.includes(place.id) && (
+                  <BadgeCheck size={11} className="ml-1 inline" />
+                )}
+                {dealPlaceIds.includes(place.id) && <Gift size={11} className="ml-1 inline" />}
               </span>
             ))}
-            {categories.length > 4 && (
-              <span className="rounded-full bg-hp-ink/5 px-2 py-1 text-[10px] font-bold text-hp-ink/65">
-                +{categories.length - 4}
+          </div>
+        </div>
+
+        {areaStoryGroups.length > 0 && (
+          <div className="mt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                {language === "GR" ? `Stories από ${cluster.name}` : `Stories from ${cluster.name}`}
               </span>
-            )}
-          </div>
-        )}
-
-        {!expanded ? (
-          <button
-            type="button"
-            onClick={onViewArea}
-            className="mt-auto flex items-center justify-center gap-1.5 rounded-full bg-hp-ink py-2.5 text-[13px] font-black text-hp-paper transition active:scale-[0.99]"
-          >
-            {t("View area")}
-            <ArrowRight size={14} />
-          </button>
-        ) : (
-          <div className="mt-3 flex flex-col gap-3">
-            <div>
-              <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                {t("Places in this area")}
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {cluster.places.map((place) => (
-                  <button
-                    key={place.id}
-                    type="button"
-                    onClick={() => onOpenDetails(place)}
-                    className="flex items-center gap-2.5 rounded-xl border border-hp-ink/10 bg-white/50 p-2 text-left transition active:bg-hp-ink/[0.03]"
-                  >
-                    <ImageBox
-                      src={place.imageUrl}
-                      alt=""
-                      className="h-9 w-9 shrink-0"
-                      rounded="rounded-lg"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[12px] font-black text-hp-ink">
-                        {place.name}
-                      </span>
-                      <span className="block truncate text-[10px] text-hp-muted">
-                        {place.recentPostCount}{" "}
-                        {language === "GR" ? "δημοσιεύσεις" : "posts"}
-                      </span>
-                    </span>
-                    {(savedPlaceIds.includes(place.id) ||
-                      claimedPlaceIds.includes(place.id) ||
-                      dealPlaceIds.includes(place.id)) && (
-                      <span className="flex shrink-0 items-center gap-1 text-hp-sunset">
-                        {savedPlaceIds.includes(place.id) && <Bookmark size={12} />}
-                        {claimedPlaceIds.includes(place.id) && <BadgeCheck size={12} />}
-                        {dealPlaceIds.includes(place.id) && <Gift size={12} />}
-                      </span>
-                    )}
-                    <ChevronRight size={14} className="shrink-0 text-hp-ink/30" />
-                  </button>
-                ))}
-              </div>
+              <span className="text-[10px] font-semibold text-hp-muted">
+                {areaStoryGroups.length}
+              </span>
             </div>
-
-            {areaStoryGroups.length > 0 && (
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {language === "GR"
-                      ? `Stories από ${cluster.name}`
-                      : `Stories from ${cluster.name}`}
-                  </span>
-                  <span className="text-[10px] font-semibold text-hp-muted">
-                    {areaStoryGroups.length}
-                  </span>
-                </div>
-                <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                  {areaStoryGroups.map((group) => {
-                    const tone = toneStyle(group.hasUnseen ? group.tone : "muted");
-                    return (
-                      <button
-                        key={group.placeId}
-                        type="button"
-                        onClick={() => onOpenStory(group.placeId)}
-                        aria-label={
-                          language === "GR"
-                            ? `Άνοιγμα stories για ${group.placeName}`
-                            : `Open stories for ${group.placeName}`
-                        }
-                        className="flex w-14 shrink-0 flex-col items-center gap-1"
-                      >
-                        <div
-                          className="rounded-full p-[2px]"
-                          style={{ background: tone.gradient }}
-                        >
-                          <ImageBox
-                            src={group.stories[0].mediaUrl}
-                            alt={group.placeName}
-                            className="h-12 w-12"
-                            rounded="rounded-full"
-                          />
-                        </div>
-                        <span className="block w-full truncate text-center text-[9px] font-bold text-hp-ink/80">
-                          {group.placeName}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {areaStoryGroups.map((group) => {
+                const tone = toneStyle(group.hasUnseen ? group.tone : "muted");
+                return (
+                  <button
+                    key={group.placeId}
+                    type="button"
+                    onClick={() => onOpenStory(group.placeId)}
+                    aria-label={
+                      language === "GR"
+                        ? `Άνοιγμα stories για ${group.placeName}`
+                        : `Open stories for ${group.placeName}`
+                    }
+                    className="flex w-14 shrink-0 flex-col items-center gap-1"
+                  >
+                    <div className="rounded-full p-[2px]" style={{ background: tone.gradient }}>
+                      <ImageBox
+                        src={group.stories[0].mediaUrl}
+                        alt={group.placeName}
+                        className="h-12 w-12"
+                        rounded="rounded-full"
+                      />
+                    </div>
+                    <span className="block w-full truncate text-center text-[9px] font-bold text-hp-ink/80">
+                      {group.placeName}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
-      </motion.div>
+      </div>
     );
   }
 
@@ -960,12 +1305,7 @@ function AreaSheetContent({
   const placeEvents = events.filter((event) => event.placeId === focusPlace.id);
 
   return (
-    <motion.div
-      key={`place-${focusPlace.id}`}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={expanded ? "w-full" : "flex h-full min-h-0 w-full flex-col"}
-    >
+    <div className={expanded ? "w-full" : "flex h-full min-h-0 w-full flex-col"}>
       <div className="flex gap-3">
         <ImageBox
           src={focusPlace.imageUrl}
@@ -990,8 +1330,7 @@ function AreaSheetContent({
                 className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset/12 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-hp-sunset"
                 title={t("Verified business")}
               >
-                <BadgeCheck size={10} />
-                {t("Business")}
+                <BadgeCheck size={10} /> {t("Business")}
               </span>
             )}
             {dealPlaceIds.includes(focusPlace.id) && (
@@ -999,7 +1338,7 @@ function AreaSheetContent({
                 className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset/12 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-hp-sunset"
                 title={t("This place has an app deal")}
               >
-                🎁 {t("Deal")}
+                <Gift size={10} /> {t("Deal")}
               </span>
             )}
           </div>
@@ -1071,7 +1410,7 @@ function AreaSheetContent({
           <Share2 size={13} />
         </button>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -4514,6 +4853,7 @@ export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [activitySnapshot, setActivitySnapshot] = useState<PulseActivitySnapshot>({});
+  const [areaIntelligence, setAreaIntelligence] = useState<AreaIntelligenceSnapshot>({});
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
   const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
@@ -4524,8 +4864,16 @@ export function PulseApp() {
   const [openPost, setOpenPost] = useState<Post | null>(null);
   const [openRoute, setOpenRoute] = useState<RouteItem | null>(null);
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
+  const [activeLens, setActiveLens] = useState<DiscoveryLens | null>(null);
+  const [mapDiscoveryViewport, setMapDiscoveryViewport] = useState<MapDiscoveryViewport | null>(
+    null,
+  );
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [markerAnimationTheme, setMarkerAnimationTheme] = useState<MarkerAnimationTheme>(
+    initialMarkerAnimationTheme,
+  );
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [visitedPlaceIds, setVisitedPlaceIds] = useState<string[]>([]);
@@ -4639,6 +4987,8 @@ export function PulseApp() {
 
   // sheet snap
   const mapBodyRef = useRef<HTMLDivElement>(null);
+  const validMapPlaceIdsRef = useRef<Set<string>>(new Set());
+  const validMapAreaIdsRef = useRef<Set<string>>(new Set());
   const [mapAreaH, setMapAreaH] = useState(560);
   useEffect(() => {
     if (tab !== "map") return;
@@ -4659,42 +5009,49 @@ export function PulseApp() {
   }, [tab]);
   const safeMapAreaH = mapAreaH > 120 ? mapAreaH : 560;
   const full = Math.round(safeMapAreaH * 0.85);
-  const idlePeek = 92;
+  const [idlePeek, setIdlePeek] = useState(72);
   const selectedPeek = 44;
-  const areaPreview = Math.min(full, Math.min(268, Math.max(244, Math.round(safeMapAreaH * 0.33))));
+  const compactMap = safeMapAreaH < 460;
+  const areaPreview = Math.min(
+    full,
+    Math.min(276, Math.max(compactMap ? 200 : 248, Math.round(safeMapAreaH * 0.34))),
+  );
   const placePreview = Math.min(
     full,
-    Math.min(228, Math.max(210, Math.round(safeMapAreaH * 0.28))),
+    Math.min(228, Math.max(compactMap ? 184 : 210, Math.round(safeMapAreaH * 0.28))),
   );
   const hasMapFocus = Boolean(selectedAreaId);
   const peek = hasMapFocus ? selectedPeek : idlePeek;
   const half = hasMapFocus ? (selectedPlace ? placePreview : areaPreview) : idlePeek;
   const [sheetH, setSheetH] = useState(peek);
+  const previousSheetGeometryRef = useRef({ mapAreaH: safeMapAreaH, peek, half, full });
   useEffect(() => {
-    if (sheetH < peek) setSheetH(peek);
-  }, [peek, sheetH]);
+    const previous = previousSheetGeometryRef.current;
+    setSheetH((currentHeight) => {
+      if (!hasMapFocus) return idlePeek;
+      if (previous.mapAreaH !== safeMapAreaH) {
+        const previousSnaps = [
+          { id: "peek", value: previous.peek },
+          { id: "preview", value: previous.half },
+          { id: "full", value: previous.full },
+        ] as const;
+        const nearest = previousSnaps.reduce((closest, candidate) =>
+          Math.abs(candidate.value - currentHeight) < Math.abs(closest.value - currentHeight)
+            ? candidate
+            : closest,
+        );
+        const remapped = nearest.id === "peek" ? peek : nearest.id === "preview" ? half : full;
+        return Math.min(full, Math.max(peek, remapped));
+      }
+      return Math.min(full, Math.max(peek, currentHeight));
+    });
+    previousSheetGeometryRef.current = { mapAreaH: safeMapAreaH, peek, half, full };
+  }, [full, half, peek, safeMapAreaH, hasMapFocus, idlePeek]);
   useEffect(() => {
     if (!hasMapFocus) {
       setSheetH(idlePeek);
     }
   }, [hasMapFocus, idlePeek]);
-  // Whenever an area (no specific place) becomes the focus, open the sheet to
-  // its preview height. Edge-triggered and only bumps up, so it never fights a
-  // drag — it just guarantees the area card is visible no matter which entry
-  // point set the selection (map bubble, on-map chip, or the Explore panel).
-  const areaFocusRef = useRef<string | null>(null);
-  useEffect(() => {
-    const previous = areaFocusRef.current;
-    areaFocusRef.current = selectedAreaId;
-    if (
-      selectedAreaId &&
-      selectedAreaId !== previous &&
-      !selectedPlace &&
-      sheetH < areaPreview
-    ) {
-      setSheetH(areaPreview);
-    }
-  }, [selectedAreaId, selectedPlace, areaPreview, sheetH]);
 
   const sameMapSnapshot = (a: MapViewSnapshot, b: MapViewSnapshot) =>
     a.areaId === b.areaId && a.placeId === b.placeId;
@@ -4731,10 +5088,18 @@ export function PulseApp() {
   };
 
   const goBackMapView = () => {
-    const previous = mapBackStack[mapBackStack.length - 1];
-    if (!previous) return;
+    const validStack = mapBackStack.filter(
+      (snapshot) =>
+        (!snapshot.areaId || validMapAreaIdsRef.current.has(snapshot.areaId)) &&
+        (!snapshot.placeId || validMapPlaceIdsRef.current.has(snapshot.placeId)),
+    );
+    const previous = validStack[validStack.length - 1];
+    if (!previous) {
+      clearMapView();
+      return;
+    }
 
-    setMapBackStack((stack) => stack.slice(0, -1));
+    setMapBackStack(validStack.slice(0, -1));
     applyMapSnapshot(previous);
   };
 
@@ -4825,16 +5190,10 @@ export function PulseApp() {
     return status;
   };
 
-  const refreshAccount = useCallback(async () => {
+  const refreshAccount = async () => {
     try {
       const nextAccount = await getCurrentPulseAccount();
       setAccount(nextAccount);
-      if (
-        (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
-        nextAccount.preferences?.language
-      ) {
-        setLanguage(nextAccount.preferences.language);
-      }
       if (nextAccount.status === "ready") {
         const nextAdminRole = await getAdminRole().catch(() => null);
         setAdminRole(nextAdminRole);
@@ -4877,10 +5236,10 @@ export function PulseApp() {
       setMyDealStats([]);
       return fallback;
     }
-  }, [setLanguage]);
+  };
 
-  const toggleAppLanguage = () => {
-    const next = language === "GR" ? "EN" : "GR";
+  const setAppLanguage = (next: "GR" | "EN") => {
+    if (next === language) return;
     setLanguage(next);
     if (account.status === "ready" || account.status === "needsProfile") {
       void savePulseLanguage(account.userId, next).catch((error) => {
@@ -4888,6 +5247,19 @@ export function PulseApp() {
       });
     }
   };
+
+  const updateMarkerAnimationTheme = (next: MarkerAnimationTheme) => {
+    setMarkerAnimationTheme(next);
+    try {
+      window.localStorage.setItem(MARKER_ANIMATION_THEME_STORAGE_KEY, next);
+    } catch (error) {
+      console.warn("Could not save marker animation preference.", error);
+    }
+  };
+
+  useEffect(() => {
+    setAppearanceOpen(false);
+  }, [tab]);
 
   const requireProfile = (action = "post") => {
     if (account.status === "ready") return true;
@@ -4953,6 +5325,7 @@ export function PulseApp() {
       const data = await loadPulseData();
       setPulseData(data);
       setActivitySnapshot(buildPulseActivitySnapshot(data));
+      setAreaIntelligence(deriveAreaIntelligenceSnapshot(data));
       lastActivityRefreshAtRef.current = Date.now();
       setPlaceComments(data.placeComments);
       setRouteComments(data.routeComments);
@@ -4981,6 +5354,10 @@ export function PulseApp() {
     void refreshPulseData();
   }, [refreshPulseData]);
 
+  useEffect(() => {
+    if (hasPasswordRecoveryUrl()) setPasswordRecoveryOpen(true);
+  }, []);
+
   const refreshActivitySnapshot = useCallback(async () => {
     if (typeof document === "undefined" || document.hidden || activityRefreshInFlightRef.current) {
       return;
@@ -4990,6 +5367,7 @@ export function PulseApp() {
     try {
       const data = await loadPulseData();
       setActivitySnapshot(buildPulseActivitySnapshot(data));
+      setAreaIntelligence(deriveAreaIntelligenceSnapshot(data));
       lastActivityRefreshAtRef.current = Date.now();
     } catch (error) {
       console.warn("Could not refresh the map activity snapshot.", error);
@@ -5017,24 +5395,87 @@ export function PulseApp() {
   }, [refreshActivitySnapshot]);
 
   useEffect(() => {
-    if (hasPasswordRecoveryUrl()) setPasswordRecoveryOpen(true);
-  }, []);
+    let ignore = false;
+    const loadAccount = async () => {
+      const nextAccount = await getCurrentPulseAccount().catch((error) => {
+        console.warn("Could not load account state.", error);
+        return { status: "signedOut" } as PulseAccountState;
+      });
+      if (ignore) return;
+      setAccount(nextAccount);
+      if (
+        (nextAccount.status === "ready" || nextAccount.status === "needsProfile") &&
+        nextAccount.preferences?.language
+      ) {
+        setLanguage(nextAccount.preferences.language);
+      }
+      // Admin/organizer status drives the Admin workspace / Verified organizer
+      // badges; fetch it here too, not only through refreshAccount() on save.
+      if (nextAccount.status === "ready") {
+        const nextAdminRole = await getAdminRole().catch(() => null);
+        if (!ignore) setAdminRole(nextAdminRole);
+      } else {
+        setAdminRole(null);
+      }
+      if (nextAccount.status === "ready" || nextAccount.status === "needsProfile") {
+        const nextOrganizerStatus = await getMyOrganizerStatus().catch(() => null);
+        if (!ignore) setOrganizerStatus(nextOrganizerStatus);
+        if (nextOrganizerStatus?.verificationStatus === "verified") {
+          const myEvents = await getMyCulturalEvents().catch(() => [] as CulturalEvent[]);
+          if (!ignore) setMyCulturalEvents(myEvents);
+        } else if (!ignore) {
+          setMyCulturalEvents([]);
+        }
+        const nextBusinessStatus = await getMyBusinessStatus().catch(() => null);
+        if (!ignore) setBusinessStatus(nextBusinessStatus);
+        if (nextBusinessStatus?.verificationStatus === "verified") {
+          const [claims, stats] = await Promise.all([
+            getMyPlaceClaims().catch(() => [] as PlaceClaim[]),
+            getMyDealStats().catch(() => [] as DealRedemptionStats[]),
+          ]);
+          if (!ignore) {
+            setMyPlaceClaims(claims);
+            setMyDealStats(stats);
+          }
+        } else if (!ignore) {
+          setMyPlaceClaims([]);
+          setMyDealStats([]);
+        }
+      } else {
+        setOrganizerStatus(null);
+        setMyCulturalEvents([]);
+        setBusinessStatus(null);
+        setMyPlaceClaims([]);
+        setMyDealStats([]);
+      }
+      const profile =
+        nextAccount.status === "ready" || nextAccount.status === "needsProfile"
+          ? nextAccount.profile
+          : null;
+      if (profile) {
+        const summary = profileSummaryFromAccount(profile);
+        setPulseData((data) => ({
+          ...data,
+          profiles: [summary, ...data.profiles.filter((item) => item.id !== summary.id)],
+        }));
+      }
+    };
 
-  useEffect(() => {
-    void refreshAccount();
+    void loadAccount();
     const unsubscribe = subscribeToPulseAuth((event) => {
       if (event === "PASSWORD_RECOVERY") {
         setAuthOpen(false);
         setProfileOpen(false);
         setPasswordRecoveryOpen(true);
       }
-      void refreshAccount();
+      void loadAccount();
     });
 
     return () => {
+      ignore = true;
       unsubscribe();
     };
-  }, [refreshAccount]);
+  }, [setLanguage]);
 
   useEffect(() => {
     let ignore = false;
@@ -5070,6 +5511,10 @@ export function PulseApp() {
   }, []);
 
   const allPosts = useMemo(() => [...userPosts, ...posts], [posts, userPosts]);
+  const discoverySnapshot = useMemo<DiscoverySnapshot>(
+    () => deriveDiscoverySnapshot({ ...pulseData, posts: allPosts }),
+    [allPosts, pulseData],
+  );
   const savedPostIds = useMemo(
     () =>
       Object.entries(savedPosts)
@@ -5895,26 +6340,105 @@ export function PulseApp() {
       ),
     [activeVibe, places, query],
   );
+  const mapPlaces = useMemo(
+    () => places.filter((place) => matchesPlaceQuery(place, query)),
+    [places, query],
+  );
   const trendingPlace = useMemo(() => {
     const [first] = [...filteredPlaces].sort((a, b) => b.hotness - a.hotness);
     return first ?? null;
   }, [filteredPlaces]);
   const mapClusters = useMemo(
-    () => buildAreaClusters(filteredPlaces, events, activitySnapshot),
-    [activitySnapshot, events, filteredPlaces],
+    () => buildAreaClusters(mapPlaces, events, activitySnapshot, areaIntelligence),
+    [activitySnapshot, areaIntelligence, events, mapPlaces],
   );
+  const mapPlaceIdSet = useMemo(() => new Set(mapPlaces.map((place) => place.id)), [mapPlaces]);
+  const mapAreaIdSet = useMemo(
+    () => new Set(mapClusters.map((cluster) => cluster.id)),
+    [mapClusters],
+  );
+  validMapPlaceIdsRef.current = mapPlaceIdSet;
+  validMapAreaIdsRef.current = mapAreaIdSet;
   const selectedCluster = selectedAreaId
     ? (mapClusters.find((cluster) => cluster.id === selectedAreaId) ?? null)
     : null;
+  const selectedAreaNeedsRecommendation = Boolean(
+    selectedCluster &&
+    !selectedPlace &&
+    areaNeedsDiscoveryRecommendation(
+      selectedCluster.intelligence,
+      discoverySnapshot.areas[selectedCluster.id],
+      activeLens,
+    ),
+  );
+  const viewportNeedsRecommendation = Boolean(
+    !selectedCluster &&
+    mapDiscoveryViewport &&
+    viewportNeedsDiscoveryRecommendation(
+      mapDiscoveryViewport.visibleAreaIds,
+      activeLens,
+      discoverySnapshot,
+      areaIntelligence,
+    ),
+  );
+  const showDiscoveryEmptyState =
+    !query.trim() && (selectedAreaNeedsRecommendation || viewportNeedsRecommendation);
+  const discoverySuggestion = useMemo<DiscoverySuggestion | null>(() => {
+    if (!showDiscoveryEmptyState) return null;
+    const origin = selectedCluster
+      ? { lat: selectedCluster.lat, lng: selectedCluster.lng }
+      : mapDiscoveryViewport?.center;
+    if (!origin) return null;
+
+    const visibleAreas = new Set(mapDiscoveryViewport?.visibleAreaIds ?? []);
+    const candidateClusters = mapClusters.filter(
+      (cluster) => selectedCluster || !visibleAreas.has(cluster.id),
+    );
+    const [recommendation] = rankDiscoveryRecommendations(
+      candidateClusters.map((cluster) => ({
+        areaId: cluster.id,
+        lat: cluster.lat,
+        lng: cluster.lng,
+        intelligence: cluster.intelligence,
+      })),
+      origin,
+      activeLens,
+      discoverySnapshot,
+      { excludeAreaId: selectedCluster?.id ?? null },
+    );
+    if (!recommendation) return null;
+    const cluster = mapClusters.find((item) => item.id === recommendation.areaId);
+    return cluster ? { recommendation, cluster } : null;
+  }, [
+    activeLens,
+    discoverySnapshot,
+    mapClusters,
+    mapDiscoveryViewport,
+    selectedCluster,
+    showDiscoveryEmptyState,
+  ]);
+  const availableMapHeight = Math.max(0, safeMapAreaH - sheetH);
+  const utilityRailHidden = availableMapHeight < 248;
 
   useEffect(() => {
-    if (!selectedAreaId) return;
-    if (mapClusters.some((cluster) => cluster.id === selectedAreaId)) return;
+    setMapBackStack((stack) => {
+      const valid = stack.filter(
+        (snapshot) =>
+          (!snapshot.areaId || mapAreaIdSet.has(snapshot.areaId)) &&
+          (!snapshot.placeId || mapPlaceIdSet.has(snapshot.placeId)),
+      );
+      return valid.length === stack.length ? stack : valid;
+    });
+
+    const selectedPlaceHidden = Boolean(selectedPlace && !mapPlaceIdSet.has(selectedPlace.id));
+    const selectedAreaHidden = Boolean(selectedAreaId && !mapAreaIdSet.has(selectedAreaId));
+    if (!selectedPlaceHidden && !selectedAreaHidden) return;
+
     setMapBackStack([]);
     setSelectedAreaId(null);
     setSelectedPlace(null);
     setSheetH(idlePeek);
-  }, [idlePeek, mapClusters, selectedAreaId]);
+  }, [idlePeek, mapAreaIdSet, mapPlaceIdSet, selectedAreaId, selectedPlace]);
 
   const filteredPosts = allPosts.filter((post) => {
     const place = findPlace(post.placeId);
@@ -5937,27 +6461,36 @@ export function PulseApp() {
     storyViewer ||
     profileOpen ||
     authOpen ||
+    passwordRecoveryOpen ||
     onboardingOpen,
   );
   const renderActiveTab = () => {
     if (tab === "map") {
       return (
-        <div ref={mapBodyRef} className="relative h-full w-full">
+        <div
+          ref={mapBodyRef}
+          className="hp-map-stage relative h-full w-full"
+          data-utility-rail-hidden={utilityRailHidden ? "true" : "false"}
+        >
           <SocialMap
             clusters={mapClusters}
             events={events}
             activitySnapshot={activitySnapshot}
             selectedAreaId={selectedAreaId}
             selectedPlaceId={sel?.id ?? null}
-            activeFilterLabel={activeVibe}
+            activeFilterLabel={activeLens ? t(DISCOVERY_LENS_LABEL[activeLens]) : null}
+            activeLens={activeLens}
+            discoverySnapshot={discoverySnapshot}
+            onDiscoveryViewportChange={setMapDiscoveryViewport}
             storyPlaceIds={storyPlaceIds}
             onSelectArea={selectAreaPreview}
             onSelectPlace={selectMapPlacePreview}
             onResetView={clearMapView}
+            onClearSelection={clearMapView}
             canGoBack={mapBackStack.length > 0}
             onBack={goBackMapView}
-            areaFocusBottomPadding={areaPreview + 112}
-            selectedBottomPadding={selectedCluster ? sheetH + 96 : 0}
+            bottomOverlayHeight={sheetH}
+            availableMapHeight={availableMapHeight}
             routePath={activeRoutePath}
             onMapLongPress={(lat, lng) => {
               openComposer("place", { lat, lng });
@@ -5987,18 +6520,20 @@ export function PulseApp() {
             half={half}
             full={full}
             onSetSnap={setSheetH}
+            onIdleHeightMeasured={setIdlePeek}
             onOpenDetails={(p) => setOpenPlace(p)}
             onSavePlace={toggleSave}
             onSharePlace={sharePlace}
             savedPlaceIds={savedIds}
             claimedPlaceIds={pulseData.claimedPlaceIds}
             dealPlaceIds={pulseData.dealPlaceIds}
-          />
-          <MapAreaInsights
-            clusters={mapClusters}
-            selectedCluster={selectedCluster}
-            onSelectArea={selectAreaPreview}
-            onDismiss={clearMapView}
+            activeLens={activeLens}
+            searchQuery={mapClusters.length === 0 ? query : ""}
+            showDiscoveryEmptyState={showDiscoveryEmptyState}
+            discoverySuggestion={discoverySuggestion}
+            onOpenDiscoverySuggestion={selectAreaPreview}
+            onClearLens={() => setActiveLens(null)}
+            onClearSearch={() => setQuery("")}
           />
         </div>
       );
@@ -6156,306 +6691,321 @@ export function PulseApp() {
   };
 
   return (
-    <div className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10">
+    <MotionConfig reducedMotion="user">
       <div
-        className="flex min-h-0 flex-1 flex-col"
-        inert={modalOpen ? true : undefined}
-        aria-hidden={modalOpen ? true : undefined}
+        className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10"
+        data-marker-animation-theme={markerAnimationTheme}
       >
-        <TopBar
-          query={query}
-          setQuery={setQuery}
-          onToggleLanguage={toggleAppLanguage}
-          showSearch={showSearch}
-          setShowSearch={setShowSearch}
-          account={account}
-          onOpenAccount={() => setProfileOpen(true)}
-          onOpenAuth={() => setAuthOpen(true)}
-          onOpenDeals={() => setTab("deals")}
-        />
-        <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
-
-        <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
-          {dataStatus !== "ready" && (
-            <div
-              role={dataStatus === "error" ? "alert" : "status"}
-              aria-live="polite"
-              className="absolute inset-x-4 top-4 z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur"
-            >
-              <span>
-                {t(dataStatus === "loading" ? "Loading pulse data…" : "Could not load pulse data.")}
-              </span>
-              {dataStatus === "error" && (
-                <button
-                  type="button"
-                  onClick={() => void refreshPulseData()}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-hp-ink px-3 py-2 text-[11px] font-black text-hp-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hp-sunset"
-                >
-                  <RefreshCw size={13} />
-                  {t("Try again")}
-                </button>
-              )}
-            </div>
+        <div
+          className="flex min-h-0 flex-1 flex-col"
+          inert={modalOpen ? true : undefined}
+          aria-hidden={modalOpen ? true : undefined}
+        >
+          <TopBar
+            query={query}
+            setQuery={setQuery}
+            onSetLanguage={setAppLanguage}
+            animationTheme={markerAnimationTheme}
+            onSetAnimationTheme={updateMarkerAnimationTheme}
+            appearanceOpen={appearanceOpen}
+            setAppearanceOpen={setAppearanceOpen}
+            showSearch={showSearch}
+            setShowSearch={setShowSearch}
+            account={account}
+            onOpenAccount={() => setProfileOpen(true)}
+            onOpenAuth={() => setAuthOpen(true)}
+            onOpenDeals={() => setTab("deals")}
+          />
+          {tab === "map" ? (
+            <DiscoveryLensRail active={activeLens} onChange={setActiveLens} />
+          ) : (
+            <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
           )}
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={tab}
-              initial={{ opacity: 0, y: 10, scale: 0.996, filter: "blur(2px)" }}
-              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -8, scale: 0.996, filter: "blur(2px)" }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 overflow-hidden bg-hp-bg"
-              style={{
-                backfaceVisibility: "hidden",
-                contain: "layout paint style",
-                transform: "translateZ(0)",
-                willChange: "opacity, transform, filter",
-              }}
-            >
-              {renderActiveTab()}
-            </motion.div>
-          </AnimatePresence>
+
+          <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
+            {dataStatus !== "ready" && (
+              <div
+                role={dataStatus === "error" ? "alert" : "status"}
+                aria-live="polite"
+                className="absolute inset-x-4 top-4 z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur"
+              >
+                <span>
+                  {t(
+                    dataStatus === "loading" ? "Loading pulse data…" : "Could not load pulse data.",
+                  )}
+                </span>
+                {dataStatus === "error" && (
+                  <button
+                    type="button"
+                    onClick={() => void refreshPulseData()}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-hp-ink px-3 py-2 text-[11px] font-black text-hp-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hp-sunset"
+                  >
+                    <RefreshCw size={13} />
+                    {t("Try again")}
+                  </button>
+                )}
+              </div>
+            )}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={tab}
+                initial={{ opacity: 0, y: 10, scale: 0.996, filter: "blur(2px)" }}
+                animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -8, scale: 0.996, filter: "blur(2px)" }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-0 overflow-hidden bg-hp-bg"
+                style={{
+                  backfaceVisibility: "hidden",
+                  contain: "layout paint style",
+                  transform: "translateZ(0)",
+                  willChange: "opacity, transform, filter",
+                }}
+              >
+                {renderActiveTab()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          <BottomNav tab={tab} setTab={setTab} />
         </div>
 
-        <BottomNav tab={tab} setTab={setTab} />
-      </div>
-
-      <PlaceDetailModal
-        place={openPlace}
-        events={events}
-        onClose={() => setOpenPlace(null)}
-        onSave={toggleSave}
-        saved={openPlace ? savedIds.includes(openPlace.id) : false}
-        visited={openPlace ? visitedPlaceIds.includes(openPlace.id) : false}
-        onToggleVisited={toggleVisited}
-        posts={openPlace ? allPosts.filter((p) => p.placeId === openPlace.id) : []}
-        onOpenMap={jumpToMap}
-        onShare={sharePlace}
-        comments={openPlace ? (placeComments[openPlace.id] ?? []) : []}
-        onComment={addPlaceComment}
-        findAuthor={findAuthor}
-        findPostAuthor={findPostAuthor}
-        storyGroups={placeStoryGroups}
-        onOpenStory={(placeId) => setStoryViewer({ placeId })}
-        businessProfile={openPlaceBusinessProfile}
-        showClaimCta={
-          !!openPlace &&
-          !pulseData.claimedPlaceIds.includes(openPlace.id) &&
-          !myPlaceClaims.some(
-            (claim) => claim.placeId === openPlace.id && claim.status !== "rejected",
-          )
-        }
-        onClaimPlace={claimFromPlaceDetail}
-        onGetDealCode={handleGetDealCode}
-        gettingDealCode={issuingDealCode}
-      />
-      <DealCodeModal code={dealCodeModal} onClose={() => setDealCodeModal(null)} />
-      <PostDetailModal
-        post={openPost}
-        onClose={() => setOpenPost(null)}
-        onOpenMap={jumpToMap}
-        onLike={() => openPost && toggleLike(openPost.id)}
-        liked={openPost ? !!likes[openPost.id] : false}
-        likeCount={
-          openPost ? (postLikes[openPost.id] ?? openPost.likes) + (likes[openPost.id] ? 1 : 0) : 0
-        }
-        comments={openPost ? [...openPost.comments, ...(postComments[openPost.id] ?? [])] : []}
-        onComment={(t) => openPost && addPostComment(openPost.id, t)}
-        saved={openPost ? !!savedPosts[openPost.id] : false}
-        onSave={() => openPost && toggleSavePost(openPost.id)}
-        onShare={sharePost}
-        findPlace={findPlace}
-        findAuthor={findAuthor}
-        findPostAuthor={findPostAuthor}
-      />
-      <RouteArticleModal
-        route={openRoute}
-        onClose={() => setOpenRoute(null)}
-        onOpenMap={jumpToMap}
-        onMapRoute={startRouteOnMap}
-        saved={openRoute ? !!savedRoutes[openRoute.id] : false}
-        comments={openRoute ? (routeComments[openRoute.id] ?? []) : []}
-        onSave={() => openRoute && toggleSaveRoute(openRoute.id)}
-        onShare={() => openRoute && shareRoute(openRoute)}
-        onComment={(text) => openRoute && addRouteComment(openRoute.id, text)}
-        findPlace={findPlace}
-        findAuthor={findAuthor}
-      />
-      <CreateComposerModal
-        open={createOpen}
-        initialMode={composerMode}
-        prefillPlace={composerPin}
-        places={places}
-        vibeChips={vibeChips}
-        account={account}
-        onClose={() => {
-          setCreateOpen(false);
-          setComposerPin(null);
-        }}
-        onRequireAccount={() => {
-          requireProfile("post");
-        }}
-        onPost={addLocalPost}
-        onPlace={addLocalPlace}
-        onStory={addLocalStory}
-        onEvent={addMeetEvent}
-      />
-
-      <OrganizerEventComposer
-        key={editingCulturalEvent?.id ?? "new"}
-        open={organizerComposerOpen}
-        lang={language}
-        event={editingCulturalEvent}
-        onClose={() => {
-          setOrganizerComposerOpen(false);
-          setEditingCulturalEvent(null);
-        }}
-        onSubmit={addCulturalEvent}
-        onUpdate={editCulturalEvent}
-      />
-
-      <OrganizerEventsSheet
-        open={myEventsOpen}
-        lang={language}
-        events={myCulturalEvents}
-        onClose={() => setMyEventsOpen(false)}
-        onEdit={(ev) => {
-          setEditingCulturalEvent(ev);
-          setMyEventsOpen(false);
-          setOrganizerComposerOpen(true);
-        }}
-      />
-
-      <BusinessPlacesSheet
-        open={businessPlacesOpen}
-        onClose={() => setBusinessPlacesOpen(false)}
-        places={places}
-        claims={myPlaceClaims}
-        otherClaimedPlaceIds={pulseData.claimedPlaceIds}
-        onClaim={handleClaimPlace}
-        onSaveProfile={handleSavePlaceProfile}
-        onUploadPhoto={uploadBusinessPhoto}
-        onSaveDeal={handleSaveDeal}
-        dealStats={myDealStats}
-        onRedeemCode={handleRedeemDealCode}
-      />
-
-      <CulturalEventDetailModal
-        event={openCulturalEvent}
-        lang={language}
-        onClose={() => setOpenCulturalEvent(null)}
-        onOpenMap={jumpToMap}
-        onLike={() => openCulturalEvent && toggleCulturalEventLike(openCulturalEvent.id)}
-        liked={openCulturalEvent ? !!culturalEventLikes[openCulturalEvent.id] : false}
-        likeCount={
-          openCulturalEvent
-            ? (culturalEventLikeCounts[openCulturalEvent.id] ?? openCulturalEvent.likesCount) +
-              (culturalEventLikes[openCulturalEvent.id] ? 1 : 0)
-            : 0
-        }
-        comments={openCulturalEvent ? (culturalEventComments[openCulturalEvent.id] ?? []) : []}
-        onComment={(text) =>
-          openCulturalEvent && addCulturalEventComment(openCulturalEvent.id, text)
-        }
-      />
-
-      <AuthSheet
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        onAuthenticated={async () => {
-          const nextAccount = await refreshAccount();
-          if (nextAccount.status === "needsProfile") setProfileOpen(true);
-        }}
-      />
-
-      <PasswordRecoverySheet
-        open={passwordRecoveryOpen}
-        onComplete={async () => {
-          clearPasswordRecoveryUrl();
-          setPasswordRecoveryOpen(false);
-          await refreshAccount();
-          showToast(t("Your password has been updated."));
-        }}
-        onCancel={async () => {
-          await signOutPulseAccount().catch((error) => {
-            console.warn("Could not close the password recovery session.", error);
-          });
-          clearPasswordRecoveryUrl();
-          setPasswordRecoveryOpen(false);
-          await refreshAccount();
-          setAuthOpen(true);
-        }}
-      />
-
-      <AccountSheet
-        open={profileOpen}
-        account={account}
-        onClose={() => setProfileOpen(false)}
-        stats={profileStats}
-        saved={{
-          placeCount: savedIds.length,
-          postCount: savedPostIds.length,
-          routeCount: savedRouteIds.length,
-          onOpenSaved: () => {
-            setProfileOpen(false);
-            setTab("saved");
-          },
-        }}
-        onSaved={async () => {
-          await refreshAccount();
-        }}
-        onOpenAuth={() => setAuthOpen(true)}
-        adminRole={adminRole}
-        onOpenAdmin={() => {
-          window.location.assign("/admin");
-        }}
-        organizerStatus={organizerStatus}
-        organizerEventCount={myCulturalEvents.length}
-        onApplyOrganizer={applyOrganizer}
-        onOpenOrganizerComposer={() => {
-          setProfileOpen(false);
-          setEditingCulturalEvent(null);
-          setOrganizerComposerOpen(true);
-        }}
-        onOpenOrganizerEvents={() => {
-          setProfileOpen(false);
-          setMyEventsOpen(true);
-        }}
-        businessStatus={businessStatus}
-        businessPlaceCount={myPlaceClaims.filter((claim) => claim.status !== "rejected").length}
-        onApplyBusiness={applyBusiness}
-        onOpenBusinessPlaces={() => {
-          setProfileOpen(false);
-          setBusinessPlacesOpen(true);
-        }}
-      />
-
-      <OnboardingGate
-        open={onboardingOpen}
-        vibeChips={vibeChips}
-        onClose={closeOnboarding}
-        onRequestLocation={requestLocationFromOnboarding}
-      />
-
-      {storyViewer && (
-        <PlaceStoryViewer
-          groups={placeStoryGroups}
-          startPlaceId={storyViewer.placeId}
-          startStoryId={storyViewer.storyId}
-          markSeen={markSeen}
-          onClose={() => setStoryViewer(null)}
-          onOpenPlace={jumpToMap}
-          onOpenPlaceDetails={(id) => {
-            const place = findPlace(id);
-            if (place) setOpenPlace(place);
-          }}
-          onShare={shareStory}
-          onToggleSave={toggleSave}
-          savedPlaceIds={savedIds}
+        <PlaceDetailModal
+          place={openPlace}
+          events={events}
+          onClose={() => setOpenPlace(null)}
+          onSave={toggleSave}
+          saved={openPlace ? savedIds.includes(openPlace.id) : false}
+          visited={openPlace ? visitedPlaceIds.includes(openPlace.id) : false}
+          onToggleVisited={toggleVisited}
+          posts={openPlace ? allPosts.filter((p) => p.placeId === openPlace.id) : []}
+          onOpenMap={jumpToMap}
+          onShare={sharePlace}
+          comments={openPlace ? (placeComments[openPlace.id] ?? []) : []}
+          onComment={addPlaceComment}
+          findAuthor={findAuthor}
+          findPostAuthor={findPostAuthor}
+          storyGroups={placeStoryGroups}
+          onOpenStory={(placeId) => setStoryViewer({ placeId })}
+          businessProfile={openPlaceBusinessProfile}
+          showClaimCta={
+            !!openPlace &&
+            !pulseData.claimedPlaceIds.includes(openPlace.id) &&
+            !myPlaceClaims.some(
+              (claim) => claim.placeId === openPlace.id && claim.status !== "rejected",
+            )
+          }
+          onClaimPlace={claimFromPlaceDetail}
+          onGetDealCode={handleGetDealCode}
+          gettingDealCode={issuingDealCode}
         />
-      )}
+        <DealCodeModal code={dealCodeModal} onClose={() => setDealCodeModal(null)} />
+        <PostDetailModal
+          post={openPost}
+          onClose={() => setOpenPost(null)}
+          onOpenMap={jumpToMap}
+          onLike={() => openPost && toggleLike(openPost.id)}
+          liked={openPost ? !!likes[openPost.id] : false}
+          likeCount={
+            openPost ? (postLikes[openPost.id] ?? openPost.likes) + (likes[openPost.id] ? 1 : 0) : 0
+          }
+          comments={openPost ? [...openPost.comments, ...(postComments[openPost.id] ?? [])] : []}
+          onComment={(t) => openPost && addPostComment(openPost.id, t)}
+          saved={openPost ? !!savedPosts[openPost.id] : false}
+          onSave={() => openPost && toggleSavePost(openPost.id)}
+          onShare={sharePost}
+          findPlace={findPlace}
+          findAuthor={findAuthor}
+          findPostAuthor={findPostAuthor}
+        />
+        <RouteArticleModal
+          route={openRoute}
+          onClose={() => setOpenRoute(null)}
+          onOpenMap={jumpToMap}
+          onMapRoute={startRouteOnMap}
+          saved={openRoute ? !!savedRoutes[openRoute.id] : false}
+          comments={openRoute ? (routeComments[openRoute.id] ?? []) : []}
+          onSave={() => openRoute && toggleSaveRoute(openRoute.id)}
+          onShare={() => openRoute && shareRoute(openRoute)}
+          onComment={(text) => openRoute && addRouteComment(openRoute.id, text)}
+          findPlace={findPlace}
+          findAuthor={findAuthor}
+        />
+        <CreateComposerModal
+          open={createOpen}
+          initialMode={composerMode}
+          prefillPlace={composerPin}
+          places={places}
+          vibeChips={vibeChips}
+          account={account}
+          onClose={() => {
+            setCreateOpen(false);
+            setComposerPin(null);
+          }}
+          onRequireAccount={() => {
+            requireProfile("post");
+          }}
+          onPost={addLocalPost}
+          onPlace={addLocalPlace}
+          onStory={addLocalStory}
+          onEvent={addMeetEvent}
+        />
 
-      <Toast msg={toast} />
-    </div>
+        <OrganizerEventComposer
+          key={editingCulturalEvent?.id ?? "new"}
+          open={organizerComposerOpen}
+          lang={language}
+          event={editingCulturalEvent}
+          onClose={() => {
+            setOrganizerComposerOpen(false);
+            setEditingCulturalEvent(null);
+          }}
+          onSubmit={addCulturalEvent}
+          onUpdate={editCulturalEvent}
+        />
+
+        <OrganizerEventsSheet
+          open={myEventsOpen}
+          lang={language}
+          events={myCulturalEvents}
+          onClose={() => setMyEventsOpen(false)}
+          onEdit={(ev) => {
+            setEditingCulturalEvent(ev);
+            setMyEventsOpen(false);
+            setOrganizerComposerOpen(true);
+          }}
+        />
+
+        <BusinessPlacesSheet
+          open={businessPlacesOpen}
+          onClose={() => setBusinessPlacesOpen(false)}
+          places={places}
+          claims={myPlaceClaims}
+          otherClaimedPlaceIds={pulseData.claimedPlaceIds}
+          onClaim={handleClaimPlace}
+          onSaveProfile={handleSavePlaceProfile}
+          onUploadPhoto={uploadBusinessPhoto}
+          onSaveDeal={handleSaveDeal}
+          dealStats={myDealStats}
+          onRedeemCode={handleRedeemDealCode}
+        />
+
+        <CulturalEventDetailModal
+          event={openCulturalEvent}
+          lang={language}
+          onClose={() => setOpenCulturalEvent(null)}
+          onOpenMap={jumpToMap}
+          onLike={() => openCulturalEvent && toggleCulturalEventLike(openCulturalEvent.id)}
+          liked={openCulturalEvent ? !!culturalEventLikes[openCulturalEvent.id] : false}
+          likeCount={
+            openCulturalEvent
+              ? (culturalEventLikeCounts[openCulturalEvent.id] ?? openCulturalEvent.likesCount) +
+                (culturalEventLikes[openCulturalEvent.id] ? 1 : 0)
+              : 0
+          }
+          comments={openCulturalEvent ? (culturalEventComments[openCulturalEvent.id] ?? []) : []}
+          onComment={(text) =>
+            openCulturalEvent && addCulturalEventComment(openCulturalEvent.id, text)
+          }
+        />
+
+        <AuthSheet
+          open={authOpen}
+          onClose={() => setAuthOpen(false)}
+          onAuthenticated={async () => {
+            const nextAccount = await refreshAccount();
+            if (nextAccount.status === "needsProfile") setProfileOpen(true);
+          }}
+        />
+
+        <PasswordRecoverySheet
+          open={passwordRecoveryOpen}
+          onComplete={async () => {
+            clearPasswordRecoveryUrl();
+            setPasswordRecoveryOpen(false);
+            await refreshAccount();
+            showToast(t("Your password has been updated."));
+          }}
+          onCancel={async () => {
+            await signOutPulseAccount().catch((error) => {
+              console.warn("Could not close the password recovery session.", error);
+            });
+            clearPasswordRecoveryUrl();
+            setPasswordRecoveryOpen(false);
+            await refreshAccount();
+            setAuthOpen(true);
+          }}
+        />
+
+        <AccountSheet
+          open={profileOpen}
+          account={account}
+          onClose={() => setProfileOpen(false)}
+          stats={profileStats}
+          saved={{
+            placeCount: savedIds.length,
+            postCount: savedPostIds.length,
+            routeCount: savedRouteIds.length,
+            onOpenSaved: () => {
+              setProfileOpen(false);
+              setTab("saved");
+            },
+          }}
+          onSaved={async () => {
+            await refreshAccount();
+          }}
+          onOpenAuth={() => setAuthOpen(true)}
+          adminRole={adminRole}
+          onOpenAdmin={() => {
+            window.location.assign("/admin");
+          }}
+          organizerStatus={organizerStatus}
+          organizerEventCount={myCulturalEvents.length}
+          onApplyOrganizer={applyOrganizer}
+          onOpenOrganizerComposer={() => {
+            setProfileOpen(false);
+            setEditingCulturalEvent(null);
+            setOrganizerComposerOpen(true);
+          }}
+          onOpenOrganizerEvents={() => {
+            setProfileOpen(false);
+            setMyEventsOpen(true);
+          }}
+          businessStatus={businessStatus}
+          businessPlaceCount={myPlaceClaims.filter((claim) => claim.status !== "rejected").length}
+          onApplyBusiness={applyBusiness}
+          onOpenBusinessPlaces={() => {
+            setProfileOpen(false);
+            setBusinessPlacesOpen(true);
+          }}
+        />
+
+        <OnboardingGate
+          open={onboardingOpen}
+          vibeChips={vibeChips}
+          onClose={closeOnboarding}
+          onRequestLocation={requestLocationFromOnboarding}
+        />
+
+        {storyViewer && (
+          <PlaceStoryViewer
+            groups={placeStoryGroups}
+            startPlaceId={storyViewer.placeId}
+            startStoryId={storyViewer.storyId}
+            markSeen={markSeen}
+            onClose={() => setStoryViewer(null)}
+            onOpenPlace={jumpToMap}
+            onOpenPlaceDetails={(id) => {
+              const place = findPlace(id);
+              if (place) setOpenPlace(place);
+            }}
+            onShare={shareStory}
+            onToggleSave={toggleSave}
+            savedPlaceIds={savedIds}
+          />
+        )}
+
+        <Toast msg={toast} />
+      </div>
+    </MotionConfig>
   );
 }

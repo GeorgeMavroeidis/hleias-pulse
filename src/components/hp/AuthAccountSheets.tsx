@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowLeft,
   BadgeCheck,
+  ArrowLeft,
   Camera,
   FileText,
   LockKeyhole,
@@ -237,7 +237,7 @@ export function AuthSheet({
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-black text-hp-ink">
+                <h3 className="text-lg font-black text-hp-ink">
                   {t(
                     mode === "signIn"
                       ? "Sign in"
@@ -289,7 +289,7 @@ export function AuthSheet({
               </div>
             )}
 
-            <form onSubmit={submit} className="hp-stagger space-y-3">
+            <form onSubmit={submit} className="space-y-3">
               {mode === "signUp" && (
                 <>
                   <Field label={t("Display name")}>
@@ -298,7 +298,7 @@ export function AuthSheet({
                       onChange={(event) => setDisplayName(event.target.value)}
                       autoComplete="name"
                       className={fieldClass()}
-                      placeholder={t("Theo from Pyrgos")}
+                      placeholder="Theo from Pyrgos"
                     />
                   </Field>
                   <Field label={t("Handle")}>
@@ -311,14 +311,34 @@ export function AuthSheet({
                     />
                   </Field>
                   <div>
-                    <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
                       {t("Default identity")}
                     </div>
-                    <IdentitySegments
-                      options={PROFILE_IDENTITIES}
-                      value={identity}
-                      onChange={setIdentity}
-                    />
+                    <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
+                      {PROFILE_IDENTITIES.map((option) => {
+                        const active = identity === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setIdentity(option.id)}
+                            aria-pressed={active}
+                            className={`rounded-xl px-2 py-2 text-left transition ${
+                              active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
+                            }`}
+                          >
+                            <span className="block text-[11px] font-black">{t(option.label)}</span>
+                            <span
+                              className={`block truncate text-[9px] font-semibold ${
+                                active ? "text-hp-paper/65" : "text-hp-muted"
+                              }`}
+                            >
+                              {t(option.helper)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </>
               )}
@@ -380,7 +400,7 @@ export function AuthSheet({
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
+                className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
               >
                 {saving
                   ? t("Working...")

@@ -1,17 +1,45 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, Crosshair, MapPinned, Minus, Plus } from "lucide-react";
 import Supercluster from "supercluster";
 import "leaflet/dist/leaflet.css";
 import { type EventItem, type Place } from "@/lib/hp-model";
 import { useImageUrls } from "@/lib/hp/image-cache";
+import { SEA_SHIMMER_LATLNGS, SEA_SHIMMER_MAX_ZOOM } from "@/lib/hp/sea-shimmer";
+import {
+  areaDefinitionForId,
+  areaIdForPlace,
+  groupPlacesByArea,
+  toneForPlace,
+  type AreaTone,
+} from "@/lib/hp/area-catalog";
+import {
+  getAreaIntelligence,
+  type AreaIntelligence,
+  type AreaIntelligenceSnapshot,
+} from "@/lib/hp/area-intelligence";
+import {
+  aggregateClusterProminence,
+  deriveMarkerProminence,
+  type DiscoveryLens,
+  type DiscoverySnapshot,
+  type MarkerProminence,
+} from "@/lib/hp/discovery";
 import {
   aggregatePulseMetrics,
   pulseMetricForPlace,
   type PulseActivitySnapshot,
   type PulseTier,
 } from "@/lib/hp/pulse-activity";
-import { SEA_SHIMMER_LATLNGS, SEA_SHIMMER_MAX_ZOOM } from "@/lib/hp/sea-shimmer";
 import { useI18n } from "@/lib/i18n";
+import {
+  childMarkerSize,
+  markerPresenceScale,
+  markerMotionPhase,
+  markerViewportDensity,
+  MAX_MARKER_CORE_BEAT,
+  markerWaveStrength,
+  markerMapFillScale,
+} from "@/lib/hp/map-visuals";
 
 type LeafletModule = typeof import("leaflet");
 type LeafletMap = import("leaflet").Map;
@@ -20,6 +48,18 @@ type LatLngTuple = import("leaflet").LatLngTuple;
 type InteractiveMarkerElement = HTMLElement & {
   __hpClickHandler?: EventListener;
   __hpKeyHandler?: EventListener;
+};
+
+type MarkerRuntimeState = {
+  lat: number;
+  lng: number;
+  opacity: number;
+  selected: boolean;
+  visible: boolean;
+  zIndexOffset: number;
+  lensOpacity: number;
+  lensScale: number;
+  prominenceBand: MarkerProminence["band"];
 };
 
 const ILIA_CENTER: LatLngTuple = [37.68, 21.52];
@@ -36,9 +76,6 @@ const OVERVIEW_ZOOM = 9.25;
 const SPLIT_ZOOM = 12.5;
 const DETAIL_CLUSTER_MAX_ZOOM = 13;
 const PLACE_FOCUS_ZOOM = 14.25;
-// Zoom band where individual pins cross-fade in while area clusters dissolve,
-// so the split from "cluster bubble" to "real pins" is smooth, never a hard pop.
-const PLACE_DETAIL_ZOOM = 11;
 // Progressive disclosure bands. Area summaries lead the overview, individual
 // places emerge through the middle zooms, and rich metadata finishes revealing
 // at the same zoom used when a place is focused.
@@ -56,19 +93,58 @@ const ALL_MARKERS_RICH_ZOOM = 15.5;
 // whose pins sit within ~800m) need ~z16 to separate; spread areas stay lower.
 const AREA_FOCUS_MAX_ZOOM = 16.25;
 const ILIA_DETAIL_BBOX: [number, number, number, number] = [19.9, 36.35, 23.25, 39.15];
+const MAP_PAN_DURATION = 0.28;
+const MAP_OVERVIEW_DURATION = 0.34;
+const MAP_FOCUS_DURATION = 0.38;
+const MAP_EASE_LINEARITY = 0.25;
+const RICH_VISUAL_ZOOM = 13.25;
+const MIN_UTILITY_RAIL_HEIGHT = 248;
+const MIN_MAP_CHROME_HEIGHT = 188;
+const SAFE_MARKER_RADIUS = 48;
 
-type AreaTone = "beach" | "culture" | "local" | "music" | "nature" | "village";
+type SafeMapRect = { left: number; right: number; top: number; bottom: number };
+
+const prefersReducedMapMotion = () =>
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function safeMapRect(
+  container: HTMLElement,
+  bottomOverlayHeight: number,
+  availableMapHeight: number,
+  markerRadius = SAFE_MARKER_RADIUS,
+): SafeMapRect {
+  const railVisible = availableMapHeight >= MIN_UTILITY_RAIL_HEIGHT;
+  const chromeVisible = availableMapHeight >= MIN_MAP_CHROME_HEIGHT;
+  const edgeInset = 20 + markerRadius;
+  const rawBottom = Math.max(
+    edgeInset + 32,
+    container.clientHeight - bottomOverlayHeight - 20 - markerRadius,
+  );
+  const desiredTop = (chromeVisible ? 108 : 20) + markerRadius;
+  const top = Math.max(edgeInset, Math.min(desiredTop, rawBottom - 32));
+  return {
+    left: edgeInset,
+    right: Math.max(edgeInset + 32, container.clientWidth - (railVisible ? 64 : 20) - markerRadius),
+    top,
+    bottom: Math.max(top + 32, rawBottom),
+  };
+}
+
+function panDeltaIntoSafeRect(point: { x: number; y: number }, rect: SafeMapRect) {
+  const x =
+    point.x < rect.left ? point.x - rect.left : point.x > rect.right ? point.x - rect.right : 0;
+  const y =
+    point.y < rect.top ? point.y - rect.top : point.y > rect.bottom ? point.y - rect.bottom : 0;
+  return { x, y };
+}
+
+function pointIsInSafeRect(point: { x: number; y: number }, rect: SafeMapRect) {
+  return (
+    point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
+  );
+}
+
 type AreaStatus = PulseTier;
-
-type AreaDef = {
-  id: string;
-  name: string;
-  title: string;
-  tone: AreaTone;
-  /** Explicit, geographically-tight membership. Areas are real neighbourhoods,
-   * assembled from actual coordinates — not fuzzy string matching. */
-  placeIds: string[];
-};
 
 export type MapAreaCluster = {
   id: string;
@@ -87,6 +163,7 @@ export type MapAreaCluster = {
   commentCount: number;
   hotness: number;
   activityScore: number;
+  intelligence: AreaIntelligence | null;
   labelOffsetPx: number;
   avatars: string[];
 };
@@ -97,9 +174,9 @@ type ClusterRenderNode = {
   cluster: MapAreaCluster;
   latLng: LatLngTuple;
   opacity: number;
-  rank: number;
   selected: boolean;
   tier: PulseTier;
+  prominence: MarkerProminence;
 };
 
 type ChildRenderNode = {
@@ -113,7 +190,7 @@ type ChildRenderNode = {
   selected: boolean;
   solo: boolean;
   tier: PulseTier;
-  compact: boolean;
+  prominence: MarkerProminence;
 };
 
 type ActivityClusterRenderNode = {
@@ -131,6 +208,7 @@ type ActivityClusterRenderNode = {
   selected: boolean;
   tone: AreaTone;
   tier: PulseTier;
+  prominence: MarkerProminence;
 };
 
 type RenderNode = ClusterRenderNode | ActivityClusterRenderNode | ChildRenderNode;
@@ -151,154 +229,6 @@ type ActivityClusterProperties = {
   commentCount: number;
   hotness: number;
 };
-
-// Curated from a proximity analysis of every place's real lat/lng
-// (scripts/hp-seed-data.ts). Each area is a genuine neighbourhood (max spread
-// ~6km) so clicking it can always frame its pins close & separated. Isolated
-// places are intentionally left out — they render as standalone pins, not
-// force-fit into a faraway bubble.
-const AREA_DEFS: AreaDef[] = [
-  {
-    id: "olympia",
-    name: "Ancient Olympia",
-    title: "Olympia pulse",
-    tone: "culture",
-    placeIds: ["ancient-olympia", "olympia-stadium", "olympia-museum", "olympic-games-museum"],
-  },
-  {
-    id: "ancient-elis",
-    name: "Ancient Elis",
-    title: "Ancient Elis",
-    tone: "culture",
-    placeIds: ["ancient-elis", "elis-agora"],
-  },
-  {
-    id: "katakolo",
-    name: "Katakolo",
-    title: "Katakolo sunset",
-    tone: "beach",
-    placeIds: [
-      "katakolo-port",
-      "katakolo-sunset",
-      "katakolo-kiani-akti",
-      "agios-andreas",
-      "lechaina-zacharo-flower",
-    ],
-  },
-  {
-    id: "skafidia",
-    name: "Skafidia",
-    title: "Skafidia coast",
-    tone: "beach",
-    placeIds: ["skafidia", "skafidia-monastery", "korakochori", "mercouri-estate"],
-  },
-  {
-    id: "kourouta",
-    name: "Kourouta",
-    title: "Kourouta tonight",
-    tone: "music",
-    placeIds: ["kourouta-beach", "kourouta-sunset", "palouki-beach", "amaliada-square"],
-  },
-  {
-    id: "kyllini",
-    name: "Kyllini",
-    title: "Kyllini harbor",
-    tone: "beach",
-    placeIds: ["kyllini-beach", "kyllini-harbor", "kyllini-old-beach"],
-  },
-  {
-    id: "chlemoutsi",
-    name: "Chlemoutsi",
-    title: "Chlemoutsi & Arkoudi",
-    tone: "culture",
-    placeIds: ["chlemoutsi", "chlemoutsi-sea-view", "loutra-kyllinis", "arkoudi-beach"],
-  },
-  {
-    id: "pyrgos",
-    name: "Pyrgos",
-    title: "Pyrgos is moving",
-    tone: "local",
-    placeIds: ["pyrgos-centre", "pyrgos-night"],
-  },
-  {
-    id: "pineios",
-    name: "Pineios",
-    title: "Pineios plain",
-    tone: "local",
-    placeIds: ["vartholomio", "gastouni"],
-  },
-  {
-    id: "zacharo",
-    name: "Zacharo",
-    title: "Zacharo sunset",
-    tone: "beach",
-    placeIds: ["zacharo-beach", "kaiafas-lake", "kaiafas-sunset"],
-  },
-  {
-    id: "kakovatos",
-    name: "Kakovatos",
-    title: "Kakovatos",
-    tone: "beach",
-    placeIds: ["kakovatos-beach", "kakovatos-inland"],
-  },
-  {
-    id: "south-coast",
-    name: "South Coast",
-    title: "South Coast pulse",
-    tone: "beach",
-    placeIds: ["giannitsochori", "tholo-beach"],
-  },
-  {
-    id: "foloi",
-    name: "Foloi Forest",
-    title: "Foloi tips",
-    tone: "nature",
-    placeIds: ["foloi-forest", "foloi-deep"],
-  },
-  {
-    id: "nemouta",
-    name: "Nemouta",
-    title: "Nemouta waterfalls",
-    tone: "nature",
-    placeIds: ["nemouta-waterfalls", "nemouta-village"],
-  },
-  {
-    id: "andritsaina",
-    name: "Andritsaina",
-    title: "Andritsaina village",
-    tone: "village",
-    placeIds: ["andritsaina", "andritsaina-streets"],
-  },
-  {
-    id: "bassae",
-    name: "Bassae",
-    title: "Temple of Bassae",
-    tone: "culture",
-    placeIds: ["bassae-temple", "bassae-inside"],
-  },
-];
-
-const PLACE_AREA_ID: Map<string, string> = new Map(
-  AREA_DEFS.flatMap((def) => def.placeIds.map((id) => [id, def.id] as const)),
-);
-
-function areaIdForPlace(place: Place): string {
-  // Known place -> its curated neighbourhood; otherwise a standalone area
-  // (renders as a lone pin, no bubble).
-  return PLACE_AREA_ID.get(place.id) ?? `solo-${place.id}`;
-}
-
-function areaDefForId(id: string): AreaDef | null {
-  return AREA_DEFS.find((def) => def.id === id) ?? null;
-}
-
-function toneForPlace(place: Place): AreaTone {
-  if (place.type === "beach" || place.type === "sunset") return "beach";
-  if (place.type === "culture") return "culture";
-  if (place.type === "nature") return "nature";
-  if (place.type === "village" || place.type === "night") return "village";
-  return "local";
-}
 
 function clusterIdForPlace(place: Place) {
   return areaIdForPlace(place);
@@ -338,80 +268,17 @@ function activityLineForCluster(
 }
 
 function markerStyle(size: number, id: string) {
-  let hash = 0;
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
-  }
-  const delaySeconds = ((hash % 5400) / 1000).toFixed(3);
-  return `--marker-size:${size}px;--hp-pulse-delay:-${delaySeconds}s`;
+  return `--marker-size:${size}px;--hp-motion-phase:${markerMotionPhase(id)}`;
 }
 
-function typeColorToken(place: Place) {
-  if (place.type === "beach") return "var(--hp-sea)";
-  if (place.type === "nature") return "var(--hp-olive)";
-  if (place.type === "night" || place.type === "village") return "var(--hp-purple)";
-  if (place.type === "culture") return "var(--hp-deep)";
-  return "var(--hp-sunset)";
+function clusterSize(status: AreaStatus) {
+  const base = status === "live" ? 76 : status === "hot" ? 70 : status === "moving" ? 64 : 60;
+  return base;
 }
 
-// ── Bubble size & animation, tied to a live-activity proxy ──────────────────
-// There is no real-time presence data yet, so `activityScore` blends the
-// place's pulse score with how many recent posts it carries and whether it has
-// a live signal (a story / an event) into a 0..1 "how alive right now". That
-// one number drives both the bubble's size and which animation tier it gets,
-// so LIVE/HOT spots read as only slightly bigger + livelier, not dramatically.
-const BUBBLE_BASE_PX = 34;
-const BUBBLE_SPAN_PX = 12;
-
-function activityScore(hotness: number, recentPostCount: number, liveSignal: boolean) {
-  return (
-    0.6 * clamp01(hotness / 10) + 0.3 * clamp01(recentPostCount / 8) + 0.1 * (liveSignal ? 1 : 0)
-  );
-}
-
-function bubbleSize(activity: number, statusBump: boolean, selected: boolean) {
-  const raw = BUBBLE_BASE_PX + BUBBLE_SPAN_PX * clamp01(activity) + (statusBump ? 2 : 0);
-  return Math.round(raw * (selected ? 1.06 : 1));
-}
-
-export function clusterActivity(cluster: MapAreaCluster) {
-  const avgPosts = cluster.postCount / Math.max(cluster.places.length, 1);
-  const liveSignal = cluster.eventCount > 0 || cluster.status === "live";
-  return activityScore(cluster.hotness, avgPosts, liveSignal);
-}
-
-// Three display tiers for the "Explore areas" panel + smart-insight banner,
-// bucketed from the same 0..1 live-activity proxy that drives the bubbles.
-// The cuts sit a touch above the per-place bubbleTier cuts (0.45 / 0.65):
-// area scores are built from averages so they compress toward the middle.
-// Deliberately tunable — revisit after real usage.
-export type AreaTier = "hot" | "active" | "calm";
-
-export function areaTier(cluster: MapAreaCluster): AreaTier {
-  if (cluster.status === "live") return "hot";
-  const activity = clusterActivity(cluster);
-  if (activity >= 0.7) return "hot";
-  if (activity >= 0.48) return "active";
-  return "calm";
-}
-
-function clusterSize(cluster: MapAreaCluster, selected: boolean, compact: boolean) {
-  const statusBump = cluster.status === "live" || cluster.status === "hot";
-  const size = bubbleSize(clusterActivity(cluster), statusBump, selected);
-  // "compact" (lower-ranked, label-less) bubbles are trimmed a touch, not shrunk
-  // to a dot — they still read their activity size and animation tier.
-  return compact && !selected ? Math.round(size * 0.86) : size;
-}
-
-function childSize(place: Place, selected: boolean, liveSignal: boolean) {
-  const activity = activityScore(place.hotness, place.recentPostCount, liveSignal);
-  return bubbleSize(activity, place.hotness >= 8, selected);
-}
-
-function activityClusterSize(node: ActivityClusterRenderNode, selected: boolean) {
-  const avgPosts = node.postCount / Math.max(node.pointCount, 1);
-  const activity = activityScore(node.hotness, avgPosts, node.eventCount > 0);
-  return bubbleSize(activity, node.hotness >= 8, selected);
+function activityClusterSize(pointCount: number) {
+  const base = pointCount >= 8 ? 72 : pointCount >= 5 ? 64 : pointCount >= 3 ? 56 : 50;
+  return base;
 }
 
 function uniqueAvatars(places: Place[]) {
@@ -450,22 +317,17 @@ export function buildAreaClusters(
   places: Place[],
   events: EventItem[],
   activitySnapshot: PulseActivitySnapshot = {},
+  intelligenceSnapshot: AreaIntelligenceSnapshot = {},
 ): MapAreaCluster[] {
   const eventCounts = eventCountForPlace(events);
 
   // Group by curated neighbourhood; places not in any def become standalone
   // single-pin "areas" (id `solo-<placeId>`) so they still render on the map.
-  const grouped = new Map<string, Place[]>();
-  places.forEach((place) => {
-    const id = areaIdForPlace(place);
-    const arr = grouped.get(id);
-    if (arr) arr.push(place);
-    else grouped.set(id, [place]);
-  });
+  const grouped = groupPlacesByArea(places);
 
   return [...grouped.entries()]
     .map(([id, areaPlaces]) => {
-      const def = areaDefForId(id);
+      const def = areaDefinitionForId(id);
       const sortedPlaces = [...areaPlaces].sort(
         (a, b) =>
           scorePlace(b, activitySnapshot, eventCounts.get(b.id) ?? 0) -
@@ -498,6 +360,7 @@ export function buildAreaClusters(
         commentCount: activity.commentCount,
         hotness,
         activityScore: activity.score,
+        intelligence: getAreaIntelligence(intelligenceSnapshot, id),
         labelOffsetPx: 0,
         avatars: uniqueAvatars(sortedPlaces).slice(0, 3),
       };
@@ -519,6 +382,14 @@ function escapeHtml(value: string) {
 // reads as a calm placeholder rather than a broken image.
 const PLACEHOLDER_IMG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=";
+const MARKER_EFFECTS_VERSION = "4";
+const MARKER_EFFECTS_HTML = `
+  <span class="hp-marker-effects" data-effects-version="${MARKER_EFFECTS_VERSION}">
+    <span class="hp-marker-field"></span>
+    <span class="hp-marker-wave"></span>
+    <span class="hp-marker-sweep"></span>
+  </span>
+`;
 
 function resolveUrl(resolve: (url: string) => string, url: string) {
   const value = url ? resolve(url) : "";
@@ -528,13 +399,9 @@ function resolveUrl(resolve: (url: string) => string, url: string) {
 function createAreaIcon(
   L: LeafletModule,
   cluster: MapAreaCluster,
-  selected: boolean,
-  rank: number,
   resolve: (url: string) => string,
 ) {
-  const compact = !selected && cluster.status !== "live" && rank > 1;
-  const size = clusterSize(cluster, selected, compact);
-  const labelOffsetPx = selected ? 0 : cluster.labelOffsetPx;
+  const size = clusterSize(cluster.status);
   const images = cluster.places.slice(0, 3);
   const collage = images
     .map(
@@ -550,36 +417,34 @@ function createAreaIcon(
       (avatar) => `<img src="${escapeHtml(resolveUrl(resolve, avatar))}" alt="" loading="lazy" />`,
     )
     .join("");
-  const statusLabel =
-    cluster.status === "quiet"
-      ? ""
-      : selected || rank <= 1 || cluster.status === "live"
-        ? cluster.status
-        : "";
+  const statusLabel = cluster.status === "quiet" ? "" : cluster.status;
 
   return L.divIcon({
     className: "hp-area-marker",
     html: `
       <div
-        class="hp-area-marker__shell is-pulse-${cluster.status} ${selected ? "is-selected" : ""} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""} ${compact ? "is-compact" : ""}"
+        class="hp-area-marker__shell is-pulse-${cluster.status} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, cluster.id)}"
       >
-        <span class="hp-marker-aura"></span>
-        <span class="hp-area-marker__ring"></span>
-        <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
-        <span class="hp-area-marker__shade"></span>
-        <span class="hp-area-marker__initial">${escapeHtml(cluster.name.slice(0, 1))}</span>
-        ${statusLabel ? `<span class="hp-area-marker__status">${escapeHtml(statusLabel)}</span>` : ""}
-        <span class="hp-area-marker__copy">
-          <strong>${escapeHtml(cluster.name)}</strong>
-          <em>${escapeHtml(cluster.activityLine)}</em>
+        ${MARKER_EFFECTS_HTML}
+        <span class="hp-marker-core">
+          <span class="hp-area-marker__ring"></span>
+          <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
+          <span class="hp-area-marker__shade"></span>
+          ${statusLabel ? `<span class="hp-area-marker__status">${escapeHtml(statusLabel)}</span>` : ""}
+          <span class="hp-area-marker__copy">
+            <strong>${escapeHtml(cluster.name)}</strong>
+            <em>${escapeHtml(cluster.activityLine)}</em>
+          </span>
+          ${avatars ? `<span class="hp-area-marker__avatars">${avatars}</span>` : ""}
+          ${cluster.status !== "quiet" ? '<span class="hp-area-marker__dot"></span>' : ""}
         </span>
-        ${avatars ? `<span class="hp-area-marker__avatars">${avatars}</span>` : ""}
-        ${cluster.status !== "quiet" ? '<span class="hp-area-marker__dot"></span>' : ""}
       </div>
     `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2 - labelOffsetPx, size / 2],
+    // A stable one-pixel Leaflet anchor lets CSS scale the visual around the
+    // real coordinate without rebuilding/re-anchoring the DivIcon while zooming.
+    iconSize: [1, 1],
+    iconAnchor: [0.5, 0.5],
   });
 }
 
@@ -588,25 +453,11 @@ function createChildIcon(
   place: Place,
   eventCount: number,
   tier: PulseTier,
-  selected: boolean,
   hasStories = false,
   solo = false,
-  compact = false,
   resolve: (url: string) => string = (url) => url,
 ) {
-  const color = typeColorToken(place);
-
-  if (compact) {
-    const size = selected ? 18 : 13;
-    return L.divIcon({
-      className: "hp-child-marker hp-child-marker--dot",
-      html: `<span class="hp-child-marker__dot-pin ${selected ? "is-selected" : ""}" style="--marker-color:${color};"></span>`,
-      iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2],
-    });
-  }
-
-  const size = childSize(place, selected, hasStories || eventCount > 0);
+  const size = childMarkerSize(tier);
   const line =
     eventCount > 0
       ? `${eventCount} event${eventCount === 1 ? "" : "s"}`
@@ -623,29 +474,31 @@ function createChildIcon(
     className: "hp-child-marker",
     html: `
       <div
-        class="hp-child-marker__shell is-pulse-${tier} ${selected ? "is-selected" : ""} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${tier === "live" ? "is-live" : ""} ${tier === "hot" ? "is-hot" : ""}"
+        class="hp-child-marker__shell is-pulse-${tier} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${tier === "live" ? "is-live" : ""} ${tier === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, place.id)}"
       >
-        <span class="hp-marker-aura"></span>
-        ${hasStories ? '<span class="hp-child-marker__story-ring"></span>' : ""}
-        <span class="hp-child-marker__ring"></span>
-        <span class="hp-child-marker__media">
-          <img class="hp-child-marker__image" src="${escapeHtml(
-            resolveUrl(resolve, place.imageUrl),
-          )}" alt="" loading="lazy" />
-          <span class="hp-child-marker__shade"></span>
-          <span class="hp-child-marker__copy">
-            <strong>${escapeHtml(shortPlaceName(place.name))}</strong>
-            <em>${escapeHtml(line)}</em>
+        ${MARKER_EFFECTS_HTML}
+        <span class="hp-marker-core">
+          ${hasStories ? '<span class="hp-child-marker__story-ring"></span>' : ""}
+          <span class="hp-child-marker__ring"></span>
+          <span class="hp-child-marker__media">
+            <img class="hp-child-marker__image" src="${escapeHtml(
+              resolveUrl(resolve, place.imageUrl),
+            )}" alt="" loading="lazy" />
+            <span class="hp-child-marker__shade"></span>
+            <span class="hp-child-marker__copy">
+              <strong>${escapeHtml(shortPlaceName(place.name))}</strong>
+              <em>${escapeHtml(line)}</em>
+            </span>
           </span>
-          ${place.recentPostCount > 0 ? '<span class="hp-child-marker__dot"></span>' : ""}
+          ${tier !== "quiet" ? '<span class="hp-child-marker__dot"></span>' : ""}
+          ${statusLabel ? `<span class="hp-child-marker__status">${statusLabel}</span>` : ""}
+          ${avatars ? `<span class="hp-child-marker__avatars">${avatars}</span>` : ""}
         </span>
-        ${statusLabel ? `<span class="hp-child-marker__status">${statusLabel}</span>` : ""}
-        ${avatars ? `<span class="hp-child-marker__avatars">${avatars}</span>` : ""}
       </div>
     `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    iconSize: [1, 1],
+    iconAnchor: [0.5, 0.5],
   });
 }
 
@@ -654,7 +507,7 @@ function createActivityClusterIcon(
   node: ActivityClusterRenderNode,
   resolve: (url: string) => string,
 ) {
-  const size = activityClusterSize(node, node.selected);
+  const size = activityClusterSize(node.pointCount);
   const images = [...node.leaves]
     .sort((a, b) => b.hotness - a.hotness || a.id.localeCompare(b.id))
     .slice(0, 3);
@@ -675,22 +528,24 @@ function createActivityClusterIcon(
     className: "hp-activity-cluster",
     html: `
       <div
-        class="hp-area-marker__shell hp-area-marker__shell--activity is-pulse-${node.tier} ${node.selected ? "is-selected" : ""} ${node.tier === "live" ? "is-live" : ""} ${node.tier === "hot" ? "is-hot" : ""}"
+        class="hp-area-marker__shell hp-area-marker__shell--activity is-pulse-${node.tier} ${node.tier === "live" ? "is-live" : ""} ${node.tier === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, node.id)}"
       >
-        <span class="hp-marker-aura"></span>
-        <span class="hp-area-marker__ring"></span>
-        <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
-        <span class="hp-area-marker__shade"></span>
-        <span class="hp-area-marker__count">${node.pointCount}</span>
-        <span class="hp-area-marker__copy">
-          <strong>${escapeHtml(node.dominantCluster.name)}</strong>
-          <em>${escapeHtml(line)}</em>
+        ${MARKER_EFFECTS_HTML}
+        <span class="hp-marker-core">
+          <span class="hp-area-marker__ring"></span>
+          <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
+          <span class="hp-area-marker__shade"></span>
+          <span class="hp-area-marker__copy">
+            <strong>${escapeHtml(node.dominantCluster.name)}</strong>
+            <em>${escapeHtml(line)}</em>
+          </span>
+          ${node.tier !== "quiet" ? '<span class="hp-area-marker__dot"></span>' : ""}
         </span>
       </div>
     `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    iconSize: [1, 1],
+    iconAnchor: [0.5, 0.5],
   });
 }
 
@@ -713,12 +568,86 @@ function smoothstep(start: number, end: number, value: number) {
   return t * t * (3 - 2 * t);
 }
 
+type ZoomAnchor = readonly [zoom: number, value: number];
+
+function interpolateZoomAnchors(zoom: number, anchors: readonly ZoomAnchor[]) {
+  const first = anchors[0];
+  const last = anchors[anchors.length - 1];
+  if (!first || !last) return 0;
+  if (zoom <= first[0]) return first[1];
+  if (zoom >= last[0]) return last[1];
+
+  for (let index = 1; index < anchors.length; index += 1) {
+    const previous = anchors[index - 1];
+    const next = anchors[index];
+    if (!previous || !next || zoom > next[0]) continue;
+    const progress = smoothstep(previous[0], next[0], zoom);
+    return previous[1] + (next[1] - previous[1]) * progress;
+  }
+
+  return last[1];
+}
+
 function markerZoomProfile(zoom: number) {
+  const childScale = interpolateZoomAnchors(zoom, [
+    [MIN_ZOOM, 0.24],
+    [OVERVIEW_ZOOM, 0.24],
+    [11.5, 0.52],
+    [12.5, 0.68],
+    [PLACE_FOCUS_ZOOM, 0.9],
+    [ALL_MARKERS_RICH_ZOOM, 1],
+  ]);
+  const soloScale = interpolateZoomAnchors(zoom, [
+    [MIN_ZOOM, 0.38],
+    [OVERVIEW_ZOOM, 0.38],
+    [11.5, 0.58],
+    [12.5, 0.68],
+    [PLACE_FOCUS_ZOOM, 0.9],
+    [ALL_MARKERS_RICH_ZOOM, 1],
+  ]);
+
   return {
     medium: smoothstep(PLACE_REVEAL_START, MEDIUM_VISUAL_END, zoom),
     detail: smoothstep(DETAIL_VISUAL_START, PLACE_FOCUS_ZOOM, zoom),
     rich: smoothstep(RICH_VISUAL_START, PLACE_FOCUS_ZOOM, zoom),
     ultra: smoothstep(PLACE_FOCUS_ZOOM, ALL_MARKERS_RICH_ZOOM, zoom),
+    childScale,
+    soloScale,
+    areaScale: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.38],
+      [OVERVIEW_ZOOM, 0.38],
+      [11.5, 0.52],
+      [AREA_FADE_END, 0.62],
+    ]),
+    activityScale: interpolateZoomAnchors(zoom, [
+      [ACTIVITY_CLUSTER_START, 0.58],
+      [ACTIVITY_CLUSTER_FULL, 0.75],
+      [DETAIL_CLUSTER_MAX_ZOOM, 0.84],
+      [PLACE_FOCUS_ZOOM, 0.9],
+    ]),
+    surfaceOpacity: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.74],
+      [OVERVIEW_ZOOM, 0.78],
+      [11.5, 0.86],
+      [12.5, 0.92],
+      [PLACE_FOCUS_ZOOM, 0.98],
+      [ALL_MARKERS_RICH_ZOOM, 1],
+    ]),
+    auraOpacity: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.3],
+      [OVERVIEW_ZOOM, 0.34],
+      [11.5, 0.42],
+      [12.5, 0.48],
+      [PLACE_FOCUS_ZOOM, 0.58],
+      [ALL_MARKERS_RICH_ZOOM, 0.6],
+    ]),
+    ringOpacity: interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.68],
+      [OVERVIEW_ZOOM, 0.72],
+      [12.5, 0.86],
+      [PLACE_FOCUS_ZOOM, 0.96],
+      [ALL_MARKERS_RICH_ZOOM, 1],
+    ]),
   };
 }
 
@@ -726,32 +655,80 @@ function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
   if (!node) return;
   const profile = markerZoomProfile(zoom);
   const farPulse = 1 - smoothstep(OVERVIEW_ZOOM, PLACE_FOCUS_ZOOM, zoom);
-  const childScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.35;
-  const nearbyScale = 0.18 + profile.medium * 0.47 + profile.detail * 0.07 + profile.ultra * 0.28;
-  const soloScale = 0.32 + profile.medium * (nearbyScale - 0.32);
+  const themeDetail = smoothstep(10.5, RICH_VISUAL_START, zoom);
+  node.style.setProperty("--hp-map-fill-scale", markerMapFillScale(zoom).toFixed(4));
+  for (const tier of ["quiet", "moving", "hot", "live"] as const) {
+    node.style.setProperty(`--hp-presence-${tier}`, markerPresenceScale(zoom, tier).toFixed(4));
+  }
+  node.classList.toggle("hp-map-identity-far", zoom < 10.5);
   node.style.setProperty("--hp-map-medium", profile.medium.toFixed(4));
   node.style.setProperty("--hp-map-detail", profile.detail.toFixed(4));
   node.style.setProperty("--hp-map-rich", profile.rich.toFixed(4));
   node.style.setProperty("--hp-map-ultra", profile.ultra.toFixed(4));
-  node.style.setProperty("--hp-map-child-scale", childScale.toFixed(4));
-  node.style.setProperty("--hp-map-nearby-scale", nearbyScale.toFixed(4));
-  node.style.setProperty("--hp-map-area-scale", (0.34 + profile.medium * 0.3).toFixed(4));
-  node.style.setProperty(
-    "--hp-map-activity-scale",
-    (0.46 + profile.medium * 0.2 + profile.detail * 0.24).toFixed(4),
-  );
+  node.style.setProperty("--hp-map-child-scale", profile.childScale.toFixed(4));
+  node.style.setProperty("--hp-map-nearby-scale", profile.childScale.toFixed(4));
+  node.style.setProperty("--hp-map-solo-scale", profile.soloScale.toFixed(4));
+  node.style.setProperty("--hp-map-area-scale", profile.areaScale.toFixed(4));
+  node.style.setProperty("--hp-map-activity-scale", profile.activityScale.toFixed(4));
+  node.style.setProperty("--hp-map-surface-opacity", profile.surfaceOpacity.toFixed(4));
+  node.style.setProperty("--hp-map-aura-opacity", profile.auraOpacity.toFixed(4));
+  node.style.setProperty("--hp-map-ring-opacity", profile.ringOpacity.toFixed(4));
   node.style.setProperty(
     "--hp-map-media-opacity",
-    (0.78 + profile.medium * 0.14 + profile.detail * 0.08).toFixed(4),
+    interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.82],
+      [11.5, 0.86],
+      [12.5, 0.92],
+      [PLACE_FOCUS_ZOOM, 0.98],
+      [ALL_MARKERS_RICH_ZOOM, 1],
+    ]).toFixed(4),
   );
-  node.style.setProperty("--hp-map-media-scale", (0.92 + profile.medium * 0.08).toFixed(4));
+  node.style.setProperty(
+    "--hp-map-media-scale",
+    interpolateZoomAnchors(zoom, [
+      [MIN_ZOOM, 0.94],
+      [12.5, 0.97],
+      [PLACE_FOCUS_ZOOM, 1],
+    ]).toFixed(4),
+  );
   node.style.setProperty("--hp-map-rich-scale", (0.8 + profile.rich * 0.2).toFixed(4));
   node.style.setProperty("--hp-map-dot-opacity", (0.35 + profile.medium * 0.65).toFixed(4));
-  node.style.setProperty("--hp-map-solo-scale", soloScale.toFixed(4));
   node.style.setProperty("--hp-map-copy-offset", `${((1 - profile.rich) * 0.2).toFixed(4)}rem`);
   node.style.setProperty("--hp-map-pulse-moving-peak", (1.04 + farPulse * 0.08).toFixed(4));
   node.style.setProperty("--hp-map-pulse-hot-peak", (1.08 + farPulse * 0.14).toFixed(4));
   node.style.setProperty("--hp-map-pulse-live-peak", (1.12 + farPulse * 0.18).toFixed(4));
+  node.style.setProperty("--hp-map-theme-detail", themeDetail.toFixed(4));
+  node.style.setProperty("--hp-map-wave-strength", markerWaveStrength(zoom).toFixed(4));
+}
+
+// Conservative theme-independent radius: Pulse is the largest core. Include
+// the rim/dot, but not the decorative wave, to avoid unnecessary camera pans.
+function markerCoreRadius(node: RenderNode, zoom: number) {
+  const profile = markerZoomProfile(zoom);
+  const size =
+    node.kind === "child"
+      ? childMarkerSize(node.tier)
+      : node.kind === "cluster"
+        ? clusterSize(node.tier)
+        : activityClusterSize(node.pointCount);
+  const scale =
+    node.kind === "cluster"
+      ? profile.areaScale
+      : node.kind === "activity-cluster"
+        ? profile.activityScale
+        : node.solo && !node.selected
+          ? profile.soloScale
+          : profile.childScale;
+  return (
+    (size *
+      scale *
+      markerPresenceScale(zoom, node.tier) *
+      markerMapFillScale(zoom) *
+      (node.selected ? 1.1 : 1) *
+      MAX_MARKER_CORE_BEAT) /
+      2 +
+    6
+  );
 }
 
 function centroidOfPlaces(places: Place[], fallback: LatLngTuple): LatLngTuple {
@@ -826,19 +803,36 @@ interface Props {
   selectedAreaId: string | null;
   selectedPlaceId?: string | null;
   activeFilterLabel?: string | null;
+  activeLens?: DiscoveryLens | null;
+  discoverySnapshot?: DiscoverySnapshot;
   storyPlaceIds?: ReadonlySet<string>;
   onSelectArea: (cluster: MapAreaCluster) => void;
   onSelectPlace: (place: Place, cluster: MapAreaCluster) => void;
   onResetView: () => void;
+  onClearSelection: () => void;
+  onDiscoveryViewportChange?: (viewport: MapDiscoveryViewport) => void;
   canGoBack?: boolean;
   onBack?: () => void;
-  areaFocusBottomPadding?: number;
-  selectedBottomPadding?: number;
+  bottomOverlayHeight: number;
+  availableMapHeight: number;
   /** Ordered lat/lng path to draw as a route polyline (e.g. an open route's stops). */
   routePath?: { lat: number; lng: number; label: string }[] | null;
   /** Fired on map long-press so the shell can open the composer pre-filled. */
   onMapLongPress?: (lat: number, lng: number) => void;
 }
+
+export type MapDiscoveryViewport = {
+  center: { lat: number; lng: number };
+  visibleAreaIds: string[];
+};
+
+const NEUTRAL_PROMINENCE: MarkerProminence = {
+  score: 1,
+  band: "high",
+  opacityFactor: 1,
+  scaleFactor: 1,
+  zIndexBoost: 0,
+};
 
 export function SocialMap({
   clusters,
@@ -847,14 +841,18 @@ export function SocialMap({
   selectedAreaId,
   selectedPlaceId,
   activeFilterLabel,
+  activeLens = null,
+  discoverySnapshot = { places: {}, areas: {} },
   storyPlaceIds,
   onSelectArea,
   onSelectPlace,
   onResetView,
+  onClearSelection,
+  onDiscoveryViewportChange,
   canGoBack = false,
   onBack,
-  areaFocusBottomPadding = 0,
-  selectedBottomPadding = 0,
+  bottomOverlayHeight,
+  availableMapHeight,
   routePath = null,
   onMapLongPress,
 }: Props) {
@@ -864,25 +862,44 @@ export function SocialMap({
   const leafletRef = useRef<LeafletModule | null>(null);
   const markersRef = useRef<Map<string, LeafletMarker>>(new Map());
   const markerSigRef = useRef<Map<string, string>>(new Map());
+  const markerRuntimeRef = useRef<Map<string, MarkerRuntimeState>>(new Map());
+  const markerClickHandlerRef = useRef<Map<string, () => void>>(new Map());
+  const renderNodesRef = useRef<Map<string, RenderNode>>(new Map());
+  const scheduleMarkerViewportSyncRef = useRef<() => void>(() => {});
+  const activitySnapshotRef = useRef(activitySnapshot);
+  activitySnapshotRef.current = activitySnapshot;
+  const activateMarkerByIdRef = useRef<(id: string) => void>(() => undefined);
   const userMarkerRef = useRef<LeafletMarker | null>(null);
   const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const seaLayerRef = useRef<import("leaflet").Polygon | null>(null);
   const seaVisibleRef = useRef(false);
   const onMapLongPressRef = useRef(onMapLongPress);
   onMapLongPressRef.current = onMapLongPress;
+  const onClearSelectionRef = useRef(onClearSelection);
+  onClearSelectionRef.current = onClearSelection;
+  const onDiscoveryViewportChangeRef = useRef(onDiscoveryViewportChange);
+  onDiscoveryViewportChangeRef.current = onDiscoveryViewportChange;
+  const lastDiscoveryViewportRef = useRef("");
+  const bottomOverlayHeightRef = useRef(bottomOverlayHeight);
+  bottomOverlayHeightRef.current = bottomOverlayHeight;
+  const availableMapHeightRef = useRef(availableMapHeight);
+  availableMapHeightRef.current = availableMapHeight;
   const didInitialFitRef = useRef(false);
   const lastMarkerActivationRef = useRef<{ id: string; at: number } | null>(null);
-  // Timestamp of the last explicit fly/fit call, so a selection that arrives
-  // from outside the map (Explore areas panel, deep link) can frame its area
-  // without double-animating when a marker/chip tap already did.
-  const lastProgrammaticFocusRef = useRef(0);
   const previousSelectionRef = useRef<{ areaId: string | null; placeId: string | null }>({
     areaId: null,
     placeId: null,
   });
+  const lastFocusedPlaceIdRef = useRef<string | null>(null);
+  const selectionMotionUntilRef = useRef(0);
+  const cameraHandledSelectionRef = useRef<string | null>(null);
+  const ignoreBackgroundClickUntilRef = useRef(0);
   const lastZoomRef = useRef(OVERVIEW_ZOOM);
   const [mapReady, setMapReady] = useState(false);
   const [zoom, setZoom] = useState(OVERVIEW_ZOOM);
+  const selectionKey = `${selectedAreaId ?? ""}|${selectedPlaceId ?? ""}`;
+  const selectionKeyRef = useRef(selectionKey);
+  selectionKeyRef.current = selectionKey;
 
   const eventCounts = useMemo(() => eventCountForPlace(events), [events]);
   const clusterById = useMemo(
@@ -958,7 +975,6 @@ export function SocialMap({
 
   const renderNodes = useMemo<RenderNode[]>(() => {
     const nodes: RenderNode[] = [];
-    const compact = zoom < PLACE_DETAIL_ZOOM;
     const placeOpacity = placeOpacityForZoom(zoom);
 
     // 1) Every place is ALWAYS on the map at its true coordinate. Selection only
@@ -980,31 +996,37 @@ export function SocialMap({
           place,
           eventCount: activity.eventCount,
           latLng: [place.lat, place.lng],
-          opacity: selected ? 1 : placeOpacity,
+          opacity: selected ? 1 : solo ? Math.max(0.72, placeOpacity) : placeOpacity,
           selected,
           solo,
           tier: activity.tier,
-          compact,
+          prominence: NEUTRAL_PROMINENCE,
         });
       });
     });
 
     // 2) Area clusters ride on top as helpers and fade out as pins emerge.
     //    Standalone single-pin areas skip the bubble (they're just a pin).
-    if (!isSplitZoom) {
+    if (zoom < AREA_FADE_END) {
       const areaOpacity = areaClusterOpacityForZoom(zoom);
       if (areaOpacity > 0.001) {
-        clusters.forEach((cluster, index) => {
+        clusters.forEach((cluster) => {
           if (cluster.places.length < 2) return;
+          const selected = Boolean(
+            selectedAreaId &&
+            !selectedPlaceId &&
+            zoom < ACTIVITY_CLUSTER_FULL &&
+            cluster.id === selectedAreaId,
+          );
           nodes.push({
             id: `cluster-${cluster.id}`,
             kind: "cluster",
             cluster,
             latLng: [cluster.lat, cluster.lng],
-            opacity: cluster.id === selectedAreaId ? Math.max(areaOpacity, 0.6) : areaOpacity,
-            rank: index,
-            selected: cluster.id === selectedAreaId,
+            opacity: selected ? 1 : areaOpacity,
+            selected,
             tier: cluster.status,
+            prominence: NEUTRAL_PROMINENCE,
           });
         });
       }
@@ -1013,7 +1035,7 @@ export function SocialMap({
     // 3) At detail zoom, activity bubbles group dense spots. Each one is placed
     //    at the centroid of its members and fades into the already-rendered pins
     //    as you zoom toward its expansion zoom -> clean split, no relocation.
-    if (isSplitZoom) {
+    if (zoom >= ACTIVITY_CLUSTER_START) {
       const features = placeClusterIndex.getClusters(ILIA_DETAIL_BBOX, superclusterZoom(zoom));
       features.forEach((feature) => {
         if (!isActivityClusterFeature(feature)) return;
@@ -1060,28 +1082,112 @@ export function SocialMap({
           eventCount: activity.eventCount,
           postCount: activity.postCount,
           hotness: activity.hotness,
-          selected: Boolean(
-            selectedAreaId && leaves.some((place) => clusterIdForPlace(place) === selectedAreaId),
-          ),
+          selected: false,
           tone: dominantCluster.tone,
           tier: activity.tier,
+          prominence: NEUTRAL_PROMINENCE,
         });
       });
     }
 
+    if (selectedAreaId && !selectedPlaceId && zoom >= ACTIVITY_CLUSTER_FULL) {
+      const selectedArea = clusterById.get(selectedAreaId);
+      const candidates = nodes.filter(
+        (node): node is ActivityClusterRenderNode =>
+          node.kind === "activity-cluster" &&
+          node.leaves.some((place) => clusterIdForPlace(place) === selectedAreaId),
+      );
+      candidates.sort((first, second) => {
+        if (!selectedArea) return second.hotness - first.hotness;
+        const firstDistance =
+          (first.latLng[0] - selectedArea.lat) ** 2 + (first.latLng[1] - selectedArea.lng) ** 2;
+        const secondDistance =
+          (second.latLng[0] - selectedArea.lat) ** 2 + (second.latLng[1] - selectedArea.lng) ** 2;
+        return firstDistance - secondDistance || second.hotness - first.hotness;
+      });
+      if (candidates[0]) {
+        candidates[0].selected = true;
+        candidates[0].opacity = 1;
+      }
+
+      // Dense activity bubbles disappear once their children fully separate.
+      // Keep one area representative selected at those close zooms so the
+      // current area never loses its visual anchor while the sheet is open.
+      if (selectedArea && !candidates[0]) {
+        const existingAreaNode = nodes.find(
+          (node): node is ClusterRenderNode =>
+            node.kind === "cluster" && node.cluster.id === selectedArea.id,
+        );
+        if (existingAreaNode) {
+          existingAreaNode.opacity = 1;
+          existingAreaNode.selected = true;
+        } else {
+          nodes.push({
+            id: `cluster-${selectedArea.id}`,
+            kind: "cluster",
+            cluster: selectedArea,
+            latLng: [selectedArea.lat, selectedArea.lng],
+            opacity: 1,
+            selected: true,
+            tier: selectedArea.status,
+            prominence: NEUTRAL_PROMINENCE,
+          });
+        }
+      }
+    }
+
+    const hasSelection = Boolean(selectedAreaId || selectedPlaceId);
+    nodes.forEach((node) => {
+      if (node.kind === "cluster") {
+        node.prominence = deriveMarkerProminence(
+          discoverySnapshot.areas[node.cluster.id],
+          node.cluster.intelligence,
+          activeLens,
+          { selected: node.selected, hasSelection },
+        );
+        return;
+      }
+      if (node.kind === "child") {
+        node.prominence = deriveMarkerProminence(
+          discoverySnapshot.places[node.place.id],
+          node.cluster.intelligence,
+          activeLens,
+          { selected: node.selected, hasSelection },
+        );
+        return;
+      }
+      node.prominence = aggregateClusterProminence(
+        node.leaves.map((place) => {
+          const memberCluster = placeById.get(place.id)?.cluster;
+          return deriveMarkerProminence(
+            discoverySnapshot.places[place.id],
+            memberCluster?.intelligence,
+            activeLens,
+            { hasSelection },
+          );
+        }),
+        { selected: node.selected, hasSelection },
+      );
+    });
+
     return nodes;
   }, [
+    activeLens,
     activitySnapshot,
     clusterById,
     clusters,
+    discoverySnapshot,
     eventCounts,
-    isSplitZoom,
     placeById,
     placeClusterIndex,
     selectedAreaId,
     selectedPlaceId,
     zoom,
   ]);
+
+  renderNodesRef.current = new Map(renderNodes.map((node) => [node.id, node]));
+  const primarySelectedNode = renderNodes.find((node) => node.selected) ?? null;
+  const hasPrimaryMarkerSelection = Boolean(primarySelectedNode);
 
   const summaryText = useMemo(() => {
     if (selectedPlaceNode) return selectedPlaceNode.place.name;
@@ -1094,71 +1200,179 @@ export function SocialMap({
     return `${clusters.length} area${clusters.length === 1 ? "" : "s"} moving tonight`;
   }, [activeFilterLabel, clusters, isSplitZoom, selectedAreaCluster, selectedPlaceNode]);
 
-  const zoomIntoCluster = useCallback(
-    (cluster: MapAreaCluster) => {
-      const L = leafletRef.current;
-      const map = mapRef.current;
-      if (!L || !map) return;
-      lastProgrammaticFocusRef.current = Date.now();
+  const discoveryChipClusters = useMemo(() => {
+    const candidates = clusters.filter((cluster) => cluster.places.length > 1);
+    if (!activeLens) return candidates.slice(0, 6);
 
-      const places = cluster.childPlaces;
-      const bottomPadding = Math.min(430, Math.max(190, areaFocusBottomPadding));
+    const ordered = [...candidates].sort((left, right) => {
+      const leftProminence = deriveMarkerProminence(
+        discoverySnapshot.areas[left.id],
+        left.intelligence,
+        activeLens,
+      );
+      const rightProminence = deriveMarkerProminence(
+        discoverySnapshot.areas[right.id],
+        right.intelligence,
+        activeLens,
+      );
+      return (
+        rightProminence.score - leftProminence.score ||
+        right.activityScore - left.activityScore ||
+        left.id.localeCompare(right.id)
+      );
+    });
+    const visible = ordered.slice(0, 6);
+    const selected = selectedAreaId
+      ? candidates.find((cluster) => cluster.id === selectedAreaId)
+      : undefined;
+    if (selected && !visible.some((cluster) => cluster.id === selected.id)) {
+      visible.splice(visible.length - 1, 1, selected);
+    }
+    return visible;
+  }, [activeLens, clusters, discoverySnapshot.areas, selectedAreaId]);
 
-      if (places.length <= 1) {
-        const focus: LatLngTuple = places[0]
-          ? [places[0].lat, places[0].lng]
-          : [cluster.lat, cluster.lng];
-        const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(SPLIT_ZOOM, map.getZoom() + 0.5));
-        const projected = map.project(focus, targetZoom);
-        const shifted = map.unproject(
-          [projected.x, projected.y + bottomPadding * 0.42],
-          targetZoom,
-        );
+  const zoomIntoCluster = useCallback((cluster: MapAreaCluster) => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    const container = mapNodeRef.current;
+    if (!L || !map || !container) return;
+
+    const places = cluster.childPlaces;
+    const overlayHeight = bottomOverlayHeightRef.current;
+    const viewport = safeMapRect(container, overlayHeight, availableMapHeightRef.current);
+    const childrenAlreadySafe =
+      map.getZoom() >= SPLIT_ZOOM &&
+      places.length > 0 &&
+      places.every((place) =>
+        pointIsInSafeRect(map.latLngToContainerPoint([place.lat, place.lng]), viewport),
+      );
+    if (childrenAlreadySafe) return;
+
+    const visibleMapHeight = Math.max(80, container.clientHeight - overlayHeight);
+    const topPadding = Math.min(96, Math.max(52, Math.round(visibleMapHeight * 0.35)));
+    const maximumBottomPadding = Math.max(96, container.clientHeight - topPadding - 72);
+    const bottomPadding = Math.min(maximumBottomPadding, Math.max(96, overlayHeight + 24));
+    const reduceMotion = prefersReducedMapMotion();
+    map.stop();
+    selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
+
+    if (places.length <= 1) {
+      const focus: LatLngTuple = places[0]
+        ? [places[0].lat, places[0].lng]
+        : [cluster.lat, cluster.lng];
+      const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(SPLIT_ZOOM, map.getZoom() + 0.5));
+      const projected = map.project(focus, targetZoom);
+      const shifted = map.unproject([projected.x, projected.y + bottomPadding * 0.42], targetZoom);
+      if (reduceMotion) {
+        map.setView([shifted.lat, shifted.lng], targetZoom, { animate: false });
+      } else {
         map.flyTo([shifted.lat, shifted.lng], targetZoom, {
-          duration: 0.6,
-          easeLinearity: 0.25,
+          duration: MAP_FOCUS_DURATION,
+          easeLinearity: MAP_EASE_LINEARITY,
         });
-        return;
       }
+      return;
+    }
 
-      // Frame EVERY pin above the bottom sheet. The high maxZoom is the key:
-      // a tight cluster like Ancient Olympia (pins within ~800m) now flies in to
-      // ~z15, where the pins clearly separate and the supercluster bubble
-      // (which stops clustering above z13) can no longer swallow them.
-      const bounds = L.latLngBounds(
-        places.map((place) => [place.lat, place.lng] as LatLngTuple),
-      ).pad(0.25);
-      map.fitBounds(bounds, {
-        animate: true,
-        duration: 0.62,
-        easeLinearity: 0.25,
-        maxZoom: AREA_FOCUS_MAX_ZOOM,
-        paddingTopLeft: [56, 120],
-        paddingBottomRight: [56, bottomPadding],
-      });
-    },
-    [areaFocusBottomPadding],
-  );
+    // Frame EVERY pin above the bottom sheet. The high maxZoom is the key:
+    // a tight cluster like Ancient Olympia (pins within ~800m) now flies in to
+    // ~z15, where the pins clearly separate and the supercluster bubble
+    // (which stops clustering above z13) can no longer swallow them.
+    const bounds = L.latLngBounds(places.map((place) => [place.lat, place.lng] as LatLngTuple)).pad(
+      0.25,
+    );
+    map.fitBounds(bounds, {
+      animate: !reduceMotion,
+      duration: MAP_FOCUS_DURATION,
+      easeLinearity: MAP_EASE_LINEARITY,
+      maxZoom: AREA_FOCUS_MAX_ZOOM,
+      paddingTopLeft: [48, topPadding],
+      paddingBottomRight: [48, bottomPadding],
+    });
+  }, []);
 
   const zoomIntoActivityCluster = useCallback(
     (node: ActivityClusterRenderNode) => {
       const map = mapRef.current;
-      if (!map) return;
-      lastProgrammaticFocusRef.current = Date.now();
+      const container = mapNodeRef.current;
+      if (!map || !container) return;
 
       const expansionZoom = placeClusterIndex.getClusterExpansionZoom(node.clusterId);
       const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(map.getZoom() + 0.75, expansionZoom));
-      map.flyTo(node.latLng, targetZoom, {
-        duration: 0.55,
-        easeLinearity: 0.25,
-      });
+      const viewport = safeMapRect(
+        container,
+        bottomOverlayHeightRef.current,
+        availableMapHeightRef.current,
+        markerCoreRadius({ ...node, selected: true }, targetZoom),
+      );
+      const desiredPoint = {
+        x: (viewport.left + viewport.right) / 2,
+        y: (viewport.top + viewport.bottom) / 2,
+      };
+      const projected = map.project(node.latLng, targetZoom);
+      const targetCenter = map.unproject(
+        [
+          projected.x + container.clientWidth / 2 - desiredPoint.x,
+          projected.y + container.clientHeight / 2 - desiredPoint.y,
+        ],
+        targetZoom,
+      );
+      const reduceMotion = prefersReducedMapMotion();
+      map.stop();
+      selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
+      if (reduceMotion) {
+        map.setView(targetCenter, targetZoom, { animate: false });
+      } else {
+        map.flyTo(targetCenter, targetZoom, {
+          duration: MAP_FOCUS_DURATION,
+          easeLinearity: MAP_EASE_LINEARITY,
+        });
+      }
     },
     [placeClusterIndex],
   );
 
   const flyToOverview = useCallback(() => {
-    mapRef.current?.flyTo(ILIA_CENTER, OVERVIEW_ZOOM, { duration: 0.45, easeLinearity: 0.25 });
+    const map = mapRef.current;
+    if (!map) return;
+    map.stop();
+    if (prefersReducedMapMotion()) {
+      map.setView(ILIA_CENTER, OVERVIEW_ZOOM, { animate: false });
+    } else {
+      map.flyTo(ILIA_CENTER, OVERVIEW_ZOOM, {
+        duration: MAP_OVERVIEW_DURATION,
+        easeLinearity: MAP_EASE_LINEARITY,
+      });
+    }
   }, []);
+
+  activateMarkerByIdRef.current = (id: string) => {
+    const node = renderNodesRef.current.get(id);
+    if (!node) return;
+
+    const now = Date.now();
+    const previousActivation = lastMarkerActivationRef.current;
+    if (previousActivation?.id === id && now - previousActivation.at < 420) return;
+    lastMarkerActivationRef.current = { id, at: now };
+
+    if (node.kind === "cluster") {
+      const nextSelectionKey = `${node.cluster.id}|`;
+      if (selectionKeyRef.current !== nextSelectionKey) {
+        cameraHandledSelectionRef.current = nextSelectionKey;
+      }
+      onSelectArea(node.cluster);
+      zoomIntoCluster(node.cluster);
+    } else if (node.kind === "activity-cluster") {
+      const nextSelectionKey = `${node.dominantCluster.id}|`;
+      if (selectionKeyRef.current !== nextSelectionKey) {
+        cameraHandledSelectionRef.current = nextSelectionKey;
+      }
+      onSelectArea(node.dominantCluster);
+      zoomIntoActivityCluster(node);
+    } else {
+      onSelectPlace(node.place, node.cluster);
+    }
+  };
 
   useEffect(() => {
     const previous = previousSelectionRef.current;
@@ -1167,20 +1381,15 @@ export function SocialMap({
 
     if (!mapReady) return;
 
-    if (previous.placeId && !next.placeId && next.areaId) {
-      const cluster = clusters.find((item) => item.id === next.areaId);
-      if (cluster) zoomIntoCluster(cluster);
+    const nextSelectionKey = `${next.areaId ?? ""}|${next.placeId ?? ""}`;
+    if (cameraHandledSelectionRef.current === nextSelectionKey) {
+      cameraHandledSelectionRef.current = null;
       return;
     }
 
-    // Area picked from outside the map (Explore areas panel, deep link) while
-    // nothing was focused — frame it. Skipped when an explicit zoom just ran,
-    // so a marker or chip tap doesn't animate there twice.
-    if (!previous.areaId && !previous.placeId && next.areaId && !next.placeId) {
-      if (Date.now() - lastProgrammaticFocusRef.current > 600) {
-        const cluster = clusters.find((item) => item.id === next.areaId);
-        if (cluster) zoomIntoCluster(cluster);
-      }
+    if (previous.placeId && !next.placeId && next.areaId) {
+      const cluster = clusters.find((item) => item.id === next.areaId);
+      if (cluster) zoomIntoCluster(cluster);
       return;
     }
 
@@ -1193,9 +1402,13 @@ export function SocialMap({
     let cancelled = false;
     let map: LeafletMap | null = null;
     let zoomFrame: number | null = null;
+    let effectsResumeFrame: number | null = null;
+    const activeMapMotion = new Set<"move" | "zoom">();
     const cleanupFns: Array<() => void> = [];
     const markers = markersRef.current;
     const markerSigs = markerSigRef.current;
+    const markerRuntimes = markerRuntimeRef.current;
+    const markerClickHandlers = markerClickHandlerRef.current;
 
     import("leaflet").then((L) => {
       if (cancelled || !mapNodeRef.current) return;
@@ -1224,8 +1437,6 @@ export function SocialMap({
       guidePane.style.zIndex = "625";
       guidePane.style.pointerEvents = "none";
 
-      // Decorative animated sea shimmer: sits just above the tiles, below every
-      // marker/vector. Fades in/out via CSS as the zoom gate flips.
       const seaPane = map.createPane("hp-sea-shimmer");
       seaPane.style.zIndex = "250";
       seaPane.style.pointerEvents = "none";
@@ -1239,6 +1450,27 @@ export function SocialMap({
         subdomains: "abcd",
         opacity: 1,
       }).addTo(map);
+
+      const onMapClick = (event: import("leaflet").LeafletMouseEvent) => {
+        if (Date.now() < ignoreBackgroundClickUntilRef.current) return;
+        const target = event.originalEvent?.target as Element | null;
+        if (target?.closest(".leaflet-marker-icon, .leaflet-control, button, a")) return;
+        if (selectionKeyRef.current === "|") return;
+
+        cameraHandledSelectionRef.current = "|";
+        onClearSelectionRef.current();
+      };
+      map.on("click", onMapClick);
+      cleanupFns.push(() => map?.off("click", onMapClick));
+
+      if (mapNodeRef.current) {
+        const mapContainer = mapNodeRef.current;
+        const resizeObserver = new ResizeObserver(() => {
+          map?.invalidateSize({ animate: false, pan: false });
+        });
+        resizeObserver.observe(mapContainer);
+        cleanupFns.push(() => resizeObserver.disconnect());
+      }
 
       // Geolocation -> pulsing "you are here" dot
       const onLocationFound = (e: import("leaflet").LocationEvent) => {
@@ -1285,6 +1517,7 @@ export function SocialMap({
               pressPoint.x - rect.left,
               pressPoint.y - rect.top,
             ]);
+            ignoreBackgroundClickUntilRef.current = Date.now() + 700;
             onMapLongPressRef.current?.(ll.lat, ll.lng);
             clearPress();
           }, 480);
@@ -1326,6 +1559,39 @@ export function SocialMap({
         });
       };
       map.on("zoom zoomend", syncZoom);
+      const pauseMarkerEffects = (kind: "move" | "zoom") => {
+        activeMapMotion.add(kind);
+        if (effectsResumeFrame !== null) {
+          window.cancelAnimationFrame(effectsResumeFrame);
+          effectsResumeFrame = null;
+        }
+        mapNodeRef.current?.classList.add("hp-map-is-moving");
+      };
+      const resumeMarkerEffects = (kind: "move" | "zoom") => {
+        activeMapMotion.delete(kind);
+        if (activeMapMotion.size > 0) return;
+        effectsResumeFrame = window.requestAnimationFrame(() => {
+          effectsResumeFrame = null;
+          mapNodeRef.current?.classList.remove("hp-map-is-moving");
+          scheduleMarkerViewportSyncRef.current();
+        });
+      };
+      const onMoveStart = () => pauseMarkerEffects("move");
+      const onZoomStart = () => pauseMarkerEffects("zoom");
+      const onMoveEnd = () => {
+        resumeMarkerEffects("move");
+      };
+      const onZoomEnd = () => resumeMarkerEffects("zoom");
+      map.on("movestart", onMoveStart);
+      map.on("zoomstart", onZoomStart);
+      map.on("moveend", onMoveEnd);
+      map.on("zoomend", onZoomEnd);
+      cleanupFns.push(() => {
+        map?.off("movestart", onMoveStart);
+        map?.off("zoomstart", onZoomStart);
+        map?.off("moveend", onMoveEnd);
+        map?.off("zoomend", onZoomEnd);
+      });
       map.whenReady(() => {
         if (cancelled || !map) return;
         mapRef.current = map;
@@ -1343,10 +1609,16 @@ export function SocialMap({
       if (zoomFrame !== null) {
         window.cancelAnimationFrame(zoomFrame);
       }
+      if (effectsResumeFrame !== null) {
+        window.cancelAnimationFrame(effectsResumeFrame);
+      }
       cleanupFns.forEach((cleanup) => cleanup());
       setMapReady(false);
+      markerClickHandlers.forEach((handler, id) => markers.get(id)?.off("click", handler));
       markers.clear();
       markerSigs.clear();
+      markerRuntimes.clear();
+      markerClickHandlers.clear();
       map?.remove();
       mapRef.current = null;
       leafletRef.current = null;
@@ -1358,13 +1630,92 @@ export function SocialMap({
   }, []);
 
   useEffect(() => {
-    const syncPageVisibility = () => {
-      mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    let frame: number | null = null;
+    const schedule = () => {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        // The settle event schedules a fresh pass; do not re-grid each zoom frame.
+        if (mapNodeRef.current?.classList.contains("hp-map-is-moving")) return;
+        const size = map.getSize();
+        const height = Math.max(
+          0,
+          Math.min(size.y - bottomOverlayHeightRef.current, availableMapHeightRef.current),
+        );
+        const nodes = [...renderNodesRef.current.values()].map((node) => {
+          const point = map.latLngToContainerPoint(node.latLng);
+          const score =
+            node.kind === "child"
+              ? scorePlace(node.place, activitySnapshotRef.current, node.eventCount)
+              : node.kind === "cluster"
+                ? node.cluster.activityScore
+                : node.leaves.reduce(
+                    (sum, place) => sum + scorePlace(place, activitySnapshotRef.current),
+                    0,
+                  );
+          return {
+            id: node.id,
+            x: point.x,
+            y: point.y,
+            opacity: node.opacity,
+            tier: node.tier,
+            selected: node.selected,
+            score,
+          };
+        });
+        const density = markerViewportDensity(nodes, size.x, height);
+        mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
+        markersRef.current.forEach((marker, id) => {
+          const shell = marker.getElement()?.firstElementChild as HTMLElement | null;
+          if (!shell) return;
+          shell.classList.toggle("is-viewport-paused", document.hidden || !density.visible.has(id));
+          shell.classList.toggle("is-marker-dense", density.dense.has(id));
+          shell.classList.toggle("is-motion-suppressed", density.suppressed.has(id));
+        });
+        const visibleAreaIds = new Set<string>();
+        density.visible.forEach((id) => {
+          const node = renderNodesRef.current.get(id);
+          if (!node) return;
+          if (node.kind === "cluster" || node.kind === "child") {
+            visibleAreaIds.add(node.cluster.id);
+          } else {
+            node.leaves.forEach((place) => visibleAreaIds.add(clusterIdForPlace(place)));
+          }
+        });
+        const center = map.getCenter();
+        const viewport: MapDiscoveryViewport = {
+          center: { lat: center.lat, lng: center.lng },
+          visibleAreaIds: [...visibleAreaIds].sort(),
+        };
+        const viewportSignature = `${center.lat.toFixed(5)}:${center.lng.toFixed(5)}:${viewport.visibleAreaIds.join(",")}`;
+        if (viewportSignature !== lastDiscoveryViewportRef.current) {
+          lastDiscoveryViewportRef.current = viewportSignature;
+          onDiscoveryViewportChangeRef.current?.(viewport);
+        }
+      });
     };
-    syncPageVisibility();
-    document.addEventListener("visibilitychange", syncPageVisibility);
-    return () => document.removeEventListener("visibilitychange", syncPageVisibility);
-  }, []);
+    const onVisibilityChange = () => {
+      // A hidden document may suspend rAF, so pause its animations immediately.
+      mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
+      schedule();
+    };
+    scheduleMarkerViewportSyncRef.current = schedule;
+    map.on("moveend zoomend resize", schedule);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    schedule();
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      scheduleMarkerViewportSyncRef.current = () => {};
+      map.off("moveend zoomend resize", schedule);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [mapReady]);
+
+  useEffect(() => {
+    scheduleMarkerViewportSyncRef.current();
+  }, [bottomOverlayHeight, availableMapHeight, activitySnapshot]);
 
   useEffect(() => {
     const L = leafletRef.current;
@@ -1374,58 +1725,27 @@ export function SocialMap({
     const nodeIds = new Set(renderNodes.map((node) => node.id));
     markersRef.current.forEach((marker, id) => {
       if (nodeIds.has(id)) return;
+      const clickHandler = markerClickHandlerRef.current.get(id);
+      if (clickHandler) marker.off("click", clickHandler);
       marker.remove();
       markersRef.current.delete(id);
       markerSigRef.current.delete(id);
+      markerRuntimeRef.current.delete(id);
+      markerClickHandlerRef.current.delete(id);
     });
 
     renderNodes.forEach((node) => {
-      const icon =
-        node.kind === "cluster"
-          ? createAreaIcon(L, node.cluster, node.selected, node.rank, resolveImg)
+      const zIndexOffset = node.selected
+        ? 2400
+        : node.kind === "child"
+          ? 1400 + node.prominence.zIndexBoost
           : node.kind === "activity-cluster"
-            ? createActivityClusterIcon(L, node, resolveImg)
-            : createChildIcon(
-                L,
-                node.place,
-                node.eventCount,
-                node.tier,
-                node.selected,
-                storyPlaceIds?.has(node.place.id) ?? false,
-                node.solo,
-                node.compact,
-                resolveImg,
-              );
-      let marker = markersRef.current.get(node.id);
-      const activateMarker = () => {
-        const now = Date.now();
-        const previousActivation = lastMarkerActivationRef.current;
-        if (previousActivation && now - previousActivation.at < 420) return;
-        lastMarkerActivationRef.current = { id: node.id, at: now };
-
-        if (node.kind === "cluster") {
-          onSelectArea(node.cluster);
-          zoomIntoCluster(node.cluster);
-        } else if (node.kind === "activity-cluster") {
-          onSelectArea(node.dominantCluster);
-          zoomIntoActivityCluster(node);
-        } else {
-          onSelectPlace(node.place, node.cluster);
-        }
-      };
-
-      const zIndexOffset =
-        node.kind === "child"
-          ? node.selected
-            ? 1700
-            : 1400
-          : node.kind === "activity-cluster"
-            ? (node.selected ? 1100 : 900) + Math.round(node.hotness * 10)
-            : (node.selected ? 1200 : 700) + Math.round(node.cluster.hotness * 10);
+            ? 900 + Math.round(node.hotness * 10) + node.prominence.zIndexBoost
+            : 700 + Math.round(node.cluster.hotness * 10) + node.prominence.zIndexBoost;
 
       // Signature captures only what changes the icon's *visual content*.
-      // Opacity & position are applied cheaply below, so a pure zoom step no
-      // longer rebuilds every marker's DOM (this was the zoom stutter).
+      // Interaction state is applied directly to the existing DOM and never
+      // rebuilds image/collage content.
       const hasStory = node.kind === "child" && (storyPlaceIds?.has(node.place.id) ?? false);
       // The image token makes a marker rebuild the moment its cached thumbnail
       // resolves (placeholder -> blob URL), without rebuilding on pure zoom.
@@ -1442,85 +1762,132 @@ export function SocialMap({
                 .slice(0, 3)
                 .map((p) => resolveImg(p.imageUrl))
                 .join(",")
-            : resolveImg(node.place.imageUrl);
-      // `act*` buckets fold the live-activity inputs (hotness / recent posts /
-      // events) into the signature, so a data refresh that shifts a bubble's
-      // size or animation tier rebuilds its icon even if status/count held.
+            : [node.place.imageUrl, ...node.place.avatars.slice(0, 2)]
+                .map((url) => resolveImg(url))
+                .join(",");
       const sig = [
+        `effects-${MARKER_EFFECTS_VERSION}`,
         node.kind,
         node.kind === "cluster"
-          ? `${node.cluster.id}:${node.cluster.status}:${node.selected ? 1 : 0}:${node.rank}:${Math.round(clusterActivity(node.cluster) * 100)}:${imageToken}`
+          ? `${node.cluster.id}:${node.cluster.status}:${imageToken}`
           : node.kind === "activity-cluster"
-            ? `${node.clusterId}:${node.pointCount}:${node.tier}:${node.selected ? 1 : 0}:${node.tone}:${Math.round(node.hotness * 10)}:${node.eventCount}:${Math.round(node.postCount)}:${imageToken}`
-            : `${node.place.id}:${node.tier}:${node.selected ? 1 : 0}:${hasStory ? 1 : 0}:${node.solo ? 1 : 0}:${node.compact ? 1 : 0}:${node.eventCount}:${Math.round(node.place.hotness * 10)}:${node.place.recentPostCount}:${imageToken}`,
+            ? `${node.clusterId}:${node.pointCount}:${node.tier}:${node.tone}:${imageToken}`
+            : `${node.place.id}:${node.tier}:${hasStory ? 1 : 0}:${node.solo ? 1 : 0}:${node.eventCount}:${imageToken}`,
       ].join("|");
+      let marker = markersRef.current.get(node.id);
       const needsRebuild = markerSigRef.current.get(node.id) !== sig;
+      const createIcon = () =>
+        node.kind === "cluster"
+          ? createAreaIcon(L, node.cluster, resolveImg)
+          : node.kind === "activity-cluster"
+            ? createActivityClusterIcon(L, node, resolveImg)
+            : createChildIcon(
+                L,
+                node.place,
+                node.eventCount,
+                node.tier,
+                hasStory,
+                node.solo,
+                resolveImg,
+              );
 
       if (!marker) {
         marker = L.marker(node.latLng, {
-          icon,
+          icon: createIcon(),
           riseOnHover: true,
           zIndexOffset,
         }).addTo(map);
         markersRef.current.set(node.id, marker);
+        const clickHandler = () => activateMarkerByIdRef.current(node.id);
+        marker.on("click", clickHandler);
+        markerClickHandlerRef.current.set(node.id, clickHandler);
+      } else if (needsRebuild) {
+        marker.setIcon(createIcon());
       }
 
-      // Cheap every-frame updates (no DOM rebuild):
-      marker.off("click");
-      marker.on("click", activateMarker);
-      marker.setLatLng(node.latLng);
-      marker.setOpacity(node.opacity);
-      marker.setZIndexOffset(zIndexOffset);
+      if (needsRebuild) markerSigRef.current.set(node.id, sig);
 
-      const visibleForInteraction = node.opacity > 0.08;
-      const currentMarkerElement = marker.getElement();
-      if (currentMarkerElement) {
-        currentMarkerElement.style.pointerEvents = visibleForInteraction ? "auto" : "none";
-        currentMarkerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
-        currentMarkerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
-        currentMarkerElement.tabIndex = visibleForInteraction ? 0 : -1;
-        const markerShell = currentMarkerElement.firstElementChild as HTMLElement | null;
-        markerShell?.style.setProperty(
-          "--hp-marker-motion-state",
-          visibleForInteraction && !document.hidden ? "running" : "paused",
-        );
+      const previousRuntime = markerRuntimeRef.current.get(node.id);
+      if (node.kind === "cluster") {
+        const shell = marker.getElement()?.querySelector<HTMLElement>(".hp-area-marker__shell");
+        const intelligence = node.cluster.intelligence;
+        if (shell && intelligence) {
+          shell.dataset.areaState = intelligence.state;
+          shell.dataset.signalQuality = intelligence.signalQuality;
+          shell.dataset.emerging = intelligence.emerging ? "true" : "false";
+        } else if (shell) {
+          delete shell.dataset.areaState;
+          delete shell.dataset.signalQuality;
+          delete shell.dataset.emerging;
+        }
+      }
+      const isPassiveAreaAnchor =
+        node.kind !== "child" && node.selected && placeOpacityForZoom(zoom) > 0.08;
+      const visuallyVisible = node.opacity > 0.08;
+      const visibleForInteraction = visuallyVisible && !isPassiveAreaAnchor;
+      if (
+        !previousRuntime ||
+        previousRuntime.lat !== node.latLng[0] ||
+        previousRuntime.lng !== node.latLng[1]
+      ) {
+        marker.setLatLng(node.latLng);
+      }
+      if (!previousRuntime || Math.abs(previousRuntime.opacity - node.opacity) > 0.0001) {
+        marker.setOpacity(node.opacity);
+      }
+      if (!previousRuntime || previousRuntime.zIndexOffset !== zIndexOffset) {
+        marker.setZIndexOffset(zIndexOffset);
       }
 
-      // Rebuild icon + re-wire DOM only when the content actually changed.
-      if (needsRebuild) {
-        marker.setIcon(icon);
-        markerSigRef.current.set(node.id, sig);
+      const markerElement = marker.getElement() as InteractiveMarkerElement | null;
+      if (markerElement) {
+        const markerShell = markerElement.firstElementChild as HTMLElement | null;
+        const shouldSyncProminence =
+          needsRebuild ||
+          !previousRuntime ||
+          Math.abs(previousRuntime.lensOpacity - node.prominence.opacityFactor) > 0.0001 ||
+          Math.abs(previousRuntime.lensScale - node.prominence.scaleFactor) > 0.0001 ||
+          previousRuntime.prominenceBand !== node.prominence.band;
 
-        const markerElement = marker.getElement();
-        if (markerElement) {
-          const interactiveElement = markerElement as InteractiveMarkerElement;
+        if (markerShell && shouldSyncProminence) {
+          markerShell.style.setProperty(
+            "--hp-marker-lens-opacity-target",
+            node.prominence.opacityFactor.toFixed(3),
+          );
+          markerShell.style.setProperty(
+            "--hp-marker-lens-scale-target",
+            node.prominence.scaleFactor.toFixed(3),
+          );
+          markerShell.dataset.discoveryProminence = node.prominence.band;
+        }
+        const shouldSyncInteraction =
+          needsRebuild ||
+          !previousRuntime ||
+          previousRuntime.selected !== node.selected ||
+          previousRuntime.visible !== visibleForInteraction ||
+          previousRuntime.opacity > 0.001 !== node.opacity > 0.001;
+
+        if (shouldSyncInteraction) {
           markerElement.style.pointerEvents = visibleForInteraction ? "auto" : "none";
           markerElement.style.visibility = node.opacity > 0.001 ? "visible" : "hidden";
-          markerElement.setAttribute("aria-hidden", visibleForInteraction ? "false" : "true");
-          const markerShell = markerElement.firstElementChild as HTMLElement | null;
-          markerShell?.style.setProperty(
-            "--hp-marker-motion-state",
-            visibleForInteraction && !document.hidden ? "running" : "paused",
-          );
-          if (interactiveElement.__hpClickHandler) {
-            interactiveElement.removeEventListener(
-              "click",
-              interactiveElement.__hpClickHandler,
-              true,
-            );
-          }
-          if (interactiveElement.__hpKeyHandler) {
-            interactiveElement.removeEventListener(
-              "keydown",
-              interactiveElement.__hpKeyHandler,
-              true,
-            );
-          }
+          markerElement.setAttribute("aria-hidden", visuallyVisible ? "false" : "true");
+          markerElement.setAttribute("aria-pressed", node.selected ? "true" : "false");
+          markerElement.tabIndex = visibleForInteraction ? 0 : -1;
+          markerElement.classList.toggle("is-selection-anchor", isPassiveAreaAnchor);
+          markerShell?.classList.toggle("is-selected", node.selected);
+        }
+
+        if (needsRebuild) {
+          // Leaflet can reuse the outer icon element when replacing its content.
+          if (markerElement.__hpClickHandler)
+            markerElement.removeEventListener("click", markerElement.__hpClickHandler, true);
+          if (markerElement.__hpKeyHandler)
+            markerElement.removeEventListener("keydown", markerElement.__hpKeyHandler, true);
           const activateFromEvent: EventListener = (event) => {
             event.preventDefault();
             event.stopImmediatePropagation();
             event.stopPropagation();
-            activateMarker();
+            activateMarkerByIdRef.current(node.id);
           };
           const keyHandler: EventListener = (event) => {
             const keyEvent = event as KeyboardEvent;
@@ -1528,47 +1895,87 @@ export function SocialMap({
             keyEvent.preventDefault();
             keyEvent.stopImmediatePropagation();
             keyEvent.stopPropagation();
-            activateMarker();
+            activateMarkerByIdRef.current(node.id);
           };
 
           markerElement.setAttribute("role", "button");
           markerElement.setAttribute(
             "aria-label",
             node.kind === "cluster"
-              ? `Zoom into ${node.cluster.name}`
+              ? `Zoom into ${node.cluster.places.length} places near ${node.cluster.name}`
               : node.kind === "activity-cluster"
                 ? `Zoom into ${node.pointCount} activities near ${node.dominantCluster.name}`
                 : `Open ${node.place.name}`,
           );
           markerElement.dataset.hpNodeId = node.id;
-          markerElement.tabIndex = 0;
           markerElement.addEventListener("click", activateFromEvent, true);
           markerElement.addEventListener("keydown", keyHandler, true);
           markerShell?.addEventListener("click", activateFromEvent, true);
-          interactiveElement.__hpClickHandler = activateFromEvent;
-          interactiveElement.__hpKeyHandler = keyHandler;
+          markerElement.__hpClickHandler = activateFromEvent;
+          markerElement.__hpKeyHandler = keyHandler;
         }
       }
+
+      markerRuntimeRef.current.set(node.id, {
+        lat: node.latLng[0],
+        lng: node.latLng[1],
+        opacity: node.opacity,
+        selected: node.selected,
+        visible: visibleForInteraction,
+        zIndexOffset,
+        lensOpacity: node.prominence.opacityFactor,
+        lensScale: node.prominence.scaleFactor,
+        prominenceBand: node.prominence.band,
+      });
     });
-  }, [
-    mapReady,
-    onSelectArea,
-    onSelectPlace,
-    renderNodes,
-    resolveImg,
-    storyPlaceIds,
-    zoomIntoActivityCluster,
-    zoomIntoCluster,
-  ]);
+    scheduleMarkerViewportSyncRef.current();
+  }, [mapReady, renderNodes, resolveImg, storyPlaceIds, zoom]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || !selectedPlaceId) return;
+    const container = mapNodeRef.current;
+    if (!selectedPlaceId) {
+      lastFocusedPlaceIdRef.current = null;
+      return;
+    }
+    if (!map || !container || !mapReady || lastFocusedPlaceIdRef.current === selectedPlaceId)
+      return;
 
     if (!selectedPlaceNode) return;
 
+    lastFocusedPlaceIdRef.current = selectedPlaceId;
+
     const latLng: LatLngTuple = [selectedPlaceNode.place.lat, selectedPlaceNode.place.lng];
-    const bottomPadding = Math.min(460, Math.max(220, selectedBottomPadding));
+    const viewport = safeMapRect(
+      container,
+      bottomOverlayHeight,
+      availableMapHeight,
+      primarySelectedNode
+        ? markerCoreRadius(primarySelectedNode, map.getZoom())
+        : SAFE_MARKER_RADIUS,
+    );
+    const currentPoint = map.latLngToContainerPoint(latLng);
+    const currentZoom = map.getZoom();
+
+    if (currentZoom >= RICH_VISUAL_ZOOM && pointIsInSafeRect(currentPoint, viewport)) return;
+
+    const reduceMotion = prefersReducedMapMotion();
+    map.stop();
+
+    if (currentZoom >= RICH_VISUAL_ZOOM) {
+      const delta = panDeltaIntoSafeRect(currentPoint, viewport);
+      if (delta.x === 0 && delta.y === 0) return;
+      selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 320);
+      map.panBy([delta.x, delta.y], {
+        animate: !reduceMotion,
+        duration: MAP_PAN_DURATION,
+        easeLinearity: MAP_EASE_LINEARITY,
+      });
+      return;
+    }
+
+    selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
+    const bottomPadding = Math.min(460, Math.max(180, bottomOverlayHeight + 40));
     const focusOffset = Math.min(270, Math.max(128, bottomPadding * 0.44));
     const targetPoint = map.project(latLng, PLACE_FOCUS_ZOOM);
     const offsetCenter = map.unproject(
@@ -1577,22 +1984,65 @@ export function SocialMap({
     );
     const targetCenter: LatLngTuple = [offsetCenter.lat, offsetCenter.lng];
 
-    map.stop();
-
-    if (Math.abs(map.getZoom() - PLACE_FOCUS_ZOOM) > 0.1) {
+    if (reduceMotion) {
+      map.setView(targetCenter, PLACE_FOCUS_ZOOM, { animate: false });
+    } else {
       map.flyTo(targetCenter, PLACE_FOCUS_ZOOM, {
-        duration: 0.42,
-        easeLinearity: 0.24,
+        duration: MAP_FOCUS_DURATION,
+        easeLinearity: MAP_EASE_LINEARITY,
       });
+    }
+  }, [
+    availableMapHeight,
+    bottomOverlayHeight,
+    mapReady,
+    primarySelectedNode,
+    selectedPlaceId,
+    selectedPlaceNode,
+  ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = mapNodeRef.current;
+    if (!map || !container || !mapReady || !primarySelectedNode || bottomOverlayHeight <= 0) {
       return;
     }
 
-    map.panTo(targetCenter, {
-      animate: true,
-      duration: 0.32,
-      easeLinearity: 0.24,
-    });
-  }, [mapReady, selectedBottomPadding, selectedPlaceId, selectedPlaceNode]);
+    let frame: number | null = null;
+    let timer: number | null = null;
+    let correctionCount = 0;
+    const keepSelectionVisible = () => {
+      const remainingMotion = selectionMotionUntilRef.current - Date.now();
+      if (remainingMotion > 0) {
+        timer = window.setTimeout(() => {
+          frame = window.requestAnimationFrame(keepSelectionVisible);
+        }, remainingMotion + 16);
+        return;
+      }
+
+      const point = map.latLngToContainerPoint(primarySelectedNode.latLng);
+      const viewport = safeMapRect(
+        container,
+        bottomOverlayHeight,
+        availableMapHeight,
+        markerCoreRadius(primarySelectedNode, map.getZoom()),
+      );
+      const delta = panDeltaIntoSafeRect(point, viewport);
+      if (delta.x !== 0 || delta.y !== 0) {
+        map.panBy([delta.x, delta.y], { animate: false });
+        correctionCount += 1;
+        if (correctionCount < 3) {
+          frame = window.requestAnimationFrame(keepSelectionVisible);
+        }
+      }
+    };
+
+    frame = window.requestAnimationFrame(keepSelectionVisible);
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [availableMapHeight, bottomOverlayHeight, mapReady, primarySelectedNode]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1604,18 +2054,14 @@ export function SocialMap({
 
     const bounds = clusters.map((cluster) => [cluster.lat, cluster.lng] as LatLngTuple);
     map.fitBounds(bounds, {
-      animate: true,
-      duration: 0.35,
+      animate: !prefersReducedMapMotion(),
+      duration: MAP_OVERVIEW_DURATION,
       maxZoom: OVERVIEW_ZOOM,
       paddingBottomRight: [52, 210],
       paddingTopLeft: [52, 108],
     });
   }, [clusters, isSplitZoom, mapReady, selectedAreaId, selectedPlaceId]);
 
-  // Decorative sea shimmer: only at overview zoom, and never while a specific
-  // place is focused (the crude polygon edge would show, and it is pointless
-  // perf-wise up close). The pane's CSS opacity transition does the fade; the
-  // layer itself is removed shortly after so Leaflet stops re-projecting it.
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
@@ -1635,8 +2081,6 @@ export function SocialMap({
           interactive: false,
           stroke: false,
           fillOpacity: 1,
-          // Ring 0 (sea rectangle) fills; every following ring is a real land
-          // mass that punches a hole — see src/lib/hp/sea-shimmer.ts.
           fillRule: "evenodd",
         });
       }
@@ -1690,11 +2134,14 @@ export function SocialMap({
     });
 
     routeLayerRef.current = group;
+    const reduceMotion = prefersReducedMapMotion();
+    const routeBottomPadding = Math.max(188, bottomOverlayHeightRef.current + 40);
+    map.stop();
     map.fitBounds(line.getBounds().pad(0.22), {
-      animate: true,
-      duration: 0.4,
+      animate: !reduceMotion,
+      duration: MAP_FOCUS_DURATION,
       maxZoom: PLACE_FOCUS_ZOOM,
-      paddingBottomRight: [48, selectedBottomPadding || 188],
+      paddingBottomRight: [48, routeBottomPadding],
       paddingTopLeft: [48, 116],
     });
 
@@ -1702,14 +2149,19 @@ export function SocialMap({
       group.remove();
       if (routeLayerRef.current === group) routeLayerRef.current = null;
     };
-  }, [mapReady, routePath, selectedBottomPadding]);
+  }, [mapReady, routePath]);
 
   const resetToOverview = () => {
+    if (selectionKeyRef.current !== "|") cameraHandledSelectionRef.current = "|";
     flyToOverview();
     onResetView();
   };
 
   const selectDiscoveryCluster = (cluster: MapAreaCluster) => {
+    const nextSelectionKey = `${cluster.id}|`;
+    if (selectionKeyRef.current !== nextSelectionKey) {
+      cameraHandledSelectionRef.current = nextSelectionKey;
+    }
     onSelectArea(cluster);
     zoomIntoCluster(cluster);
   };
@@ -1724,13 +2176,20 @@ export function SocialMap({
     map.locate({ enableHighAccuracy: true, maxZoom: 15, setView: true });
   };
 
+  const utilityRailHidden = availableMapHeight < MIN_UTILITY_RAIL_HEIGHT;
+  const mapChromeHidden = availableMapHeight < MIN_MAP_CHROME_HEIGHT;
+  const mapStyle = {
+    "--hp-map-bottom-overlay-height": `${Math.max(0, bottomOverlayHeight)}px`,
+  } as CSSProperties;
+
   return (
-    <div className="hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper">
+    <div
+      className={`hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""} ${activeLens ? "has-discovery-lens" : ""} ${mapChromeHidden ? "is-map-compressed" : ""}`}
+      data-discovery-lens={activeLens ?? undefined}
+      style={mapStyle}
+    >
       <div ref={mapNodeRef} className="h-full w-full" aria-label={t("Interactive map of Ilia")} />
 
-      {/* Paint server for the decorative sea shimmer. Referenced from the
-          Leaflet polygon via `fill: url(#hp-waves)` in styles.css. Purely
-          aesthetic — carries no real sea/weather data. */}
       <svg
         aria-hidden="true"
         focusable="false"
@@ -1767,88 +2226,96 @@ export function SocialMap({
         <button
           type="button"
           onClick={onBack}
-          className="absolute left-3 top-14 z-20 grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur transition active:scale-95"
+          className="hp-icon-button hp-control-surface hp-map-back absolute"
           aria-label={t("Back to previous map view")}
         >
-          <ChevronLeft size={18} strokeWidth={2.6} />
+          <ChevronLeft size={18} strokeWidth={2.5} />
         </button>
       )}
 
-      <div className="pointer-events-none absolute left-1/2 top-3 z-20 max-w-[72%] -translate-x-1/2 rounded-full border border-hp-ink/10 bg-hp-paper/95 px-3 py-1.5 text-center text-[11px] font-semibold text-hp-ink/80 shadow-sm backdrop-blur">
-        <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
-        {summaryText}
+      <div className="hp-map-summary pointer-events-none">
+        <span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-hp-sunset" />
+        <span className="hp-map-summary__text">{summaryText}</span>
       </div>
 
-      {clusters.length > 0 && (
+      {discoveryChipClusters.length > 0 && (
         <div
-          className={`hp-no-scrollbar absolute ${canGoBack ? "left-16" : "left-3"} right-16 top-14 z-20 flex gap-2 overflow-x-auto pb-2`}
+          className={`hp-map-chip-rail hp-no-scrollbar ${canGoBack ? "has-back" : ""} ${selectedAreaId ? "has-selection" : ""}`}
+          inert={mapChromeHidden ? true : undefined}
+          aria-hidden={mapChromeHidden ? true : undefined}
           aria-label={t("Top map areas")}
         >
-          {clusters
-            .filter((cluster) => cluster.places.length > 1)
-            .slice(0, 6)
-            .map((cluster) => {
-              const selected = cluster.id === selectedAreaId;
-              return (
-                <button
-                  key={cluster.id}
-                  type="button"
-                  onClick={() => selectDiscoveryCluster(cluster)}
-                  aria-pressed={selected}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-left text-[11px] font-bold shadow-sm backdrop-blur transition active:scale-95 ${
-                    selected
-                      ? "border-hp-ink bg-hp-ink text-hp-paper"
-                      : "border-hp-ink/10 bg-hp-paper/95 text-hp-ink"
-                  }`}
-                >
-                  <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
+          {discoveryChipClusters.map((cluster) => {
+            const selected = cluster.id === selectedAreaId;
+            return (
+              <button
+                key={cluster.id}
+                type="button"
+                onClick={() => selectDiscoveryCluster(cluster)}
+                aria-pressed={selected}
+                tabIndex={mapChromeHidden ? -1 : undefined}
+                className={`hp-chip hp-map-chip ${selected ? "is-active" : ""}`}
+              >
+                <span className="hp-map-chip__face">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
                   {cluster.name}
-                  <span className={selected ? "ml-1 text-hp-paper/70" : "ml-1 text-hp-muted"}>
-                    {cluster.places.length}
-                  </span>
-                </button>
-              );
-            })}
+                  <span className="text-hp-muted">{cluster.places.length}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      <div className="absolute right-3 top-14 z-20 flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={() => mapRef.current?.zoomIn()}
-          disabled={!mapReady || zoom >= MAX_ZOOM}
-          className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Zoom in map")}
-        >
-          <Plus size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={zoomOut}
-          disabled={!mapReady || zoom <= MIN_ZOOM}
-          className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Zoom out map")}
-        >
-          <Minus size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={locateUser}
-          disabled={!mapReady}
-          className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Find my location")}
-        >
-          <Crosshair size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={resetToOverview}
-          disabled={!mapReady}
-          className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/10 bg-hp-paper/95 text-hp-ink shadow backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={t("Show Ilia overview")}
-        >
-          <MapPinned size={16} />
-        </button>
+      <div
+        className={`hp-map-utility-rail ${utilityRailHidden ? "is-hidden" : ""}`}
+        inert={utilityRailHidden ? true : undefined}
+        aria-hidden={utilityRailHidden ? true : undefined}
+      >
+        <div className="hp-map-control-group" role="group" aria-label={t("Map zoom controls")}>
+          <button
+            type="button"
+            onClick={() => mapRef.current?.zoomIn()}
+            disabled={!mapReady || zoom >= MAX_ZOOM}
+            tabIndex={utilityRailHidden ? -1 : undefined}
+            className="hp-icon-button hp-map-icon-button"
+            aria-label={t("Zoom in map")}
+          >
+            <Plus size={17} strokeWidth={2.5} />
+          </button>
+          <button
+            type="button"
+            onClick={zoomOut}
+            disabled={!mapReady || zoom <= MIN_ZOOM}
+            tabIndex={utilityRailHidden ? -1 : undefined}
+            className="hp-icon-button hp-map-icon-button"
+            aria-label={t("Zoom out map")}
+          >
+            <Minus size={17} strokeWidth={2.5} />
+          </button>
+        </div>
+        <div className="hp-map-control-group" role="group" aria-label={t("Map view controls")}>
+          <button
+            type="button"
+            onClick={locateUser}
+            disabled={!mapReady}
+            tabIndex={utilityRailHidden ? -1 : undefined}
+            className="hp-icon-button hp-map-icon-button"
+            aria-label={t("Find my location")}
+          >
+            <Crosshair size={17} strokeWidth={2.2} />
+          </button>
+          <button
+            type="button"
+            onClick={resetToOverview}
+            disabled={!mapReady}
+            tabIndex={utilityRailHidden ? -1 : undefined}
+            className="hp-icon-button hp-map-icon-button"
+            aria-label={t("Show Ilia overview")}
+          >
+            <MapPinned size={17} strokeWidth={2.2} />
+          </button>
+        </div>
       </div>
     </div>
   );

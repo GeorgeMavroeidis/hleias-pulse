@@ -30,6 +30,8 @@ export interface MeetEvent {
   hostType: "LOCAL" | "GUIDE" | "BUSINESS" | "TOURIST";
   /** ISO timestamp. */
   happensAt: string;
+  /** ISO timestamp for when this signal was published. */
+  createdAt?: string | null;
   durationMin: number;
   category: MeetCategory;
   vibe: string;
