@@ -12,23 +12,36 @@ import {
   RefreshCw,
   Route,
   ShieldCheck,
+  Store,
+  Ticket,
+  UserCheck,
   Users,
   X,
 } from "lucide-react";
 import { AdminMapPicker } from "./AdminMapPicker";
 import {
   EMPTY_ADMIN_DATA,
+  type AdminBusiness,
   type AdminComment,
+  type AdminCulturalEvent,
   type AdminData,
   type AdminMeetEvent,
+  type AdminOrganizer,
   type AdminPlace,
+  type AdminPlaceClaim,
   type AdminPost,
   type AdminProfile,
   type AdminRole,
   type AdminRoute,
   type AdminRouteStop,
   type AdminStory,
+  type BusinessVerificationStatus,
   type ModerationTarget,
+  type OrganizerVerificationStatus,
+  type PlaceClaimStatus,
+  clearPlaceDeal,
+  getClaimRedemptionCounts,
+  createAdminBusiness,
   editAdminComment,
   editAdminPost,
   getAdminRole,
@@ -36,17 +49,33 @@ import {
   moderateContent,
   removeAdminMember,
   replaceAdminRouteStops,
+  reviewPlaceClaim,
+  saveAdminCulturalEvent,
+  createAdminOrganizer,
   saveAdminMeetEvent,
   saveAdminPlace,
   saveAdminRoute,
   saveAdminStory,
   setAdminMember,
+  setBusinessVerification,
+  setOrganizerVerification,
   uploadContentMedia,
 } from "@/lib/admin-api";
 import { getCurrentPulseAccount, type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
+import { CULTURAL_EVENT_TYPES, CULTURAL_EVENT_TYPE_META, tr } from "@/lib/hp/cultural-events-types";
 
-type AdminTab = "overview" | "places" | "stories" | "meet" | "routes" | "moderation" | "team";
+type AdminTab =
+  | "overview"
+  | "places"
+  | "stories"
+  | "meet"
+  | "cultural"
+  | "organizers"
+  | "businesses"
+  | "routes"
+  | "moderation"
+  | "team";
 type Notice = { tone: "success" | "error"; message: string } | null;
 type ModerationItem = {
   type: ModerationTarget;
@@ -67,10 +96,45 @@ const TABS: Array<{ id: AdminTab; label: string; icon: typeof LayoutDashboard }>
   { id: "places", label: "Places", icon: MapPin },
   { id: "stories", label: "Stories", icon: ImagePlus },
   { id: "meet", label: "Meet events", icon: Clock3 },
+  { id: "cultural", label: "Cultural events", icon: Ticket },
+  { id: "organizers", label: "Organizers", icon: UserCheck },
+  { id: "businesses", label: "Businesses", icon: Store },
   { id: "routes", label: "Routes", icon: Route },
   { id: "moderation", label: "Moderation", icon: ShieldCheck },
   { id: "team", label: "Team", icon: Users },
 ];
+
+// Human-readable i18n keys for the internal enum <option>s in the editors.
+// Place-type keys mirror the composer's PLACE_TYPE_LABEL_KEYS (PulseApp.tsx) so a
+// place type reads the same in the admin editor and the public composer.
+const PLACE_TYPE_LABEL_KEYS: Record<string, string> = {
+  beach: "Beach",
+  culture: "Culture",
+  food: "Food",
+  local: "Local spot",
+  nature: "Nature",
+  night: "Night",
+  sunset: "Sunset",
+  village: "Village",
+};
+const STORY_KIND_LABEL_KEYS: Record<string, string> = {
+  report: "Report",
+  photo: "Photo",
+  beach_status: "Beach status",
+  business_status: "Business status",
+  editor_note: "Editor note",
+  event: "Event",
+  route_tease: "Route teaser",
+};
+
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
+  }
+  return fallback;
+}
 
 function slug(value: string) {
   return (
@@ -216,9 +280,10 @@ export function AdminDashboard() {
       }
       setData(await loadAdminData());
     } catch (error) {
+      console.error("Could not load admin data.", error);
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not load admin data.",
+        message: describeError(error, t("Could not load admin data.")),
       });
     } finally {
       setLoading(false);
@@ -258,6 +323,9 @@ export function AdminDashboard() {
                 : item.id === "places" ||
                     item.id === "stories" ||
                     item.id === "meet" ||
+                    item.id === "cultural" ||
+                    item.id === "organizers" ||
+                    item.id === "businesses" ||
                     item.id === "routes"
                   ? canEdit
                   : true,
@@ -320,6 +388,15 @@ export function AdminDashboard() {
           )}
           {tab === "meet" && canEdit && (
             <MeetPanel data={data} onSaved={load} setNotice={setNotice} />
+          )}
+          {tab === "cultural" && canEdit && (
+            <CulturalEventsPanel data={data} onSaved={load} setNotice={setNotice} />
+          )}
+          {tab === "organizers" && canEdit && (
+            <OrganizersPanel data={data} onSaved={load} setNotice={setNotice} />
+          )}
+          {tab === "businesses" && canEdit && (
+            <BusinessesPanel data={data} onSaved={load} setNotice={setNotice} />
           )}
           {tab === "routes" && canEdit && (
             <RoutesPanel data={data} onSaved={load} setNotice={setNotice} />
@@ -393,10 +470,24 @@ function AdminDenied() {
 
 function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeration: () => void }) {
   const { language, t } = useI18n();
-  const pending = [data.places, data.posts, data.comments, data.stories, data.meetEvents]
+  const pending = [
+    data.places,
+    data.posts,
+    data.comments,
+    data.stories,
+    data.meetEvents,
+    data.culturalEvents,
+  ]
     .flat()
     .filter((item) => item.moderation_status === "pending").length;
-  const published = [data.places, data.posts, data.comments, data.stories, data.meetEvents]
+  const published = [
+    data.places,
+    data.posts,
+    data.comments,
+    data.stories,
+    data.meetEvents,
+    data.culturalEvents,
+  ]
     .flat()
     .filter((item) => item.moderation_status === "published").length;
   const metrics = [
@@ -580,11 +671,11 @@ function PlaceEditor({
     try {
       setSaving(true);
       setImageUrl(await uploadContentMedia(file, "places"));
-      setNotice({ tone: "success", message: "Image uploaded. Save the place to attach it." });
+      setNotice({ tone: "success", message: t("Image uploaded. Save the place to attach it.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not upload image.",
+        message: error instanceof Error ? error.message : t("Could not upload image."),
       });
     } finally {
       setSaving(false);
@@ -593,7 +684,7 @@ function PlaceEditor({
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!name.trim() || !area.trim() || !short.trim() || !imageUrl.trim()) {
-      setNotice({ tone: "error", message: "Name, area, description, and image are required." });
+      setNotice({ tone: "error", message: t("Name, area, description, and image are required.") });
       return;
     }
     try {
@@ -624,11 +715,11 @@ function PlaceEditor({
         created_by_identity: "LOCAL",
       });
       await onSaved();
-      setNotice({ tone: "success", message: "Place saved." });
+      setNotice({ tone: "success", message: t("Place saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save place.",
+        message: error instanceof Error ? error.message : t("Could not save place."),
       });
     } finally {
       setSaving(false);
@@ -671,7 +762,9 @@ function PlaceEditor({
             >
               {["beach", "culture", "food", "local", "nature", "night", "sunset", "village"].map(
                 (item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item} value={item}>
+                    {t(PLACE_TYPE_LABEL_KEYS[item] ?? item)}
+                  </option>
                 ),
               )}
             </select>
@@ -779,7 +872,7 @@ function PlaceEditor({
               className={inputClass}
               value={imageUrl}
               onChange={(event) => setImageUrl(event.target.value)}
-              placeholder="Image URL"
+              placeholder={t("Image URL")}
             />
             <label className="shrink-0 cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700">
               <ImagePlus size={16} />
@@ -793,7 +886,7 @@ function PlaceEditor({
           </div>
         </Field>
         {imageUrl && (
-          <img className="h-28 w-full rounded-lg object-cover" src={imageUrl} alt="Preview" />
+          <img className="h-28 w-full rounded-lg object-cover" src={imageUrl} alt={t("Preview")} />
         )}
         <ActionButton type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save place"}
@@ -867,7 +960,7 @@ function StoryEditor({
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not upload image.",
+        message: error instanceof Error ? error.message : t("Could not upload image."),
       });
     } finally {
       setSaving(false);
@@ -876,7 +969,7 @@ function StoryEditor({
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!placeId || !label.trim() || !mediaUrl.trim())
-      return setNotice({ tone: "error", message: "Place, label, and image are required." });
+      return setNotice({ tone: "error", message: t("Place, label, and image are required.") });
     try {
       setSaving(true);
       await saveAdminStory({
@@ -897,11 +990,11 @@ function StoryEditor({
         moderation_status: status,
       });
       await onSaved();
-      setNotice({ tone: "success", message: "Story saved." });
+      setNotice({ tone: "success", message: t("Story saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save story.",
+        message: error instanceof Error ? error.message : t("Could not save story."),
       });
     } finally {
       setSaving(false);
@@ -958,7 +1051,9 @@ function StoryEditor({
                 "event",
                 "route_tease",
               ].map((item) => (
-                <option key={item}>{item}</option>
+                <option key={item} value={item}>
+                  {t(STORY_KIND_LABEL_KEYS[item] ?? item)}
+                </option>
               ))}
             </select>
           </Field>
@@ -1009,7 +1104,7 @@ function StoryEditor({
           </div>
         </Field>
         {mediaUrl && (
-          <img className="h-28 w-full rounded-lg object-cover" src={mediaUrl} alt="Preview" />
+          <img className="h-28 w-full rounded-lg object-cover" src={mediaUrl} alt={t("Preview")} />
         )}
         <ActionButton type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save story"}
@@ -1084,7 +1179,7 @@ function MeetEditor({
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not upload image.",
+        message: error instanceof Error ? error.message : t("Could not upload image."),
       });
     } finally {
       setSaving(false);
@@ -1095,7 +1190,7 @@ function MeetEditor({
     if (!placeId || !title.trim() || !startsAt || !description.trim() || !coverUrl.trim())
       return setNotice({
         tone: "error",
-        message: "Place, title, time, description, and image are required.",
+        message: t("Place, title, time, description, and image are required."),
       });
     try {
       setSaving(true);
@@ -1124,11 +1219,11 @@ function MeetEditor({
         moderation_status: status,
       });
       await onSaved();
-      setNotice({ tone: "success", message: "Meet event saved." });
+      setNotice({ tone: "success", message: t("Meet event saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save event.",
+        message: error instanceof Error ? error.message : t("Could not save event."),
       });
     } finally {
       setSaving(false);
@@ -1218,13 +1313,692 @@ function MeetEditor({
           </div>
         </Field>
         {coverUrl && (
-          <img className="h-28 w-full rounded-lg object-cover" src={coverUrl} alt="Preview" />
+          <img className="h-28 w-full rounded-lg object-cover" src={coverUrl} alt={t("Preview")} />
         )}
         <ActionButton type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save event"}
         </ActionButton>
       </div>
     </form>
+  );
+}
+
+function CulturalEventsPanel({ data, onSaved, setNotice }: PanelProps) {
+  const { language } = useI18n();
+  const [selected, setSelected] = useState<AdminCulturalEvent | null>(null);
+  return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
+      <div>
+        <SectionHeader
+          title="Cultural events"
+          detail="Theater, concerts, and festivals across Ilia."
+          action={
+            <ActionButton onClick={() => setSelected(null)}>
+              <Ticket size={16} /> Add event
+            </ActionButton>
+          }
+        />
+        <ContentList
+          items={data.culturalEvents}
+          selectedId={selected?.id}
+          onSelect={setSelected}
+          title={(item) => item.title}
+          subtitle={(item) => `${item.venue_name} · ${formatDate(item.event_date, language)}`}
+          image={(item) => item.poster_url}
+        />
+      </div>
+      <CulturalEventEditor
+        key={selected?.id ?? "new"}
+        event={selected}
+        places={data.places}
+        organizers={data.organizers}
+        onSaved={onSaved}
+        setNotice={setNotice}
+      />
+    </div>
+  );
+}
+
+function CulturalEventEditor({
+  event,
+  places,
+  organizers,
+  onSaved,
+  setNotice,
+}: {
+  event: AdminCulturalEvent | null;
+  places: AdminPlace[];
+  organizers: AdminOrganizer[];
+  onSaved: () => Promise<void>;
+  setNotice: (notice: Notice) => void;
+}) {
+  const { language, t } = useI18n();
+  const [title, setTitle] = useState(event?.title ?? "");
+  const [greekTitle, setGreekTitle] = useState(event?.greek_title ?? "");
+  const [eventType, setEventType] = useState(event?.event_type ?? CULTURAL_EVENT_TYPES[0]);
+  const [venueName, setVenueName] = useState(event?.venue_name ?? "");
+  const [area, setArea] = useState(event?.area ?? "");
+  const [placeId, setPlaceId] = useState(event?.place_id ?? "");
+  const [eventDate, setEventDate] = useState(
+    event?.event_date ? event.event_date.slice(0, 16) : "",
+  );
+  const [organizerId, setOrganizerId] = useState(event?.organizer_id ?? "");
+  const [organizerName, setOrganizerName] = useState(event?.organizer_name ?? "");
+  const [descriptionEl, setDescriptionEl] = useState(event?.description_el ?? "");
+  const [descriptionEn, setDescriptionEn] = useState(event?.description_en ?? "");
+  const [posterUrl, setPosterUrl] = useState(event?.poster_url ?? "");
+  const [ticketUrl, setTicketUrl] = useState(event?.ticket_url ?? "");
+  const [isPastEvent, setIsPastEvent] = useState(event?.is_past_event ?? false);
+  const [isOfficial, setIsOfficial] = useState(event?.is_official ?? true);
+  const [status, setStatus] = useState(event?.moderation_status ?? "published");
+  const [saving, setSaving] = useState(false);
+  const upload = async (file: File | null) => {
+    if (!file) return;
+    try {
+      setSaving(true);
+      setPosterUrl(await uploadContentMedia(file, "cultural-events"));
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not upload poster."),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+  const save = async (formEvent: React.FormEvent) => {
+    formEvent.preventDefault();
+    if (
+      !title.trim() ||
+      !greekTitle.trim() ||
+      !venueName.trim() ||
+      !area.trim() ||
+      !eventDate ||
+      !organizerName.trim() ||
+      !descriptionEl.trim() ||
+      !posterUrl.trim()
+    ) {
+      setNotice({
+        tone: "error",
+        message: t(
+          "Title, venue, area, date, organizer, Greek description, and poster are required.",
+        ),
+      });
+      return;
+    }
+    try {
+      setSaving(true);
+      const place = places.find((item) => item.id === placeId);
+      await saveAdminCulturalEvent({
+        id: event?.id ?? `cultural-event-${slug(title)}-${Date.now()}`,
+        title: title.trim(),
+        greek_title: greekTitle.trim(),
+        event_type: eventType,
+        venue_name: venueName.trim(),
+        area: area.trim(),
+        place_id: placeId || null,
+        lat: place?.lat ?? null,
+        lng: place?.lng ?? null,
+        event_date: new Date(eventDate).toISOString(),
+        organizer_id: organizerId || null,
+        organizer_name: organizerName.trim(),
+        description_el: descriptionEl.trim(),
+        description_en: descriptionEn.trim() || null,
+        poster_url: posterUrl.trim(),
+        ticket_url: ticketUrl.trim() || null,
+        is_past_event: isPastEvent,
+        is_official: isOfficial,
+        moderation_status: status,
+      });
+      await onSaved();
+      setNotice({ tone: "success", message: t("Cultural event saved.") });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not save cultural event."),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <form
+      onSubmit={save}
+      className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
+    >
+      <h3 className="text-base font-black">
+        {t(event ? "Edit cultural event" : "New cultural event")}
+      </h3>
+      <div className="mt-4 grid gap-3">
+        <Field label="Title">
+          <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+        <Field label="Greek title">
+          <input
+            className={inputClass}
+            value={greekTitle}
+            onChange={(e) => setGreekTitle(e.target.value)}
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Type">
+            <select
+              className={inputClass}
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+            >
+              {CULTURAL_EVENT_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {tr(language, CULTURAL_EVENT_TYPE_META[type].label)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Event date">
+            <input
+              className={inputClass}
+              type="datetime-local"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Venue name">
+            <input
+              className={inputClass}
+              value={venueName}
+              onChange={(e) => setVenueName(e.target.value)}
+            />
+          </Field>
+          <Field label="Area">
+            <input className={inputClass} value={area} onChange={(e) => setArea(e.target.value)} />
+          </Field>
+        </div>
+        <Field label="Linked place (optional)">
+          <select
+            className={inputClass}
+            value={placeId}
+            onChange={(e) => setPlaceId(e.target.value)}
+          >
+            <option value="">{t("No linked place")}</option>
+            {places.map((place) => (
+              <option key={place.id} value={place.id}>
+                {place.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Organizer (optional link)">
+          <select
+            className={inputClass}
+            value={organizerId}
+            onChange={(e) => {
+              const nextId = e.target.value;
+              setOrganizerId(nextId);
+              const organizer = organizers.find((item) => item.id === nextId);
+              if (organizer) setOrganizerName(organizer.display_name);
+            }}
+          >
+            <option value="">{t("No linked organizer account")}</option>
+            {organizers.map((organizer) => (
+              <option key={organizer.id} value={organizer.id}>
+                {organizer.display_name} ·{" "}
+                {t(
+                  organizer.verification_status[0].toUpperCase() +
+                    organizer.verification_status.slice(1),
+                )}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Organizer display name">
+          <input
+            className={inputClass}
+            value={organizerName}
+            onChange={(e) => setOrganizerName(e.target.value)}
+            placeholder="e.g. Δήμος Ήλιδας"
+          />
+        </Field>
+        <Field label="Description (Greek)">
+          <textarea
+            className={inputClass}
+            rows={3}
+            value={descriptionEl}
+            onChange={(e) => setDescriptionEl(e.target.value)}
+          />
+        </Field>
+        <Field label="Description (English, optional)">
+          <textarea
+            className={inputClass}
+            rows={3}
+            value={descriptionEn}
+            onChange={(e) => setDescriptionEn(e.target.value)}
+          />
+        </Field>
+        <Field label="Ticket URL (optional)">
+          <input
+            className={inputClass}
+            value={ticketUrl}
+            onChange={(e) => setTicketUrl(e.target.value)}
+            placeholder="https://viva.com/…"
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <input
+              type="checkbox"
+              checked={isPastEvent}
+              onChange={(e) => setIsPastEvent(e.target.checked)}
+            />
+            {t("Past event")}
+          </label>
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <input
+              type="checkbox"
+              checked={isOfficial}
+              onChange={(e) => setIsOfficial(e.target.checked)}
+            />
+            {t("Official event")}
+          </label>
+        </div>
+        <Field label="Visibility">
+          <select className={inputClass} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="published">{t("Published")}</option>
+            <option value="pending">{t("Pending")}</option>
+            <option value="hidden">{t("Hidden")}</option>
+          </select>
+        </Field>
+        <Field label="Poster">
+          <div className="mt-1 flex gap-2">
+            <input
+              className={inputClass}
+              value={posterUrl}
+              onChange={(e) => setPosterUrl(e.target.value)}
+            />
+            <label className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2">
+              <ImagePlus size={16} />
+              <input
+                className="hidden"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                onChange={(e) => void upload(e.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+        </Field>
+        {posterUrl && (
+          <img className="h-28 w-full rounded-lg object-cover" src={posterUrl} alt={t("Preview")} />
+        )}
+        <ActionButton type="submit" disabled={saving}>
+          {saving ? "Saving…" : "Save event"}
+        </ActionButton>
+      </div>
+    </form>
+  );
+}
+
+function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
+  const { language, t } = useI18n();
+  const organizerUserIds = new Set(data.organizers.map((organizer) => organizer.user_id));
+  const [selectedId, setSelectedId] = useState("");
+  const [adding, setAdding] = useState(false);
+  const eligibleProfiles = data.profiles.filter(
+    (profile) => profile.profile_completed_at && !organizerUserIds.has(profile.id),
+  );
+
+  const act = async (organizer: AdminOrganizer, status: OrganizerVerificationStatus) => {
+    try {
+      await setOrganizerVerification(organizer.id, status);
+      await onSaved();
+      setNotice({
+        tone: "success",
+        message: t(status === "verified" ? "Organizer verified." : "Organizer rejected."),
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not update organizer."),
+      });
+    }
+  };
+
+  const addDirect = async () => {
+    const profile = data.profiles.find((item) => item.id === selectedId);
+    if (!profile) return;
+    try {
+      setAdding(true);
+      await createAdminOrganizer(profile.id, profile.display_name || profile.handle || "Organizer");
+      await onSaved();
+      setSelectedId("");
+      setNotice({ tone: "success", message: t("Organizer added and verified.") });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not add organizer."),
+      });
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <>
+      <SectionHeader
+        title="Organizers"
+        detail="Verify accounts before they can submit cultural events."
+      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+          <div className="divide-y divide-slate-100">
+            {data.organizers.length ? (
+              data.organizers.map((organizer) => (
+                <div key={organizer.id} className="flex flex-wrap items-center gap-3 p-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900">{organizer.display_name}</span>
+                      <StatusBadge status={organizer.verification_status} />
+                    </div>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-600">{organizer.bio}</p>
+                    <time className="mt-1 block text-xs text-slate-400">
+                      {t("Applied")} {formatDate(organizer.created_at, language)}
+                    </time>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {organizer.verification_status !== "verified" && (
+                      <ActionButton onClick={() => void act(organizer, "verified")}>
+                        <Check size={15} /> Verify
+                      </ActionButton>
+                    )}
+                    {organizer.verification_status !== "rejected" && (
+                      <ActionButton tone="muted" onClick={() => void act(organizer, "rejected")}>
+                        Reject
+                      </ActionButton>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyState>No organizer applications yet.</EmptyState>
+            )}
+          </div>
+        </div>
+        <div className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h3 className="font-black">{t("Add an organizer directly")}</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            {t("Skip the self-service application and verify an existing user right away.")}
+          </p>
+          <div className="mt-4 grid gap-3">
+            <Field label="Profile">
+              <select
+                className={inputClass}
+                value={selectedId}
+                onChange={(event) => setSelectedId(event.target.value)}
+              >
+                <option value="">{t("Choose a profile…")}</option>
+                {eligibleProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.display_name || profile.handle} · @{profile.handle}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {eligibleProfiles.length === 0 && (
+              <p className="text-xs text-slate-400">
+                {t(
+                  "No eligible profiles — a user needs to complete their profile (display name + handle) before they can be added here.",
+                )}
+              </p>
+            )}
+            <ActionButton onClick={() => void addDirect()} disabled={!selectedId || adding}>
+              {adding ? "Adding…" : "Add & verify organizer"}
+            </ActionButton>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
+  const { language, t } = useI18n();
+  const businessUserIds = new Set(data.businesses.map((business) => business.user_id));
+  const [selectedId, setSelectedId] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [redemptionCounts, setRedemptionCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let ignore = false;
+    getClaimRedemptionCounts()
+      .then((counts) => {
+        if (!ignore) setRedemptionCounts(counts);
+      })
+      .catch(() => {
+        // read-only decoration -- a failure here just hides the counts
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [data.placeClaims]);
+  const eligibleProfiles = data.profiles.filter(
+    (profile) => profile.profile_completed_at && !businessUserIds.has(profile.id),
+  );
+  const placeName = (id: string) => data.places.find((place) => place.id === id)?.name ?? id;
+  const businessName = (id: string) =>
+    data.businesses.find((business) => business.id === id)?.display_name ?? "—";
+
+  const verify = async (business: AdminBusiness, status: BusinessVerificationStatus) => {
+    try {
+      await setBusinessVerification(business.id, status);
+      await onSaved();
+      setNotice({
+        tone: "success",
+        message: t(status === "verified" ? "Business verified." : "Business rejected."),
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not update business."),
+      });
+    }
+  };
+
+  const review = async (claim: AdminPlaceClaim, status: PlaceClaimStatus) => {
+    try {
+      await reviewPlaceClaim(claim.id, status);
+      await onSaved();
+      setNotice({
+        tone: "success",
+        message: t(status === "approved" ? "Claim approved." : "Claim rejected."),
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not update the claim."),
+      });
+    }
+  };
+
+  const clearDeal = async (claim: AdminPlaceClaim) => {
+    try {
+      await clearPlaceDeal(claim.id);
+      await onSaved();
+      setNotice({ tone: "success", message: t("Deal cleared.") });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not clear the deal."),
+      });
+    }
+  };
+
+  const addDirect = async () => {
+    const profile = data.profiles.find((item) => item.id === selectedId);
+    if (!profile) return;
+    try {
+      setAdding(true);
+      await createAdminBusiness(profile.id, profile.display_name || profile.handle || "Business");
+      await onSaved();
+      setSelectedId("");
+      setNotice({ tone: "success", message: t("Business added and verified.") });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : t("Could not add business."),
+      });
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <>
+      <SectionHeader
+        title="Businesses"
+        detail="Verify business accounts, then approve the places they claim."
+      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="flex flex-col gap-6">
+          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div className="border-b border-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+              {t("Business accounts")}
+            </div>
+            <div className="divide-y divide-slate-100">
+              {data.businesses.length ? (
+                data.businesses.map((business) => (
+                  <div key={business.id} className="flex flex-wrap items-center gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">{business.display_name}</span>
+                        <StatusBadge status={business.verification_status} />
+                      </div>
+                      <p className="mt-1 max-w-2xl text-sm text-slate-600">{business.bio}</p>
+                      <time className="mt-1 block text-xs text-slate-400">
+                        {t("Applied")} {formatDate(business.created_at, language)}
+                      </time>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {business.verification_status !== "verified" && (
+                        <ActionButton onClick={() => void verify(business, "verified")}>
+                          <Check size={15} /> Verify
+                        </ActionButton>
+                      )}
+                      {business.verification_status !== "rejected" && (
+                        <ActionButton
+                          tone="muted"
+                          onClick={() => void verify(business, "rejected")}
+                        >
+                          Reject
+                        </ActionButton>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState>No business applications yet.</EmptyState>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div className="border-b border-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+              {t("Place claims")}
+            </div>
+            <div className="divide-y divide-slate-100">
+              {data.placeClaims.length ? (
+                data.placeClaims.map((claim) => (
+                  <div key={claim.id} className="flex flex-wrap items-center gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">
+                          {placeName(claim.place_id)}
+                        </span>
+                        <StatusBadge status={claim.status} />
+                      </div>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {t("Claimed by")} {businessName(claim.business_id)}
+                      </p>
+                      {(claim.hours_text || claim.phone) && (
+                        <p className="mt-1 max-w-2xl text-xs text-slate-400">
+                          {[claim.hours_text, claim.phone].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                      {claim.deal_text && (
+                        <p className="mt-1 max-w-2xl text-xs font-semibold text-orange-700">
+                          🎁 {claim.deal_text}
+                          {!claim.deal_active && (
+                            <span className="ml-1 font-normal text-slate-400">
+                              ({t("inactive")})
+                            </span>
+                          )}
+                          {(redemptionCounts[claim.id] ?? 0) > 0 && (
+                            <span className="ml-2 font-normal text-slate-500">
+                              🎟️ {redemptionCounts[claim.id]} {t("redeemed")}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {claim.status !== "approved" && (
+                        <ActionButton onClick={() => void review(claim, "approved")}>
+                          <Check size={15} /> Approve
+                        </ActionButton>
+                      )}
+                      {claim.status !== "rejected" && (
+                        <ActionButton tone="muted" onClick={() => void review(claim, "rejected")}>
+                          Reject
+                        </ActionButton>
+                      )}
+                      {claim.deal_text && (
+                        <ActionButton tone="muted" onClick={() => void clearDeal(claim)}>
+                          Clear deal
+                        </ActionButton>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState>No place claims yet.</EmptyState>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h3 className="font-black">{t("Add a business directly")}</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            {t("Skip the self-service application and verify an existing user right away.")}
+          </p>
+          <div className="mt-4 grid gap-3">
+            <Field label="Profile">
+              <select
+                className={inputClass}
+                value={selectedId}
+                onChange={(event) => setSelectedId(event.target.value)}
+              >
+                <option value="">{t("Choose a profile…")}</option>
+                {eligibleProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.display_name || profile.handle} · @{profile.handle}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {eligibleProfiles.length === 0 && (
+              <p className="text-xs text-slate-400">
+                {t(
+                  "No eligible profiles — a user needs to complete their profile (display name + handle) before they can be added here.",
+                )}
+              </p>
+            )}
+            <ActionButton onClick={() => void addDirect()} disabled={!selectedId || adding}>
+              {adding ? "Adding…" : "Add & verify business"}
+            </ActionButton>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1297,7 +2071,7 @@ function RouteEditor({
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not upload image.",
+        message: error instanceof Error ? error.message : t("Could not upload image."),
       });
     } finally {
       setSaving(false);
@@ -1320,7 +2094,7 @@ function RouteEditor({
     if (!title.trim() || !lede.trim() || !duration.trim() || !imageUrl.trim())
       return setNotice({
         tone: "error",
-        message: "Title, summary, duration, and image are required.",
+        message: t("Title, summary, duration, and image are required."),
       });
     const routeId = route?.id ?? `route-${slug(title)}-${Date.now()}`;
     try {
@@ -1343,11 +2117,11 @@ function RouteEditor({
         stops.map((stop, position) => ({ ...stop, route_id: routeId, position })),
       );
       await onSaved();
-      setNotice({ tone: "success", message: "Route and stops saved." });
+      setNotice({ tone: "success", message: t("Route and stops saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save route.",
+        message: error instanceof Error ? error.message : t("Could not save route."),
       });
     } finally {
       setSaving(false);
@@ -1423,7 +2197,9 @@ function RouteEditor({
             {stops.map((stop, index) => (
               <div key={index} className="rounded-xl border border-slate-200 p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-slate-500">Stop {index + 1}</span>
+                  <span className="text-xs font-black text-slate-500">
+                    {t("Stop {n}", { n: index + 1 })}
+                  </span>
                   <button
                     type="button"
                     onClick={() =>
@@ -1549,6 +2325,14 @@ function ModerationPanel({ data, canEdit, onSaved, setNotice }: PanelProps & { c
             status: item.moderation_status,
             createdAt: item.created_at,
           })),
+          ...data.culturalEvents.map((item) => ({
+            type: "cultural_event" as const,
+            id: item.id,
+            title: item.title,
+            detail: item.description_el,
+            status: item.moderation_status,
+            createdAt: item.created_at,
+          })),
         ] as ModerationItem[]
       )
         .filter((item) => filter === "all" || item.status === filter)
@@ -1567,11 +2351,16 @@ function ModerationPanel({ data, canEdit, onSaved, setNotice }: PanelProps & { c
     try {
       await moderateContent(item.type, item.id, status);
       await onSaved();
-      setNotice({ tone: "success", message: `${item.type.replace("_", " ")} ${status}.` });
+      setNotice({
+        tone: "success",
+        message: t(status === "published" ? "{item} published." : "{item} hidden.", {
+          item: t(item.type.replace("_", " ")),
+        }),
+      });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not update moderation status.",
+        message: error instanceof Error ? error.message : t("Could not update moderation status."),
       });
     }
   };
@@ -1666,11 +2455,11 @@ function ModerationRow({
       if (item.type === "comment") await editAdminComment(item.id, text);
       await onEdited();
       setEditing(false);
-      setNotice({ tone: "success", message: "Content text updated." });
+      setNotice({ tone: "success", message: t("Content text updated.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not update content text.",
+        message: error instanceof Error ? error.message : t("Could not update content text."),
       });
     }
   };
@@ -1733,11 +2522,11 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
       await setAdminMember(selectedId, selectedRole);
       await onSaved();
       setSelectedId("");
-      setNotice({ tone: "success", message: "Team role saved." });
+      setNotice({ tone: "success", message: t("Team role saved.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not save team role.",
+        message: error instanceof Error ? error.message : t("Could not save team role."),
       });
     }
   };
@@ -1778,7 +2567,9 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                             setNotice({
                               tone: "error",
                               message:
-                                error instanceof Error ? error.message : "Could not change role.",
+                                error instanceof Error
+                                  ? error.message
+                                  : t("Could not change role."),
                             }),
                           )
                       }
@@ -1801,7 +2592,7 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
                                 message:
                                   error instanceof Error
                                     ? error.message
-                                    : "Could not remove member.",
+                                    : t("Could not remove member."),
                               }),
                             );
                       }}

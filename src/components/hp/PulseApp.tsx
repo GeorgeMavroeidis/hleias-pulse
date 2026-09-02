@@ -31,6 +31,20 @@ import {
   ExternalLink,
   LockKeyhole,
   RefreshCw,
+  Ticket,
+  Check,
+  Store,
+  Phone,
+  Globe,
+  Users,
+  UtensilsCrossed,
+  BadgeCheck,
+  Gift,
+  Camera,
+  Info,
+  ListChecks,
+  ChevronRight,
+  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -45,18 +59,36 @@ import {
 } from "@/lib/hp-model";
 import {
   addPulseComment,
+  applyToBecomeOrganizer,
+  applyToBecomeBusiness,
+  claimPlace,
   createPulsePlace,
   createPulsePost,
   createPulseMeetEvent,
+  createPulseCulturalEvent,
   createPulseStory,
   emptyPulseData,
+  getMyBusinessStatus,
+  getMyCulturalEvents,
+  getMyDealStats,
+  getMyOrganizerStatus,
+  getMyPlaceClaims,
+  getPlaceBusinessProfile,
+  issueDealCode,
+  redeemDealCode,
+  setPlaceDeal,
+  updatePlaceBusinessProfile,
+  updatePulseCulturalEvent,
+  uploadBusinessPhoto,
   loadPulseData,
   loadPulseUserState,
   markPulseStoriesSeen,
   recordPulseActivityDay,
+  setCulturalEventLike,
   setPostLike,
   setPulseMeetRsvp,
   setSavedItem,
+  setVisited,
   type CreatePulsePlaceInput,
   type PulseData,
   type PulseProfileSummary,
@@ -77,11 +109,13 @@ import { useI18n } from "@/lib/i18n";
 import { getAdminRole, type AdminRole } from "@/lib/admin-api";
 import { ImageBox } from "./ImageBox";
 import {
+  areaTier,
   buildAreaClusters,
   getMapAreaIdForPlace,
   SocialMap,
   type MapAreaCluster,
 } from "./SocialMap";
+import { MapAreaInsights, AREA_TIER_META } from "./MapAreaInsights";
 import { PlaceStoryRail } from "./PlaceStoryRail";
 import { PlaceStoryViewer } from "./PlaceStoryViewer";
 import {
@@ -94,8 +128,24 @@ import {
 import { LiveTicker } from "./LiveTicker";
 import { TrendingHero } from "./TrendingHero";
 import { MeetScreen } from "./MeetScreen";
+import { CulturalEventsScreen } from "./CulturalEventsScreen";
+import { DealsScreen } from "./DealsScreen";
+import { OrganizerEventComposer } from "./OrganizerEventComposer";
+import { OrganizerEventsSheet } from "./OrganizerEventsSheet";
+import { BusinessPlacesSheet } from "./BusinessPlacesSheet";
+import { DealCodeModal } from "./DealCodeModal";
+import type {
+  BusinessStatus,
+  DealCode,
+  DealRedemptionStats,
+  PlaceBusinessProfile,
+  PlaceBusinessProfileFields,
+  PlaceClaim,
+} from "@/lib/hp/business-types";
+import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet, PasswordRecoverySheet } from "./AuthAccountSheets";
+import { IdentitySegments, SectionHeader, fieldClass } from "./blend-ui";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { buildPulseActivitySnapshot, type PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
 import { type StreakState } from "@/lib/hp/meet-store";
@@ -107,9 +157,16 @@ import {
   type MeetEvent,
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
+import {
+  DEFAULT_ORGANIZER_BIO,
+  type CreateCulturalEventInput,
+  type CulturalEvent,
+  type OrganizerStatus,
+} from "@/lib/hp/cultural-events-types";
 
-type Tab = "map" | "pulse" | "routes" | "meet" | "saved";
-type NavTab = Exclude<Tab, "saved">;
+type Tab = "map" | "pulse" | "routes" | "meet" | "saved" | "deals";
+type NavTab = Exclude<Tab, "saved" | "deals">;
+type MeetSubTab = "community" | "events";
 type ComposerMode = "post" | "place" | "story" | "event";
 type CreateStoryInput = {
   placeId: string;
@@ -127,6 +184,12 @@ const POSTING_IDENTITIES: { id: PostingIdentity; label: string; helper: string }
   { id: "TOURIST", label: "Tourist", helper: "I am visiting" },
   { id: "GUIDE", label: "Guide", helper: "I can recommend" },
 ];
+const COMPOSER_MODE_ICONS: Record<ComposerMode, LucideIcon> = {
+  post: MessageCircle,
+  place: MapPin,
+  story: Camera,
+  event: CalendarHeart,
+};
 const ROUTE_FILTERS = ["All", "Beach", "Nature", "Culture", "No car", "Free"] as const;
 type RouteFilter = (typeof ROUTE_FILTERS)[number];
 
@@ -155,7 +218,8 @@ const isTab = (value: string | null): value is Tab =>
   value === "pulse" ||
   value === "routes" ||
   value === "meet" ||
-  value === "saved";
+  value === "saved" ||
+  value === "deals";
 
 const truncateShareText = (text: string) =>
   text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;
@@ -310,6 +374,7 @@ interface TopBarProps {
   account: PulseAccountState;
   onOpenAccount: () => void;
   onOpenAuth: () => void;
+  onOpenDeals: () => void;
 }
 
 function TopBar({
@@ -321,6 +386,7 @@ function TopBar({
   account,
   onOpenAccount,
   onOpenAuth,
+  onOpenDeals,
 }: TopBarProps) {
   const { language, t } = useI18n();
   return (
@@ -341,6 +407,15 @@ function TopBar({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenDeals}
+            className="hp-deals-pill inline-flex items-center gap-1 rounded-full border border-hp-sunset/30 bg-hp-sunset/10 px-2.5 py-1.5 text-[11px] font-bold text-hp-sunset"
+            aria-label={t("Open deals")}
+          >
+            <Gift size={13} strokeWidth={2.6} />
+            {t("Deals")}
+          </button>
           <button
             type="button"
             onClick={() => setShowSearch((s) => !s)}
@@ -454,6 +529,8 @@ function MapBottomSheet({
   onSavePlace,
   onSharePlace,
   savedPlaceIds,
+  claimedPlaceIds,
+  dealPlaceIds,
 }: {
   cluster: MapAreaCluster | null;
   selectedPlace: Place | null;
@@ -469,6 +546,8 @@ function MapBottomSheet({
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
   savedPlaceIds: string[];
+  claimedPlaceIds: string[];
+  dealPlaceIds: string[];
 }) {
   const { t } = useI18n();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
@@ -573,12 +652,17 @@ function MapBottomSheet({
   };
 
   return (
-    <motion.div
-      style={{ height }}
-      animate={{ height }}
-      transition={
-        isDraggingSheet ? { duration: 0 } : { type: "spring", stiffness: 260, damping: 30 }
-      }
+    // Plain element + CSS height transition rather than framer's animate — a
+    // framer height animation here gets dropped when another motion element
+    // (the Explore areas panel) unmounts in the same commit, leaving the sheet
+    // stuck collapsed after picking an area from that panel.
+    <div
+      style={{
+        height,
+        transition: isDraggingSheet
+          ? "none"
+          : "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
       className="hp-map-sheet absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overscroll-contain rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper/98 shadow-[0_-12px_40px_rgba(23,20,17,0.18)] backdrop-blur"
     >
       {/* Drag handle */}
@@ -621,7 +705,10 @@ function MapBottomSheet({
               events={events}
               expanded={isExpanded}
               savedPlaceIds={savedPlaceIds}
+              claimedPlaceIds={claimedPlaceIds}
+              dealPlaceIds={dealPlaceIds}
               storyGroups={storyGroups}
+              onViewArea={() => onSetSnap(full)}
               onOpenStory={onOpenStory}
               onSavePlace={onSavePlace}
               onSharePlace={onSharePlace}
@@ -632,7 +719,7 @@ function MapBottomSheet({
           )}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -650,13 +737,28 @@ function TonightPulseContent() {
   );
 }
 
+// Place type -> category chip label (English source key; Greek via i18n).
+const CATEGORY_LABEL: Record<Place["type"], string> = {
+  beach: "Beach",
+  culture: "Culture",
+  nature: "Nature",
+  food: "Food",
+  local: "Town",
+  village: "Village",
+  night: "Nightlife",
+  sunset: "Sunset",
+};
+
 function AreaSheetContent({
   cluster,
   selectedPlace,
   events,
   expanded,
   savedPlaceIds,
+  claimedPlaceIds,
+  dealPlaceIds,
   storyGroups,
+  onViewArea,
   onOpenStory,
   onSavePlace,
   onSharePlace,
@@ -667,7 +769,10 @@ function AreaSheetContent({
   events: PulseData["events"];
   expanded: boolean;
   savedPlaceIds: string[];
+  claimedPlaceIds: string[];
+  dealPlaceIds: string[];
   storyGroups: PlaceStoryGroup[];
+  onViewArea: () => void;
   onOpenStory: (placeId: string) => void;
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
@@ -679,105 +784,169 @@ function AreaSheetContent({
   const areaStoryGroups = storyGroups.filter((group) => placeIds.has(group.placeId));
 
   if (!isPlaceSheet) {
+    // One unified area card for every entry point (map bubble, the on-map chip
+    // rail, and the Explore areas panel all land here). Compact first glance;
+    // "View area" expands the same sheet to the full detail (places + stories).
+    const tier = areaTier(cluster);
+    const meta = AREA_TIER_META[tier];
+    const TierIcon = meta.Icon;
+    const signals = cluster.postCount + cluster.eventCount;
+    const categories = [...new Set(cluster.places.map((place) => place.type))];
+
     return (
       <motion.div
         key={`area-${cluster.id}`}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex h-full min-h-0 w-full flex-col"
+        className={expanded ? "w-full" : "flex h-full min-h-0 w-full flex-col"}
       >
         <div className="flex gap-3">
-          <div className="grid h-16 w-16 shrink-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-ink/5">
-            {cluster.places.slice(0, 4).map((place) => (
-              <ImageBox
-                key={place.id}
-                src={place.imageUrl}
-                alt=""
-                className="h-8 w-full"
-                rounded="rounded-none"
-              />
-            ))}
-          </div>
+          <ImageBox
+            src={cluster.leadPlace.imageUrl}
+            alt=""
+            className="h-16 w-16 shrink-0"
+            rounded="rounded-2xl"
+          />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-[11px] font-bold text-hp-ink/70">
-              <span className="inline-block h-2 w-2 rounded-full bg-hp-sunset" />
-              <span>{cluster.activityLine}</span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h3 className="text-[16px] font-black text-hp-ink">{cluster.name}</h3>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${meta.badge}`}
+              >
+                <TierIcon size={10} />
+                {t(meta.label)}
+              </span>
             </div>
-            <h3 className="mt-1 text-[16px] font-black text-hp-ink">{cluster.name}</h3>
-            <p className="text-[11px] text-hp-muted">
-              {language === "GR"
-                ? `${cluster.places.length} σημεία σε αυτή την περιοχή`
-                : `${cluster.places.length} clustered places in this area`}
-            </p>
-            <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
+            <p className="mt-0.5 text-[12px] text-hp-ink/75">{t(meta.blurb)}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-hp-ink/60">
               <span className="inline-flex items-center gap-0.5">
                 <Radio size={11} />
-                {cluster.postCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
+                {t("{count} signals", { count: signals })}
               </span>
-              <span className="inline-flex items-center gap-0.5">
-                <Clock size={11} />
-                {cluster.eventCount} {language === "GR" ? "εκδηλώσεις" : "events"}
-              </span>
+              <span aria-hidden="true">·</span>
+              <span>{t("{count} places", { count: cluster.places.length })}</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-            {language === "GR" ? "Σημεία της περιοχής" : "Clustered elements"}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {cluster.places.map((place) => (
+        {categories.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {categories.slice(0, 4).map((category) => (
               <span
-                key={place.id}
-                className="rounded-full bg-hp-ink/5 px-2 py-1 text-[11px] font-bold text-hp-ink/75"
+                key={category}
+                className="rounded-full bg-hp-ink/5 px-2 py-1 text-[10px] font-bold text-hp-ink/65"
               >
-                {place.name}
+                {t(CATEGORY_LABEL[category])}
               </span>
             ))}
+            {categories.length > 4 && (
+              <span className="rounded-full bg-hp-ink/5 px-2 py-1 text-[10px] font-bold text-hp-ink/65">
+                +{categories.length - 4}
+              </span>
+            )}
           </div>
-        </div>
+        )}
 
-        {areaStoryGroups.length > 0 && (
-          <div className="mt-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                {language === "GR" ? `Stories από ${cluster.name}` : `Stories from ${cluster.name}`}
-              </span>
-              <span className="text-[10px] font-semibold text-hp-muted">
-                {areaStoryGroups.length}
-              </span>
-            </div>
-            <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              {areaStoryGroups.map((group) => {
-                const tone = toneStyle(group.hasUnseen ? group.tone : "muted");
-                return (
+        {!expanded ? (
+          <button
+            type="button"
+            onClick={onViewArea}
+            className="mt-auto flex items-center justify-center gap-1.5 rounded-full bg-hp-ink py-2.5 text-[13px] font-black text-hp-paper transition active:scale-[0.99]"
+          >
+            {t("View area")}
+            <ArrowRight size={14} />
+          </button>
+        ) : (
+          <div className="mt-3 flex flex-col gap-3">
+            <div>
+              <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                {t("Places in this area")}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {cluster.places.map((place) => (
                   <button
-                    key={group.placeId}
+                    key={place.id}
                     type="button"
-                    onClick={() => onOpenStory(group.placeId)}
-                    aria-label={
-                      language === "GR"
-                        ? `Άνοιγμα stories για ${group.placeName}`
-                        : `Open stories for ${group.placeName}`
-                    }
-                    className="flex w-14 shrink-0 flex-col items-center gap-1"
+                    onClick={() => onOpenDetails(place)}
+                    className="flex items-center gap-2.5 rounded-xl border border-hp-ink/10 bg-white/50 p-2 text-left transition active:bg-hp-ink/[0.03]"
                   >
-                    <div className="rounded-full p-[2px]" style={{ background: tone.gradient }}>
-                      <ImageBox
-                        src={group.stories[0].mediaUrl}
-                        alt={group.placeName}
-                        className="h-12 w-12"
-                        rounded="rounded-full"
-                      />
-                    </div>
-                    <span className="block w-full truncate text-center text-[9px] font-bold text-hp-ink/80">
-                      {group.placeName}
+                    <ImageBox
+                      src={place.imageUrl}
+                      alt=""
+                      className="h-9 w-9 shrink-0"
+                      rounded="rounded-lg"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12px] font-black text-hp-ink">
+                        {place.name}
+                      </span>
+                      <span className="block truncate text-[10px] text-hp-muted">
+                        {place.recentPostCount}{" "}
+                        {language === "GR" ? "δημοσιεύσεις" : "posts"}
+                      </span>
                     </span>
+                    {(savedPlaceIds.includes(place.id) ||
+                      claimedPlaceIds.includes(place.id) ||
+                      dealPlaceIds.includes(place.id)) && (
+                      <span className="flex shrink-0 items-center gap-1 text-hp-sunset">
+                        {savedPlaceIds.includes(place.id) && <Bookmark size={12} />}
+                        {claimedPlaceIds.includes(place.id) && <BadgeCheck size={12} />}
+                        {dealPlaceIds.includes(place.id) && <Gift size={12} />}
+                      </span>
+                    )}
+                    <ChevronRight size={14} className="shrink-0 text-hp-ink/30" />
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
+
+            {areaStoryGroups.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    {language === "GR"
+                      ? `Stories από ${cluster.name}`
+                      : `Stories from ${cluster.name}`}
+                  </span>
+                  <span className="text-[10px] font-semibold text-hp-muted">
+                    {areaStoryGroups.length}
+                  </span>
+                </div>
+                <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                  {areaStoryGroups.map((group) => {
+                    const tone = toneStyle(group.hasUnseen ? group.tone : "muted");
+                    return (
+                      <button
+                        key={group.placeId}
+                        type="button"
+                        onClick={() => onOpenStory(group.placeId)}
+                        aria-label={
+                          language === "GR"
+                            ? `Άνοιγμα stories για ${group.placeName}`
+                            : `Open stories for ${group.placeName}`
+                        }
+                        className="flex w-14 shrink-0 flex-col items-center gap-1"
+                      >
+                        <div
+                          className="rounded-full p-[2px]"
+                          style={{ background: tone.gradient }}
+                        >
+                          <ImageBox
+                            src={group.stories[0].mediaUrl}
+                            alt={group.placeName}
+                            className="h-12 w-12"
+                            rounded="rounded-full"
+                          />
+                        </div>
+                        <span className="block w-full truncate text-center text-[9px] font-bold text-hp-ink/80">
+                          {group.placeName}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </motion.div>
@@ -814,7 +983,26 @@ function AreaSheetContent({
               {focusPlace.type} · {focusPlace.bestTime}
             </span>
           </div>
-          <h3 className="mt-1 text-[16px] font-black text-hp-ink">{focusPlace.name}</h3>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <h3 className="text-[16px] font-black text-hp-ink">{focusPlace.name}</h3>
+            {claimedPlaceIds.includes(focusPlace.id) && (
+              <span
+                className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset/12 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-hp-sunset"
+                title={t("Verified business")}
+              >
+                <BadgeCheck size={10} />
+                {t("Business")}
+              </span>
+            )}
+            {dealPlaceIds.includes(focusPlace.id) && (
+              <span
+                className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset/12 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-hp-sunset"
+                title={t("This place has an app deal")}
+              >
+                🎁 {t("Deal")}
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-hp-muted">
             {focusPlace.greekName} · {focusPlace.area}
           </p>
@@ -1118,6 +1306,236 @@ function PulseFeed({
   );
 }
 
+/* ============== "Must-see today" deck (Tourist orientation, Routes tab) ============== */
+// TEMP stopgap until a real `places.featured` flag exists (phase 2). Hotness
+// ranking alone buries Ancient Olympia — the region's headline site — at rank ~9
+// behind a wall of beaches, so it is pinned to the front of the "Must-see today"
+// deck by hand. REPLACE this list with a `places.featured` column set from the
+// admin panel once phase 2 is built; this is not meant to be permanent
+// architecture. See HANDOFF.md > Known Limitations.
+const TEMP_FEATURED_PLACE_IDS = ["ancient-olympia"];
+
+// Shown only to Tourist identities, at the top of the Routes tab. Places only —
+// route recommendations are already covered by the Routes tab's own "What we
+// recommend" (curated) section, so this deck deliberately does not repeat them.
+function MustSeeTodayDeck({
+  places,
+  onOpenPlace,
+}: {
+  places: Place[];
+  onOpenPlace: (place: Place) => void;
+}) {
+  const { language, t } = useI18n();
+
+  // "Must-see today": TEMP_FEATURED_PLACE_IDS pinned to the front (in list order),
+  // then the remaining slots up to 6 filled by the normal ranking — lively spots
+  // (status popular/busy), strongest hotness first, skipping anything already
+  // pinned so it never shows twice. Falls back to a plain hotness ranking of all
+  // places only if fewer than 6 are flagged live.
+  // TODO(phase 2): drop TEMP_FEATURED_PLACE_IDS once `places.featured` exists and
+  // source the pinned set from that column instead.
+  const mustSee = useMemo(() => {
+    const DECK_SIZE = 6;
+    const pinned = TEMP_FEATURED_PLACE_IDS.map((id) =>
+      places.find((place) => place.id === id),
+    ).filter((place): place is Place => Boolean(place));
+    const pinnedIds = new Set(pinned.map((place) => place.id));
+
+    const live = places.filter((place) => place.status === "popular" || place.status === "busy");
+    const pool = live.length >= DECK_SIZE ? live : places;
+    const ranked = [...pool]
+      .filter((place) => !pinnedIds.has(place.id))
+      .sort((a, b) => b.hotness - a.hotness);
+
+    return [...pinned, ...ranked].slice(0, DECK_SIZE);
+  }, [places]);
+
+  if (mustSee.length === 0) return null;
+
+  return (
+    <section className="mb-6 flex flex-col gap-3">
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+          {language === "GR" ? `${mustSee.length} επιλογές` : `${mustSee.length} picks`}
+        </div>
+        <h3 className="text-[17px] font-black text-hp-ink">{t("Must-see today")}</h3>
+        <p className="text-[12px] text-hp-muted">
+          {t("A quick first look for visitors — the spots to begin with.")}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {mustSee.map((place) => (
+          <button
+            key={place.id}
+            type="button"
+            onClick={() => onOpenPlace(place)}
+            aria-label={t("Open {place}", { place: place.name })}
+            className="overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
+          >
+            <ImageBox
+              src={place.imageUrl}
+              alt={place.name}
+              className="h-28 w-full"
+              rounded="rounded-none"
+            />
+            <div className="p-2">
+              <div
+                className="text-[10px] font-bold uppercase tracking-wider"
+                style={{ color: typeColor[place.type] }}
+              >
+                {place.type}
+              </div>
+              <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">{place.name}</div>
+              <div className="text-[10px] text-hp-muted">{place.area}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ============== "Έχεις πάει;" — Local exploration card (Pulse feed) ============== */
+// The north-west peninsula (Kyllini, Chlemoutsi/Arkoudi, Loutra) and mountain
+// Ilia (Foloi, Nemouta, Andritsaina, Bassae) hold far fewer spots than the
+// Amaliada–Pyrgos–Olympia / coastal core. This is the union of those
+// underrepresented SocialMap clusters — the set we nudge Locals to go cover.
+// Hand-maintained here (same spirit as TEMP_FEATURED_PLACE_IDS); if a real
+// region field lands on `places` later, derive this from it instead.
+const DISCOVERY_PLACE_IDS = [
+  // Kyllini
+  "kyllini-beach",
+  "kyllini-harbor",
+  "kyllini-old-beach",
+  // Chlemoutsi & Arkoudi
+  "chlemoutsi",
+  "chlemoutsi-sea-view",
+  "loutra-kyllinis",
+  "arkoudi-beach",
+  // Pineios plain
+  "vartholomio",
+  "gastouni",
+  // Foloi forest
+  "foloi-forest",
+  "foloi-deep",
+  // Nemouta
+  "nemouta-waterfalls",
+  "nemouta-village",
+  // Andritsaina
+  "andritsaina",
+  "andritsaina-streets",
+  // Bassae
+  "bassae-temple",
+  "bassae-inside",
+];
+
+// v1 milestone: a single fixed nudge, no badges / no persisted achievements.
+// Only fires as a toast when the user *crosses* it during a session.
+const DISCOVERY_MILESTONE = 5;
+
+// Local-only, top of the Pulse feed. "Covered" = the user has at least one own
+// post at that place (posts-as-visited proxy — no check-in table in v1).
+function LocalDiscoveryCard({
+  places,
+  coveredIds,
+  onOpenPlace,
+  onMilestone,
+}: {
+  places: Place[];
+  coveredIds: string[];
+  onOpenPlace: (place: Place) => void;
+  onMilestone: () => void;
+}) {
+  const { t } = useI18n();
+  const total = DISCOVERY_PLACE_IDS.length;
+  const covered = coveredIds.length;
+
+  const uncoveredPlaces = useMemo(() => {
+    const coveredSet = new Set(coveredIds);
+    return DISCOVERY_PLACE_IDS.filter((id) => !coveredSet.has(id))
+      .map((id) => places.find((place) => place.id === id))
+      .filter((place): place is Place => Boolean(place));
+  }, [coveredIds, places]);
+
+  // Celebrate crossing the milestone within the session — never on mount if the
+  // user is already past it, and never more than once.
+  const startedBelowMilestone = useRef(covered < DISCOVERY_MILESTONE);
+  const celebrated = useRef(false);
+  useEffect(() => {
+    if (covered >= DISCOVERY_MILESTONE && startedBelowMilestone.current && !celebrated.current) {
+      celebrated.current = true;
+      onMilestone();
+    }
+  }, [covered, onMilestone]);
+
+  if (places.length === 0) return null;
+
+  const pct = total > 0 ? Math.round((covered / total) * 100) : 0;
+
+  return (
+    <section className="mb-1 flex flex-col gap-3 border-b border-hp-ink/10 pb-4">
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+          {t("{covered}/{total} places", { covered, total })}
+        </div>
+        <h3 className="text-[17px] font-black text-hp-ink">{t("Have you been?")}</h3>
+        <p className="text-[12px] text-hp-muted">
+          {t("Discover north-west and mountain Ilia — the corners with the fewest spots.")}
+        </p>
+      </div>
+
+      <div
+        className="h-2 w-full overflow-hidden rounded-full bg-hp-ink/10"
+        role="progressbar"
+        aria-valuenow={covered}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-label={t("Discovery progress")}
+      >
+        <div
+          className="h-full rounded-full bg-hp-sunset transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      {uncoveredPlaces.length > 0 ? (
+        <div className="hp-no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4">
+          {uncoveredPlaces.map((place) => (
+            <button
+              key={place.id}
+              type="button"
+              onClick={() => onOpenPlace(place)}
+              aria-label={t("Open {place}", { place: place.name })}
+              className="w-36 shrink-0 overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
+            >
+              <ImageBox
+                src={place.imageUrl}
+                alt={place.name}
+                className="h-24 w-full"
+                rounded="rounded-none"
+              />
+              <div className="p-2">
+                <div
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: typeColor[place.type] }}
+                >
+                  {place.type}
+                </div>
+                <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">{place.name}</div>
+                <div className="line-clamp-1 text-[10px] text-hp-muted">{place.area}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-2xl border border-dashed border-hp-ink/15 bg-hp-paper/60 px-4 py-3 text-center text-[12px] font-semibold text-hp-ink">
+          {t("You've been everywhere on this list. Respect.")}
+        </p>
+      )}
+    </section>
+  );
+}
+
 /* ============== Routes Screen ============== */
 function routeMatchesQuery(route: RouteItem, author: Author, query: string) {
   if (!query.trim()) return true;
@@ -1294,12 +1712,18 @@ function RoutesScreen({
   savedRoutes,
   routeComments,
   findAuthor,
+  showMustSee,
+  places,
+  onOpenPlace,
 }: {
   routes: RouteItem[];
   onOpenRoute: (r: RouteItem) => void;
   savedRoutes: Record<string, boolean>;
   routeComments: Record<string, Comment[]>;
   findAuthor: (id: string) => Author;
+  showMustSee: boolean;
+  places: Place[];
+  onOpenPlace: (place: Place) => void;
 }) {
   const { language, t } = useI18n();
   const [query, setQuery] = useState("");
@@ -1325,6 +1749,7 @@ function RoutesScreen({
       <p className="mb-4 text-[12px] text-hp-muted">
         {t("Curated local routes with practical stops.")}
       </p>
+      {showMustSee && <MustSeeTodayDeck places={places} onOpenPlace={onOpenPlace} />}
       <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
         <div className="flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
           <Search size={13} className="text-hp-muted" />
@@ -1694,6 +2119,8 @@ function PlaceDetailModal({
   onClose,
   onSave,
   saved,
+  visited,
+  onToggleVisited,
   posts,
   onOpenMap,
   onShare,
@@ -1703,12 +2130,19 @@ function PlaceDetailModal({
   findPostAuthor,
   storyGroups,
   onOpenStory,
+  businessProfile,
+  showClaimCta,
+  onClaimPlace,
+  onGetDealCode,
+  gettingDealCode,
 }: {
   place: Place | null;
   events: PulseData["events"];
   onClose: () => void;
   onSave: (id: string) => void;
   saved: boolean;
+  visited: boolean;
+  onToggleVisited: (id: string) => void;
   posts: Post[];
   onOpenMap: (id: string) => void;
   onShare: (place: Place) => void;
@@ -1718,11 +2152,25 @@ function PlaceDetailModal({
   findPostAuthor: (post: Post) => Author;
   storyGroups: PlaceStoryGroup[];
   onOpenStory: (placeId: string) => void;
+  businessProfile: PlaceBusinessProfile | null;
+  showClaimCta: boolean;
+  onClaimPlace: () => void;
+  onGetDealCode: () => void;
+  gettingDealCode: boolean;
 }) {
   const [commentText, setCommentText] = useState("");
   const { language, t } = useI18n();
   const eventCount = place ? events.filter((event) => event.placeId === place.id).length : 0;
   const noteCount = place ? place.commentCount + comments.length : 0;
+  const hasBusinessDetail = Boolean(
+    businessProfile &&
+    ((businessProfile.dealActive && businessProfile.dealText) ||
+      businessProfile.hoursText ||
+      businessProfile.phone ||
+      businessProfile.websiteUrl ||
+      businessProfile.menuUrl ||
+      businessProfile.photos.length > 0),
+  );
   const placeStories = place
     ? (storyGroups.find((group) => group.placeId === place.id)?.stories ?? [])
     : [];
@@ -1779,6 +2227,14 @@ function PlaceDetailModal({
                 <p className="text-[12px] opacity-85">
                   {place.greekName} · {place.area}
                 </p>
+                {businessProfile && (
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-hp-paper/95 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-hp-sunset">
+                    <BadgeCheck size={12} />
+                    {businessProfile.businessName
+                      ? t("Managed by {name}", { name: businessProfile.businessName })
+                      : t("Verified business")}
+                  </span>
+                )}
               </div>
             </div>
             {placeStories.length > 0 && (
@@ -1827,20 +2283,126 @@ function PlaceDetailModal({
                   </span>
                 ))}
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <Stat label="posts today" value={String(place.recentPostCount)} />
-                <Stat label="events tonight" value={String(eventCount)} />
-                <Stat label="crowd" value={place.crowd} />
-                <Stat label="budget" value={place.budget} />
-                <Stat label="best time" value={place.bestTime} />
-                <Stat label="local notes" value={String(noteCount)} />
-              </div>
-              <div className="mt-4 rounded-2xl border border-hp-ink/10 bg-white/60 p-3">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                  Best for
+              <PlaceStats
+                postsToday={place.recentPostCount}
+                eventsTonight={eventCount}
+                notes={noteCount}
+                crowd={place.crowd}
+                budget={place.budget}
+                bestTime={place.bestTime}
+                mood={place.mood}
+              />
+
+              {hasBusinessDetail && <div className="hp-pd-rule" />}
+
+              {businessProfile?.dealActive && businessProfile.dealText && (
+                <div className="hp-card-lift mt-4 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[7px] bg-hp-sunset text-hp-paper">
+                      <Gift size={12} strokeWidth={2.4} />
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-hp-sunset">
+                      {t("App deal")}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[14px] font-bold leading-snug text-hp-ink">
+                    {businessProfile.dealText}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onGetDealCode}
+                    disabled={gettingDealCode}
+                    className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-full bg-hp-sunset py-2.5 text-[12px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-50 disabled:shadow-none"
+                  >
+                    <Ticket size={13} strokeWidth={2.4} />
+                    {gettingDealCode ? t("Working...") : t("Get code")}
+                  </button>
                 </div>
-                <div className="mt-1 text-[13px] font-semibold text-hp-ink">{place.mood}</div>
-              </div>
+              )}
+
+              {businessProfile &&
+                (businessProfile.hoursText ||
+                  businessProfile.phone ||
+                  businessProfile.websiteUrl ||
+                  businessProfile.menuUrl ||
+                  businessProfile.photos.length > 0) && (
+                  <div className="mt-4 rounded-2xl border border-hp-sunset/25 bg-hp-sunset/5 p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-sunset">
+                      <Store size={12} /> {t("Business info")}
+                    </div>
+                    {businessProfile.hoursText && (
+                      <div className="mt-2 flex items-start gap-2 text-[12.5px] text-hp-ink">
+                        <Clock size={13} className="mt-0.5 shrink-0 text-hp-muted" />
+                        <span className="whitespace-pre-line">{businessProfile.hoursText}</span>
+                      </div>
+                    )}
+                    {businessProfile.phone && (
+                      <a
+                        href={`tel:${businessProfile.phone}`}
+                        className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-hp-ink"
+                      >
+                        <Phone size={13} className="shrink-0 text-hp-muted" />
+                        {businessProfile.phone}
+                      </a>
+                    )}
+                    {businessProfile.websiteUrl && (
+                      <a
+                        href={businessProfile.websiteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-hp-sunset"
+                      >
+                        <Globe size={13} className="shrink-0" />
+                        {t("Website")}
+                      </a>
+                    )}
+                    {businessProfile.menuUrl && (
+                      <a
+                        href={businessProfile.menuUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-hp-sunset"
+                      >
+                        <UtensilsCrossed size={13} className="shrink-0" />
+                        {t("See menu")}
+                      </a>
+                    )}
+                    {businessProfile.photos.length > 0 && (
+                      <div className="hp-no-scrollbar -mx-1 mt-3 flex gap-2 overflow-x-auto px-1">
+                        {businessProfile.photos.map((url) => (
+                          <ImageBox
+                            key={url}
+                            src={url}
+                            alt=""
+                            className="h-24 w-32 shrink-0"
+                            rounded="rounded-xl"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {showClaimCta && (
+                <button
+                  type="button"
+                  onClick={onClaimPlace}
+                  className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-dashed border-hp-ink/20 bg-hp-paper p-3 text-left transition active:scale-[0.99]"
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink">
+                    <Store size={15} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12.5px] font-black text-hp-ink">
+                      {t("Is this your business?")}
+                    </span>
+                    <span className="block text-[11px] text-hp-muted">
+                      {t("Claim it to add hours, a menu, and photos.")}
+                    </span>
+                  </span>
+                </button>
+              )}
+
               <div className="mt-5">
                 <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-hp-muted">
                   Recent posts
@@ -1932,41 +2494,54 @@ function PlaceDetailModal({
                 )}
               </div>
             </div>
-            <div className="sticky bottom-0 flex gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3 backdrop-blur">
-              <button
-                type="button"
-                onClick={() => onSave(place.id)}
-                className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
-              >
-                <Bookmark size={13} className="mr-1 inline" /> {saved ? "Saved" : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenMap(place.id);
-                }}
-                className="flex-1 rounded-full bg-hp-ink py-3 text-[12px] font-bold text-hp-paper"
-              >
-                Map
-              </button>
-              <a
-                href={openStreetMapUrl(place)}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
-                className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-              >
-                <ExternalLink size={14} />
-              </a>
-              <button
-                type="button"
-                onClick={() => onShare(place)}
-                className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                aria-label={t("Share {place}", { place: place.name })}
-              >
-                <Share2 size={14} />
-              </button>
+            <div className="sticky bottom-0 flex flex-col gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3 backdrop-blur">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSave(place.id)}
+                  className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
+                >
+                  <Bookmark size={13} className="mr-1 inline" /> {saved ? "Saved" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggleVisited(place.id)}
+                  aria-pressed={visited}
+                  className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${visited ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
+                >
+                  <Check size={13} strokeWidth={visited ? 3 : 2.4} className="mr-1 inline" />{" "}
+                  {t("I've been here")}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenMap(place.id);
+                  }}
+                  className="flex-1 rounded-full bg-hp-ink py-3 text-[12px] font-bold text-hp-paper"
+                >
+                  Map
+                </button>
+                <a
+                  href={openStreetMapUrl(place)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
+                  className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+                >
+                  <ExternalLink size={14} />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => onShare(place)}
+                  className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+                  aria-label={t("Share {place}", { place: place.name })}
+                >
+                  <Share2 size={14} />
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>
@@ -1974,12 +2549,121 @@ function PlaceDetailModal({
     </AnimatePresence>
   );
 }
-function Stat({ label, value }: { label: string; value: string }) {
+// Typography-led place stats: an activity byline (only non-zero counts, joined
+// with "·") over a no-box descriptor row, then a single "Best for" line. No
+// tiles, no colour -- ink for the values, muted for everything else.
+function PlaceStats({
+  postsToday,
+  eventsTonight,
+  notes,
+  crowd,
+  budget,
+  bestTime,
+  mood,
+}: {
+  postsToday: number;
+  eventsTonight: number;
+  notes: number;
+  crowd: string;
+  budget: string;
+  bestTime: string;
+  mood: string;
+}) {
+  const { t } = useI18n();
+
+  const clauses: ReactNode[] = [];
+  if (postsToday > 0) {
+    clauses.push(
+      <span key="posts">
+        <MessageCircle strokeWidth={2.2} />
+        <b>{postsToday}</b> {t("posts today")}
+      </span>,
+    );
+  }
+  if (eventsTonight > 0) {
+    clauses.push(
+      <span key="events">
+        <CalendarHeart strokeWidth={2.2} />
+        <b>{eventsTonight}</b> {t("events tonight")}
+      </span>,
+    );
+  }
+  if (notes > 0) {
+    clauses.push(
+      <span key="notes">
+        <ListChecks strokeWidth={2.2} />
+        <b>{notes}</b> {t("local notes")}
+      </span>,
+    );
+  }
+
+  const descriptors: { key: string; icon: ReactNode; label: string; value: string }[] = [];
+  if (crowd.trim()) {
+    descriptors.push({
+      key: "crowd",
+      icon: <Users strokeWidth={2.2} />,
+      label: t("Crowd"),
+      value: t(crowd.trim()),
+    });
+  }
+  if (budget.trim()) {
+    descriptors.push({
+      key: "budget",
+      icon: <Wallet strokeWidth={2.2} />,
+      label: t("Budget"),
+      value: /^free$/i.test(budget.trim()) ? t("Free") : budget.trim(),
+    });
+  }
+  if (bestTime.trim()) {
+    descriptors.push({
+      key: "bestTime",
+      icon: <Clock strokeWidth={2.2} />,
+      label: t("Best time"),
+      value: bestTime.trim(),
+    });
+  }
+
+  const moodText = mood.trim();
+  const hasStats = clauses.length > 0 || descriptors.length > 0;
+  if (!hasStats && !moodText) return null;
+
   return (
-    <div className="rounded-2xl border border-hp-ink/10 bg-white/60 p-3">
-      <div className="text-[9px] font-bold uppercase tracking-wider text-hp-muted">{label}</div>
-      <div className="mt-1 text-[14px] font-bold text-hp-ink">{value}</div>
-    </div>
+    <>
+      {hasStats && (
+        <div className="hp-pd-stats">
+          <p className="hp-pd-byline">
+            {clauses.length > 0
+              ? clauses.flatMap((node, i) =>
+                  i === 0
+                    ? [node]
+                    : [
+                        <span key={`sep-${i}`} className="hp-pd-sep">
+                          ·
+                        </span>,
+                        node,
+                      ],
+                )
+              : t("Quiet here right now")}
+          </p>
+          {descriptors.length > 0 && (
+            <div className="hp-pd-desc">
+              {descriptors.map((d) => (
+                <span key={d.key}>
+                  {d.icon}
+                  {d.label} <b>{d.value}</b>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {moodText && (
+        <div className="hp-pd-bestfor">
+          <i>{t("Best for")}</i>
+          <span>{moodText}</span>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -2491,6 +3175,18 @@ const placeTypeOptions: Place["type"][] = [
   "sunset",
 ];
 
+// English i18n keys for the place-type <option>s in the create composer.
+const PLACE_TYPE_LABEL_KEYS: Record<Place["type"], string> = {
+  beach: "Beach",
+  culture: "Culture",
+  nature: "Nature",
+  food: "Food",
+  local: "Local spot",
+  village: "Village",
+  night: "Night",
+  sunset: "Sunset",
+};
+
 const STORY_CONDITION_OPTIONS = ["clean", "windy", "busy", "quiet", "event"] as const;
 
 function defaultMeetDateTime() {
@@ -2942,8 +3638,13 @@ function CreateComposerModal({
             className="hp-composer-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper p-4"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hp-ink/15" />
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-black text-hp-ink">{t("Add to ΗΛΕΙΑ PULSE")}</h3>
+            <div className="mb-4 flex items-center justify-between border-b border-hp-ink/10 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[9px] bg-hp-sunset text-hp-paper">
+                  <Plus size={14} strokeWidth={2.6} />
+                </span>
+                <h3 className="text-xl font-black text-hp-ink">{t("Add to ΗΛΕΙΑ PULSE")}</h3>
+              </div>
               <button
                 type="button"
                 onClick={onClose}
@@ -2954,76 +3655,84 @@ function CreateComposerModal({
               </button>
             </div>
 
-            <div className="mb-3 grid grid-cols-4 rounded-full border border-hp-ink/10 bg-white/50 p-1">
-              {(["post", "place", "story", "event"] as ComposerMode[]).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  data-testid={`composer-mode-${option}`}
-                  onClick={() => {
-                    setMode(option);
-                    setError(null);
-                  }}
-                  aria-pressed={mode === option}
-                  className={`rounded-full px-3 py-2 text-[12px] font-bold capitalize ${
-                    mode === option ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
+            <div className="mb-4 grid grid-cols-4 gap-1 rounded-full border border-hp-ink/10 bg-white/50 p-1">
+              {(["post", "place", "story", "event"] as ComposerMode[]).map((option) => {
+                const ModeIcon = COMPOSER_MODE_ICONS[option];
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    data-testid={`composer-mode-${option}`}
+                    onClick={() => {
+                      setMode(option);
+                      setError(null);
+                    }}
+                    aria-pressed={mode === option}
+                    className={`flex flex-col items-center gap-1 rounded-full px-2 py-1.5 text-[11px] font-bold capitalize transition ${
+                      mode === option ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
+                    }`}
+                  >
+                    <ModeIcon size={14} strokeWidth={2.2} />
+                    {t(option[0].toUpperCase() + option.slice(1))}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="mb-3 flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/55 px-3 py-2.5">
+            <div className="hp-card-lift mb-4 flex items-center gap-2.5 rounded-2xl border border-hp-ink/10 bg-hp-paper px-3 py-2.5">
               {profile ? (
                 <>
                   {profileAvatarUrl(profile) ? (
                     <img
                       src={profileAvatarUrl(profile) ?? ""}
                       alt=""
-                      className="h-8 w-8 rounded-full border border-hp-ink/10 object-cover"
+                      className="h-8 w-8 shrink-0 rounded-full border border-hp-ink/10 object-cover"
                     />
                   ) : (
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-hp-ink text-[10px] font-black text-hp-paper">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-hp-ink text-[10px] font-black text-hp-paper">
                       {profileDisplayName(profile).slice(0, 2).toUpperCase()}
                     </span>
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12px] font-black text-hp-ink">
-                      Posting as {profileDisplayName(profile)}
+                      {t("Posting as {name}", { name: profileDisplayName(profile) })}
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      Profile identity will be stored with this contribution
+                      {t("Profile identity will be stored with this contribution")}
                     </span>
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-hp-sunset/10 text-hp-sunset">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-hp-sunset/10 text-hp-sunset">
                     <LockKeyhole size={14} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[12px] font-black text-hp-ink">
-                      Sign in to post
+                      {t("Sign in to post")}
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      Saves can be private, public posts need a profile
+                      {t("Saves can be private, public posts need a profile")}
                     </span>
                   </span>
                   <button
                     type="button"
                     onClick={onRequireAccount}
-                    className="rounded-full bg-hp-ink px-3 py-1.5 text-[11px] font-bold text-hp-paper"
+                    className="shrink-0 rounded-full bg-hp-ink px-3 py-1.5 text-[11px] font-bold text-hp-paper"
                   >
-                    Sign in
+                    {t("Sign in")}
                   </button>
                 </>
               )}
             </div>
 
             {mode === "post" ? (
-              <form data-testid="composer-post-form" onSubmit={handlePostSubmit}>
-                <div className="relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+              <form
+                data-testid="composer-post-form"
+                onSubmit={handlePostSubmit}
+                className="hp-stagger space-y-3"
+              >
+                <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
                   <ImageBox
                     src={selectedPlace.imageUrl}
                     alt={selectedPlace.name}
@@ -3031,10 +3740,10 @@ function CreateComposerModal({
                     rounded="rounded-2xl"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 text-hp-paper">
-                    <ImagePlus size={18} />
-                    <span className="text-[12px] font-bold">Using {selectedPlace.name} image</span>
-                  </div>
+                  <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
+                    <ImagePlus size={12} />
+                    {t("Using {place} image", { place: selectedPlace.name })}
+                  </span>
                 </div>
                 <label htmlFor="create-post-text" className="sr-only">
                   Post text
@@ -3047,42 +3756,22 @@ function CreateComposerModal({
                   onChange={(e) => setText(e.target.value)}
                   autoComplete="off"
                   placeholder={t("What's happening at this place?…")}
-                  className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
+                  className={`${fieldClass()} resize-none`}
                   rows={3}
                 />
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Posting as
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    {t("Posting as")}
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                    {POSTING_IDENTITIES.map((option) => {
-                      const active = identity === option.id;
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setIdentity(option.id)}
-                          aria-pressed={active}
-                          className={`rounded-xl px-2 py-2 text-left transition ${
-                            active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
-                          }`}
-                        >
-                          <span className="block text-[11px] font-black">{option.label}</span>
-                          <span
-                            className={`block truncate text-[9px] font-semibold ${
-                              active ? "text-hp-paper/65" : "text-hp-muted"
-                            }`}
-                          >
-                            {option.helper}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <IdentitySegments
+                    options={POSTING_IDENTITIES}
+                    value={identity}
+                    onChange={setIdentity}
+                  />
                 </div>
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Location
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    {t("Location")}
                   </div>
                   <input
                     type="hidden"
@@ -3100,9 +3789,9 @@ function CreateComposerModal({
                     setQuery={setPlaceQuery}
                   />
                 </div>
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Vibe
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    {t("Vibe")}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {vibeChips.map((v) => {
@@ -3127,271 +3816,295 @@ function CreateComposerModal({
                     })}
                   </div>
                 </div>
-                {error && <p className="mt-3 text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
                 <button
                   type="submit"
                   data-testid="composer-post-submit"
                   disabled={!text.trim() || saving}
-                  className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+                  className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
-                  {saving ? "Saving…" : "Post"}
+                  {saving ? t("Saving…") : t("Post")}
                 </button>
               </form>
             ) : mode === "place" ? (
-              <form data-testid="composer-place-form" onSubmit={handlePlaceSubmit}>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-place-name"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Place name
-                    </label>
-                    <input
-                      id="create-place-name"
-                      name="create-place-name"
-                      data-testid="composer-place-name"
-                      value={placeName}
-                      onChange={(e) => setPlaceName(e.target.value)}
-                      autoComplete="off"
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
+              <form
+                data-testid="composer-place-form"
+                onSubmit={handlePlaceSubmit}
+                className="hp-stagger space-y-4"
+              >
+                <section>
+                  <SectionHeader icon={Info} label={t("Basics")} tone="deep" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-place-name"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Place name")}
+                      </label>
+                      <input
+                        id="create-place-name"
+                        name="create-place-name"
+                        data-testid="composer-place-name"
+                        value={placeName}
+                        onChange={(e) => setPlaceName(e.target.value)}
+                        autoComplete="off"
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-area"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Area")}
+                      </label>
+                      <input
+                        id="create-place-area"
+                        name="create-place-area"
+                        data-testid="composer-place-area"
+                        value={placeArea}
+                        onChange={(e) => setPlaceArea(e.target.value)}
+                        autoComplete="off"
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-type"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Type")}
+                      </label>
+                      <select
+                        id="create-place-type"
+                        name="create-place-type"
+                        data-testid="composer-place-type"
+                        value={placeType}
+                        onChange={(e) => setPlaceType(e.target.value as Place["type"])}
+                        className={fieldClass()}
+                      >
+                        {placeTypeOptions.map((type) => (
+                          <option key={type} value={type}>
+                            {t(PLACE_TYPE_LABEL_KEYS[type])}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-area"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Area
-                    </label>
-                    <input
-                      id="create-place-area"
-                      name="create-place-area"
-                      data-testid="composer-place-area"
-                      value={placeArea}
-                      onChange={(e) => setPlaceArea(e.target.value)}
-                      autoComplete="off"
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
+                </section>
+
+                <section>
+                  <SectionHeader icon={MapPin} label={t("Place on the map")} tone="sea" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label
+                        htmlFor="create-place-lat"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Lat")}
+                      </label>
+                      <input
+                        id="create-place-lat"
+                        name="create-place-lat"
+                        data-testid="composer-place-lat"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.000001"
+                        value={placeLat}
+                        onChange={(e) => setPlaceLat(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-lng"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Lng")}
+                      </label>
+                      <input
+                        id="create-place-lng"
+                        name="create-place-lng"
+                        data-testid="composer-place-lng"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.000001"
+                        value={placeLng}
+                        onChange={(e) => setPlaceLng(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-place-image"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Photo URL")}
+                      </label>
+                      <input
+                        id="create-place-image"
+                        name="create-place-image"
+                        data-testid="composer-place-image"
+                        type="url"
+                        value={placeImageUrl}
+                        onChange={(e) => setPlaceImageUrl(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-type"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Type
-                    </label>
-                    <select
-                      id="create-place-type"
-                      name="create-place-type"
-                      data-testid="composer-place-type"
-                      value={placeType}
-                      onChange={(e) => setPlaceType(e.target.value as Place["type"])}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
-                    >
-                      {placeTypeOptions.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
+                </section>
+
+                <section>
+                  <SectionHeader icon={ListChecks} label={t("Details")} tone="olive" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <label htmlFor="create-place-short" className="sr-only">
+                        {t("Description")}
+                      </label>
+                      <textarea
+                        id="create-place-short"
+                        name="create-place-short"
+                        data-testid="composer-place-short"
+                        value={placeShort}
+                        onChange={(e) => setPlaceShort(e.target.value)}
+                        placeholder={t("What should locals know?…")}
+                        className={`${fieldClass()} resize-none`}
+                        rows={3}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-place-tags"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Tags")}
+                      </label>
+                      <input
+                        id="create-place-tags"
+                        name="create-place-tags"
+                        data-testid="composer-place-tags"
+                        value={placeTags}
+                        onChange={(e) => setPlaceTags(e.target.value)}
+                        placeholder={t("beach, quiet, sunset")}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-crowd"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Crowd")}
+                      </label>
+                      <select
+                        id="create-place-crowd"
+                        name="create-place-crowd"
+                        data-testid="composer-place-crowd"
+                        value={placeCrowd}
+                        onChange={(e) => setPlaceCrowd(e.target.value)}
+                        className={fieldClass()}
+                      >
+                        <option value="low">{t("low")}</option>
+                        <option value="medium">{t("medium")}</option>
+                        <option value="high">{t("high")}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-place-budget"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Budget")}
+                      </label>
+                      <select
+                        id="create-place-budget"
+                        name="create-place-budget"
+                        data-testid="composer-place-budget"
+                        value={placeBudget}
+                        onChange={(e) => setPlaceBudget(e.target.value)}
+                        className={fieldClass()}
+                      >
+                        <option value="free">{t("Free")}</option>
+                        <option value="€">€</option>
+                        <option value="€€">€€</option>
+                        <option value="€€€">€€€</option>
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-place-best-time"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Best time")}
+                      </label>
+                      <input
+                        id="create-place-best-time"
+                        name="create-place-best-time"
+                        data-testid="composer-place-best-time"
+                        value={placeBestTime}
+                        onChange={(e) => setPlaceBestTime(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-lat"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Lat
-                    </label>
-                    <input
-                      id="create-place-lat"
-                      name="create-place-lat"
-                      data-testid="composer-place-lat"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.000001"
-                      value={placeLat}
-                      onChange={(e) => setPlaceLat(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-lng"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Lng
-                    </label>
-                    <input
-                      id="create-place-lng"
-                      name="create-place-lng"
-                      data-testid="composer-place-lng"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.000001"
-                      value={placeLng}
-                      onChange={(e) => setPlaceLng(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-place-image"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Photo URL
-                    </label>
-                    <input
-                      id="create-place-image"
-                      name="create-place-image"
-                      data-testid="composer-place-image"
-                      type="url"
-                      value={placeImageUrl}
-                      onChange={(e) => setPlaceImageUrl(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label htmlFor="create-place-short" className="sr-only">
-                      Description
-                    </label>
-                    <textarea
-                      id="create-place-short"
-                      name="create-place-short"
-                      data-testid="composer-place-short"
-                      value={placeShort}
-                      onChange={(e) => setPlaceShort(e.target.value)}
-                      placeholder={t("What should locals know?…")}
-                      className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-place-tags"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Tags
-                    </label>
-                    <input
-                      id="create-place-tags"
-                      name="create-place-tags"
-                      data-testid="composer-place-tags"
-                      value={placeTags}
-                      onChange={(e) => setPlaceTags(e.target.value)}
-                      placeholder="beach, quiet, sunset"
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-crowd"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Crowd
-                    </label>
-                    <select
-                      id="create-place-crowd"
-                      name="create-place-crowd"
-                      data-testid="composer-place-crowd"
-                      value={placeCrowd}
-                      onChange={(e) => setPlaceCrowd(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
-                    >
-                      <option value="low">low</option>
-                      <option value="medium">medium</option>
-                      <option value="high">high</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-place-budget"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Budget
-                    </label>
-                    <select
-                      id="create-place-budget"
-                      name="create-place-budget"
-                      data-testid="composer-place-budget"
-                      value={placeBudget}
-                      onChange={(e) => setPlaceBudget(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px]"
-                    >
-                      <option value="free">free</option>
-                      <option value="€">€</option>
-                      <option value="€€">€€</option>
-                      <option value="€€€">€€€</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-place-best-time"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      Best time
-                    </label>
-                    <input
-                      id="create-place-best-time"
-                      name="create-place-best-time"
-                      data-testid="composer-place-best-time"
-                      value={placeBestTime}
-                      onChange={(e) => setPlaceBestTime(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                </div>
-                {error && <p className="mt-3 text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                </section>
+
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
                 <button
                   type="submit"
                   data-testid="composer-place-submit"
                   disabled={saving}
-                  className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+                  className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
-                  {saving ? "Saving…" : "Save place"}
+                  {saving ? t("Saving…") : t("Save place")}
                 </button>
               </form>
             ) : mode === "story" ? (
-              <form data-testid="composer-story-form" onSubmit={handleStorySubmit}>
-                <div className="relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                  <ImageBox
-                    src={selectedPlace.imageUrl}
-                    alt={selectedPlace.name}
-                    className="h-full w-full"
-                    rounded="rounded-2xl"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 text-hp-paper">
-                    <ImagePlus size={18} />
-                    <span className="text-[12px] font-bold">
-                      Story photo · using {selectedPlace.name} image
+              <form
+                data-testid="composer-story-form"
+                onSubmit={handleStorySubmit}
+                className="hp-stagger space-y-4"
+              >
+                <section>
+                  <SectionHeader icon={Camera} label={t("Photo & caption")} tone="sunset" />
+                  <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+                    <ImageBox
+                      src={selectedPlace.imageUrl}
+                      alt={selectedPlace.name}
+                      className="h-full w-full"
+                      rounded="rounded-2xl"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
+                    <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
+                      <ImagePlus size={12} />
+                      {t("Story photo · using {place} image", { place: selectedPlace.name })}
                     </span>
                   </div>
-                </div>
-                <p className="mt-2 text-[11px] text-hp-muted">
-                  Shows full-screen, 9:16. Swap in your own photo later — this previews with the
-                  place image.
-                </p>
+                  <p className="mt-2 text-[11px] text-hp-muted">
+                    {t(
+                      "Shows full-screen, 9:16. Swap in your own photo later — this previews with the place image.",
+                    )}
+                  </p>
 
-                <label htmlFor="create-story-caption" className="sr-only">
-                  Story caption
-                </label>
-                <textarea
-                  id="create-story-caption"
-                  name="create-story-caption"
-                  data-testid="composer-story-caption"
-                  value={storyCaption}
-                  onChange={(e) => setStoryCaption(e.target.value)}
-                  autoComplete="off"
-                  placeholder={t("What's happening here right now?…")}
-                  className="mt-3 w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
-                  rows={3}
-                />
+                  <label htmlFor="create-story-caption" className="sr-only">
+                    {t("Story caption")}
+                  </label>
+                  <textarea
+                    id="create-story-caption"
+                    name="create-story-caption"
+                    data-testid="composer-story-caption"
+                    value={storyCaption}
+                    onChange={(e) => setStoryCaption(e.target.value)}
+                    autoComplete="off"
+                    placeholder={t("What's happening here right now?…")}
+                    className={`${fieldClass()} mt-3 resize-none`}
+                    rows={3}
+                  />
+                </section>
 
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Type
-                  </div>
+                <section>
+                  <SectionHeader icon={Info} label={t("Type")} tone="deep" />
                   <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
                     {(["photo", "report"] as const).map((option) => {
                       const active = storyKind === option;
@@ -3406,318 +4119,344 @@ function CreateComposerModal({
                             active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                           }`}
                         >
-                          {option === "report" ? "Live report" : "Photo"}
+                          {option === "report" ? t("Live report") : t("Photo")}
                         </button>
                       );
                     })}
                   </div>
-                </div>
 
-                {storyKind === "report" && (
-                  <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/50 p-2.5">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          Crowd
+                  {storyKind === "report" && (
+                    <div className="mt-2 rounded-2xl border border-hp-ink/10 bg-white/50 p-2.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                            {t("Crowd")}
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
+                            {(["low", "medium", "high"] as const).map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                aria-pressed={storyCrowd === c}
+                                onClick={() => setStoryCrowd(c)}
+                                className={`rounded-lg px-1 py-1.5 text-[10px] font-bold capitalize ${
+                                  storyCrowd === c
+                                    ? "bg-hp-ink text-hp-paper"
+                                    : "bg-hp-paper text-hp-ink/65"
+                                }`}
+                              >
+                                {t(c)}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          {(["low", "medium", "high"] as const).map((c) => (
-                            <button
-                              key={c}
-                              type="button"
-                              aria-pressed={storyCrowd === c}
-                              onClick={() => setStoryCrowd(c)}
-                              className={`rounded-lg px-1 py-1.5 text-[10px] font-bold capitalize ${
-                                storyCrowd === c
-                                  ? "bg-hp-ink text-hp-paper"
-                                  : "bg-hp-paper text-hp-ink/65"
-                              }`}
-                            >
-                              {c}
-                            </button>
-                          ))}
+                        <div>
+                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                            {t("Parking")}
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
+                            {(["easy", "tight", "full"] as const).map((p) => (
+                              <button
+                                key={p}
+                                type="button"
+                                aria-pressed={storyParking === p}
+                                onClick={() => setStoryParking(p)}
+                                className={`rounded-lg px-1 py-1.5 text-[10px] font-bold capitalize ${
+                                  storyParking === p
+                                    ? "bg-hp-ink text-hp-paper"
+                                    : "bg-hp-paper text-hp-ink/65"
+                                }`}
+                              >
+                                {t(p)}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                      <div>
+                      <div className="mt-2">
                         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                          Parking
+                          {t("Condition")}
                         </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          {(["easy", "tight", "full"] as const).map((p) => (
-                            <button
-                              key={p}
-                              type="button"
-                              aria-pressed={storyParking === p}
-                              onClick={() => setStoryParking(p)}
-                              className={`rounded-lg px-1 py-1.5 text-[10px] font-bold capitalize ${
-                                storyParking === p
-                                  ? "bg-hp-ink text-hp-paper"
-                                  : "bg-hp-paper text-hp-ink/65"
-                              }`}
-                            >
-                              {p}
-                            </button>
-                          ))}
+                        <div className="flex flex-wrap gap-1.5">
+                          {STORY_CONDITION_OPTIONS.map((cond) => {
+                            const on = storyCondition.includes(cond);
+                            return (
+                              <button
+                                key={cond}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() =>
+                                  setStoryCondition((arr) =>
+                                    on ? arr.filter((x) => x !== cond) : [...arr, cond],
+                                  )
+                                }
+                                className={`rounded-full px-2.5 py-1 text-[10px] font-bold capitalize ${
+                                  on
+                                    ? "bg-hp-ink text-hp-paper"
+                                    : "border border-hp-ink/10 text-hp-ink/70"
+                                }`}
+                              >
+                                {t(cond[0].toUpperCase() + cond.slice(1))}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
-                    <div className="mt-2">
-                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                        Condition
+                  )}
+                </section>
+
+                <section>
+                  <SectionHeader icon={Clock} label={t("Visibility & place")} tone="olive" />
+                  <div className="space-y-3">
+                    <div>
+                      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                        {t("Visible for")}
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {STORY_CONDITION_OPTIONS.map((cond) => {
-                          const on = storyCondition.includes(cond);
+                      <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
+                        {(
+                          [
+                            { h: 6, label: "6h" },
+                            { h: 24, label: "24h" },
+                            { h: undefined, label: t("Keep tip") },
+                          ] as const
+                        ).map((opt) => {
+                          const active = storyVisibility === opt.h;
                           return (
                             <button
-                              key={cond}
+                              key={opt.label}
                               type="button"
-                              aria-pressed={on}
-                              onClick={() =>
-                                setStoryCondition((arr) =>
-                                  on ? arr.filter((x) => x !== cond) : [...arr, cond],
-                                )
-                              }
-                              className={`rounded-full px-2.5 py-1 text-[10px] font-bold capitalize ${
-                                on
-                                  ? "bg-hp-ink text-hp-paper"
-                                  : "border border-hp-ink/10 text-hp-ink/70"
+                              aria-pressed={active}
+                              onClick={() => setStoryVisibility(opt.h)}
+                              className={`rounded-xl px-2 py-2 text-[11px] font-bold transition ${
+                                active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
                               }`}
                             >
-                              {cond}
+                              {opt.label}
                             </button>
                           );
                         })}
                       </div>
                     </div>
-                  </div>
-                )}
 
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Visible for
+                    <div>
+                      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                        {t("Location")}
+                      </div>
+                      <SearchablePlacePicker
+                        places={places}
+                        value={place}
+                        onChange={setPlace}
+                        query={placeQuery}
+                        setQuery={setPlaceQuery}
+                      />
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
-                    {(
-                      [
-                        { h: 6, label: "6h" },
-                        { h: 24, label: "24h" },
-                        { h: undefined, label: t("Keep tip") },
-                      ] as const
-                    ).map((opt) => {
-                      const active = storyVisibility === opt.h;
-                      return (
-                        <button
-                          key={opt.label}
-                          type="button"
-                          aria-pressed={active}
-                          onClick={() => setStoryVisibility(opt.h)}
-                          className={`rounded-xl px-2 py-2 text-[11px] font-bold transition ${
-                            active ? "bg-hp-ink text-hp-paper" : "text-hp-ink/70"
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                </section>
 
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Location
-                  </div>
-                  <SearchablePlacePicker
-                    places={places}
-                    value={place}
-                    onChange={setPlace}
-                    query={placeQuery}
-                    setQuery={setPlaceQuery}
-                  />
-                </div>
-
-                {error && <p className="mt-3 text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
                 <button
                   type="submit"
                   data-testid="composer-story-submit"
                   disabled={!storyCaption.trim()}
-                  className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+                  className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {t("Post story")}
                 </button>
               </form>
             ) : (
-              <form data-testid="composer-event-form" onSubmit={handleEventSubmit}>
-                <div className="relative h-36 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                  <ImageBox
-                    src={selectedPlace.imageUrl}
-                    alt={selectedPlace.name}
-                    className="h-full w-full"
-                    rounded="rounded-2xl"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3 text-hp-paper">
-                    <div className="text-[10px] font-bold uppercase">{t("Hosting at")}</div>
-                    <div className="text-[15px] font-black leading-tight">{selectedPlace.name}</div>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="create-event-title"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Gathering title")}
-                    </label>
-                    <input
-                      id="create-event-title"
-                      name="create-event-title"
-                      value={eventTitle}
-                      onChange={(e) => setEventTitle(e.target.value)}
-                      autoComplete="off"
-                      placeholder={t("Sunset swim, coffee tips, live music...")}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
+              <form
+                data-testid="composer-event-form"
+                onSubmit={handleEventSubmit}
+                className="hp-stagger space-y-4"
+              >
+                <section>
+                  <SectionHeader icon={Store} label={t("What & where")} tone="sunset" />
+                  <div className="hp-card-lift relative h-36 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+                    <ImageBox
+                      src={selectedPlace.imageUrl}
+                      alt={selectedPlace.name}
+                      className="h-full w-full"
+                      rounded="rounded-2xl"
                     />
-                  </div>
-                  <div className="col-span-2">
-                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Location")}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                    <div className="absolute bottom-3 left-3 right-3 text-hp-paper">
+                      <div className="text-[10px] font-bold uppercase">{t("Hosting at")}</div>
+                      <div className="text-[15px] font-black leading-tight">
+                        {selectedPlace.name}
+                      </div>
                     </div>
-                    <SearchablePlacePicker
-                      places={places}
-                      value={place}
-                      onChange={setPlace}
-                      query={placeQuery}
-                      setQuery={setPlaceQuery}
-                    />
                   </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-when"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("When")}
-                    </label>
-                    <input
-                      id="create-event-when"
-                      name="create-event-when"
-                      type="datetime-local"
-                      value={eventWhen}
-                      onChange={(e) => setEventWhen(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[12px] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-category"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Type")}
-                    </label>
-                    <select
-                      id="create-event-category"
-                      name="create-event-category"
-                      value={eventCategory}
-                      onChange={(e) => setEventCategory(e.target.value as MeetCategory)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[12px]"
-                    >
-                      {MEET_CATEGORIES.map((category) => (
-                        <option key={category} value={category}>
-                          {t(MEET_CATEGORY_META[category].label)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-vibe"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Vibe")}
-                    </label>
-                    <input
-                      id="create-event-vibe"
-                      name="create-event-vibe"
-                      value={eventVibe}
-                      onChange={(e) => setEventVibe(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-price"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Price")}
-                    </label>
-                    <input
-                      id="create-event-price"
-                      name="create-event-price"
-                      value={eventPrice}
-                      onChange={(e) => setEventPrice(e.target.value)}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-capacity"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Capacity")}
-                    </label>
-                    <input
-                      id="create-event-capacity"
-                      name="create-event-capacity"
-                      type="number"
-                      inputMode="numeric"
-                      min={2}
-                      value={eventCapacity}
-                      onChange={(e) => setEventCapacity(e.target.value)}
-                      placeholder={t("Optional")}
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="create-event-tags"
-                      className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
-                    >
-                      {t("Tags")}
-                    </label>
-                    <input
-                      id="create-event-tags"
-                      name="create-event-tags"
-                      value={eventTags}
-                      onChange={(e) => setEventTags(e.target.value)}
-                      placeholder="sunset, local, free"
-                      className="w-full rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5 text-[13px] outline-none placeholder:text-hp-muted"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label htmlFor="create-event-description" className="sr-only">
-                      {t("Gathering description")}
-                    </label>
-                    <textarea
-                      id="create-event-description"
-                      name="create-event-description"
-                      value={eventDescription}
-                      onChange={(e) => setEventDescription(e.target.value)}
-                      placeholder={t("What should people know before they join?")}
-                      className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 p-3 text-[13px] outline-none placeholder:text-hp-muted"
-                      rows={3}
-                    />
-                  </div>
-                </div>
 
-                {error && <p className="mt-3 text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-event-title"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Gathering title")}
+                      </label>
+                      <input
+                        id="create-event-title"
+                        name="create-event-title"
+                        value={eventTitle}
+                        onChange={(e) => setEventTitle(e.target.value)}
+                        autoComplete="off"
+                        placeholder={t("Sunset swim, coffee tips, live music...")}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                        {t("Location")}
+                      </div>
+                      <SearchablePlacePicker
+                        places={places}
+                        value={place}
+                        onChange={setPlace}
+                        query={placeQuery}
+                        setQuery={setPlaceQuery}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <SectionHeader icon={Clock} label={t("When & kind")} tone="deep" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label
+                        htmlFor="create-event-when"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("When")}
+                      </label>
+                      <input
+                        id="create-event-when"
+                        name="create-event-when"
+                        type="datetime-local"
+                        value={eventWhen}
+                        onChange={(e) => setEventWhen(e.target.value)}
+                        className={`${fieldClass()} text-[12px]`}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-event-category"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Type")}
+                      </label>
+                      <select
+                        id="create-event-category"
+                        name="create-event-category"
+                        value={eventCategory}
+                        onChange={(e) => setEventCategory(e.target.value as MeetCategory)}
+                        className={`${fieldClass()} text-[12px]`}
+                      >
+                        {MEET_CATEGORIES.map((category) => (
+                          <option key={category} value={category}>
+                            {t(MEET_CATEGORY_META[category].label)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-event-vibe"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Vibe")}
+                      </label>
+                      <input
+                        id="create-event-vibe"
+                        name="create-event-vibe"
+                        value={eventVibe}
+                        onChange={(e) => setEventVibe(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <SectionHeader icon={ListChecks} label={t("Details")} tone="olive" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label
+                        htmlFor="create-event-price"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Price")}
+                      </label>
+                      <input
+                        id="create-event-price"
+                        name="create-event-price"
+                        value={eventPrice}
+                        onChange={(e) => setEventPrice(e.target.value)}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-event-capacity"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Capacity")}
+                      </label>
+                      <input
+                        id="create-event-capacity"
+                        name="create-event-capacity"
+                        type="number"
+                        inputMode="numeric"
+                        min={2}
+                        value={eventCapacity}
+                        onChange={(e) => setEventCapacity(e.target.value)}
+                        placeholder={t("Optional")}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label
+                        htmlFor="create-event-tags"
+                        className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
+                      >
+                        {t("Tags")}
+                      </label>
+                      <input
+                        id="create-event-tags"
+                        name="create-event-tags"
+                        value={eventTags}
+                        onChange={(e) => setEventTags(e.target.value)}
+                        placeholder={t("sunset, local, free")}
+                        className={fieldClass()}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label htmlFor="create-event-description" className="sr-only">
+                        {t("Gathering description")}
+                      </label>
+                      <textarea
+                        id="create-event-description"
+                        name="create-event-description"
+                        value={eventDescription}
+                        onChange={(e) => setEventDescription(e.target.value)}
+                        placeholder={t("What should people know before they join?")}
+                        className={`${fieldClass()} resize-none`}
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
                 <button
                   type="submit"
                   data-testid="composer-event-submit"
                   disabled={!eventTitle.trim() || !eventDescription.trim() || saving}
-                  className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper disabled:opacity-45"
+                  className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
-                  {saving ? "Hosting..." : "Host gathering"}
+                  {saving ? t("Hosting…") : t("Host gathering")}
                 </button>
               </form>
             )}
@@ -3777,6 +4516,7 @@ export function PulseApp() {
   const [activitySnapshot, setActivitySnapshot] = useState<PulseActivitySnapshot>({});
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
+  const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [mapBackStack, setMapBackStack] = useState<MapViewSnapshot[]>([]);
@@ -3788,8 +4528,15 @@ export function PulseApp() {
   const [showSearch, setShowSearch] = useState(false);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [visitedPlaceIds, setVisitedPlaceIds] = useState<string[]>([]);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [postLikes, setPostLikes] = useState<Record<string, number>>({});
+  const [culturalEventLikes, setCulturalEventLikes] = useState<Record<string, boolean>>({});
+  const [culturalEventLikeCounts, setCulturalEventLikeCounts] = useState<Record<string, number>>(
+    {},
+  );
+  const [culturalEventComments, setCulturalEventComments] = useState<Record<string, Comment[]>>({});
+  const [openCulturalEvent, setOpenCulturalEvent] = useState<CulturalEvent | null>(null);
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
   const [savedRoutes, setSavedRoutes] = useState<Record<string, boolean>>({});
   const [rsvpMap, setRsvpMap] = useState<Record<string, RsvpStatus>>({});
@@ -3809,6 +4556,19 @@ export function PulseApp() {
   const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
   const [account, setAccount] = useState<PulseAccountState>({ status: "loading" });
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+  const [organizerStatus, setOrganizerStatus] = useState<OrganizerStatus | null>(null);
+  const [organizerComposerOpen, setOrganizerComposerOpen] = useState(false);
+  const [myCulturalEvents, setMyCulturalEvents] = useState<CulturalEvent[]>([]);
+  const [myEventsOpen, setMyEventsOpen] = useState(false);
+  const [editingCulturalEvent, setEditingCulturalEvent] = useState<CulturalEvent | null>(null);
+  const [businessStatus, setBusinessStatus] = useState<BusinessStatus | null>(null);
+  const [myPlaceClaims, setMyPlaceClaims] = useState<PlaceClaim[]>([]);
+  const [businessPlacesOpen, setBusinessPlacesOpen] = useState(false);
+  const [openPlaceBusinessProfile, setOpenPlaceBusinessProfile] =
+    useState<PlaceBusinessProfile | null>(null);
+  const [myDealStats, setMyDealStats] = useState<DealRedemptionStats[]>([]);
+  const [dealCodeModal, setDealCodeModal] = useState<DealCode | null>(null);
+  const [issuingDealCode, setIssuingDealCode] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
   const [activeRouteStopIndex, setActiveRouteStopIndex] = useState(0);
@@ -3824,6 +4584,8 @@ export function PulseApp() {
   const places = pulseData.places;
   const posts = pulseData.posts;
   const events = pulseData.events;
+  const deals = pulseData.deals;
+  const culturalEvents = pulseData.culturalEvents;
   const routes = pulseData.routes;
   const stories = pulseData.stories;
   const vibeChips = pulseData.vibeChips;
@@ -3899,7 +4661,7 @@ export function PulseApp() {
   const full = Math.round(safeMapAreaH * 0.85);
   const idlePeek = 92;
   const selectedPeek = 44;
-  const areaPreview = Math.min(full, Math.min(276, Math.max(248, Math.round(safeMapAreaH * 0.34))));
+  const areaPreview = Math.min(full, Math.min(268, Math.max(244, Math.round(safeMapAreaH * 0.33))));
   const placePreview = Math.min(
     full,
     Math.min(228, Math.max(210, Math.round(safeMapAreaH * 0.28))),
@@ -3916,6 +4678,23 @@ export function PulseApp() {
       setSheetH(idlePeek);
     }
   }, [hasMapFocus, idlePeek]);
+  // Whenever an area (no specific place) becomes the focus, open the sheet to
+  // its preview height. Edge-triggered and only bumps up, so it never fights a
+  // drag — it just guarantees the area card is visible no matter which entry
+  // point set the selection (map bubble, on-map chip, or the Explore panel).
+  const areaFocusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = areaFocusRef.current;
+    areaFocusRef.current = selectedAreaId;
+    if (
+      selectedAreaId &&
+      selectedAreaId !== previous &&
+      !selectedPlace &&
+      sheetH < areaPreview
+    ) {
+      setSheetH(areaPreview);
+    }
+  }, [selectedAreaId, selectedPlace, areaPreview, sheetH]);
 
   const sameMapSnapshot = (a: MapViewSnapshot, b: MapViewSnapshot) =>
     a.areaId === b.areaId && a.placeId === b.placeId;
@@ -4016,6 +4795,36 @@ export function PulseApp() {
       });
   };
 
+  // Only verified organizers have any cultural events to own; everyone else gets
+  // an empty list without a round-trip.
+  const loadMyCulturalEvents = async (status: OrganizerStatus | null) => {
+    if (status?.verificationStatus !== "verified") {
+      setMyCulturalEvents([]);
+      return;
+    }
+    setMyCulturalEvents(await getMyCulturalEvents().catch(() => [] as CulturalEvent[]));
+  };
+
+  // Business status + claims, mirroring the organizer pattern. Claims are only
+  // readable (RLS) once the business is verified, so skip the round-trip
+  // otherwise.
+  const loadMyBusinessState = async () => {
+    const status = await getMyBusinessStatus().catch(() => null);
+    setBusinessStatus(status);
+    if (status?.verificationStatus === "verified") {
+      const [claims, stats] = await Promise.all([
+        getMyPlaceClaims().catch(() => [] as PlaceClaim[]),
+        getMyDealStats().catch(() => [] as DealRedemptionStats[]),
+      ]);
+      setMyPlaceClaims(claims);
+      setMyDealStats(stats);
+    } else {
+      setMyPlaceClaims([]);
+      setMyDealStats([]);
+    }
+    return status;
+  };
+
   const refreshAccount = useCallback(async () => {
     try {
       const nextAccount = await getCurrentPulseAccount();
@@ -4031,6 +4840,18 @@ export function PulseApp() {
         setAdminRole(nextAdminRole);
       } else {
         setAdminRole(null);
+      }
+      if (nextAccount.status === "ready" || nextAccount.status === "needsProfile") {
+        const nextOrganizerStatus = await getMyOrganizerStatus().catch(() => null);
+        setOrganizerStatus(nextOrganizerStatus);
+        await loadMyCulturalEvents(nextOrganizerStatus);
+        await loadMyBusinessState();
+      } else {
+        setOrganizerStatus(null);
+        setMyCulturalEvents([]);
+        setBusinessStatus(null);
+        setMyPlaceClaims([]);
+        setMyDealStats([]);
       }
       const profile =
         nextAccount.status === "ready" || nextAccount.status === "needsProfile"
@@ -4049,6 +4870,11 @@ export function PulseApp() {
       const fallback: PulseAccountState = { status: "signedOut" };
       setAccount(fallback);
       setAdminRole(null);
+      setOrganizerStatus(null);
+      setMyCulturalEvents([]);
+      setBusinessStatus(null);
+      setMyPlaceClaims([]);
+      setMyDealStats([]);
       return fallback;
     }
   }, [setLanguage]);
@@ -4130,6 +4956,7 @@ export function PulseApp() {
       lastActivityRefreshAtRef.current = Date.now();
       setPlaceComments(data.placeComments);
       setRouteComments(data.routeComments);
+      setCulturalEventComments(data.culturalEventComments);
       setSelectedPlace((current) =>
         current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
       );
@@ -4220,8 +5047,10 @@ export function PulseApp() {
         setSavedPosts(state.savedPosts);
         setSavedRoutes(state.savedRoutes);
         setLikes(state.likedPosts);
+        setCulturalEventLikes(state.likedCulturalEvents);
         setRsvpMap(state.rsvpMap);
         setSeen(new Set(state.seenStoryIds));
+        setVisitedPlaceIds(state.visitedPlaceIds);
         setStreak(state.streak);
       } catch (error) {
         console.warn("Could not load Supabase user state.", error);
@@ -4291,6 +5120,13 @@ export function PulseApp() {
     };
   }, [account.status, accountProfileId, allPosts, rsvpMap, savedRouteIds.length]);
 
+  // Discovery progress now comes from the real user_place_visits check-ins
+  // (phase 2), not the v1 posts-as-proxy.
+  const discoveryExploredIds = useMemo(
+    () => DISCOVERY_PLACE_IDS.filter((id) => visitedPlaceIds.includes(id)),
+    [visitedPlaceIds],
+  );
+
   useEffect(() => {
     if (initialShareHandled.current || dataStatus !== "ready" || typeof window === "undefined") {
       return;
@@ -4308,7 +5144,11 @@ export function PulseApp() {
     initialShareHandled.current = true;
     setCreateOpen(false);
 
-    if (isTab(tabParam)) {
+    if (tabParam === "events") {
+      // Legacy deep link from before Cultural Events moved under Meet.
+      setTab("meet");
+      setMeetSubTab("events");
+    } else if (isTab(tabParam)) {
       setTab(tabParam);
     }
 
@@ -4381,6 +5221,17 @@ export function PulseApp() {
     void setSavedItem({ type: "place", id }, nextSaved).catch((error) => {
       console.warn("Could not persist place save.", error);
       setSavedIds((arr) => (wasSaved ? [...arr, id] : arr.filter((x) => x !== id)));
+      showToast(t("Could not save"));
+    });
+  };
+  const toggleVisited = (id: string) => {
+    const wasVisited = visitedPlaceIds.includes(id);
+    const nextVisited = !wasVisited;
+    setVisitedPlaceIds((arr) => (wasVisited ? arr.filter((x) => x !== id) : [...arr, id]));
+    showToast(t(wasVisited ? "Visit removed" : "Marked as visited"));
+    void setVisited(id, nextVisited).catch((error) => {
+      console.warn("Could not persist place visit.", error);
+      setVisitedPlaceIds((arr) => (wasVisited ? [...arr, id] : arr.filter((x) => x !== id)));
       showToast(t("Could not save"));
     });
   };
@@ -4680,7 +5531,241 @@ export function PulseApp() {
     setCreateOpen(false);
     setComposerPin(null);
     setTab("meet");
+    setMeetSubTab("community");
     showToast(t("Gathering hosted"));
+  };
+
+  const applyOrganizer = async () => {
+    if (account.status !== "ready") {
+      requireProfile("post");
+      return;
+    }
+    const displayName = profileDisplayName(account.profile);
+    const status = await applyToBecomeOrganizer(displayName, DEFAULT_ORGANIZER_BIO);
+    setOrganizerStatus(status);
+    showToast(t("Organizer application sent"));
+  };
+
+  const applyBusiness = async () => {
+    if (account.status !== "ready") {
+      requireProfile("post");
+      return;
+    }
+    const displayName = profileDisplayName(account.profile);
+    const status = await applyToBecomeBusiness(displayName);
+    setBusinessStatus(status);
+    showToast(t("Business request sent"));
+  };
+
+  // Claim a place from the BusinessPlacesSheet (the caller is already a verified
+  // business). Errors (e.g. the place already has a live claim) surface as a
+  // toast; the sheet also shows them inline.
+  const handleClaimPlace = async (placeId: string) => {
+    const claim = await claimPlace(placeId);
+    setMyPlaceClaims((list) => [claim, ...list.filter((item) => item.id !== claim.id)]);
+    showToast(t("Claim submitted for review"));
+  };
+
+  const handleSavePlaceProfile = async (
+    claimId: string,
+    fields: Partial<PlaceBusinessProfileFields>,
+  ) => {
+    const updated = await updatePlaceBusinessProfile(claimId, fields);
+    setMyPlaceClaims((list) => list.map((item) => (item.id === claimId ? updated : item)));
+    showToast(t("Changes saved"));
+  };
+
+  // Stage B2: set/toggle the single static deal on an approved claim. Goes
+  // through set_place_deal (RPC), then patches local state so the badge (map
+  // peek) and the open place detail reflect it without a bootstrap refetch.
+  const handleSaveDeal = async (claimId: string, dealText: string | null, dealActive: boolean) => {
+    await setPlaceDeal(claimId, dealText, dealActive);
+    const claim = myPlaceClaims.find((item) => item.id === claimId);
+    setMyPlaceClaims((list) =>
+      list.map((item) => (item.id === claimId ? { ...item, dealText, dealActive } : item)),
+    );
+    if (claim) {
+      const showsDeal = dealActive && !!dealText;
+      setPulseData((data) => ({
+        ...data,
+        dealPlaceIds: showsDeal
+          ? Array.from(new Set([...data.dealPlaceIds, claim.placeId]))
+          : data.dealPlaceIds.filter((id) => id !== claim.placeId),
+        deals: showsDeal
+          ? [
+              ...data.deals.filter((deal) => deal.placeId !== claim.placeId),
+              {
+                placeId: claim.placeId,
+                dealText: dealText as string,
+                businessName: businessStatus?.displayName ?? "",
+              },
+            ]
+          : data.deals.filter((deal) => deal.placeId !== claim.placeId),
+      }));
+      if (openPlace?.id === claim.placeId) {
+        setOpenPlaceBusinessProfile((prev) => (prev ? { ...prev, dealText, dealActive } : prev));
+      }
+    }
+    showToast(t("Deal saved"));
+  };
+
+  // Stage B3: user taps "Get code" in the APP DEAL callout. Any session works
+  // (issueDealCode calls ensurePulseUserId first). A repeat tap for the same
+  // deal returns the existing live code.
+  const handleGetDealCode = async () => {
+    if (!openPlace || issuingDealCode) return;
+    setIssuingDealCode(true);
+    try {
+      setDealCodeModal(await issueDealCode(openPlace.id));
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t("Could not get a code."));
+    } finally {
+      setIssuingDealCode(false);
+    }
+  };
+
+  // Business side: redeem a code typed into "My places". Refreshes the counters
+  // on success; the sheet surfaces the failure inline.
+  const handleRedeemDealCode = async (code: string) => {
+    await redeemDealCode(code);
+    setMyDealStats(await getMyDealStats().catch(() => myDealStats));
+    showToast(t("Code redeemed"));
+  };
+
+  // PlaceDetailModal "Is this your business?" entry. Routes the user to the
+  // right next step depending on how far along they are.
+  const claimFromPlaceDetail = () => {
+    if (!openPlace) return;
+    if (account.status !== "ready") {
+      requireProfile("post");
+      return;
+    }
+    if (businessStatus?.verificationStatus !== "verified") {
+      setOpenPlace(null);
+      setProfileOpen(true);
+      showToast(
+        businessStatus?.verificationStatus === "pending"
+          ? t("Your request to register a business is pending approval.")
+          : t("Register a business first"),
+      );
+      return;
+    }
+    const placeId = openPlace.id;
+    void handleClaimPlace(placeId).catch((error) => {
+      showToast(error instanceof Error ? error.message : t("Could not send the claim."));
+    });
+  };
+
+  // Lazy-load the approved business enrichment for whichever place detail is
+  // open -- only when the bootstrap flagged it as claimed, so unclaimed places
+  // cost no request.
+  useEffect(() => {
+    const placeId = openPlace?.id;
+    if (!placeId || !pulseData.claimedPlaceIds.includes(placeId)) {
+      setOpenPlaceBusinessProfile(null);
+      return;
+    }
+    let ignore = false;
+    setOpenPlaceBusinessProfile(null);
+    void getPlaceBusinessProfile(placeId)
+      .then((profile) => {
+        if (!ignore) setOpenPlaceBusinessProfile(profile);
+      })
+      .catch((error) => {
+        console.warn("Could not load business profile.", error);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [openPlace?.id, pulseData.claimedPlaceIds]);
+
+  const addCulturalEvent = async (input: CreateCulturalEventInput) => {
+    if (organizerStatus?.verificationStatus !== "verified") {
+      throw new Error("Only verified organizers can submit cultural events.");
+    }
+    const event = await createPulseCulturalEvent({
+      ...input,
+      organizerId: organizerStatus.id,
+      organizerName: organizerStatus.displayName,
+    });
+    setPulseData((data) => ({
+      ...data,
+      culturalEvents: [event, ...data.culturalEvents.filter((item) => item.id !== event.id)],
+    }));
+    setMyCulturalEvents((list) => [event, ...list.filter((item) => item.id !== event.id)]);
+    markContribution();
+    showToast(t("Event submitted for review"));
+  };
+
+  // Edit an own pending cultural event. RLS rejects the update unless the row
+  // stays 'pending', so a published event's Edit button is never shown.
+  const editCulturalEvent = async (id: string, input: CreateCulturalEventInput) => {
+    const updated = await updatePulseCulturalEvent(id, input);
+    setMyCulturalEvents((list) => list.map((item) => (item.id === id ? updated : item)));
+    setPulseData((data) => ({
+      ...data,
+      culturalEvents: data.culturalEvents.map((item) => (item.id === id ? updated : item)),
+    }));
+    setEditingCulturalEvent(null);
+    markContribution();
+    showToast(t("Changes saved"));
+  };
+
+  const toggleCulturalEventLike = (id: string) => {
+    if (account.status !== "ready") {
+      requireProfile("like");
+      return;
+    }
+    const nextLiked = !culturalEventLikes[id];
+    setCulturalEventLikes((m) => ({ ...m, [id]: nextLiked }));
+    setCulturalEventLikeCounts((m) => ({
+      ...m,
+      [id]: m[id] ?? culturalEvents.find((e) => e.id === id)?.likesCount ?? 0,
+    }));
+    void setCulturalEventLike(id, nextLiked).catch((error) => {
+      console.warn("Could not persist cultural event like.", error);
+      setCulturalEventLikes((m) => ({ ...m, [id]: !nextLiked }));
+      showToast(t("Could not save"));
+    });
+  };
+
+  const addCulturalEventComment = (id: string, text: string) => {
+    if (account.status !== "ready") {
+      requireProfile("comment");
+      return;
+    }
+    const authorName = profileDisplayName(account.profile);
+    const optimisticComment: Comment = {
+      author: authorName,
+      text,
+      userId: account.userId,
+      profileId: account.profile.id,
+      postingIdentity: account.profile.defaultIdentity,
+      authorKind: "user",
+    };
+    setCulturalEventComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
+    showToast(t("Comment posted"));
+    void addPulseComment({ type: "cultural_event", id }, text, {
+      profileId: account.profile.id,
+      authorName,
+      identity: account.profile.defaultIdentity,
+    })
+      .then((savedComment) => {
+        setCulturalEventComments((m) => ({
+          ...m,
+          [id]: (m[id] ?? []).map((comment) =>
+            comment === optimisticComment ? savedComment : comment,
+          ),
+        }));
+      })
+      .catch((error) => {
+        console.warn("Could not persist cultural event comment.", error);
+        setCulturalEventComments((m) => ({
+          ...m,
+          [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
+        }));
+        showToast(t("Could not post comment"));
+      });
   };
 
   const toggleMeetRsvp = (event: MeetEvent, next: RsvpStatus) => {
@@ -4740,10 +5825,12 @@ export function PulseApp() {
     if (!event) {
       showToast(t("No gathering there yet"));
       setTab("meet");
+      setMeetSubTab("community");
       return;
     }
     toggleMeetRsvp(event, "going");
     setTab("meet");
+    setMeetSubTab("community");
   };
 
   const openComposer = (mode: ComposerMode, pin: { lat: number; lng: number } | null = null) => {
@@ -4904,6 +5991,14 @@ export function PulseApp() {
             onSavePlace={toggleSave}
             onSharePlace={sharePlace}
             savedPlaceIds={savedIds}
+            claimedPlaceIds={pulseData.claimedPlaceIds}
+            dealPlaceIds={pulseData.dealPlaceIds}
+          />
+          <MapAreaInsights
+            clusters={mapClusters}
+            selectedCluster={selectedCluster}
+            onSelectArea={selectAreaPreview}
+            onDismiss={clearMapView}
           />
         </div>
       );
@@ -4913,6 +6008,16 @@ export function PulseApp() {
       return (
         <div className="relative h-full">
           <div className="h-full overflow-y-auto">
+            {readyProfile(account)?.defaultIdentity === "LOCAL" && (
+              <div className="px-4 pt-3">
+                <LocalDiscoveryCard
+                  places={places}
+                  coveredIds={discoveryExploredIds}
+                  onOpenPlace={setOpenPlace}
+                  onMilestone={() => showToast(t("Five new places — you're really exploring now."))}
+                />
+              </div>
+            )}
             <PulseFeed
               posts={filteredPosts}
               storyGroups={placeStoryGroups}
@@ -4962,6 +6067,9 @@ export function PulseApp() {
             savedRoutes={savedRoutes}
             routeComments={routeComments}
             findAuthor={findAuthor}
+            showMustSee={readyProfile(account)?.defaultIdentity === "TOURIST"}
+            places={places}
+            onOpenPlace={setOpenPlace}
           />
         </div>
       );
@@ -4969,15 +6077,59 @@ export function PulseApp() {
 
     if (tab === "meet") {
       return (
-        <MeetScreen
-          events={meetEvents}
-          rsvp={rsvpMap}
-          findPlace={findPlace}
-          onToggleRsvp={toggleMeetRsvp}
-          onOpenPlace={jumpToMap}
-          onCreate={() => openComposer("event")}
-        />
+        <div className="flex h-full flex-col">
+          <div className="flex shrink-0 gap-1.5 px-4 pt-3">
+            {(
+              [
+                { id: "community" as MeetSubTab, label: t("Community"), Icon: CalendarHeart },
+                { id: "events" as MeetSubTab, label: t("Events"), Icon: Ticket },
+              ] satisfies { id: MeetSubTab; label: string; Icon: LucideIcon }[]
+            ).map(({ id, label, Icon }) => {
+              const active = meetSubTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setMeetSubTab(id)}
+                  aria-pressed={active}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-2xl border py-2 text-[12.5px] font-bold transition active:scale-[0.98] ${
+                    active
+                      ? "border-hp-ink bg-hp-ink text-hp-paper"
+                      : "border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+                  }`}
+                >
+                  <Icon size={14} strokeWidth={2.6} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="min-h-0 flex-1">
+            {meetSubTab === "community" ? (
+              <MeetScreen
+                events={meetEvents}
+                rsvp={rsvpMap}
+                findPlace={findPlace}
+                onToggleRsvp={toggleMeetRsvp}
+                onOpenPlace={jumpToMap}
+                onCreate={() => openComposer("event")}
+              />
+            ) : (
+              <CulturalEventsScreen
+                events={culturalEvents}
+                lang={language}
+                onOpenDetail={setOpenCulturalEvent}
+                canCreate={organizerStatus?.verificationStatus === "verified"}
+                onCreate={() => setOrganizerComposerOpen(true)}
+              />
+            )}
+          </div>
+        </div>
       );
+    }
+
+    if (tab === "deals") {
+      return <DealsScreen deals={deals} places={places} onOpenPlace={setOpenPlace} />;
     }
 
     return (
@@ -5019,6 +6171,7 @@ export function PulseApp() {
           account={account}
           onOpenAccount={() => setProfileOpen(true)}
           onOpenAuth={() => setAuthOpen(true)}
+          onOpenDeals={() => setTab("deals")}
         />
         <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
 
@@ -5073,6 +6226,8 @@ export function PulseApp() {
         onClose={() => setOpenPlace(null)}
         onSave={toggleSave}
         saved={openPlace ? savedIds.includes(openPlace.id) : false}
+        visited={openPlace ? visitedPlaceIds.includes(openPlace.id) : false}
+        onToggleVisited={toggleVisited}
         posts={openPlace ? allPosts.filter((p) => p.placeId === openPlace.id) : []}
         onOpenMap={jumpToMap}
         onShare={sharePlace}
@@ -5082,7 +6237,19 @@ export function PulseApp() {
         findPostAuthor={findPostAuthor}
         storyGroups={placeStoryGroups}
         onOpenStory={(placeId) => setStoryViewer({ placeId })}
+        businessProfile={openPlaceBusinessProfile}
+        showClaimCta={
+          !!openPlace &&
+          !pulseData.claimedPlaceIds.includes(openPlace.id) &&
+          !myPlaceClaims.some(
+            (claim) => claim.placeId === openPlace.id && claim.status !== "rejected",
+          )
+        }
+        onClaimPlace={claimFromPlaceDetail}
+        onGetDealCode={handleGetDealCode}
+        gettingDealCode={issuingDealCode}
       />
+      <DealCodeModal code={dealCodeModal} onClose={() => setDealCodeModal(null)} />
       <PostDetailModal
         post={openPost}
         onClose={() => setOpenPost(null)}
@@ -5134,6 +6301,64 @@ export function PulseApp() {
         onEvent={addMeetEvent}
       />
 
+      <OrganizerEventComposer
+        key={editingCulturalEvent?.id ?? "new"}
+        open={organizerComposerOpen}
+        lang={language}
+        event={editingCulturalEvent}
+        onClose={() => {
+          setOrganizerComposerOpen(false);
+          setEditingCulturalEvent(null);
+        }}
+        onSubmit={addCulturalEvent}
+        onUpdate={editCulturalEvent}
+      />
+
+      <OrganizerEventsSheet
+        open={myEventsOpen}
+        lang={language}
+        events={myCulturalEvents}
+        onClose={() => setMyEventsOpen(false)}
+        onEdit={(ev) => {
+          setEditingCulturalEvent(ev);
+          setMyEventsOpen(false);
+          setOrganizerComposerOpen(true);
+        }}
+      />
+
+      <BusinessPlacesSheet
+        open={businessPlacesOpen}
+        onClose={() => setBusinessPlacesOpen(false)}
+        places={places}
+        claims={myPlaceClaims}
+        otherClaimedPlaceIds={pulseData.claimedPlaceIds}
+        onClaim={handleClaimPlace}
+        onSaveProfile={handleSavePlaceProfile}
+        onUploadPhoto={uploadBusinessPhoto}
+        onSaveDeal={handleSaveDeal}
+        dealStats={myDealStats}
+        onRedeemCode={handleRedeemDealCode}
+      />
+
+      <CulturalEventDetailModal
+        event={openCulturalEvent}
+        lang={language}
+        onClose={() => setOpenCulturalEvent(null)}
+        onOpenMap={jumpToMap}
+        onLike={() => openCulturalEvent && toggleCulturalEventLike(openCulturalEvent.id)}
+        liked={openCulturalEvent ? !!culturalEventLikes[openCulturalEvent.id] : false}
+        likeCount={
+          openCulturalEvent
+            ? (culturalEventLikeCounts[openCulturalEvent.id] ?? openCulturalEvent.likesCount) +
+              (culturalEventLikes[openCulturalEvent.id] ? 1 : 0)
+            : 0
+        }
+        comments={openCulturalEvent ? (culturalEventComments[openCulturalEvent.id] ?? []) : []}
+        onComment={(text) =>
+          openCulturalEvent && addCulturalEventComment(openCulturalEvent.id, text)
+        }
+      />
+
       <AuthSheet
         open={authOpen}
         onClose={() => setAuthOpen(false)}
@@ -5183,6 +6408,25 @@ export function PulseApp() {
         adminRole={adminRole}
         onOpenAdmin={() => {
           window.location.assign("/admin");
+        }}
+        organizerStatus={organizerStatus}
+        organizerEventCount={myCulturalEvents.length}
+        onApplyOrganizer={applyOrganizer}
+        onOpenOrganizerComposer={() => {
+          setProfileOpen(false);
+          setEditingCulturalEvent(null);
+          setOrganizerComposerOpen(true);
+        }}
+        onOpenOrganizerEvents={() => {
+          setProfileOpen(false);
+          setMyEventsOpen(true);
+        }}
+        businessStatus={businessStatus}
+        businessPlaceCount={myPlaceClaims.filter((claim) => claim.status !== "rejected").length}
+        onApplyBusiness={applyBusiness}
+        onOpenBusinessPlaces={() => {
+          setProfileOpen(false);
+          setBusinessPlacesOpen(true);
         }}
       />
 

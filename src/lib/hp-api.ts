@@ -9,6 +9,24 @@ import {
 } from "./hp-model";
 import type { CreateMeetInput, MeetEvent, RsvpStatus } from "./hp/meet-types";
 import type { StreakState } from "./hp/meet-store";
+import type {
+  CreateCulturalEventInput,
+  CulturalEvent,
+  CulturalEventType,
+  OrganizerStatus,
+  OrganizerVerificationStatus,
+} from "./hp/cultural-events-types";
+import {
+  DEAL_TEXT_MAX_LENGTH,
+  type BusinessStatus,
+  type BusinessVerificationStatus,
+  type DealCode,
+  type DealRedemptionStats,
+  type PlaceBusinessProfile,
+  type PlaceBusinessProfileFields,
+  type PlaceClaim,
+  type PlaceClaimStatus,
+} from "./hp/business-types";
 import { supabase } from "./supabase/client";
 import type { Database } from "./supabase/database.types";
 
@@ -23,6 +41,7 @@ type CommentRow = Pick<
   | "place_id"
   | "post_id"
   | "route_id"
+  | "cultural_event_id"
   | "user_id"
   | "profile_id"
   | "posting_identity"
@@ -137,15 +156,64 @@ type MeetEventRow = Pick<
   | "hot"
   | "attendee_avatar_urls"
 >;
+type CulturalEventRow = Pick<
+  TableRow<"cultural_events">,
+  | "id"
+  | "title"
+  | "greek_title"
+  | "event_type"
+  | "venue_name"
+  | "area"
+  | "place_id"
+  | "lat"
+  | "lng"
+  | "event_date"
+  | "organizer_name"
+  | "organizer_id"
+  | "description_el"
+  | "description_en"
+  | "poster_url"
+  | "ticket_url"
+  | "is_past_event"
+  | "is_official"
+  | "likes_count"
+  | "moderation_status"
+  | "user_id"
+  | "created_at"
+>;
+type OrganizerRow = Pick<
+  TableRow<"organizers">,
+  "id" | "display_name" | "bio" | "verification_status"
+>;
+type BusinessRow = Pick<
+  TableRow<"businesses">,
+  "id" | "display_name" | "bio" | "contact_phone" | "contact_email" | "verification_status"
+>;
+type PlaceBusinessProfileRow = Pick<
+  TableRow<"place_business_profiles">,
+  | "id"
+  | "place_id"
+  | "business_id"
+  | "status"
+  | "hours_text"
+  | "phone"
+  | "website_url"
+  | "menu_url"
+  | "photos"
+  | "deal_text"
+  | "deal_active"
+>;
 type VibeChipRow = Pick<TableRow<"vibe_chips">, "label">;
 type SavedItemRow = Pick<
   TableRow<"saved_items">,
   "target_type" | "place_id" | "post_id" | "route_id"
 >;
 type PostLikeRow = Pick<TableRow<"post_likes">, "post_id">;
+type CulturalEventLikeRow = Pick<TableRow<"cultural_event_likes">, "cultural_event_id">;
 type EventRsvpRow = Pick<TableRow<"event_rsvps">, "event_id" | "status">;
 type StoryViewRow = Pick<TableRow<"story_views">, "story_id">;
 type ActivityDayRow = Pick<TableRow<"user_activity_days">, "activity_day">;
+type PlaceVisitRow = Pick<TableRow<"user_place_visits">, "place_id">;
 type ProfileRow = Pick<
   TableRow<"profiles">,
   | "id"
@@ -167,14 +235,24 @@ interface PulseBootstrapPayload {
   comments: CommentRow[];
   events: EventRow[];
   meet_events: MeetEventRow[];
+  cultural_events: CulturalEventRow[];
   routes: RouteRow[];
   route_stops: RouteStopRow[];
   stories: LiveStoryRow[];
   vibe_chips: VibeChipRow[];
+  claimed_place_ids: string[];
+  deal_place_ids: string[];
+  deals: PulseDealRow[];
+}
+
+interface PulseDealRow {
+  place_id: string;
+  deal_text: string;
+  business_name: string;
 }
 
 const COMMENT_RETURN_COLUMNS =
-  "author_name,text,place_id,post_id,route_id,user_id,profile_id,posting_identity,author_kind";
+  "author_name,text,place_id,post_id,route_id,cultural_event_id,user_id,profile_id,posting_identity,author_kind";
 const PLACE_RETURN_COLUMNS =
   "id,name,greek_name,type,area,x,y,lat,lng,pulse,mood,crowd,budget,best_time,tags,short,image_url,hotness,comment_count,recent_post_count,status,user_id,profile_id,created_by_identity,moderation_status";
 const POST_RETURN_COLUMNS =
@@ -183,13 +261,20 @@ const STORY_RETURN_COLUMNS =
   "id,label,place_id,user_id,profile_id,kind,author_name,author_type,author_avatar_url,media_url,caption,expires_after_hours,crowd,parking,condition,created_at";
 const MEET_EVENT_RETURN_COLUMNS =
   "id,place_id,user_id,profile_id,title,host_name,host_avatar_url,host_type,starts_at,duration_min,category,vibe,price,capacity,description,cover_url,tags,going_count,maybe_count,hot,attendee_avatar_urls";
+const CULTURAL_EVENT_RETURN_COLUMNS =
+  "id,title,greek_title,event_type,venue_name,area,place_id,lat,lng,event_date,organizer_name,organizer_id,description_el,description_en,poster_url,ticket_url,is_past_event,is_official,likes_count,moderation_status,user_id,created_at";
+const ORGANIZER_RETURN_COLUMNS = "id,display_name,bio,verification_status";
+const BUSINESS_RETURN_COLUMNS =
+  "id,display_name,bio,contact_phone,contact_email,verification_status";
+const PLACE_BUSINESS_PROFILE_RETURN_COLUMNS =
+  "id,place_id,business_id,status,hours_text,phone,website_url,menu_url,photos,deal_text,deal_active";
 
 type SavedTarget =
   | { type: "place"; id: string }
   | { type: "post"; id: string }
   | { type: "route"; id: string };
 
-type CommentTarget = SavedTarget;
+type CommentTarget = SavedTarget | { type: "cultural_event"; id: string };
 
 export interface PulseData {
   authors: Author[];
@@ -198,12 +283,25 @@ export interface PulseData {
   posts: Post[];
   events: EventItem[];
   meetEvents: MeetEvent[];
+  culturalEvents: CulturalEvent[];
   routes: RouteItem[];
   stories: StoryItem[];
   vibeChips: string[];
+  claimedPlaceIds: string[];
+  dealPlaceIds: string[];
+  deals: PulseDeal[];
   placeComments: Record<string, Comment[]>;
   routeComments: Record<string, Comment[]>;
+  culturalEventComments: Record<string, Comment[]>;
   source: "supabase";
+}
+
+// One active static deal, denormalised for the browsable Deals screen. The
+// place name / area / image live in PulseData.places (looked up by placeId).
+export interface PulseDeal {
+  placeId: string;
+  dealText: string;
+  businessName: string;
 }
 
 export interface PulseProfileSummary {
@@ -222,8 +320,10 @@ export interface PulseUserState {
   savedPosts: Record<string, boolean>;
   savedRoutes: Record<string, boolean>;
   likedPosts: Record<string, boolean>;
+  likedCulturalEvents: Record<string, boolean>;
   rsvpMap: Record<string, RsvpStatus>;
   seenStoryIds: string[];
+  visitedPlaceIds: string[];
   streak: StreakState;
 }
 
@@ -277,6 +377,11 @@ export interface CreatePulseMeetEventInput extends CreateMeetInput {
   hostType: MeetEvent["hostType"];
 }
 
+export interface CreatePulseCulturalEventInput extends CreateCulturalEventInput {
+  organizerId: string;
+  organizerName: string;
+}
+
 export const emptyPulseData: PulseData = {
   authors: [],
   profiles: [],
@@ -284,11 +389,16 @@ export const emptyPulseData: PulseData = {
   posts: [],
   events: [],
   meetEvents: [],
+  culturalEvents: [],
   routes: [],
   stories: [],
   vibeChips: [],
+  claimedPlaceIds: [],
+  dealPlaceIds: [],
+  deals: [],
   placeComments: {},
   routeComments: {},
+  culturalEventComments: {},
   source: "supabase",
 };
 
@@ -572,6 +682,108 @@ function mapMeetEvent(row: MeetEventRow, place?: Place): MeetEvent {
   };
 }
 
+function culturalEventType(value: string | null | undefined): CulturalEventType {
+  const normalized = (value ?? "other").toLowerCase();
+  if (
+    normalized === "theater" ||
+    normalized === "concert" ||
+    normalized === "festival" ||
+    normalized === "other"
+  ) {
+    return normalized;
+  }
+  return "other";
+}
+
+function organizerVerificationStatus(
+  value: string | null | undefined,
+): OrganizerVerificationStatus {
+  const normalized = (value ?? "pending").toLowerCase();
+  if (normalized === "pending" || normalized === "verified" || normalized === "rejected") {
+    return normalized;
+  }
+  return "pending";
+}
+
+function mapCulturalEvent(row: CulturalEventRow): CulturalEvent {
+  return {
+    id: row.id,
+    title: row.title,
+    greekTitle: row.greek_title,
+    eventType: culturalEventType(row.event_type),
+    venueName: row.venue_name,
+    area: row.area,
+    placeId: row.place_id,
+    lat: row.lat,
+    lng: row.lng,
+    eventDate: row.event_date,
+    organizerName: row.organizer_name,
+    organizerId: row.organizer_id,
+    descriptionEl: row.description_el,
+    descriptionEn: row.description_en,
+    posterUrl: row.poster_url,
+    ticketUrl: row.ticket_url,
+    isPastEvent: row.is_past_event,
+    isOfficial: row.is_official,
+    likesCount: row.likes_count,
+    moderationStatus: row.moderation_status ?? undefined,
+    userId: row.user_id ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+function mapOrganizer(row: OrganizerRow): OrganizerStatus {
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    bio: row.bio,
+    verificationStatus: organizerVerificationStatus(row.verification_status),
+  };
+}
+
+function businessVerificationStatus(value: string | null | undefined): BusinessVerificationStatus {
+  const normalized = (value ?? "pending").toLowerCase();
+  if (normalized === "pending" || normalized === "verified" || normalized === "rejected") {
+    return normalized;
+  }
+  return "pending";
+}
+
+function placeClaimStatus(value: string | null | undefined): PlaceClaimStatus {
+  const normalized = (value ?? "pending").toLowerCase();
+  if (normalized === "pending" || normalized === "approved" || normalized === "rejected") {
+    return normalized;
+  }
+  return "pending";
+}
+
+function mapBusiness(row: BusinessRow): BusinessStatus {
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    bio: row.bio,
+    contactPhone: row.contact_phone,
+    contactEmail: row.contact_email,
+    verificationStatus: businessVerificationStatus(row.verification_status),
+  };
+}
+
+function mapPlaceClaim(row: PlaceBusinessProfileRow): PlaceClaim {
+  return {
+    id: row.id,
+    placeId: row.place_id,
+    businessId: row.business_id,
+    status: placeClaimStatus(row.status),
+    hoursText: row.hours_text,
+    phone: row.phone,
+    websiteUrl: row.website_url,
+    menuUrl: row.menu_url,
+    photos: row.photos ?? [],
+    dealText: row.deal_text,
+    dealActive: row.deal_active ?? false,
+  };
+}
+
 function mapRoute(row: RouteRow, stopsByRoute: Record<string, RouteStopRow[]>): RouteItem {
   return {
     id: row.id,
@@ -596,10 +808,26 @@ function mapRoute(row: RouteRow, stopsByRoute: Record<string, RouteStopRow[]>): 
 function commentTargetColumn(target: CommentTarget) {
   if (target.type === "place") return "place_id" as const;
   if (target.type === "post") return "post_id" as const;
+  if (target.type === "cultural_event") return "cultural_event_id" as const;
   return "route_id" as const;
 }
 
-function targetColumnValues(target: CommentTarget) {
+function savedTargetColumn(target: SavedTarget) {
+  if (target.type === "place") return "place_id" as const;
+  if (target.type === "post") return "post_id" as const;
+  return "route_id" as const;
+}
+
+function commentTargetColumnValues(target: CommentTarget) {
+  return {
+    place_id: target.type === "place" ? target.id : null,
+    post_id: target.type === "post" ? target.id : null,
+    route_id: target.type === "route" ? target.id : null,
+    cultural_event_id: target.type === "cultural_event" ? target.id : null,
+  };
+}
+
+function savedTargetColumnValues(target: SavedTarget) {
   return {
     place_id: target.type === "place" ? target.id : null,
     post_id: target.type === "post" ? target.id : null,
@@ -653,10 +881,14 @@ async function fetchPulseData(): Promise<PulseData> {
     comments: [],
     events: [],
     meet_events: [],
+    cultural_events: [],
     routes: [],
     route_stops: [],
     stories: [],
     vibe_chips: [],
+    claimed_place_ids: [],
+    deal_place_ids: [],
+    deals: [],
   }) as unknown as PulseBootstrapPayload;
 
   const commentRows = data.comments ?? [];
@@ -664,6 +896,10 @@ async function fetchPulseData(): Promise<PulseData> {
   const commentsByPost = groupBy(comments, (_, index) => commentRows[index]?.post_id ?? null);
   const commentsByPlace = groupBy(comments, (_, index) => commentRows[index]?.place_id ?? null);
   const commentsByRoute = groupBy(comments, (_, index) => commentRows[index]?.route_id ?? null);
+  const commentsByCulturalEvent = groupBy(
+    comments,
+    (_, index) => commentRows[index]?.cultural_event_id ?? null,
+  );
   const avatarsByPlace = groupBy(data.place_avatars ?? [], (avatar) => avatar.place_id);
   const stopsByRoute = groupBy(data.route_stops ?? [], (stop) => stop.route_id);
 
@@ -679,11 +915,22 @@ async function fetchPulseData(): Promise<PulseData> {
     meetEvents: (data.meet_events ?? []).map((event) =>
       mapMeetEvent(event, placeById.get(event.place_id)),
     ),
+    culturalEvents: (data.cultural_events ?? []).map(mapCulturalEvent),
     routes: (data.routes ?? []).map((route) => mapRoute(route, stopsByRoute)),
     stories: (data.stories ?? []).map(mapStory),
     vibeChips: (data.vibe_chips ?? []).map((chip) => chip.label),
+    claimedPlaceIds: Array.isArray(data.claimed_place_ids) ? data.claimed_place_ids : [],
+    dealPlaceIds: Array.isArray(data.deal_place_ids) ? data.deal_place_ids : [],
+    deals: Array.isArray(data.deals)
+      ? data.deals.map((deal) => ({
+          placeId: deal.place_id,
+          dealText: deal.deal_text,
+          businessName: deal.business_name,
+        }))
+      : [],
     placeComments: commentsByPlace,
     routeComments: commentsByRoute,
+    culturalEventComments: commentsByCulturalEvent,
     source: "supabase",
   };
 
@@ -735,8 +982,10 @@ function emptyPulseUserState(): PulseUserState {
     savedPosts: {},
     savedRoutes: {},
     likedPosts: {},
+    likedCulturalEvents: {},
     rsvpMap: {},
     seenStoryIds: [],
+    visitedPlaceIds: [],
     streak: { count: 0, lastContributionDay: "", freezeAvailable: true },
   };
 }
@@ -748,27 +997,38 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
   const userId = sessionResult.data.session?.user.id;
   if (!userId) return emptyPulseUserState();
 
-  const [savedResult, likesResult, rsvpsResult, storyViewsResult, activityDaysResult] =
-    await Promise.all([
-      client
-        .from("saved_items")
-        .select("target_type,place_id,post_id,route_id")
-        .eq("user_id", userId),
-      client.from("post_likes").select("post_id").eq("user_id", userId),
-      client.from("event_rsvps").select("event_id,status").eq("user_id", userId),
-      client.from("story_views").select("story_id").eq("user_id", userId),
-      client
-        .from("user_activity_days")
-        .select("activity_day")
-        .eq("user_id", userId)
-        .order("activity_day", { ascending: false })
-        .limit(30),
-    ]);
+  const [
+    savedResult,
+    likesResult,
+    culturalEventLikesResult,
+    rsvpsResult,
+    storyViewsResult,
+    placeVisitsResult,
+    activityDaysResult,
+  ] = await Promise.all([
+    client
+      .from("saved_items")
+      .select("target_type,place_id,post_id,route_id")
+      .eq("user_id", userId),
+    client.from("post_likes").select("post_id").eq("user_id", userId),
+    client.from("cultural_event_likes").select("cultural_event_id").eq("user_id", userId),
+    client.from("event_rsvps").select("event_id,status").eq("user_id", userId),
+    client.from("story_views").select("story_id").eq("user_id", userId),
+    client.from("user_place_visits").select("place_id").eq("user_id", userId),
+    client
+      .from("user_activity_days")
+      .select("activity_day")
+      .eq("user_id", userId)
+      .order("activity_day", { ascending: false })
+      .limit(30),
+  ]);
 
   if (savedResult.error) throw savedResult.error;
   if (likesResult.error) throw likesResult.error;
+  if (culturalEventLikesResult.error) throw culturalEventLikesResult.error;
   if (rsvpsResult.error) throw rsvpsResult.error;
   if (storyViewsResult.error) throw storyViewsResult.error;
+  if (placeVisitsResult.error) throw placeVisitsResult.error;
   if (activityDaysResult.error) throw activityDaysResult.error;
 
   const activityDays =
@@ -796,6 +1056,10 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
         (items, item) => ({ ...items, [item.post_id]: true }),
         {},
       ) ?? {},
+    likedCulturalEvents:
+      (culturalEventLikesResult.data as CulturalEventLikeRow[] | null)?.reduce<
+        Record<string, boolean>
+      >((items, item) => ({ ...items, [item.cultural_event_id]: true }), {}) ?? {},
     rsvpMap:
       (rsvpsResult.data as EventRsvpRow[] | null)?.reduce<Record<string, RsvpStatus>>(
         (items, item) => ({ ...items, [item.event_id]: item.status as RsvpStatus }),
@@ -803,6 +1067,8 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
       ) ?? {},
     seenStoryIds:
       (storyViewsResult.data as StoryViewRow[] | null)?.map((item) => item.story_id) ?? [],
+    visitedPlaceIds:
+      (placeVisitsResult.data as PlaceVisitRow[] | null)?.map((item) => item.place_id) ?? [],
     streak: computeStreak(activityDays),
   };
 }
@@ -837,7 +1103,7 @@ export async function createPulsePost(input: CreatePulsePostInput): Promise<Post
       posting_identity: identity,
       author_kind: "user",
       moderation_status: "pending",
-      sort_order: -Date.now(),
+      sort_order: -Math.floor(Date.now() / 1000),
     })
     .select(POST_RETURN_COLUMNS)
     .single();
@@ -1017,6 +1283,423 @@ export async function createPulseMeetEvent(input: CreatePulseMeetEventInput): Pr
   return mapMeetEvent(updatedResult.data, input.place);
 }
 
+export async function getMyOrganizerStatus(): Promise<OrganizerStatus | null> {
+  const client = assertSupabase();
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  const userId = sessionResult.data.session?.user.id;
+  if (!userId) return null;
+
+  const result = await client
+    .from("organizers")
+    .select(ORGANIZER_RETURN_COLUMNS)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (result.error) throw result.error;
+  return result.data ? mapOrganizer(result.data) : null;
+}
+
+export async function applyToBecomeOrganizer(
+  displayName: string,
+  bio?: string,
+): Promise<OrganizerStatus> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+
+  const result = await client
+    .from("organizers")
+    .insert({
+      user_id: userId,
+      display_name: displayName.trim(),
+      ...(bio?.trim() ? { bio: bio.trim() } : {}),
+    })
+    .select(ORGANIZER_RETURN_COLUMNS)
+    .single();
+  if (result.error) throw result.error;
+  return mapOrganizer(result.data);
+}
+
+export async function updateOrganizerProfile(
+  displayName: string,
+  bio: string,
+): Promise<OrganizerStatus> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+
+  const result = await client
+    .from("organizers")
+    .update({ display_name: displayName.trim(), bio: bio.trim() })
+    .eq("user_id", userId)
+    .select(ORGANIZER_RETURN_COLUMNS)
+    .single();
+  if (result.error) throw result.error;
+  return mapOrganizer(result.data);
+}
+
+// ---- Business profile (stage B1) -------------------------------------------
+
+export async function getMyBusinessStatus(): Promise<BusinessStatus | null> {
+  const client = assertSupabase();
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  const userId = sessionResult.data.session?.user.id;
+  if (!userId) return null;
+
+  const result = await client
+    .from("businesses")
+    .select(BUSINESS_RETURN_COLUMNS)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (result.error) throw result.error;
+  return result.data ? mapBusiness(result.data) : null;
+}
+
+export async function applyToBecomeBusiness(
+  displayName: string,
+  options: { bio?: string; contactPhone?: string; contactEmail?: string } = {},
+): Promise<BusinessStatus> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+
+  const result = await client
+    .from("businesses")
+    .insert({
+      user_id: userId,
+      display_name: displayName.trim(),
+      ...(options.bio?.trim() ? { bio: options.bio.trim() } : {}),
+      ...(options.contactPhone?.trim() ? { contact_phone: options.contactPhone.trim() } : {}),
+      ...(options.contactEmail?.trim() ? { contact_email: options.contactEmail.trim() } : {}),
+    })
+    .select(BUSINESS_RETURN_COLUMNS)
+    .single();
+  if (result.error) throw result.error;
+  return mapBusiness(result.data);
+}
+
+// The caller's own claims, any status. RLS "Business can read own claims" scopes
+// this to business_id = current_business_id().
+export async function getMyPlaceClaims(): Promise<PlaceClaim[]> {
+  const client = assertSupabase();
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  if (!sessionResult.data.session?.user.id) return [];
+
+  const result = await client
+    .from("place_business_profiles")
+    .select(PLACE_BUSINESS_PROFILE_RETURN_COLUMNS)
+    .order("created_at", { ascending: false });
+  if (result.error) throw result.error;
+  return (result.data ?? []).map(mapPlaceClaim);
+}
+
+export async function claimPlace(placeId: string): Promise<PlaceClaim> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+
+  const business = await getMyBusinessStatus();
+  if (!business || business.verificationStatus !== "verified") {
+    throw new Error("Only a verified business can claim a place.");
+  }
+
+  const result = await client
+    .from("place_business_profiles")
+    .insert({ place_id: placeId, business_id: business.id, status: "pending" })
+    .select(PLACE_BUSINESS_PROFILE_RETURN_COLUMNS)
+    .single();
+  if (result.error) {
+    // 23505 = the partial unique index: another live claim already exists.
+    if (result.error.code === "23505") {
+      throw new Error("This place already has a pending or approved claim.");
+    }
+    throw result.error;
+  }
+  return mapPlaceClaim(result.data);
+}
+
+// Enrichment fields only. status / business_id / place_id are never sent -- RLS
+// "Business can edit own pending claim" also rejects the update once the claim
+// leaves 'pending'.
+export async function updatePlaceBusinessProfile(
+  claimId: string,
+  fields: Partial<PlaceBusinessProfileFields>,
+): Promise<PlaceClaim> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+
+  const patch: Database["public"]["Tables"]["place_business_profiles"]["Update"] = {};
+  if (fields.hoursText !== undefined) patch.hours_text = fields.hoursText?.trim() || null;
+  if (fields.phone !== undefined) patch.phone = fields.phone?.trim() || null;
+  if (fields.websiteUrl !== undefined) patch.website_url = fields.websiteUrl?.trim() || null;
+  if (fields.menuUrl !== undefined) patch.menu_url = fields.menuUrl?.trim() || null;
+  if (fields.photos !== undefined) patch.photos = fields.photos;
+
+  const result = await client
+    .from("place_business_profiles")
+    .update(patch)
+    .eq("id", claimId)
+    .select(PLACE_BUSINESS_PROFILE_RETURN_COLUMNS)
+    .single();
+  if (result.error) throw result.error;
+  return mapPlaceClaim(result.data);
+}
+
+// Public, approved-only enrichment for a place detail. RLS "Public can read
+// approved place business profiles" already filters to status = 'approved'.
+export async function getPlaceBusinessProfile(
+  placeId: string,
+): Promise<PlaceBusinessProfile | null> {
+  const client = assertSupabase();
+  const result = await client
+    .from("place_business_profiles")
+    .select(`${PLACE_BUSINESS_PROFILE_RETURN_COLUMNS},businesses(display_name)`)
+    .eq("place_id", placeId)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (result.error) throw result.error;
+  if (!result.data) return null;
+
+  const row = result.data as PlaceBusinessProfileRow & {
+    businesses: { display_name: string } | { display_name: string }[] | null;
+  };
+  const business = Array.isArray(row.businesses) ? row.businesses[0] : row.businesses;
+  const claim = mapPlaceClaim(row);
+  return {
+    placeId: claim.placeId,
+    businessName: business?.display_name ?? "",
+    hoursText: claim.hoursText,
+    phone: claim.phone,
+    websiteUrl: claim.websiteUrl,
+    menuUrl: claim.menuUrl,
+    photos: claim.photos,
+    dealText: claim.dealText,
+    dealActive: claim.dealActive,
+  };
+}
+
+// Stage B2: the owning business sets/toggles the single deal on its OWN approved
+// claim. Goes through set_place_deal() (SECURITY DEFINER) so it works even
+// though the blanket row UPDATE policy is locked once the claim is approved.
+export async function setPlaceDeal(
+  claimId: string,
+  dealText: string | null,
+  dealActive: boolean,
+): Promise<void> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+  const trimmed = dealText?.trim() ? dealText.trim() : null;
+  if (trimmed && trimmed.length > DEAL_TEXT_MAX_LENGTH) {
+    throw new Error(`Deal text must be ${DEAL_TEXT_MAX_LENGTH} characters or fewer.`);
+  }
+  const result = await client.rpc("set_place_deal", {
+    claim_id: claimId,
+    deal_text: trimmed,
+    deal_active: dealActive,
+  });
+  if (result.error) throw result.error;
+}
+
+// ---- Trackable coupons (stage B3) -----------------------------------------
+
+// Take a coupon code for the active deal at a place. Any signed-in session
+// (anonymous included) can call it; ensurePulseUserId() guarantees one. A
+// repeat call for the same deal returns the caller's existing live code.
+export async function issueDealCode(placeId: string): Promise<DealCode> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+  const result = await client.rpc("issue_deal_code", { target_place_id: placeId });
+  if (result.error) throw result.error;
+  const row = (result.data ?? {}) as {
+    code?: string;
+    expires_at?: string;
+    deal_text?: string;
+  };
+  return {
+    code: row.code ?? "",
+    expiresAt: row.expires_at ?? "",
+    dealText: row.deal_text ?? "",
+  };
+}
+
+// Business-only: mark a code redeemed. Throws "Code not found or already used"
+// for an unknown / expired / other-business / already-redeemed code.
+export async function redeemDealCode(
+  code: string,
+): Promise<{ dealText: string; issuedAt: string }> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+  const result = await client.rpc("redeem_deal_code", { code: code.trim().toUpperCase() });
+  if (result.error) throw result.error;
+  const row = (result.data ?? {}) as { deal_text?: string; issued_at?: string };
+  return { dealText: row.deal_text ?? "", issuedAt: row.issued_at ?? "" };
+}
+
+// Per-claim redemption tallies for the owning business. RLS "Business can read
+// redemptions for its claims" scopes the rows; aggregation is done here.
+export async function getMyDealStats(): Promise<DealRedemptionStats[]> {
+  const client = assertSupabase();
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  if (!sessionResult.data.session?.user.id) return [];
+
+  const result = await client
+    .from("deal_redemptions")
+    .select("profile_claim_id,status,redeemed_at,expires_at");
+  if (result.error) throw result.error;
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const now = Date.now();
+
+  const byClaim = new Map<string, DealRedemptionStats>();
+  for (const row of result.data ?? []) {
+    const stats =
+      byClaim.get(row.profile_claim_id) ??
+      ({
+        claimId: row.profile_claim_id,
+        redeemedTotal: 0,
+        redeemedThisMonth: 0,
+        issuedLive: 0,
+      } satisfies DealRedemptionStats);
+    if (row.status === "redeemed") {
+      stats.redeemedTotal += 1;
+      if (row.redeemed_at && new Date(row.redeemed_at) >= monthStart) {
+        stats.redeemedThisMonth += 1;
+      }
+    } else if (row.status === "issued" && new Date(row.expires_at).getTime() > now) {
+      stats.issuedLive += 1;
+    }
+    byClaim.set(row.profile_claim_id, stats);
+  }
+  return [...byClaim.values()];
+}
+
+export async function uploadBusinessPhoto(file: File): Promise<string> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+  if (!file.type.match(/^image\/(png|jpeg|webp)$/)) {
+    throw new Error("Use a PNG, JPEG, or WebP image.");
+  }
+  if (file.size > 5 * 1024 * 1024) throw new Error("Images must be 5 MB or smaller.");
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const fileName = `business-profiles/${userId}/${Date.now()}-${randomIdSuffix()}.${extension}`;
+  const upload = await client.storage.from("content-media").upload(fileName, file, {
+    cacheControl: "31536000",
+    contentType: file.type,
+    upsert: false,
+  });
+  if (upload.error) throw upload.error;
+  return client.storage.from("content-media").getPublicUrl(upload.data.path).data.publicUrl;
+}
+
+export async function uploadCulturalEventPoster(file: File): Promise<string> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+  if (!file.type.match(/^image\/(png|jpeg|webp|svg\+xml)$/)) {
+    throw new Error("Use a PNG, JPEG, WebP, or SVG image.");
+  }
+  if (file.size > 5 * 1024 * 1024) throw new Error("Images must be 5 MB or smaller.");
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const fileName = `cultural-events/${userId}/${Date.now()}-${randomIdSuffix()}.${extension}`;
+  const upload = await client.storage.from("content-media").upload(fileName, file, {
+    cacheControl: "31536000",
+    contentType: file.type,
+    upsert: false,
+  });
+  if (upload.error) throw upload.error;
+  return client.storage.from("content-media").getPublicUrl(upload.data.path).data.publicUrl;
+}
+
+export async function createPulseCulturalEvent(
+  input: CreatePulseCulturalEventInput,
+): Promise<CulturalEvent> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+  const id = `user-cultural-event-${Date.now().toString(36)}-${randomIdSuffix()}`;
+
+  const result = await client
+    .from("cultural_events")
+    .insert({
+      id,
+      title: input.title.trim(),
+      greek_title: input.greekTitle.trim(),
+      event_type: culturalEventType(input.eventType),
+      venue_name: input.venueName.trim(),
+      area: input.area.trim(),
+      place_id: input.placeId ?? null,
+      lat: input.lat ?? null,
+      lng: input.lng ?? null,
+      event_date: input.eventDate,
+      organizer_name: input.organizerName,
+      organizer_id: input.organizerId,
+      description_el: input.descriptionEl.trim(),
+      description_en: input.descriptionEn?.trim() || null,
+      poster_url: input.posterUrl,
+      ticket_url: input.ticketUrl?.trim() || null,
+      is_past_event: false,
+      is_official: true,
+      user_id: userId,
+      moderation_status: "pending",
+    })
+    .select(CULTURAL_EVENT_RETURN_COLUMNS)
+    .single();
+
+  if (result.error) throw result.error;
+  return mapCulturalEvent(result.data);
+}
+
+// An organizer's own submissions (any moderation_status). RLS "Users can read
+// own cultural event submissions" already scopes this to user_id = auth.uid().
+export async function getMyCulturalEvents(): Promise<CulturalEvent[]> {
+  const client = assertSupabase();
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  const userId = sessionResult.data.session?.user.id;
+  if (!userId) return [];
+
+  const result = await client
+    .from("cultural_events")
+    .select(CULTURAL_EVENT_RETURN_COLUMNS)
+    .eq("user_id", userId)
+    .order("event_date", { ascending: true });
+  if (result.error) throw result.error;
+  return (result.data ?? []).map(mapCulturalEvent);
+}
+
+// Edits the content fields only. moderation_status / user_id / organizer_id /
+// place linkage are never sent -- RLS "Organizers can update own pending
+// cultural events" also rejects the update unless the row stays 'pending'.
+export async function updatePulseCulturalEvent(
+  id: string,
+  input: CreateCulturalEventInput,
+): Promise<CulturalEvent> {
+  const client = assertSupabase();
+  await ensurePulseUserId();
+
+  const result = await client
+    .from("cultural_events")
+    .update({
+      title: input.title.trim(),
+      greek_title: input.greekTitle.trim(),
+      event_type: culturalEventType(input.eventType),
+      venue_name: input.venueName.trim(),
+      area: input.area.trim(),
+      event_date: input.eventDate,
+      description_el: input.descriptionEl.trim(),
+      description_en: input.descriptionEn?.trim() || null,
+      poster_url: input.posterUrl.trim(),
+      ticket_url: input.ticketUrl?.trim() || null,
+    })
+    .eq("id", id)
+    .select(CULTURAL_EVENT_RETURN_COLUMNS)
+    .single();
+
+  if (result.error) throw result.error;
+  return mapCulturalEvent(result.data);
+}
+
 export async function markPulseStoriesSeen(storyIds: string[]) {
   const uniqueStoryIds = Array.from(new Set(storyIds)).filter(Boolean);
   if (uniqueStoryIds.length === 0) return;
@@ -1074,7 +1757,7 @@ export async function addPulseComment(
     .from("comments")
     .insert({
       target_type: target.type,
-      ...targetColumnValues(target),
+      ...commentTargetColumnValues(target),
       author_id: "you",
       author_name: options.authorName?.trim() || "You",
       user_id: userId,
@@ -1083,7 +1766,7 @@ export async function addPulseComment(
       author_kind: "user",
       text,
       moderation_status: "pending",
-      sort_order: Date.now(),
+      sort_order: Math.floor(Date.now() / 1000),
     })
     .select(COMMENT_RETURN_COLUMNS)
     .single();
@@ -1095,7 +1778,7 @@ export async function addPulseComment(
 export async function setSavedItem(target: SavedTarget, saved: boolean) {
   const client = assertSupabase();
   const userId = await ensurePulseUserId();
-  const column = commentTargetColumn(target);
+  const column = savedTargetColumn(target);
 
   if (!saved) {
     const result = await client
@@ -1111,7 +1794,7 @@ export async function setSavedItem(target: SavedTarget, saved: boolean) {
   const result = await client.from("saved_items").insert({
     user_id: userId,
     target_type: target.type,
-    ...targetColumnValues(target),
+    ...savedTargetColumnValues(target),
   });
 
   if (result.error && result.error.code !== "23505") throw result.error;
@@ -1134,6 +1817,50 @@ export async function setPostLike(postId: string, liked: boolean) {
   const result = await client.from("post_likes").insert({
     user_id: userId,
     post_id: postId,
+  });
+
+  if (result.error && result.error.code !== "23505") throw result.error;
+}
+
+export async function setVisited(placeId: string, visited: boolean) {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+
+  if (!visited) {
+    const result = await client
+      .from("user_place_visits")
+      .delete()
+      .eq("user_id", userId)
+      .eq("place_id", placeId);
+    if (result.error) throw result.error;
+    return;
+  }
+
+  const result = await client.from("user_place_visits").insert({
+    user_id: userId,
+    place_id: placeId,
+  });
+
+  if (result.error && result.error.code !== "23505") throw result.error;
+}
+
+export async function setCulturalEventLike(eventId: string, liked: boolean) {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+
+  if (!liked) {
+    const result = await client
+      .from("cultural_event_likes")
+      .delete()
+      .eq("user_id", userId)
+      .eq("cultural_event_id", eventId);
+    if (result.error) throw result.error;
+    return;
+  }
+
+  const result = await client.from("cultural_event_likes").insert({
+    user_id: userId,
+    cultural_event_id: eventId,
   });
 
   if (result.error && result.error.code !== "23505") throw result.error;

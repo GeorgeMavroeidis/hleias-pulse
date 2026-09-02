@@ -13,7 +13,7 @@ interface Props {
  * its tone (sea/olive/purple/sunset) and dims once every story has been seen.
  */
 export function PlaceStoryRail({ groups, onOpen }: Props) {
-  const { language } = useI18n();
+  const { language, t } = useI18n();
   if (groups.length === 0) return null;
 
   return (
@@ -48,7 +48,7 @@ export function PlaceStoryRail({ groups, onOpen }: Props) {
                   rounded="rounded-full"
                 />
               </div>
-              {group.live && <span className="hp-story-bubble__live">Live</span>}
+              {group.live && <span className="hp-story-bubble__live">{t("Live")}</span>}
               {group.count > 1 && (
                 <span className="hp-story-bubble__count" aria-hidden="true">
                   {group.count}

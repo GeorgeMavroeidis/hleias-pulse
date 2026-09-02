@@ -276,9 +276,7 @@
 
 .hp-area-marker__shell,
 .hp-child-marker__shell {
-  position: absolute;
-  left: 50%;
-  top: 50%;
+  position: relative;
   display: block;
   width: var(--marker-size);
   height: var(--marker-size);
@@ -290,12 +288,11 @@
   box-sizing: border-box;
   border-radius: 9999px;
   overflow: visible;
-  transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-zoom-scale, 1));
+  transform: translateZ(0) scale(var(--hp-marker-zoom-scale, 1));
   transform-origin: center;
   transition:
-    opacity 90ms linear,
-    transform 90ms linear;
-  will-change: transform, opacity;
+    opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .hp-area-marker__shell {
@@ -325,7 +322,7 @@
 
 .hp-area-marker__shell.is-selected,
 .hp-child-marker__shell.is-selected {
-  transform: translate(-50%, -50%) translateZ(0) scale(calc(var(--hp-marker-zoom-scale, 1) + 0.05));
+  transform: translateZ(0) scale(calc(var(--hp-marker-zoom-scale, 1) + 0.05));
 }
 
 .hp-marker-aura {
@@ -471,13 +468,8 @@
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--hp-paper) 82%, transparent);
+  border: 2px solid color-mix(in srgb, var(--hp-paper) 88%, transparent);
   background: color-mix(in srgb, var(--hp-ink) 12%, var(--hp-paper));
-  opacity: var(--hp-map-media-opacity);
-  transform: scale(var(--hp-map-media-scale));
-  transition:
-    opacity 90ms linear,
-    transform 90ms linear;
 }
 
 .hp-area-marker__collage--2 {
@@ -545,12 +537,10 @@
   z-index: 1;
   box-sizing: border-box;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--hp-paper) 84%, transparent);
+  border: 2px solid color-mix(in srgb, var(--hp-paper) 88%, transparent);
   background: color-mix(in srgb, var(--hp-ink) 12%, var(--hp-paper));
   clip-path: circle(50% at 50% 50%);
   contain: paint;
-  opacity: var(--hp-map-media-opacity);
-  transition: opacity 90ms linear;
 }
 
 .hp-area-marker__shell.is-selected .hp-area-marker__collage,
@@ -567,23 +557,9 @@
     rgba(0, 0, 0, 0.18) 44%,
     rgba(0, 0, 0, 0.74)
   );
-  transition: opacity 90ms linear;
 }
 
-.hp-area-marker__shade {
-  opacity: var(--hp-map-rich);
-}
-
-.hp-child-marker__shade {
-  opacity: var(--hp-map-ultra);
-}
-
-.hp-child-marker__shell.is-selected .hp-child-marker__shade {
-  opacity: var(--hp-map-rich);
-}
-
-.hp-area-marker__status,
-.hp-child-marker__status {
+.hp-area-marker__status {
   position: absolute;
   z-index: 3;
   right: 0.34rem;
@@ -637,6 +613,46 @@
   text-shadow: 0 1px 3px rgba(23, 20, 17, 0.45);
 }
 
+.hp-area-marker__count {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 0.42rem;
+  display: grid;
+  min-width: 1.25rem;
+  transform: translateX(-50%);
+  place-items: center;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--marker-color) 90%, var(--hp-ink));
+  color: var(--hp-paper);
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0.24rem 0.38rem;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hp-paper) 78%, transparent);
+}
+
+.hp-area-marker__shell.is-compact .hp-area-marker__collage {
+  opacity: 1;
+}
+
+.hp-area-marker__shell.is-compact .hp-area-marker__ring {
+  inset: -0.18rem;
+  border-width: 2px;
+  background: color-mix(in srgb, var(--marker-color) 16%, transparent);
+  box-shadow:
+    0 0.18rem 0.8rem color-mix(in srgb, var(--marker-color) 18%, transparent),
+    0 0.3rem 1rem rgba(23, 20, 17, 0.16);
+}
+
+.hp-area-marker__shell.is-compact .hp-area-marker__shade,
+.hp-area-marker__shell.is-compact .hp-area-marker__copy,
+.hp-area-marker__shell.is-compact .hp-area-marker__avatars,
+.hp-area-marker__shell.is-compact .hp-area-marker__status,
+.hp-area-marker__shell.is-compact .hp-area-marker__initial {
+  display: none;
+}
+
 .hp-area-marker__copy,
 .hp-child-marker__copy {
   position: absolute;
@@ -651,22 +667,6 @@
   line-height: 1.06;
   text-align: center;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
-  transform: translateY(var(--hp-map-copy-offset));
-  transition:
-    opacity 90ms linear,
-    transform 90ms linear;
-}
-
-.hp-area-marker__copy {
-  opacity: var(--hp-map-rich);
-}
-
-.hp-child-marker__copy {
-  opacity: var(--hp-map-ultra);
-}
-
-.hp-child-marker__shell.is-selected .hp-child-marker__copy {
-  opacity: var(--hp-map-rich);
 }
 
 .hp-area-marker__copy strong,
@@ -751,8 +751,33 @@
   border-radius: 9999px;
   background: var(--hp-sunset);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--hp-paper) 82%, transparent);
-  opacity: var(--hp-map-dot-opacity);
-  transition: opacity 90ms linear;
+}
+
+/* Compact dot pin used at low zoom so every place is always rendered without
+   cluttering the overview. Cross-fades into the full marker as you zoom in. */
+.hp-child-marker--dot {
+  display: grid;
+  place-items: center;
+}
+.hp-child-marker__dot-pin {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--marker-color) 92%, var(--hp-paper));
+  border: 2px solid color-mix(in srgb, var(--hp-paper) 92%, transparent);
+  box-shadow: 0 1px 5px rgba(23, 20, 17, 0.3);
+  transition:
+    width 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hp-child-marker__dot-pin.is-selected {
+  width: 18px;
+  height: 18px;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--marker-color) 28%, transparent),
+    0 1px 7px rgba(23, 20, 17, 0.32);
 }
 
 .hp-real-map .hp-child-marker__guide {
@@ -1039,10 +1064,21 @@ select:focus-visible {
     linear-gradient(135deg, #f0a85f 0%, #9b6fe6 100%) border-box;
   opacity: var(--hp-map-rich);
   transition: opacity 90ms linear;
+  animation: hp-story-ring-pulse 2.6s ease-in-out infinite;
+}
+@keyframes hp-story-ring-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hp-story-bubble__live {
+  .hp-story-bubble__live,
+  .hp-child-marker__story-ring {
     animation: none;
   }
   .hp-story-progress__fill.is-running {
@@ -1115,6 +1151,38 @@ select:focus-visible {
     stroke-dashoffset: -24;
   }
 }
+
+/* Map: decorative animated sea shimmer (purely aesthetic — NOT real sea state).
+   The polygon is filled with an SVG <pattern> of drifting wavy lines. */
+.hp-real-map .hp-sea-shimmer {
+  fill: url(#hp-waves);
+  fill-opacity: 1;
+}
+.hp-sea-shimmer__tint {
+  fill: var(--hp-sea);
+  fill-opacity: 0.12;
+}
+.hp-sea-shimmer__waves {
+  stroke: var(--hp-sea);
+  animation: hp-sea-drift 7s linear infinite;
+}
+.hp-sea-shimmer__wave-a {
+  stroke-width: 1.4;
+  stroke-opacity: 0.5;
+}
+.hp-sea-shimmer__wave-b {
+  stroke-width: 1.1;
+  stroke-opacity: 0.3;
+}
+@keyframes hp-sea-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-28px);
+  }
+}
+
 .hp-real-map .hp-route-stop {
   display: grid;
   width: 28px;
@@ -1249,23 +1317,558 @@ h3 {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .hp-area-marker__shell,
-  .hp-child-marker__shell,
-  .hp-area-marker__collage,
-  .hp-child-marker__media,
-  .hp-area-marker__copy,
-  .hp-child-marker__copy,
-  .hp-area-marker__status,
-  .hp-child-marker__status,
-  .hp-area-marker__avatars,
-  .hp-child-marker__avatars {
-    transition: none;
+/* TopBar "Deals" pill: a subtle, periodic attention pulse — a soft sunset
+   glow plus a micro-bounce that rests for most of the cycle, so it draws
+   the eye toward offers without nagging. */
+.hp-deals-pill {
+  animation: hp-deals-pulse 3.4s ease-in-out infinite;
+}
+@keyframes hp-deals-pulse {
+  0%,
+  68%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--hp-sunset) 0%, transparent);
   }
+  78% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--hp-sunset) 22%, transparent);
+  }
+  88% {
+    transform: scale(0.99);
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--hp-sunset) 0%, transparent);
+  }
+}
+
+/* ── Blend design language (account sheet, composer, deals) ───────────────
+   A soft elevation token so cards lift off the hp-bg sheet without leaning
+   on the near-invisible paper/sand contrast; a static gradient identity
+   hero with a ghost wordmark (account only); a condensed numeric face; and
+   a stagger-in on open. Motion is gated to no-preference, so reduced-motion
+   gets the full static layout with nothing to switch off. */
+.hp-card-lift {
+  box-shadow:
+    0 1px 2px rgba(23, 20, 17, 0.05),
+    0 14px 34px -18px rgba(23, 20, 17, 0.26);
+}
+
+.hp-acct-hero__banner {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(115deg, var(--hp-sunset) 0%, #b0472e 44%, var(--hp-night) 100%);
+}
+.hp-acct-hero__banner::after {
+  content: "PULSE";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.16em;
+  color: rgba(255, 248, 236, 0.22);
+  pointer-events: none;
+}
+
+.hp-num {
+  font-family: var(--hp-font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes hp-stagger-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hp-stagger > * {
+    animation: hp-stagger-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .hp-stagger > *:nth-child(1) {
+    animation-delay: 0.03s;
+  }
+  .hp-stagger > *:nth-child(2) {
+    animation-delay: 0.07s;
+  }
+  .hp-stagger > *:nth-child(3) {
+    animation-delay: 0.11s;
+  }
+  .hp-stagger > *:nth-child(4) {
+    animation-delay: 0.15s;
+  }
+  .hp-stagger > *:nth-child(5) {
+    animation-delay: 0.19s;
+  }
+  .hp-stagger > *:nth-child(6) {
+    animation-delay: 0.23s;
+  }
+  .hp-stagger > *:nth-child(7) {
+    animation-delay: 0.27s;
+  }
+  .hp-stagger > *:nth-child(n + 8) {
+    animation-delay: 0.31s;
+  }
+}
+
+/* ── PlaceDetailModal stats: typography-led byline (no tiles) ────────────
+   An activity byline (number in ink, rest muted, "·" separators) over a
+   no-box descriptor row, then a single "Best for" line. Monochrome only --
+   ink for values, muted for labels/icons. No new tokens. */
+.hp-pd-stats {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--hp-border);
+}
+.hp-pd-byline {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.75;
+  color: var(--hp-muted);
+}
+.hp-pd-byline b {
+  font-weight: 700;
+  color: var(--hp-ink);
+  font-variant-numeric: tabular-nums;
+}
+.hp-pd-byline svg {
+  display: inline;
+  width: 10px;
+  height: 10px;
+  margin-right: 0.22rem;
+  vertical-align: -0.09em;
+  opacity: 0.7;
+}
+.hp-pd-byline .hp-pd-sep {
+  margin: 0 0.4rem;
+  opacity: 0.35;
+}
+.hp-pd-desc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.15rem;
+  margin-top: 0.7rem;
+  font-size: 0.7rem;
+  color: var(--hp-muted);
+}
+.hp-pd-desc > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+.hp-pd-desc svg {
+  width: 11px;
+  height: 11px;
+  align-self: center;
+  opacity: 0.7;
+}
+.hp-pd-desc b {
+  font-weight: 600;
+  color: var(--hp-ink);
+}
+.hp-pd-bestfor {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin-top: 0.8rem;
+  font-size: 0.8rem;
+}
+.hp-pd-bestfor > i {
+  flex: none;
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hp-muted);
+}
+.hp-pd-bestfor > span {
+  font-weight: 600;
+  color: var(--hp-ink);
+  line-height: 1.4;
+}
+.hp-pd-rule {
+  margin-top: 1rem;
+  height: 1px;
+  background: var(--hp-border);
+}
+
+/* ── Premium deal coupon (DealsScreen / DealCard) ────────────────────────
+   An editorial, "printed" coupon: photo, then a perforation row (dashed
+   rule + notch cut-outs in the sheet colour), then the body. A wax-stamp
+   seal for the offer size, a business monogram, a low Gift watermark and
+   a warm layered shadow. Sits on the hp-bg screen; the notches are cut in
+   hp-bg. No new tokens. */
+.hp-coupon {
+  position: relative;
+  background: var(--hp-paper);
+  border-radius: 1.15rem;
+  overflow: hidden;
+  box-shadow:
+    0 1px 1px rgba(23, 20, 17, 0.05),
+    0 3px 8px rgba(23, 20, 17, 0.06),
+    0 22px 42px -20px rgba(23, 20, 17, 0.35);
+}
+.hp-coupon__photo {
+  position: relative;
+  height: 7.25rem;
+}
+.hp-coupon--featured .hp-coupon__photo {
+  height: 9.25rem;
+}
+.hp-coupon__photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    0deg,
+    rgba(20, 16, 12, 0.62),
+    rgba(20, 16, 12, 0.05) 46%,
+    transparent
+  );
+}
+.hp-coupon__name {
+  position: absolute;
+  left: 0.85rem;
+  bottom: 0.6rem;
+  z-index: 1;
+  color: var(--hp-paper);
+}
+.hp-coupon__name strong {
+  display: block;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.005em;
+}
+.hp-coupon--featured .hp-coupon__name strong {
+  font-size: 1.15rem;
+}
+.hp-coupon__name span {
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+.hp-coupon__seal {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.8rem;
+  z-index: 1;
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 999px;
+  background: var(--hp-paper);
+  color: var(--hp-sunset);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  transform: rotate(-8deg);
+  box-shadow:
+    0 3px 8px rgba(23, 20, 17, 0.3),
+    inset 0 0 0 2px var(--hp-sunset),
+    inset 0 0 0 4px var(--hp-paper),
+    inset 0 0 0 5px color-mix(in srgb, var(--hp-sunset) 40%, transparent);
+}
+.hp-coupon__seal b {
+  display: block;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  line-height: 0.85;
+}
+.hp-coupon__seal small {
+  display: block;
+  font-size: 0.36rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.hp-coupon__perf {
+  position: relative;
+  height: 1rem;
+}
+.hp-coupon__perf i {
+  position: absolute;
+  left: 0.85rem;
+  right: 0.85rem;
+  top: 50%;
+  border-top: 1.5px dashed var(--hp-border);
+}
+.hp-coupon__perf::before,
+.hp-coupon__perf::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: var(--hp-bg);
+  transform: translateY(-50%);
+}
+.hp-coupon__perf::before {
+  left: -0.55rem;
+}
+.hp-coupon__perf::after {
+  right: -0.55rem;
+}
+.hp-coupon__body {
+  position: relative;
+  padding: 0.2rem 0.9rem 0.9rem;
+}
+.hp-coupon__watermark {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.3rem;
+  color: color-mix(in srgb, var(--hp-sunset) 9%, transparent);
+  pointer-events: none;
+}
+.hp-coupon__mono {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+.hp-coupon__mono i {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--hp-ink);
+  color: var(--hp-paper);
+  display: grid;
+  place-items: center;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.62rem;
+  flex: none;
+}
+.hp-coupon__mono span {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--hp-muted);
+}
+.hp-coupon__deal {
+  position: relative;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+.hp-coupon--featured .hp-coupon__deal {
+  font-size: 1.15rem;
+}
+.hp-coupon__foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--hp-muted);
+}
+.hp-coupon__foot .hp-coupon__dot {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--hp-olive);
+}
+
+/* ── Coupon code ticket (DealCodeModal) ─────────────────────────────────
+   Same "printed" language as the premium coupon: a head band, a
+   perforation row with notch cut-outs (in hp-paper — the modal sheet is
+   hp-paper), then a redemption zone with the QR + numeric code. */
+.hp-ticket {
+  position: relative;
+  margin: 0 auto;
+  max-width: 19rem;
+  background: var(--hp-paper);
+  border-radius: 1.15rem;
+  text-align: left;
+  overflow: hidden;
+  box-shadow:
+    0 1px 1px rgba(23, 20, 17, 0.05),
+    0 3px 8px rgba(23, 20, 17, 0.06),
+    0 22px 42px -20px rgba(23, 20, 17, 0.35);
+}
+.hp-ticket__head {
+  position: relative;
+  padding: 0.85rem 0.9rem 0.75rem;
+  background: linear-gradient(
+    118deg,
+    color-mix(in srgb, var(--hp-sunset) 12%, transparent),
+    color-mix(in srgb, var(--hp-night) 6%, transparent)
+  );
+}
+.hp-ticket__chip {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.55rem;
+  background: var(--hp-sunset);
+  color: var(--hp-paper);
+  display: grid;
+  place-items: center;
+}
+.hp-ticket__deal {
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.18;
+  letter-spacing: -0.005em;
+  margin: 0.6rem 0 0;
+  color: var(--hp-ink);
+}
+.hp-ticket__seal {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.75rem;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 999px;
+  background: var(--hp-paper);
+  color: var(--hp-sunset);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  transform: rotate(-7deg);
+  box-shadow:
+    0 3px 8px rgba(23, 20, 17, 0.25),
+    inset 0 0 0 2px var(--hp-sunset),
+    inset 0 0 0 3.5px var(--hp-paper),
+    inset 0 0 0 4.5px color-mix(in srgb, var(--hp-sunset) 40%, transparent);
+}
+.hp-ticket__seal b {
+  display: block;
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.75rem;
+  line-height: 0.85;
+}
+.hp-ticket__seal small {
+  display: block;
+  font-size: 0.32rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.hp-ticket__perf {
+  position: relative;
+  height: 1rem;
+}
+.hp-ticket__perf i {
+  position: absolute;
+  left: 0.9rem;
+  right: 0.9rem;
+  top: 50%;
+  border-top: 1.5px dashed var(--hp-border);
+}
+.hp-ticket__perf::before,
+.hp-ticket__perf::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: var(--hp-bg);
+  transform: translateY(-50%);
+}
+.hp-ticket__perf::before {
+  left: -0.55rem;
+}
+.hp-ticket__perf::after {
+  right: -0.55rem;
+}
+.hp-ticket__body {
+  padding: 0.15rem 0.9rem 0.95rem;
+}
+.hp-ticket__redeem {
+  position: relative;
+  border-radius: 0.9rem;
+  padding: 0.85rem 0.8rem 0.8rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--hp-sunset) 4.5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hp-sunset) 16%, transparent);
+}
+.hp-ticket__qr {
+  width: 9.25rem;
+  height: 9.25rem;
+  margin: 0 auto;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(23, 20, 17, 0.06),
+    inset 0 0 0 1px rgba(23, 20, 17, 0.06);
+}
+.hp-ticket__qr img,
+.hp-ticket__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hp-ticket__code {
+  margin-top: 0.7rem;
+  font-family: var(--hp-font-mono, ui-monospace, monospace);
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: 0.3em;
+  color: var(--hp-ink);
+}
+.hp-ticket__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--hp-muted);
+}
+.hp-ticket__meta .hp-ticket__tag {
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid var(--hp-border);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+.hp-ticket.is-expired .hp-ticket__qr {
+  filter: grayscale(1) opacity(0.35);
+}
+.hp-ticket__stamp {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.hp-ticket__stamp span {
+  transform: rotate(-11deg);
+  border: 2.5px solid var(--hp-muted);
+  color: var(--hp-muted);
+  font-family: var(--hp-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  padding: 0.3rem 0.8rem;
+  border-radius: 0.4rem;
+  box-shadow: inset 0 0 0 2px var(--hp-paper);
+  background: color-mix(in srgb, var(--hp-paper) 72%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
   .hp-live-ping,
   .hp-user-dot::after,
   .hp-real-map .hp-route-line,
+  .hp-sea-shimmer__waves,
   .hp-pin-target,
+  .hp-deals-pill,
   .hp-shimmer::after {
     animation: none;
   }

@@ -10,6 +10,7 @@ import {
   type PulseActivitySnapshot,
   type PulseTier,
 } from "@/lib/hp/pulse-activity";
+import { SEA_SHIMMER_LATLNGS, SEA_SHIMMER_MAX_ZOOM } from "@/lib/hp/sea-shimmer";
 import { useI18n } from "@/lib/i18n";
 
 type LeafletModule = typeof import("leaflet");
@@ -35,6 +36,9 @@ const OVERVIEW_ZOOM = 9.25;
 const SPLIT_ZOOM = 12.5;
 const DETAIL_CLUSTER_MAX_ZOOM = 13;
 const PLACE_FOCUS_ZOOM = 14.25;
+// Zoom band where individual pins cross-fade in while area clusters dissolve,
+// so the split from "cluster bubble" to "real pins" is smooth, never a hard pop.
+const PLACE_DETAIL_ZOOM = 11;
 // Progressive disclosure bands. Area summaries lead the overview, individual
 // places emerge through the middle zooms, and rich metadata finishes revealing
 // at the same zoom used when a place is focused.
@@ -93,6 +97,7 @@ type ClusterRenderNode = {
   cluster: MapAreaCluster;
   latLng: LatLngTuple;
   opacity: number;
+  rank: number;
   selected: boolean;
   tier: PulseTier;
 };
@@ -108,6 +113,7 @@ type ChildRenderNode = {
   selected: boolean;
   solo: boolean;
   tier: PulseTier;
+  compact: boolean;
 };
 
 type ActivityClusterRenderNode = {
@@ -340,19 +346,72 @@ function markerStyle(size: number, id: string) {
   return `--marker-size:${size}px;--hp-pulse-delay:-${delaySeconds}s`;
 }
 
-function clusterSize(status: AreaStatus) {
-  const base = status === "live" ? 76 : status === "hot" ? 70 : status === "moving" ? 64 : 60;
-  return base;
+function typeColorToken(place: Place) {
+  if (place.type === "beach") return "var(--hp-sea)";
+  if (place.type === "nature") return "var(--hp-olive)";
+  if (place.type === "night" || place.type === "village") return "var(--hp-purple)";
+  if (place.type === "culture") return "var(--hp-deep)";
+  return "var(--hp-sunset)";
 }
 
-function childSize(place: Place) {
-  const base = place.hotness >= 8 ? 60 : place.hotness >= 6 ? 54 : 48;
-  return base;
+// ── Bubble size & animation, tied to a live-activity proxy ──────────────────
+// There is no real-time presence data yet, so `activityScore` blends the
+// place's pulse score with how many recent posts it carries and whether it has
+// a live signal (a story / an event) into a 0..1 "how alive right now". That
+// one number drives both the bubble's size and which animation tier it gets,
+// so LIVE/HOT spots read as only slightly bigger + livelier, not dramatically.
+const BUBBLE_BASE_PX = 34;
+const BUBBLE_SPAN_PX = 12;
+
+function activityScore(hotness: number, recentPostCount: number, liveSignal: boolean) {
+  return (
+    0.6 * clamp01(hotness / 10) + 0.3 * clamp01(recentPostCount / 8) + 0.1 * (liveSignal ? 1 : 0)
+  );
 }
 
-function activityClusterSize(pointCount: number) {
-  const base = pointCount >= 8 ? 72 : pointCount >= 5 ? 64 : pointCount >= 3 ? 56 : 50;
-  return base;
+function bubbleSize(activity: number, statusBump: boolean, selected: boolean) {
+  const raw = BUBBLE_BASE_PX + BUBBLE_SPAN_PX * clamp01(activity) + (statusBump ? 2 : 0);
+  return Math.round(raw * (selected ? 1.06 : 1));
+}
+
+export function clusterActivity(cluster: MapAreaCluster) {
+  const avgPosts = cluster.postCount / Math.max(cluster.places.length, 1);
+  const liveSignal = cluster.eventCount > 0 || cluster.status === "live";
+  return activityScore(cluster.hotness, avgPosts, liveSignal);
+}
+
+// Three display tiers for the "Explore areas" panel + smart-insight banner,
+// bucketed from the same 0..1 live-activity proxy that drives the bubbles.
+// The cuts sit a touch above the per-place bubbleTier cuts (0.45 / 0.65):
+// area scores are built from averages so they compress toward the middle.
+// Deliberately tunable — revisit after real usage.
+export type AreaTier = "hot" | "active" | "calm";
+
+export function areaTier(cluster: MapAreaCluster): AreaTier {
+  if (cluster.status === "live") return "hot";
+  const activity = clusterActivity(cluster);
+  if (activity >= 0.7) return "hot";
+  if (activity >= 0.48) return "active";
+  return "calm";
+}
+
+function clusterSize(cluster: MapAreaCluster, selected: boolean, compact: boolean) {
+  const statusBump = cluster.status === "live" || cluster.status === "hot";
+  const size = bubbleSize(clusterActivity(cluster), statusBump, selected);
+  // "compact" (lower-ranked, label-less) bubbles are trimmed a touch, not shrunk
+  // to a dot — they still read their activity size and animation tier.
+  return compact && !selected ? Math.round(size * 0.86) : size;
+}
+
+function childSize(place: Place, selected: boolean, liveSignal: boolean) {
+  const activity = activityScore(place.hotness, place.recentPostCount, liveSignal);
+  return bubbleSize(activity, place.hotness >= 8, selected);
+}
+
+function activityClusterSize(node: ActivityClusterRenderNode, selected: boolean) {
+  const avgPosts = node.postCount / Math.max(node.pointCount, 1);
+  const activity = activityScore(node.hotness, avgPosts, node.eventCount > 0);
+  return bubbleSize(activity, node.hotness >= 8, selected);
 }
 
 function uniqueAvatars(places: Place[]) {
@@ -470,9 +529,12 @@ function createAreaIcon(
   L: LeafletModule,
   cluster: MapAreaCluster,
   selected: boolean,
+  rank: number,
   resolve: (url: string) => string,
 ) {
-  const size = clusterSize(cluster.status);
+  const compact = !selected && cluster.status !== "live" && rank > 1;
+  const size = clusterSize(cluster, selected, compact);
+  const labelOffsetPx = selected ? 0 : cluster.labelOffsetPx;
   const images = cluster.places.slice(0, 3);
   const collage = images
     .map(
@@ -488,19 +550,25 @@ function createAreaIcon(
       (avatar) => `<img src="${escapeHtml(resolveUrl(resolve, avatar))}" alt="" loading="lazy" />`,
     )
     .join("");
-  const statusLabel = cluster.status === "quiet" ? "" : cluster.status;
+  const statusLabel =
+    cluster.status === "quiet"
+      ? ""
+      : selected || rank <= 1 || cluster.status === "live"
+        ? cluster.status
+        : "";
 
   return L.divIcon({
     className: "hp-area-marker",
     html: `
       <div
-        class="hp-area-marker__shell is-pulse-${cluster.status} ${selected ? "is-selected" : ""} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
+        class="hp-area-marker__shell is-pulse-${cluster.status} ${selected ? "is-selected" : ""} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""} ${compact ? "is-compact" : ""}"
         style="${markerStyle(size, cluster.id)}"
       >
         <span class="hp-marker-aura"></span>
         <span class="hp-area-marker__ring"></span>
         <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
         <span class="hp-area-marker__shade"></span>
+        <span class="hp-area-marker__initial">${escapeHtml(cluster.name.slice(0, 1))}</span>
         ${statusLabel ? `<span class="hp-area-marker__status">${escapeHtml(statusLabel)}</span>` : ""}
         <span class="hp-area-marker__copy">
           <strong>${escapeHtml(cluster.name)}</strong>
@@ -510,10 +578,8 @@ function createAreaIcon(
         ${cluster.status !== "quiet" ? '<span class="hp-area-marker__dot"></span>' : ""}
       </div>
     `,
-    // A stable one-pixel Leaflet anchor lets CSS scale the visual around the
-    // real coordinate without rebuilding/re-anchoring the DivIcon while zooming.
-    iconSize: [1, 1],
-    iconAnchor: [0.5, 0.5],
+    iconSize: [size, size],
+    iconAnchor: [size / 2 - labelOffsetPx, size / 2],
   });
 }
 
@@ -525,9 +591,22 @@ function createChildIcon(
   selected: boolean,
   hasStories = false,
   solo = false,
+  compact = false,
   resolve: (url: string) => string = (url) => url,
 ) {
-  const size = childSize(place);
+  const color = typeColorToken(place);
+
+  if (compact) {
+    const size = selected ? 18 : 13;
+    return L.divIcon({
+      className: "hp-child-marker hp-child-marker--dot",
+      html: `<span class="hp-child-marker__dot-pin ${selected ? "is-selected" : ""}" style="--marker-color:${color};"></span>`,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+    });
+  }
+
+  const size = childSize(place, selected, hasStories || eventCount > 0);
   const line =
     eventCount > 0
       ? `${eventCount} event${eventCount === 1 ? "" : "s"}`
@@ -565,8 +644,8 @@ function createChildIcon(
         ${avatars ? `<span class="hp-child-marker__avatars">${avatars}</span>` : ""}
       </div>
     `,
-    iconSize: [1, 1],
-    iconAnchor: [0.5, 0.5],
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
 }
 
@@ -575,7 +654,7 @@ function createActivityClusterIcon(
   node: ActivityClusterRenderNode,
   resolve: (url: string) => string,
 ) {
-  const size = activityClusterSize(node.pointCount);
+  const size = activityClusterSize(node, node.selected);
   const images = [...node.leaves]
     .sort((a, b) => b.hotness - a.hotness || a.id.localeCompare(b.id))
     .slice(0, 3);
@@ -603,14 +682,15 @@ function createActivityClusterIcon(
         <span class="hp-area-marker__ring"></span>
         <span class="hp-area-marker__collage hp-area-marker__collage--${images.length}">${collage}</span>
         <span class="hp-area-marker__shade"></span>
+        <span class="hp-area-marker__count">${node.pointCount}</span>
         <span class="hp-area-marker__copy">
           <strong>${escapeHtml(node.dominantCluster.name)}</strong>
           <em>${escapeHtml(line)}</em>
         </span>
       </div>
     `,
-    iconSize: [1, 1],
-    iconAnchor: [0.5, 0.5],
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
 }
 
@@ -786,10 +866,16 @@ export function SocialMap({
   const markerSigRef = useRef<Map<string, string>>(new Map());
   const userMarkerRef = useRef<LeafletMarker | null>(null);
   const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const seaLayerRef = useRef<import("leaflet").Polygon | null>(null);
+  const seaVisibleRef = useRef(false);
   const onMapLongPressRef = useRef(onMapLongPress);
   onMapLongPressRef.current = onMapLongPress;
   const didInitialFitRef = useRef(false);
   const lastMarkerActivationRef = useRef<{ id: string; at: number } | null>(null);
+  // Timestamp of the last explicit fly/fit call, so a selection that arrives
+  // from outside the map (Explore areas panel, deep link) can frame its area
+  // without double-animating when a marker/chip tap already did.
+  const lastProgrammaticFocusRef = useRef(0);
   const previousSelectionRef = useRef<{ areaId: string | null; placeId: string | null }>({
     areaId: null,
     placeId: null,
@@ -872,6 +958,7 @@ export function SocialMap({
 
   const renderNodes = useMemo<RenderNode[]>(() => {
     const nodes: RenderNode[] = [];
+    const compact = zoom < PLACE_DETAIL_ZOOM;
     const placeOpacity = placeOpacityForZoom(zoom);
 
     // 1) Every place is ALWAYS on the map at its true coordinate. Selection only
@@ -893,20 +980,21 @@ export function SocialMap({
           place,
           eventCount: activity.eventCount,
           latLng: [place.lat, place.lng],
-          opacity: selected ? 1 : solo ? Math.max(0.72, placeOpacity) : placeOpacity,
+          opacity: selected ? 1 : placeOpacity,
           selected,
           solo,
           tier: activity.tier,
+          compact,
         });
       });
     });
 
     // 2) Area clusters ride on top as helpers and fade out as pins emerge.
     //    Standalone single-pin areas skip the bubble (they're just a pin).
-    if (zoom < AREA_FADE_END) {
+    if (!isSplitZoom) {
       const areaOpacity = areaClusterOpacityForZoom(zoom);
       if (areaOpacity > 0.001) {
-        clusters.forEach((cluster) => {
+        clusters.forEach((cluster, index) => {
           if (cluster.places.length < 2) return;
           nodes.push({
             id: `cluster-${cluster.id}`,
@@ -914,6 +1002,7 @@ export function SocialMap({
             cluster,
             latLng: [cluster.lat, cluster.lng],
             opacity: cluster.id === selectedAreaId ? Math.max(areaOpacity, 0.6) : areaOpacity,
+            rank: index,
             selected: cluster.id === selectedAreaId,
             tier: cluster.status,
           });
@@ -924,7 +1013,7 @@ export function SocialMap({
     // 3) At detail zoom, activity bubbles group dense spots. Each one is placed
     //    at the centroid of its members and fades into the already-rendered pins
     //    as you zoom toward its expansion zoom -> clean split, no relocation.
-    if (zoom >= ACTIVITY_CLUSTER_START) {
+    if (isSplitZoom) {
       const features = placeClusterIndex.getClusters(ILIA_DETAIL_BBOX, superclusterZoom(zoom));
       features.forEach((feature) => {
         if (!isActivityClusterFeature(feature)) return;
@@ -986,6 +1075,7 @@ export function SocialMap({
     clusterById,
     clusters,
     eventCounts,
+    isSplitZoom,
     placeById,
     placeClusterIndex,
     selectedAreaId,
@@ -1009,6 +1099,7 @@ export function SocialMap({
       const L = leafletRef.current;
       const map = mapRef.current;
       if (!L || !map) return;
+      lastProgrammaticFocusRef.current = Date.now();
 
       const places = cluster.childPlaces;
       const bottomPadding = Math.min(430, Math.max(190, areaFocusBottomPadding));
@@ -1053,6 +1144,7 @@ export function SocialMap({
     (node: ActivityClusterRenderNode) => {
       const map = mapRef.current;
       if (!map) return;
+      lastProgrammaticFocusRef.current = Date.now();
 
       const expansionZoom = placeClusterIndex.getClusterExpansionZoom(node.clusterId);
       const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(map.getZoom() + 0.75, expansionZoom));
@@ -1078,6 +1170,17 @@ export function SocialMap({
     if (previous.placeId && !next.placeId && next.areaId) {
       const cluster = clusters.find((item) => item.id === next.areaId);
       if (cluster) zoomIntoCluster(cluster);
+      return;
+    }
+
+    // Area picked from outside the map (Explore areas panel, deep link) while
+    // nothing was focused — frame it. Skipped when an explicit zoom just ran,
+    // so a marker or chip tap doesn't animate there twice.
+    if (!previous.areaId && !previous.placeId && next.areaId && !next.placeId) {
+      if (Date.now() - lastProgrammaticFocusRef.current > 600) {
+        const cluster = clusters.find((item) => item.id === next.areaId);
+        if (cluster) zoomIntoCluster(cluster);
+      }
       return;
     }
 
@@ -1120,6 +1223,14 @@ export function SocialMap({
       const guidePane = map.createPane("hp-marker-guides");
       guidePane.style.zIndex = "625";
       guidePane.style.pointerEvents = "none";
+
+      // Decorative animated sea shimmer: sits just above the tiles, below every
+      // marker/vector. Fades in/out via CSS as the zoom gate flips.
+      const seaPane = map.createPane("hp-sea-shimmer");
+      seaPane.style.zIndex = "250";
+      seaPane.style.pointerEvents = "none";
+      seaPane.style.opacity = "0";
+      seaPane.style.transition = "opacity 360ms ease";
 
       L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
         attribution:
@@ -1241,6 +1352,8 @@ export function SocialMap({
       leafletRef.current = null;
       userMarkerRef.current = null;
       routeLayerRef.current = null;
+      seaLayerRef.current = null;
+      seaVisibleRef.current = false;
     };
   }, []);
 
@@ -1269,7 +1382,7 @@ export function SocialMap({
     renderNodes.forEach((node) => {
       const icon =
         node.kind === "cluster"
-          ? createAreaIcon(L, node.cluster, node.selected, resolveImg)
+          ? createAreaIcon(L, node.cluster, node.selected, node.rank, resolveImg)
           : node.kind === "activity-cluster"
             ? createActivityClusterIcon(L, node, resolveImg)
             : createChildIcon(
@@ -1280,6 +1393,7 @@ export function SocialMap({
                 node.selected,
                 storyPlaceIds?.has(node.place.id) ?? false,
                 node.solo,
+                node.compact,
                 resolveImg,
               );
       let marker = markersRef.current.get(node.id);
@@ -1328,16 +1442,17 @@ export function SocialMap({
                 .slice(0, 3)
                 .map((p) => resolveImg(p.imageUrl))
                 .join(",")
-            : [node.place.imageUrl, ...node.place.avatars.slice(0, 2)]
-                .map((url) => resolveImg(url))
-                .join(",");
+            : resolveImg(node.place.imageUrl);
+      // `act*` buckets fold the live-activity inputs (hotness / recent posts /
+      // events) into the signature, so a data refresh that shifts a bubble's
+      // size or animation tier rebuilds its icon even if status/count held.
       const sig = [
         node.kind,
         node.kind === "cluster"
-          ? `${node.cluster.id}:${node.cluster.status}:${node.selected ? 1 : 0}:${imageToken}`
+          ? `${node.cluster.id}:${node.cluster.status}:${node.selected ? 1 : 0}:${node.rank}:${Math.round(clusterActivity(node.cluster) * 100)}:${imageToken}`
           : node.kind === "activity-cluster"
-            ? `${node.clusterId}:${node.pointCount}:${node.tier}:${node.selected ? 1 : 0}:${node.tone}:${imageToken}`
-            : `${node.place.id}:${node.tier}:${node.selected ? 1 : 0}:${hasStory ? 1 : 0}:${node.solo ? 1 : 0}:${node.eventCount}:${imageToken}`,
+            ? `${node.clusterId}:${node.pointCount}:${node.tier}:${node.selected ? 1 : 0}:${node.tone}:${Math.round(node.hotness * 10)}:${node.eventCount}:${Math.round(node.postCount)}:${imageToken}`
+            : `${node.place.id}:${node.tier}:${node.selected ? 1 : 0}:${hasStory ? 1 : 0}:${node.solo ? 1 : 0}:${node.compact ? 1 : 0}:${node.eventCount}:${Math.round(node.place.hotness * 10)}:${node.place.recentPostCount}:${imageToken}`,
       ].join("|");
       const needsRebuild = markerSigRef.current.get(node.id) !== sig;
 
@@ -1420,13 +1535,13 @@ export function SocialMap({
           markerElement.setAttribute(
             "aria-label",
             node.kind === "cluster"
-              ? `Zoom into ${node.cluster.places.length} places near ${node.cluster.name}`
+              ? `Zoom into ${node.cluster.name}`
               : node.kind === "activity-cluster"
                 ? `Zoom into ${node.pointCount} activities near ${node.dominantCluster.name}`
                 : `Open ${node.place.name}`,
           );
           markerElement.dataset.hpNodeId = node.id;
-          markerElement.tabIndex = visibleForInteraction ? 0 : -1;
+          markerElement.tabIndex = 0;
           markerElement.addEventListener("click", activateFromEvent, true);
           markerElement.addEventListener("keydown", keyHandler, true);
           markerShell?.addEventListener("click", activateFromEvent, true);
@@ -1496,6 +1611,50 @@ export function SocialMap({
       paddingTopLeft: [52, 108],
     });
   }, [clusters, isSplitZoom, mapReady, selectedAreaId, selectedPlaceId]);
+
+  // Decorative sea shimmer: only at overview zoom, and never while a specific
+  // place is focused (the crude polygon edge would show, and it is pointless
+  // perf-wise up close). The pane's CSS opacity transition does the fade; the
+  // layer itself is removed shortly after so Leaflet stops re-projecting it.
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!L || !map || !mapReady) return;
+
+    const shouldShow = zoom <= SEA_SHIMMER_MAX_ZOOM && !selectedPlaceId;
+    if (shouldShow === seaVisibleRef.current) return;
+    seaVisibleRef.current = shouldShow;
+
+    const pane = map.getPane("hp-sea-shimmer");
+
+    if (shouldShow) {
+      if (!seaLayerRef.current) {
+        seaLayerRef.current = L.polygon(SEA_SHIMMER_LATLNGS as LatLngTuple[][][], {
+          pane: "hp-sea-shimmer",
+          className: "hp-sea-shimmer",
+          interactive: false,
+          stroke: false,
+          fillOpacity: 1,
+          // Ring 0 (sea rectangle) fills; every following ring is a real land
+          // mass that punches a hole — see src/lib/hp/sea-shimmer.ts.
+          fillRule: "evenodd",
+        });
+      }
+      seaLayerRef.current.addTo(map);
+      window.requestAnimationFrame(() => {
+        if (seaVisibleRef.current && pane) pane.style.opacity = "1";
+      });
+      return;
+    }
+
+    if (pane) pane.style.opacity = "0";
+    const layer = seaLayerRef.current;
+    if (layer) {
+      window.setTimeout(() => {
+        if (!seaVisibleRef.current) layer.remove();
+      }, 400);
+    }
+  }, [mapReady, zoom, selectedPlaceId]);
 
   useEffect(() => {
     const L = leafletRef.current;
@@ -1568,6 +1727,33 @@ export function SocialMap({
   return (
     <div className="hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper">
       <div ref={mapNodeRef} className="h-full w-full" aria-label={t("Interactive map of Ilia")} />
+
+      {/* Paint server for the decorative sea shimmer. Referenced from the
+          Leaflet polygon via `fill: url(#hp-waves)` in styles.css. Purely
+          aesthetic — carries no real sea/weather data. */}
+      <svg
+        aria-hidden="true"
+        focusable="false"
+        width="0"
+        height="0"
+        className="pointer-events-none absolute"
+      >
+        <defs>
+          <pattern id="hp-waves" width="28" height="20" patternUnits="userSpaceOnUse">
+            <rect className="hp-sea-shimmer__tint" width="28" height="20" />
+            <g className="hp-sea-shimmer__waves" fill="none" strokeLinecap="round">
+              <path
+                className="hp-sea-shimmer__wave-a"
+                d="M-28 7 Q-21 2 -14 7 T0 7 T14 7 T28 7 T42 7 T56 7"
+              />
+              <path
+                className="hp-sea-shimmer__wave-b"
+                d="M-28 14 Q-21 10 -14 14 T0 14 T14 14 T28 14 T42 14 T56 14"
+              />
+            </g>
+          </pattern>
+        </defs>
+      </svg>
 
       {!mapReady && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-hp-paper/70">

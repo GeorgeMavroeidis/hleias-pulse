@@ -111,12 +111,60 @@ export type Database = {
         };
         Relationships: [];
       };
+      businesses: {
+        Row: {
+          bio: string;
+          contact_email: string | null;
+          contact_phone: string | null;
+          created_at: string;
+          display_name: string;
+          id: string;
+          profile_id: string | null;
+          updated_at: string;
+          user_id: string | null;
+          verification_status: string;
+        };
+        Insert: {
+          bio?: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          created_at?: string;
+          display_name: string;
+          id?: string;
+          profile_id?: string | null;
+          updated_at?: string;
+          user_id?: string | null;
+          verification_status?: string;
+        };
+        Update: {
+          bio?: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          created_at?: string;
+          display_name?: string;
+          id?: string;
+          profile_id?: string | null;
+          updated_at?: string;
+          user_id?: string | null;
+          verification_status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "businesses_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       comments: {
         Row: {
           author_id: string | null;
           author_kind: string;
           author_name: string;
           created_at: string;
+          cultural_event_id: string | null;
           id: string;
           moderation_status: string;
           place_id: string | null;
@@ -135,6 +183,7 @@ export type Database = {
           author_kind?: string;
           author_name: string;
           created_at?: string;
+          cultural_event_id?: string | null;
           id?: string;
           moderation_status?: string;
           place_id?: string | null;
@@ -153,6 +202,7 @@ export type Database = {
           author_kind?: string;
           author_name?: string;
           created_at?: string;
+          cultural_event_id?: string | null;
           id?: string;
           moderation_status?: string;
           place_id?: string | null;
@@ -172,6 +222,13 @@ export type Database = {
             columns: ["author_id"];
             isOneToOne: false;
             referencedRelation: "authors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comments_cultural_event_id_fkey";
+            columns: ["cultural_event_id"];
+            isOneToOne: false;
+            referencedRelation: "cultural_events";
             referencedColumns: ["id"];
           },
           {
@@ -200,6 +257,189 @@ export type Database = {
             columns: ["route_id"];
             isOneToOne: false;
             referencedRelation: "routes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      cultural_events: {
+        Row: {
+          area: string;
+          created_at: string;
+          description_el: string;
+          description_en: string | null;
+          event_date: string;
+          event_type: string;
+          greek_title: string;
+          id: string;
+          is_official: boolean;
+          is_past_event: boolean;
+          lat: number | null;
+          likes_count: number;
+          lng: number | null;
+          moderation_status: string;
+          organizer_id: string | null;
+          organizer_name: string;
+          place_id: string | null;
+          poster_url: string;
+          ticket_url: string | null;
+          title: string;
+          updated_at: string;
+          user_id: string | null;
+          venue_name: string;
+        };
+        Insert: {
+          area: string;
+          created_at?: string;
+          description_el: string;
+          description_en?: string | null;
+          event_date: string;
+          event_type: string;
+          greek_title: string;
+          id: string;
+          is_official?: boolean;
+          is_past_event?: boolean;
+          lat?: number | null;
+          likes_count?: number;
+          lng?: number | null;
+          moderation_status?: string;
+          organizer_id?: string | null;
+          organizer_name: string;
+          place_id?: string | null;
+          poster_url: string;
+          ticket_url?: string | null;
+          title: string;
+          updated_at?: string;
+          user_id?: string | null;
+          venue_name: string;
+        };
+        Update: {
+          area?: string;
+          created_at?: string;
+          description_el?: string;
+          description_en?: string | null;
+          event_date?: string;
+          event_type?: string;
+          greek_title?: string;
+          id?: string;
+          is_official?: boolean;
+          is_past_event?: boolean;
+          lat?: number | null;
+          likes_count?: number;
+          lng?: number | null;
+          moderation_status?: string;
+          organizer_id?: string | null;
+          organizer_name?: string;
+          place_id?: string | null;
+          poster_url?: string;
+          ticket_url?: string | null;
+          title?: string;
+          updated_at?: string;
+          user_id?: string | null;
+          venue_name?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cultural_events_organizer_id_fkey";
+            columns: ["organizer_id"];
+            isOneToOne: false;
+            referencedRelation: "organizers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cultural_events_place_id_fkey";
+            columns: ["place_id"];
+            isOneToOne: false;
+            referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      cultural_event_likes: {
+        Row: {
+          created_at: string;
+          cultural_event_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          cultural_event_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          cultural_event_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cultural_event_likes_cultural_event_id_fkey";
+            columns: ["cultural_event_id"];
+            isOneToOne: false;
+            referencedRelation: "cultural_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      deal_redemptions: {
+        Row: {
+          business_id: string;
+          code: string;
+          expires_at: string;
+          id: string;
+          issued_at: string;
+          place_id: string;
+          profile_claim_id: string;
+          redeemed_at: string | null;
+          redeemed_by: string | null;
+          status: string;
+          user_id: string | null;
+        };
+        Insert: {
+          business_id: string;
+          code: string;
+          expires_at?: string;
+          id?: string;
+          issued_at?: string;
+          place_id: string;
+          profile_claim_id: string;
+          redeemed_at?: string | null;
+          redeemed_by?: string | null;
+          status?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          business_id?: string;
+          code?: string;
+          expires_at?: string;
+          id?: string;
+          issued_at?: string;
+          place_id?: string;
+          profile_claim_id?: string;
+          redeemed_at?: string | null;
+          redeemed_by?: string | null;
+          status?: string;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "deal_redemptions_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deal_redemptions_place_id_fkey";
+            columns: ["place_id"];
+            isOneToOne: false;
+            referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deal_redemptions_profile_claim_id_fkey";
+            columns: ["profile_claim_id"];
+            isOneToOne: false;
+            referencedRelation: "place_business_profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -395,6 +635,47 @@ export type Database = {
           },
         ];
       };
+      organizers: {
+        Row: {
+          bio: string;
+          created_at: string;
+          display_name: string;
+          id: string;
+          profile_id: string | null;
+          updated_at: string;
+          user_id: string | null;
+          verification_status: string;
+        };
+        Insert: {
+          bio?: string;
+          created_at?: string;
+          display_name: string;
+          id?: string;
+          profile_id?: string | null;
+          updated_at?: string;
+          user_id?: string | null;
+          verification_status?: string;
+        };
+        Update: {
+          bio?: string;
+          created_at?: string;
+          display_name?: string;
+          id?: string;
+          profile_id?: string | null;
+          updated_at?: string;
+          user_id?: string | null;
+          verification_status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "organizers_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       place_avatars: {
         Row: {
           avatar_url: string;
@@ -518,6 +799,69 @@ export type Database = {
             columns: ["profile_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      place_business_profiles: {
+        Row: {
+          business_id: string;
+          created_at: string;
+          deal_active: boolean;
+          deal_text: string | null;
+          hours_text: string | null;
+          id: string;
+          menu_url: string | null;
+          phone: string | null;
+          photos: string[];
+          place_id: string;
+          status: string;
+          updated_at: string;
+          website_url: string | null;
+        };
+        Insert: {
+          business_id: string;
+          created_at?: string;
+          deal_active?: boolean;
+          deal_text?: string | null;
+          hours_text?: string | null;
+          id?: string;
+          menu_url?: string | null;
+          phone?: string | null;
+          photos?: string[];
+          place_id: string;
+          status?: string;
+          updated_at?: string;
+          website_url?: string | null;
+        };
+        Update: {
+          business_id?: string;
+          created_at?: string;
+          deal_active?: boolean;
+          deal_text?: string | null;
+          hours_text?: string | null;
+          id?: string;
+          menu_url?: string | null;
+          phone?: string | null;
+          photos?: string[];
+          place_id?: string;
+          status?: string;
+          updated_at?: string;
+          website_url?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "place_business_profiles_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "place_business_profiles_place_id_fkey";
+            columns: ["place_id"];
+            isOneToOne: false;
+            referencedRelation: "places";
             referencedColumns: ["id"];
           },
         ];
@@ -947,6 +1291,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_place_visits: {
+        Row: {
+          place_id: string;
+          user_id: string;
+          visited_at: string;
+        };
+        Insert: {
+          place_id: string;
+          user_id: string;
+          visited_at?: string;
+        };
+        Update: {
+          place_id?: string;
+          user_id?: string;
+          visited_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_place_visits_place_id_fkey";
+            columns: ["place_id"];
+            isOneToOne: false;
+            referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       user_preferences: {
         Row: {
           created_at: string;
@@ -1031,9 +1401,21 @@ export type Database = {
     };
     Functions: {
       current_admin_role: { Args: never; Returns: string | null };
+      current_business_id: { Args: never; Returns: string | null };
+      current_organizer_id: { Args: never; Returns: string | null };
       get_pulse_bootstrap: { Args: never; Returns: Json };
+      issue_deal_code: { Args: { target_place_id: string }; Returns: Json };
+      redeem_deal_code: { Args: { code: string }; Returns: Json };
       moderate_content: {
         Args: { next_status: string; target_id: string; target_type: string };
+        Returns: undefined;
+      };
+      review_place_claim: {
+        Args: { claim_id: string; next_status: string };
+        Returns: undefined;
+      };
+      set_place_deal: {
+        Args: { claim_id: string; deal_active: boolean; deal_text: string | null };
         Returns: undefined;
       };
       refresh_meet_event_rsvp_counts: {
