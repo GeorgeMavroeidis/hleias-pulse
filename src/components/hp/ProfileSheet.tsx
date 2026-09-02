@@ -243,7 +243,7 @@ export function ProfileSheet({
             </button>
 
             <p className="mt-4 text-center text-[10px] text-hp-muted">
-              ΗΛΕΑ PULSE · accounts & sync coming soon
+              ΗΛΕΙΑ PULSE · ο λογαριασμός σου συγχρονίζεται με ασφάλεια
             </p>
           </motion.div>
         </motion.div>

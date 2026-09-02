@@ -1,114 +1,91 @@
-# ΗΛΕΙΑ PULSE Local Handoff
+# ΗΛΕΙΑ PULSE Handoff
 
-Last updated: 2026-06-14 13:45 EEST
+Last updated: 2026-08-27
 
-## Project Location
+## Repository And Workflow
 
-- Project path: `/Users/theodoroskapsalis/Projects/NOMOSILIASPROJECT/ilia-pulse-local`
-- Local dev URL: `http://127.0.0.1:5173/`
-- Static deploy folder: `/Users/theodoroskapsalis/Projects/NOMOSILIASPROJECT/ilia-pulse-local/cloudflare-static-dist`
-- Cloudflare upload zip: `/Users/theodoroskapsalis/Projects/NOMOSILIASPROJECT/local-backups/ilia-pulse-cloudflare-static-20260613-231243.zip`
-- Full local backup: `/Users/theodoroskapsalis/Projects/NOMOSILIASPROJECT/local-backups/ilia-pulse-local-20260613-230730-full.tar.gz`
+- Repository: `GeorgeMavroeidis/hleias-pulse`
+- George's working branch: `mavroeidis-main`
+- Shared branches: `main` and `margaris-main` (never change or merge them directly)
+- Every code task starts from an updated `mavroeidis-main` on a new `codex/...` branch.
+- Feature branches are pushed and merged into `mavroeidis-main` through pull requests.
 
-## Stack
+```sh
+git fetch origin
+git switch mavroeidis-main
+git pull --ff-only origin mavroeidis-main
+git switch -c codex/<descriptive-feature-name>
+```
 
-- React 19
-- Vite 7
-- Tailwind CSS 4
-- Framer Motion
-- Leaflet with OpenStreetMap tiles
-- TanStack Start project shell, plus a separate static Vite build for Cloudflare drag-and-drop upload
+## Local Development
 
-## Current Status
-
-The app is a local, mobile-first frontend prototype for ΗΛΕΙΑ PULSE. It now has a real Leaflet/OpenStreetMap map, real coordinate-backed Ilia locations, working marker selection, post/detail modals, route views, saved state, comments, and a Cloudflare-ready static upload build.
-
-The project is committed locally only. There is no GitHub remote configured, and nothing has been pushed online.
-
-## Local Git State
-
-Local repo was initialized inside:
-
-`/Users/theodoroskapsalis/Projects/NOMOSILIASPROJECT/ilia-pulse-local`
-
-Branch:
-
-`main`
-
-Functional local commits created before this handoff update:
+George's Windows checkout:
 
 ```text
-4985ffa Add Cloudflare static upload build
-e308248 Checkpoint frontend audit and map fixes
+C:\Users\user\Desktop\hleias-pulse-mavroeidis
 ```
 
-Remote check:
-
-```bash
-git remote -v
+```bat
+npm.cmd ci
+npm.cmd run dev -- --host 127.0.0.1 --port 8080
 ```
 
-Expected output is empty. That means there is no GitHub remote and no online push target.
+Open `http://127.0.0.1:8080/`.
 
-Ignored local/generated items:
+Verification:
 
-- `.env`
-- `node_modules/`
-- `dist/`
-- `cloudflare-static-dist/`
+```bat
+npm.cmd run lint
+npm.cmd run build
+```
 
-## What Was Fixed
+## Current Product State
 
-- Removed fake-feeling visible labels like `LIVE`, `LIVE NOW`, `HOT`, and `MOVING`.
-- Removed blinking/pulsing bubble animations from map markers.
-- Replaced the decorative fake map with a real Leaflet/OpenStreetMap map.
-- Added 51 real coordinate-backed Ilia-area places in `scripts/hp-seed-data.ts`.
-- Fixed route/detail/comment screens that were breaking out of the mobile shell.
-- Fixed post card interactions so post details can be opened.
-- Made the route/detail screens respect the app frame instead of going fullscreen.
-- Smoothed map zoom and pan behavior.
-- Widened and softened map bounds so panning does not snap back aggressively.
-- Reduced bottom-sheet snap aggression so slow drags hold intermediate heights.
-- Removed the hidden drag handler from the `Tonight's pulse` content header so it does not steal normal scroll.
-- Added defensive pointer-capture handling for sheet drag streams.
-- Added a dedicated Cloudflare static upload build path.
-- Added Supabase-backed creation for user posts and user-created places.
-- Removed local-only write fallbacks: failed writes now roll back instead of leaving phantom local data.
-- Added a `get_pulse_bootstrap` Supabase RPC so initial content loads through one explicit-column RPC instead of ten `select("*")` table requests.
-- Added `npm run smoke:post-write` to exercise the same app API path used by the composer, verify the inserted post row, and clean it up.
-- Added branded SEO/share metadata, favicon/app icons, web manifest, robots file, and a 1200x630 social preview image generated from the supplied ΗΛΕΙΑ PULSE logo.
-- Share actions now produce real app links like `/?place=...`, `/?post=...`, and `/?route=...`; those links reopen the correct place, post, or route after Supabase data loads.
+The app is a mobile-first React 19 and Vite experience backed by Supabase. It includes:
+
+- A Leaflet/OpenStreetMap social map with real Ilia locations.
+- Zoom-responsive pulse and photo markers.
+- Places, posts, comments, stories, routes, likes, saves, Meet events, and RSVPs.
+- Supabase authentication, profiles, posting identity, avatars, and activity state.
+- An admin workspace for content, moderation, Meet events, and team roles.
+- Static Cloudflare output and a Capacitor iOS shell.
+- Greek-first bilingual UI through `src/lib/i18n.tsx` and `useI18n()`.
+
+The map marker work and the admin-badge startup fix are included in `mavroeidis-main`.
+
+## Product Decisions
+
+- Keep `src/lib/i18n.tsx` and `useI18n()` as the only translation system.
+- Do not introduce or merge the separate `useLang()` / `language-context` system.
+- Cultural events developed on `margaris-main` are not integrated yet. Treat that as a separate,
+  reviewed integration task; do not merge the branch directly.
+- Before adding, changing, or applying a Supabase migration, ask George explicitly.
+- Never deploy to production without George's explicit approval.
+- Never commit `.env` files, passwords, service-role keys, API tokens, or other secrets.
 
 ## Important Source Files
 
-- `src/components/hp/PulseApp.tsx`
-  Main app shell, bottom nav, bottom sheet, pulse feed, routes, saved view, modals, comments, and post/place composer.
-- `src/components/hp/SocialMap.tsx`
-  Leaflet map setup, OpenStreetMap tiles, marker generation, zoom/recenter controls, marker select behavior.
-- `src/lib/hp-api.ts`
-  Supabase-backed data access and app data mapping for places, posts, routes, events, comments, saves, and likes.
-- `src/lib/supabase/client.ts`
-  Static-build Supabase client using the project URL and publishable anon key.
-- `src/lib/seo.ts`
-  Shared SEO metadata constants for the TanStack shell.
-- `scripts/hp-seed-data.ts`
-  Seed-generation source data only; this is not imported by the frontend runtime.
-- `src/styles.css`
-  Global design tokens, map marker styling, app polish, focus states, responsive/mobile CSS.
-- `cloudflare-static-src/index.html`
-  Static-only HTML entry for Cloudflare upload builds.
-- `public/`
-  Branded icons, app manifest, robots file, and social preview image copied into both production build outputs.
-- `cloudflare-static-src/main.tsx`
-  Static-only React entry that renders `PulseApp` directly without TanStack Start SSR hydration.
-- `vite.static.config.ts`
-  Dedicated Vite config for building `cloudflare-static-dist`.
-- `HANDOFF.md`
-  This document.
+- `src/components/hp/PulseApp.tsx`: main app shell and product flows.
+- `src/components/hp/SocialMap.tsx`: Leaflet map and marker behavior.
+- `src/components/hp/AuthAccountSheets.tsx`: active authentication and account UI.
+- `src/components/admin/AdminDashboard.tsx`: admin workspace.
+- `src/lib/hp-api.ts`: Supabase-backed app data access.
+- `src/lib/admin-api.ts`: admin data access and roles.
+- `src/lib/i18n.tsx`: shared Greek/English translations.
+- `src/lib/supabase/client.ts`: browser-safe Supabase client configuration.
+- `vite.static.config.ts`: Cloudflare static build.
 
-## Environment And Secrets
+`src/components/hp/ProfileSheet.tsx` is legacy display code; the active account surface is
+`AuthAccountSheets.tsx`.
 
-`.env` exists locally and contains the Supabase DB password provided during the session.
+## Safety Checklist
+
+- Review `git status --short` and `git diff --cached` before every commit.
+- Stage only intentional files.
+- Do not stage `src/routeTree.gen.ts` for unexplained line-ending-only changes.
+- Use small, clear commits.
+- Push only the current `codex/...` feature branch.
+- Never force-push shared branches.
 
 Do not:
 
