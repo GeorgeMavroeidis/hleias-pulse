@@ -175,28 +175,28 @@ export function MapAreaInsights({ clusters, selectedCluster, onSelectArea, onDis
       {/* ── Banner + Areas pill (top of map, below the chip rail) ── */}
       <div className="pointer-events-none absolute inset-x-3 top-[92px] z-[25] flex flex-col gap-2">
         {selectedCluster && selTier ? (
-          <div className="pointer-events-auto mr-14 flex items-center gap-2.5 rounded-2xl bg-hp-ink/92 px-3 py-2 shadow-[0_1px_2px_rgba(23,20,17,0.05),0_16px_32px_-18px_rgba(23,20,17,0.5)] backdrop-blur">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-white/15 text-white">
-              <SelIcon size={16} />
+          <div className="pointer-events-auto mr-14 flex items-center gap-2 rounded-full bg-hp-ink/92 py-1.5 pl-1.5 pr-2 shadow-[0_1px_2px_rgba(23,20,17,0.05),0_16px_32px_-18px_rgba(23,20,17,0.5)] backdrop-blur">
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/15 text-white">
+              <SelIcon size={12} />
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-black leading-tight text-hp-paper">
+            <span className="min-w-0 flex-1 truncate text-[11.5px] leading-tight">
+              <span className="font-black text-hp-paper">
                 {t("Viewing {area}", { area: selectedCluster.name })}
               </span>
-              <span className="block truncate text-[10px] text-hp-paper/60">
-                {t("{tier} · {count} recent signals", {
-                  tier: t(AREA_TIER_META[selTier].label),
-                  count: signalCount(selectedCluster),
-                })}
+              <span className="text-hp-paper/60">
+                {" · "}
+                {t(AREA_TIER_META[selTier].label)}
+                {" · "}
+                {t("{count} signals", { count: signalCount(selectedCluster) })}
               </span>
             </span>
             <button
               type="button"
               onClick={onDismiss}
               aria-label={t("Clear area focus")}
-              className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/10 text-hp-paper transition active:scale-90"
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/10 text-hp-paper transition active:scale-90"
             >
-              <X size={14} />
+              <X size={12} />
             </button>
           </div>
         ) : (
