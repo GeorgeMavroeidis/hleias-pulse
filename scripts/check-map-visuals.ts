@@ -300,16 +300,23 @@ assert.ok(
   ),
 );
 
-const appSource = readFileSync(
-  new URL("../src/components/hp/PulseApp.tsx", import.meta.url),
+// The app shell was split out of PulseApp.tsx: the theme picker markup now
+// lives in PulseTopBar.tsx and the theme table in pulse-shared.ts. These
+// assertions are unchanged - only the files they read moved.
+const sharedSource = readFileSync(
+  new URL("../src/components/hp/pulse-shared.ts", import.meta.url),
   "utf8",
 );
+const appSource =
+  readFileSync(new URL("../src/components/hp/PulseApp.tsx", import.meta.url), "utf8") +
+  readFileSync(new URL("../src/components/hp/PulseTopBar.tsx", import.meta.url), "utf8") +
+  sharedSource;
 assert.ok(appSource.includes("hp-animation-theme-preview is-pulse-hot"));
 assert.ok(appSource.includes("hp-marker-core hp-animation-theme-preview__core"));
 assert.ok(appSource.includes("hp.marker-animation-theme.v1"));
-const themeOptions = appSource.slice(
-  appSource.indexOf("const MARKER_ANIMATION_THEMES"),
-  appSource.indexOf("function", appSource.indexOf("const MARKER_ANIMATION_THEMES")),
+const themeOptions = sharedSource.slice(
+  sharedSource.indexOf("MARKER_ANIMATION_THEMES"),
+  sharedSource.indexOf("function", sharedSource.indexOf("MARKER_ANIMATION_THEMES")),
 );
 assert.deepEqual(
   [...themeOptions.matchAll(/id: "(pulse|signal|calm)"/g)].map(([, id]) => id),
