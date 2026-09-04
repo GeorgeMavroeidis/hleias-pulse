@@ -21,6 +21,11 @@
 -- Verified: both hosts return HTTP 200 with access-control-allow-origin: *.
 --
 -- Idempotent: matches on the old URL, so re-running is a no-op.
+--
+-- Column names verified against the live schema on 2026-09-05 after a first
+-- attempt failed with 42703: place_avatars stores its URL in avatar_url, not
+-- image_url. places.image_url, stories.media_url and posts.image_url are
+-- correct. The failed push rolled back, so nothing was partially applied.
 
 with url_map(old_url, new_url) as (
   values
@@ -92,9 +97,9 @@ with url_map(old_url, new_url) as (
     ('https://commons.wikimedia.org/wiki/Special:FilePath/Pancratium%20Maritimum%20Lechaina-Zaharo%20beach%2020140816.jpg?width=1200', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/0/01/Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg/1280px-Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg')
 )
 update public.place_avatars a
-   set image_url = m.new_url
+   set avatar_url = m.new_url
   from url_map m
- where a.image_url = m.old_url;
+ where a.avatar_url = m.old_url;
 
 with url_map(old_url, new_url) as (
   values
