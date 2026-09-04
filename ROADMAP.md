@@ -63,16 +63,32 @@ App Store launch · ready for summer 2027.
 
 ## Week 1 · Sept 4–10 — Make it work. Make it parallel.
 
-| George — infra/data/security | Margaris — features/product |
-|---|---|
-| **D1** Diagnose RLS drift → corrective migration → apply → verify post+comment PASS | **D1–3** Report / block / mute (Apple 1.2 blocker) — all **new files**, zero conflict |
-| **D1** Anonymous auth: enable, or gate the 24 write paths behind login | ↳ `ReportSheet`, `BlockedUsersSheet`, `hp-api` fns, migration request |
-| **D2** Fix CARTO tiles + rehost Wikimedia images to Supabase Storage | **D4–5** First PRs against the freshly split screen files |
-| **D2** CI (lint/tsc/tests/build) · branch-protect `main` · `CLAUDE.md` · `CONTRIBUTING.md` | ↳ Deals screen polish, empty states |
-| **D3–4** 🔑 **Split `PulseApp.tsx` + `styles.css`** — unblocks everything | |
-| **D5** `/ship` git automation · repoint stale smoke scripts · delete audit accounts · fix "roday" typo | |
+**Status as of 5 Sept — Mavroeidis track is ~70% done, Margaris track not started.**
 
-> **Gate:** nothing in Week 2 starts until the split is merged and CI is green.
+### Done
+
+| | What | Where |
+|---|---|---|
+| ✅ | **The core loop works.** Posting, commenting, places, stories and meet events all failed with `42501`. Root cause was not the write but the `.insert().select()` read-back: no SELECT policy let an author see their own `pending` row. | PR #27 |
+| ✅ | **Map renders again.** CARTO began serving "API KEY REQUIRED" watermark tiles with HTTP 200. Now keyless OSM, overridable via `VITE_MAP_TILE_URL`. | PR #29 |
+| ✅ | **CI on every PR** — lint, typecheck, three suites, production build. There was none before. | PR #26 |
+| ✅ | **Migration history repaired.** All 20 migrations had been hand-pasted and were untracked, which is why #24090000 landed half-applied and broke posting for weeks. Duplicate version number also fixed. | PR #28 |
+| ✅ | **Image URLs made CORS-safe.** `Special:FilePath` sends no ACAO header, so the thumbnail cache never worked and full 1200–2000px originals were downloaded for 48px markers. | PR #30 |
+| ✅ | `ROADMAP.md` + `CLAUDE.md`, ownership lanes, CODEOWNERS | PR #24, #31 |
+| ✅ | All three branches synced; `main` is the single source of truth | — |
+
+### Not done
+
+| | What | Owner |
+|---|---|---|
+| ⬜ | **Report / block / mute.** Apple Guideline 1.2 — guaranteed rejection without it. All new files. | **Margaris** |
+| ⬜ | **Accounts-required flow.** Decision made: no anonymous posting. 24 write paths must open the sign-in sheet instead of throwing a raw `AuthApiError`. | Mavroeidis |
+| ⬜ | **Split `PulseApp.tsx`** (7,011 lines) and `styles.css` (3,967). The gate before two people can work in parallel. | Mavroeidis |
+| ⬜ | **Apply the image migration.** `20260904210000` is merged but not run against the database. | Mavroeidis |
+| ⬜ | **Branch protection** on `main` + require Code Owner review. Without it CI and CODEOWNERS are advisory. | Mavroeidis |
+| ⬜ | `/ship` git automation · repoint the two stale smoke scripts · delete ~15 audit accounts · fix the "roday" typo | Mavroeidis |
+
+> **Gate still stands:** Week 2 does not start until `PulseApp.tsx` is split and CI is enforced.
 
 ## Week 2 · Sept 11–17 — Complete the social loop
 

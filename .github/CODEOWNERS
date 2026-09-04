@@ -1,0 +1,63 @@
+# Ownership lanes for ΗΛΕΙΑ PULSE.
+#
+# GitHub applies the LAST matching pattern, so the order here is deliberate:
+# broad defaults first, then each owner's specific claims, then the overrides
+# that pull a file back out of a directory the other person owns.
+#
+# Turn this into enforcement rather than documentation: Settings -> Branches ->
+# rule on `main` -> "Require review from Code Owners". GitHub then blocks a
+# merge that touches the other person's lane without their approval.
+#
+# Both of us are called Giorgos. @GeorgeMavroeidis is Mavroeidis,
+# @GeorgeMargaris is Margaris. Read the surname, not the first name.
+
+# ---------------------------------------------------------------- default ---
+# Anything not claimed below needs Mavroeidis, who owns the repo's plumbing.
+*                                       @GeorgeMavroeidis
+
+# ------------------------------------------------- Margaris: the product ---
+# Screens, sheets, composers, cards - everything a user actually looks at.
+/src/components/hp/                     @GeorgeMargaris
+/src/components/ui/                     @GeorgeMargaris
+/public/                                @GeorgeMargaris
+
+# -------------------------------------- Mavroeidis: data, map, security ---
+# Pulled back out of the directories above. These stay with Mavroeidis even
+# though they sit inside Margaris's folders.
+/src/components/hp/SocialMap.tsx        @GeorgeMavroeidis
+/src/components/hp/ImageBox.tsx         @GeorgeMavroeidis
+/src/components/admin/                  @GeorgeMavroeidis
+
+/src/lib/                               @GeorgeMavroeidis
+/src/lib/supabase/                      @GeorgeMavroeidis
+/src/lib/hp/discovery.ts                @GeorgeMavroeidis
+/src/lib/hp/area-intelligence.ts        @GeorgeMavroeidis
+/src/lib/hp/area-catalog.ts             @GeorgeMavroeidis
+/src/lib/hp/map-visuals.ts              @GeorgeMavroeidis
+/src/lib/hp/image-cache.ts              @GeorgeMavroeidis
+/src/lib/hp/ionian-land.ts              @GeorgeMavroeidis
+/src/lib/hp/sea-shimmer.ts              @GeorgeMavroeidis
+
+/supabase/                              @GeorgeMavroeidis
+/scripts/                               @GeorgeMavroeidis
+/.github/                               @GeorgeMavroeidis
+
+# Build, deploy and dependency surface.
+/package.json                           @GeorgeMavroeidis
+/package-lock.json                      @GeorgeMavroeidis
+/vite.config.ts                         @GeorgeMavroeidis
+/vite.static.config.ts                  @GeorgeMavroeidis
+/wrangler.toml                          @GeorgeMavroeidis
+/capacitor.config.ts                    @GeorgeMavroeidis
+/ios/                                   @GeorgeMavroeidis
+
+# --------------------------------------------------- Margaris: the words ---
+# Last word wins: copy lives with the person writing the product voice, even
+# though the file sits under src/lib/.
+/src/lib/i18n.tsx                       @GeorgeMargaris
+/src/lib/hp/i18n.ts                     @GeorgeMargaris
+
+# ------------------------------------------------------ shared, by design ---
+# Either of us may propose changes; both should see them.
+/CLAUDE.md                              @GeorgeMavroeidis @GeorgeMargaris
+/ROADMAP.md                             @GeorgeMavroeidis @GeorgeMargaris
