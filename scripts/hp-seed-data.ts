@@ -108,7 +108,7 @@ const RAW_PLACES = [
     tags: ["culture", "unesco", "walk", "history"],
     short: "Ancient ruins, golden light, and a surprisingly good late-afternoon wander.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Aerial%20view%20of%20the%20archaeological%20site%20of%20Ancient%20Olympia%2C%20Greece%20%2851223832734%29.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg",
   },
   {
     id: "olympia-stadium",
@@ -125,8 +125,7 @@ const RAW_PLACES = [
     bestTime: "morning",
     tags: ["ancient", "walk", "photo", "calm"],
     short: "The ancient stadium. Simple, huge, silent. Feels better than expected.",
-    imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Olympia%20the%20stadium.jpg?width=1200",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/8/8e/Olympia_the_stadium.jpg",
   },
   {
     id: "olympia-museum",
@@ -144,7 +143,7 @@ const RAW_PLACES = [
     tags: ["museum", "culture", "indoor", "rainy"],
     short: "Good indoor move when the sun is too aggressive.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/20190507%20061%20olympia%20museum.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/20190507_061_olympia_museum.jpg/1280px-20190507_061_olympia_museum.jpg",
   },
   {
     id: "olympic-games-museum",
@@ -162,7 +161,7 @@ const RAW_PLACES = [
     tags: ["museum", "olympics", "quick", "culture"],
     short: "Small culture hit before going back to beach mode.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Museum%20of%20the%20History%20of%20the%20Ancient%20Olympic%20Games%2C%20Archaia%20Olympia%20Greece.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/Museum_of_the_History_of_the_Ancient_Olympic_Games%2C_Archaia_Olympia_Greece.jpg/1280px-Museum_of_the_History_of_the_Ancient_Olympic_Games%2C_Archaia_Olympia_Greece.jpg",
   },
   {
     id: "katakolo-port",
@@ -179,7 +178,8 @@ const RAW_PLACES = [
     bestTime: "sunset",
     tags: ["port", "walk", "coffee", "cruise"],
     short: "Port walk, coffee, sea air, cruise chaos, good people-watching.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Katakolo%20Port.jpg?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg",
   },
   {
     id: "katakolo-sunset",
@@ -196,7 +196,8 @@ const RAW_PLACES = [
     bestTime: "20:00",
     tags: ["sunset", "walk", "date", "photo"],
     short: "Low-effort sunset spot with port lights and sea breeze.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Katakolo-sunset.jpg?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2f/Katakolo-sunset.jpg/1280px-Katakolo-sunset.jpg",
   },
   {
     id: "katakolo-kiani-akti",
@@ -214,7 +215,7 @@ const RAW_PLACES = [
     tags: ["beach", "near-port", "quick", "swim"],
     short: "Easy beach option when you're around Katakolo and don't want a whole expedition.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Katakolo-Kiani%20Akti%20beach.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Katakolo-Kiani_Akti_beach.jpg/1280px-Katakolo-Kiani_Akti_beach.jpg",
   },
   {
     id: "kourouta-beach",
@@ -232,7 +233,7 @@ const RAW_PLACES = [
     tags: ["beach", "party", "bars", "after"],
     short: "The obvious beach-party magnet. Come for sea, stay when the lights turn on.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1%20-%20panoramio%20%281%29.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg/1280px-%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg",
   },
   {
     id: "kourouta-sunset",
@@ -250,7 +251,7 @@ const RAW_PLACES = [
     tags: ["sunset", "drinks", "after", "music"],
     short: "Where the beach slowly turns into the night plan.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Sunset%20in%20Kourouta%2C%20western%20Peloponnese%2C%20Greece.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg/1280px-Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg",
   },
   {
     id: "palouki-beach",
@@ -285,8 +286,7 @@ const RAW_PLACES = [
     bestTime: "sunset dinner",
     tags: ["seafood", "sunset", "local", "drinks"],
     short: "Small seaside hang for food, beers, and low-stress sunset.",
-    imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Sunset%20at%20Agios%20Andreas.jpg?width=1200",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/8/81/Sunset_at_Agios_Andreas.jpg",
   },
   {
     id: "kyllini-beach",
@@ -304,7 +304,7 @@ const RAW_PLACES = [
     tags: ["beach", "long", "swim", "open"],
     short: "Big beach feeling, easier to breathe than the packed spots.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Aerial%20view%20of%20Kyllini%20Beach%2C%20Greece%20%2851224121780%29.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg/1280px-Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg",
   },
   {
     id: "kyllini-harbor",
@@ -321,7 +321,8 @@ const RAW_PLACES = [
     bestTime: "before ferry",
     tags: ["port", "ferry", "walk", "coffee"],
     short: "Ferry movement, quick coffee, sea view, people in transit.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Kyllini%20harbor.JPG?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Kyllini_harbor.JPG/1280px-Kyllini_harbor.JPG",
   },
   {
     id: "kyllini-old-beach",
@@ -338,7 +339,8 @@ const RAW_PLACES = [
     bestTime: "morning",
     tags: ["beach", "port", "simple", "swim"],
     short: "Nothing fancy. Just a quick sea reset near the harbor.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Kyllini%20beach.JPG?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4d/Kyllini_beach.JPG/1280px-Kyllini_beach.JPG",
   },
   {
     id: "arkoudi-beach",
@@ -391,7 +393,7 @@ const RAW_PLACES = [
     tags: ["thermal", "spa", "north", "quiet"],
     short: "Thermal-bath area near Kyllini for a slower, non-beach reset.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Roman%20baths%2C%20Loutra%20Killinis%2C%20Greece.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Roman_baths%2C_Loutra_Killinis%2C_Greece.jpg/1280px-Roman_baths%2C_Loutra_Killinis%2C_Greece.jpg",
   },
   {
     id: "chlemoutsi",
@@ -408,8 +410,7 @@ const RAW_PLACES = [
     bestTime: "golden hour",
     tags: ["castle", "view", "history", "photo"],
     short: "Castle silhouette, hill views, and a good break from the beach loop.",
-    imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Castello%20Chlemoutsi.jpg?width=1200",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fb/Castello_Chlemoutsi.jpg",
   },
   {
     id: "chlemoutsi-sea-view",
@@ -427,7 +428,7 @@ const RAW_PLACES = [
     tags: ["view", "castle", "quiet", "sunset"],
     short: "A more cinematic angle on the castle and the Ionian horizon.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Chlemoutsi%20castle%20from%20the%20sea.jpg?width=1200",
+      "https://upload.wikimedia.org/wikipedia/commons/4/47/Chlemoutsi_castle_from_the_sea.jpg",
   },
   {
     id: "vartholomio",
@@ -462,7 +463,7 @@ const RAW_PLACES = [
     tags: ["town", "coffee", "local", "cheap"],
     short: "Real local rhythm: coffee, errands, and a useful stop before the coast.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Panagia%20Katholiki%20%28Gastouni%29%20Journal%20of%20the%20Royal%20Institute%20of%20British%20Architects%201923-12-08%20Vol%2031%20%282%29.png?width=1200",
+      "https://upload.wikimedia.org/wikipedia/commons/5/5b/Panagia_Katholiki_%28Gastouni%29_Journal_of_the_Royal_Institute_of_British_Architects_1923-12-08_Vol_31_%282%29.png",
   },
   {
     id: "lechaina",
@@ -480,7 +481,7 @@ const RAW_PLACES = [
     tags: ["town", "coffee", "north", "local"],
     short: "A small northern town stop that makes the Kyllini side feel less empty on the map.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/House%20of%20Andreas%20Karkavitsas%20at%20Lechaina.jpg?width=1200",
+      "https://upload.wikimedia.org/wikipedia/commons/8/87/House_of_Andreas_Karkavitsas_at_Lechaina.jpg",
   },
   {
     id: "pineios-reservoir",
@@ -497,7 +498,8 @@ const RAW_PLACES = [
     bestTime: "late afternoon",
     tags: ["lake", "dam", "nature", "quiet"],
     short: "Artificial lake and dam country northeast of Amaliada, good for a quiet inland drive.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Kaiafa%20lake.jpg?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Kaiafa_lake.jpg/1280px-Kaiafa_lake.jpg",
   },
   {
     id: "kaiafas-lake",
@@ -514,7 +516,8 @@ const RAW_PLACES = [
     bestTime: "late afternoon",
     tags: ["lake", "nature", "walk", "weird"],
     short: "Lake, pine forest, strange calm energy. Great contrast after the beach.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Kaiafa%20lake.jpg?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Kaiafa_lake.jpg/1280px-Kaiafa_lake.jpg",
   },
   {
     id: "kaiafas-sunset",
@@ -531,7 +534,8 @@ const RAW_PLACES = [
     bestTime: "20:00",
     tags: ["sunset", "lake", "nature", "quiet"],
     short: "For when you want sunset without the beach bar noise.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Kaiafa%20Sunset.jpg?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Kaiafa_Sunset.jpg/1280px-Kaiafa_Sunset.jpg",
   },
   {
     id: "zacharo-beach",
@@ -549,7 +553,7 @@ const RAW_PLACES = [
     tags: ["beach", "sunset", "long-walk", "cheap"],
     short: "Long sandy beach, big sky, less polished, more free.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/500px%20photo%20%28255278229%29.jpeg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/500px_photo_%28255278229%29.jpeg/1280px-500px_photo_%28255278229%29.jpeg",
   },
   {
     id: "kakovatos-beach",
@@ -567,7 +571,7 @@ const RAW_PLACES = [
     tags: ["beach", "quiet", "sand", "walk"],
     short: "Low-key beach for people who don't want the obvious scene.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Beach%20of%20Kakovatos%2C%20Elis%2C%20Greece%20%281%29.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg",
   },
   {
     id: "kakovatos-inland",
@@ -585,7 +589,7 @@ const RAW_PLACES = [
     tags: ["nature", "beach", "quiet", "walk"],
     short: "Beach meets inland fields. Good for a quiet reset.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Looking%20inland%20from%20the%20beach%20of%20Kakovatos%2C%20Elis%2C%20Greece.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/Looking_inland_from_the_beach_of_Kakovatos%2C_Elis%2C_Greece.jpg/1280px-Looking_inland_from_the_beach_of_Kakovatos%2C_Elis%2C_Greece.jpg",
   },
   {
     id: "giannitsochori",
@@ -603,7 +607,7 @@ const RAW_PLACES = [
     tags: ["beach", "south", "quiet", "raw"],
     short: "South-coast escape when you want more space and fewer people.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Giannitsochori%20beach%20-%20panoramio.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9f/Giannitsochori_beach_-_panoramio.jpg/1280px-Giannitsochori_beach_-_panoramio.jpg",
   },
   {
     id: "tholo-beach",
@@ -621,7 +625,7 @@ const RAW_PLACES = [
     tags: ["beach", "south", "camping", "quiet"],
     short: "A south-coast sandy stop near Zacharo for camping vibes and more breathing room.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Beach%20of%20Kakovatos%2C%20Elis%2C%20Greece%20%281%29.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg",
   },
   {
     id: "samiko-acropolis",
@@ -639,7 +643,7 @@ const RAW_PLACES = [
     tags: ["ancient", "hill", "hidden", "route"],
     short: "For people who like the obscure ancient-place feeling more than guided tours.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Samia%20acropolis.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8e/Samia_acropolis.jpg/1280px-Samia_acropolis.jpg",
   },
   {
     id: "foloi-forest",
@@ -657,7 +661,7 @@ const RAW_PLACES = [
     tags: ["forest", "nature", "shade", "walk"],
     short: "Oak forest, shade, mythic quiet. The anti-beach day.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Foloi%20Forest%20-%20panoramio.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg",
   },
   {
     id: "foloi-deep",
@@ -675,7 +679,7 @@ const RAW_PLACES = [
     tags: ["forest", "camping-vibe", "walk", "quiet"],
     short: "For the alternative/nature people. Bring water, leave no trash.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/%CE%94%CE%AC%CF%83%CE%BF%CF%82%20%CE%A6%CE%BF%CE%BB%CF%8C%CE%B7%CF%82%20-%20panoramio.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/%CE%94%CE%AC%CF%83%CE%BF%CF%82_%CE%A6%CE%BF%CE%BB%CF%8C%CE%B7%CF%82_-_panoramio.jpg/1280px-%CE%94%CE%AC%CF%83%CE%BF%CF%82_%CE%A6%CE%BF%CE%BB%CF%8C%CE%B7%CF%82_-_panoramio.jpg",
   },
   {
     id: "nemouta-waterfalls",
@@ -729,7 +733,7 @@ const RAW_PLACES = [
     tags: ["village", "mountain", "cooler", "local"],
     short: "A cooler mountain-side village stop when the coast is too hot.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Foloi%20Forest%20-%20panoramio.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg",
   },
   {
     id: "andritsaina",
@@ -747,7 +751,7 @@ const RAW_PLACES = [
     tags: ["village", "food", "slow", "local"],
     short: "Mountain village energy. Not polished, in a good way.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Andritsaina%20overview.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Andritsaina_overview.jpg/1280px-Andritsaina_overview.jpg",
   },
   {
     id: "andritsaina-streets",
@@ -764,7 +768,8 @@ const RAW_PLACES = [
     bestTime: "evening",
     tags: ["village", "walk", "local", "quiet"],
     short: "Good for a slow walk before food and mountain air.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Andritsaina.jpg?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Andritsaina.jpg/1280px-Andritsaina.jpg",
   },
   {
     id: "bassae-temple",
@@ -782,7 +787,7 @@ const RAW_PLACES = [
     tags: ["unesco", "temple", "route", "remote"],
     short: "A serious detour, but the kind that makes the day feel bigger.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Temple%20of%20Apollo%20Bassae%201982.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Temple_of_Apollo_Bassae_1982.jpg/1280px-Temple_of_Apollo_Bassae_1982.jpg",
   },
   {
     id: "bassae-inside",
@@ -800,7 +805,7 @@ const RAW_PLACES = [
     tags: ["temple", "roadtrip", "culture", "quiet"],
     short: "For the roadtrip people who want something more than beach bars.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Bassae%20Temple%20of%20Apollo%20040911.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Bassae_Temple_of_Apollo_040911.jpg/1280px-Bassae_Temple_of_Apollo_040911.jpg",
   },
   {
     id: "ancient-elis",
@@ -817,7 +822,7 @@ const RAW_PLACES = [
     bestTime: "late afternoon",
     tags: ["ancient", "hidden", "walk", "quiet"],
     short: "Ancient site without the tourist pressure. Good quiet culture stop.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Elis%20acropolis.JPG?width=1200",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Elis_acropolis.JPG",
   },
   {
     id: "elis-agora",
@@ -834,7 +839,7 @@ const RAW_PLACES = [
     bestTime: "morning",
     tags: ["ancient", "agora", "quiet", "culture"],
     short: "A calm archaeology stop for people who hate packed sites.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Elis%20Agora.JPG?width=1200",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/4/42/Elis_Agora.JPG",
   },
   {
     id: "pyrgos-centre",
@@ -851,7 +856,7 @@ const RAW_PLACES = [
     bestTime: "evening",
     tags: ["city", "coffee", "local", "cheap"],
     short: "Not a postcard. More like where the actual local week happens.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Pyrgos%20rathaus.jpg?width=1200",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/e/e8/Pyrgos_rathaus.jpg",
   },
   {
     id: "pyrgos-night",
@@ -869,7 +874,7 @@ const RAW_PLACES = [
     tags: ["city", "night", "bars", "local"],
     short: "Start here, ask around, follow the night.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82%20%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg/1280px-%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg",
   },
   {
     id: "amaliada-square",
@@ -887,7 +892,7 @@ const RAW_PLACES = [
     tags: ["square", "coffee", "local", "cheap"],
     short: "Coffee, pregame, local movement before Kourouta.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1%20%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg/1280px-%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg",
   },
   {
     id: "skafidia",
@@ -905,7 +910,7 @@ const RAW_PLACES = [
     tags: ["beach", "coast", "sunset", "chill"],
     short: "Smaller coastal energy near Pyrgos/Katakolo.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/%CE%A3%CE%BA%CE%B1%CF%86%CE%B9%CE%B4%CE%B9%CE%B1%20%CE%B7%CE%BB%CE%B5%CE%B9%CE%B1%CF%82.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/32/%CE%A3%CE%BA%CE%B1%CF%86%CE%B9%CE%B4%CE%B9%CE%B1_%CE%B7%CE%BB%CE%B5%CE%B9%CE%B1%CF%82.jpg/1280px-%CE%A3%CE%BA%CE%B1%CF%86%CE%B9%CE%B4%CE%B9%CE%B1_%CE%B7%CE%BB%CE%B5%CE%B9%CE%B1%CF%82.jpg",
   },
   {
     id: "skafidia-monastery",
@@ -975,7 +980,7 @@ const RAW_PLACES = [
     tags: ["wild", "coast", "nature", "quiet"],
     short: "A raw coastal stretch for quiet walks, salt air, and finding your own spot.",
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Pancratium%20Maritimum%20Lechaina-Zaharo%20beach%2020140816.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/01/Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg/1280px-Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg",
   },
   {
     id: "epitalio",
@@ -992,7 +997,7 @@ const RAW_PLACES = [
     bestTime: "evening",
     tags: ["village", "alfeios", "local", "route"],
     short: "A real local point south of Pyrgos that helps connect the city to the Zacharo side.",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Elis%20acropolis.JPG?width=1200",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Elis_acropolis.JPG",
   },
 ];
 
@@ -1102,7 +1107,7 @@ export const POSTS: Post[] = [
     tags: ["beach", "tonight", "parking"],
     likes: 48,
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1%20-%20panoramio%20%281%29.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg/1280px-%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg",
     comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
@@ -1115,7 +1120,7 @@ export const POSTS: Post[] = [
     tags: ["sunset", "quiet", "cheap"],
     likes: 31,
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/500px%20photo%20%28255278229%29.jpeg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/500px_photo_%28255278229%29.jpeg/1280px-500px_photo_%28255278229%29.jpeg",
     comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
@@ -1128,7 +1133,7 @@ export const POSTS: Post[] = [
     tags: ["pregame", "local", "after"],
     likes: 64,
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1%20%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg/1280px-%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg",
     comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
@@ -1141,7 +1146,7 @@ export const POSTS: Post[] = [
     tags: ["dj", "night", "local"],
     likes: 22,
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82%20%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg/1280px-%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg",
     comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
@@ -1154,7 +1159,7 @@ export const POSTS: Post[] = [
     tags: ["nature", "respect", "walk"],
     likes: 57,
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Foloi%20Forest%20-%20panoramio.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg",
     comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
@@ -1166,8 +1171,7 @@ export const POSTS: Post[] = [
     text: "Fresh fish tonight, tables outside, sunset view. No dress code nonsense.",
     tags: ["food", "sunset", "sea"],
     likes: 19,
-    imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Sunset%20at%20Agios%20Andreas.jpg?width=1200",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/8/81/Sunset_at_Agios_Andreas.jpg",
     comments: SAMPLE_COMMENTS.slice(0, 2),
   },
   {
@@ -1179,7 +1183,8 @@ export const POSTS: Post[] = [
     text: "Katakolo is touristy but the port walk is actually nice at golden hour.",
     tags: ["port", "walk", "photo"],
     likes: 27,
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Katakolo%20Port.jpg?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg",
     comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
@@ -1192,7 +1197,7 @@ export const POSTS: Post[] = [
     tags: ["village", "beer", "slow"],
     likes: 39,
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Andritsaina%20overview.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Andritsaina_overview.jpg/1280px-Andritsaina_overview.jpg",
     comments: SAMPLE_COMMENTS.slice(0, 3),
   },
 ];
@@ -1275,7 +1280,7 @@ export const ROUTES: RouteItem[] = [
     ],
     tags: ["party", "beach", "night"],
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Sunset%20in%20Kourouta%2C%20western%20Peloponnese%2C%20Greece.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg/1280px-Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg",
     commentCount: 8,
     saves: 30,
   },
@@ -1307,7 +1312,8 @@ export const ROUTES: RouteItem[] = [
       },
     ],
     tags: ["no car", "cruise", "walk"],
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Katakolo%20Port.jpg?width=1200",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg",
     commentCount: 11,
     saves: 41,
   },
@@ -1340,7 +1346,7 @@ export const ROUTES: RouteItem[] = [
     ],
     tags: ["quiet", "beach", "sunset"],
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Beach%20of%20Kakovatos%2C%20Elis%2C%20Greece%20%281%29.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg",
     commentCount: 14,
     saves: 52,
   },
@@ -1373,7 +1379,7 @@ export const ROUTES: RouteItem[] = [
     ],
     tags: ["nature", "shade", "village"],
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Foloi%20Forest%20-%20panoramio.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg",
     commentCount: 17,
     saves: 63,
   },
@@ -1406,7 +1412,7 @@ export const ROUTES: RouteItem[] = [
     ],
     tags: ["culture", "roadtrip", "views"],
     imageUrl:
-      "https://commons.wikimedia.org/wiki/Special:FilePath/Aerial%20view%20of%20the%20archaeological%20site%20of%20Ancient%20Olympia%2C%20Greece%20%2851223832734%29.jpg?width=1200",
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg",
     commentCount: 20,
     saves: 74,
   },
