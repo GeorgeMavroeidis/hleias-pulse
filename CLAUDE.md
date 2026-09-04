@@ -17,17 +17,65 @@ Ships as an **iOS app first** (Capacitor shell), with a Cloudflare static web bu
 React 19 · Vite 7 · TanStack Start/Router · Tailwind 4 · Leaflet · Supabase (Postgres + Auth
 + Storage + RLS) · Capacitor (iOS) · TypeScript
 
-## Ownership — do not cross without asking
+## Which of the two of us are you working for?
 
-| George (`@GeorgeMavroeidis`) | Margaris |
-|---|---|
-| `src/lib/**`, `src/lib/supabase/**` | Screens, sheets, composer |
-| `supabase/**` — schema, RLS, migrations | Feed / Stories / Deals / Meet UI |
-| `SocialMap.tsx`, map + discovery internals | `src/lib/i18n.tsx` copy |
-| Monetization plumbing, auth, security | Onboarding, empty states, polish |
-| CI, build, release pipeline | Product features and breadth |
+Two people share this repo and **both are called Giorgos**. Never infer from a first
+name. Before you edit anything, establish whose session this is:
 
-Two people work here in parallel. **Never edit a file the other owns without agreeing first.**
+```sh
+git config user.email
+```
+
+| Email | Who | Lane |
+|---|---|---|
+| `128294142+GeorgeMavroeidis@users.noreply.github.com` | **Mavroeidis** (`@GeorgeMavroeidis`) | Data, map, security, infra |
+| `giorgosmargaris1234@gmail.com` | **Margaris** (`@GeorgeMargaris`) | Product surface, UI, copy |
+
+If that command returns nothing, **stop and ask which of them you are working for.**
+Do not guess, and do not commit until it is set — an unset identity produces commits
+attributed to a machine-local address that GitHub cannot link to either account.
+
+## Ownership lanes — enforced, not advisory
+
+`.github/CODEOWNERS` encodes these lanes and GitHub enforces them once branch
+protection requires Code Owner review. This table is the human-readable version.
+
+### If you are working for MAVROEIDIS
+
+**You may edit:** `src/lib/**` (except the two i18n files) · `src/lib/supabase/**` ·
+`supabase/**` · `scripts/**` · `.github/**` · `src/components/hp/SocialMap.tsx` ·
+`src/components/hp/ImageBox.tsx` · `src/components/admin/**` · build, deploy, Capacitor
+and dependency config.
+
+**Do not edit without asking Margaris:** anything else under `src/components/hp/`,
+`src/components/ui/`, `public/`, `src/lib/i18n.tsx`, `src/lib/hp/i18n.ts`.
+
+His work is the product surface. Changing a screen out from under him is how two
+people produce one merge conflict.
+
+### If you are working for MARGARIS
+
+**You may edit:** `src/components/hp/**` (except `SocialMap.tsx` and `ImageBox.tsx`) ·
+`src/components/ui/**` · `public/**` · `src/lib/i18n.tsx` · `src/lib/hp/i18n.ts`.
+
+**Do not edit without asking Mavroeidis:** `src/lib/**`, `supabase/**`, `scripts/**`,
+`.github/**`, `SocialMap.tsx`, `src/components/admin/**`, and anything to do with
+build, deploy, auth, payments or security.
+
+He owns the data layer and the security model. If your feature needs a new query, a
+new column, or a change to `hp-api.ts`, **do not write it yourself** — describe the
+shape you need and let him add it. That boundary is what keeps the API stable enough
+for two people to build against.
+
+### When you need to cross the line
+
+Do not quietly edit the other lane, and do not work around it by duplicating logic on
+your own side. Say what you need and stop:
+
+> "This needs a `reports` table and a `createReport()` in `hp-api.ts`. That is
+> Mavroeidis's lane — I have not touched it. Here is the exact shape required: …"
+
+A blocked task reported clearly is worth more than a merge conflict delivered quietly.
 
 ## Workflow — non-negotiable
 
