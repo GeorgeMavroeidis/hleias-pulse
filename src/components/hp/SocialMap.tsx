@@ -41,6 +41,15 @@ import {
   markerMapFillScale,
 } from "@/lib/hp/map-visuals";
 
+const OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const OSM_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+const MAP_TILE_URL = import.meta.env.VITE_MAP_TILE_URL || OSM_TILE_URL;
+const MAP_TILE_ATTRIBUTION = import.meta.env.VITE_MAP_TILE_ATTRIBUTION || OSM_ATTRIBUTION;
+const MAP_TILE_SUBDOMAINS = import.meta.env.VITE_MAP_TILE_SUBDOMAINS || "";
+const MAP_TILE_MAX_ZOOM = Number(import.meta.env.VITE_MAP_TILE_MAX_ZOOM) || 19;
+
 type LeafletModule = typeof import("leaflet");
 type LeafletMap = import("leaflet").Map;
 type LeafletMarker = import("leaflet").Marker;
@@ -1443,11 +1452,15 @@ export function SocialMap({
       seaPane.style.opacity = "0";
       seaPane.style.transition = "opacity 360ms ease";
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> · <a href="https://carto.com/attributions">CARTO</a>',
-        maxZoom: 20,
-        subdomains: "abcd",
+      // Basemap. CARTO's basemaps.cartocdn.com now returns an "API KEY REQUIRED"
+      // watermark tile (HTTP 200, ~3KB) to unauthenticated callers, so the default
+      // is the keyless OpenStreetMap tile server. Point VITE_MAP_TILE_URL at a
+      // keyed provider (CARTO, MapTiler, Stadia, Mapbox) before public launch --
+      // the OSM community tile server is not intended for production app traffic.
+      L.tileLayer(MAP_TILE_URL, {
+        attribution: MAP_TILE_ATTRIBUTION,
+        maxZoom: MAP_TILE_MAX_ZOOM,
+        ...(MAP_TILE_SUBDOMAINS ? { subdomains: MAP_TILE_SUBDOMAINS } : {}),
         opacity: 1,
       }).addTo(map);
 
