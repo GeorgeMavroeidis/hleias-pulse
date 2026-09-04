@@ -74,10 +74,14 @@ npm run ios:sync && npm run ios:open
 
 Ordered by severity. Fix before building on top of them.
 
-1. **🔴 `posts` and `comments` INSERT fail** — `[42501] new row violates row-level security
-   policy`, even for a fresh authenticated user with a valid `profiles` row. The migrations
-   in `supabase/migrations/` *should* permit it, so the **live database has drifted**.
-   Posting and commenting — the core of the app — do not work.
+1. **🔴 Authors cannot read their own pending content.** New rows default to
+   `moderation_status = 'pending'`, and the only SELECT policies are "published"
+   and "admins". `hp-api.ts` creates rows with `.insert(...).select(...)`, whose
+   RETURNING clause reads the row back — so the statement aborts with
+   `[42501] new row violates row-level security policy`. It reads like a write
+   rejection but the write is fine; the read-back is what fails. Posting,
+   commenting, adding places, stories and meet events are all broken by this.
+   Fix in `20260904190000_authors_can_read_own_content.sql`.
 2. **🔴 No user-facing report / block / mute.** Moderation exists only in the admin dashboard.
    Apple Guideline 1.2 requires all three for UGC apps. Guaranteed App Store rejection.
 3. **🟠 Anonymous sign-in is disabled** on the Supabase project, but `ensurePulseUserId()`
