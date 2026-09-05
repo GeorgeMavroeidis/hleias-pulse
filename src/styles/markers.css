@@ -1,0 +1,372 @@
+/* Map markers, base layer: leaflet container, area/child markers, dot pins. */
+
+.hp-real-map .leaflet-container {
+  z-index: 0;
+  height: 100%;
+  width: 100%;
+  background: #f2efe9;
+  font-family: var(--hp-font-body);
+}
+
+.hp-real-map .leaflet-control-attribution {
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--hp-paper) 88%, transparent);
+  color: var(--hp-muted);
+  font-size: 9px;
+  line-height: 1.5;
+  margin: 0 0 calc(4.75rem + env(safe-area-inset-bottom)) 0.5rem;
+  padding: 0.125rem 0.45rem;
+}
+
+.hp-real-map .leaflet-control-attribution a {
+  color: var(--hp-deep);
+  font-weight: 700;
+}
+
+.hp-real-map .leaflet-tile-pane {
+  /* Warm CARTO Voyager toward the hp-paper identity */
+  filter: saturate(0.82) brightness(1.03) sepia(0.06) hue-rotate(-6deg);
+  opacity: 1;
+}
+
+.hp-area-marker,
+.hp-activity-cluster,
+.hp-child-marker {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  overflow: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.hp-area-marker:focus,
+.hp-activity-cluster:focus,
+.hp-child-marker:focus {
+  outline: none;
+}
+
+.hp-area-marker__shell,
+.hp-child-marker__shell {
+  position: relative;
+  display: block;
+  width: var(--marker-size);
+  height: var(--marker-size);
+  min-width: var(--marker-size);
+  max-width: var(--marker-size);
+  min-height: var(--marker-size);
+  max-height: var(--marker-size);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border-radius: 9999px;
+  overflow: visible;
+  transform: translateZ(0);
+  transition:
+    opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hp-area-marker__shell *,
+.hp-child-marker__shell * {
+  pointer-events: none;
+}
+
+.hp-area-marker__shell.is-selected,
+.hp-child-marker__shell.is-selected {
+  transform: translateZ(0) scale(1.02);
+}
+
+.hp-area-marker__ring,
+.hp-area-marker__collage,
+.hp-area-marker__shade,
+.hp-child-marker__ring,
+.hp-child-marker__media,
+.hp-child-marker__image,
+.hp-child-marker__shade {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+}
+
+.hp-area-marker__ring,
+.hp-child-marker__ring {
+  z-index: 0;
+  inset: -0.34rem;
+  border: 2px solid color-mix(in srgb, var(--marker-color) 76%, var(--hp-paper));
+  background: color-mix(in srgb, var(--marker-color) 16%, transparent);
+  box-shadow:
+    0 0.4rem 1.35rem color-mix(in srgb, var(--marker-color) 22%, transparent),
+    0 0.55rem 1.65rem rgba(23, 20, 17, 0.18);
+}
+
+.hp-area-marker__shell.is-live .hp-area-marker__ring,
+.hp-area-marker__shell.is-pulsing .hp-area-marker__ring {
+  animation: hp-live-ring 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.hp-area-marker__collage {
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.78fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--hp-paper) 88%, transparent);
+  background: color-mix(in srgb, var(--hp-ink) 12%, var(--hp-paper));
+}
+
+.hp-area-marker__photo,
+.hp-child-marker__image {
+  display: block;
+  height: 100%;
+  min-height: 100%;
+  min-width: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.hp-area-marker__photo--1 {
+  grid-row: 1 / span 2;
+  min-width: 0;
+}
+
+.hp-area-marker__photo--2,
+.hp-area-marker__photo--3 {
+  min-width: 0;
+  border-left: 1px solid color-mix(in srgb, var(--hp-paper) 48%, transparent);
+}
+
+.hp-area-marker__photo--3 {
+  border-top: 1px solid color-mix(in srgb, var(--hp-paper) 48%, transparent);
+}
+
+.hp-child-marker__image {
+  z-index: 1;
+  border: 0;
+  background: color-mix(in srgb, var(--hp-ink) 12%, var(--hp-paper));
+}
+
+.hp-child-marker__media {
+  z-index: 1;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--hp-paper) 88%, transparent);
+  background: color-mix(in srgb, var(--hp-ink) 12%, var(--hp-paper));
+  clip-path: circle(50% at 50% 50%);
+  contain: paint;
+}
+
+.hp-area-marker__shade,
+.hp-child-marker__shade {
+  z-index: 2;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.02),
+    rgba(0, 0, 0, 0.18) 44%,
+    rgba(0, 0, 0, 0.74)
+  );
+}
+
+.hp-area-marker__status {
+  position: absolute;
+  z-index: 3;
+  right: 0.34rem;
+  top: 0.42rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--marker-color) 88%, var(--hp-ink));
+  color: var(--hp-paper);
+  font-size: 0.52rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.22rem 0.38rem;
+  text-transform: uppercase;
+}
+
+.hp-area-marker__initial {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: none;
+  place-items: center;
+  color: var(--hp-paper);
+  font-size: calc(var(--marker-size) * 0.42);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(23, 20, 17, 0.45);
+}
+
+.hp-area-marker__count {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 0.42rem;
+  display: grid;
+  min-width: 1.25rem;
+  transform: translateX(-50%);
+  place-items: center;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--marker-color) 90%, var(--hp-ink));
+  color: var(--hp-paper);
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0.24rem 0.38rem;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hp-paper) 78%, transparent);
+}
+
+.hp-area-marker__shell.is-compact .hp-area-marker__collage {
+  opacity: 1;
+}
+
+.hp-area-marker__shell.is-compact .hp-area-marker__ring {
+  inset: -0.18rem;
+  border-width: 2px;
+  background: color-mix(in srgb, var(--marker-color) 16%, transparent);
+  box-shadow:
+    0 0.18rem 0.8rem color-mix(in srgb, var(--marker-color) 18%, transparent),
+    0 0.3rem 1rem rgba(23, 20, 17, 0.16);
+}
+
+.hp-area-marker__shell.is-compact .hp-area-marker__shade,
+.hp-area-marker__shell.is-compact .hp-area-marker__copy,
+.hp-area-marker__shell.is-compact .hp-area-marker__avatars,
+.hp-area-marker__shell.is-compact .hp-area-marker__status,
+.hp-area-marker__shell.is-compact .hp-area-marker__initial {
+  display: none;
+}
+
+.hp-area-marker__copy,
+.hp-child-marker__copy {
+  position: absolute;
+  z-index: 3;
+  inset-inline: 0.38rem;
+  bottom: 0.52rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  gap: 0.12rem;
+  line-height: 1.06;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
+.hp-area-marker__copy strong,
+.hp-area-marker__copy em,
+.hp-child-marker__copy strong,
+.hp-child-marker__copy em {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.hp-area-marker__copy strong {
+  font-size: clamp(0.58rem, calc(var(--marker-size) * 0.105), 0.84rem);
+  font-weight: 900;
+}
+
+.hp-area-marker__copy em {
+  font-size: clamp(0.48rem, calc(var(--marker-size) * 0.076), 0.64rem);
+  font-style: normal;
+  font-weight: 700;
+  opacity: 0.86;
+}
+
+.hp-child-marker__copy strong {
+  font-size: 0.58rem;
+  font-weight: 900;
+}
+
+.hp-child-marker__copy em {
+  font-size: 0.48rem;
+  font-style: normal;
+  font-weight: 700;
+  opacity: 0.86;
+}
+
+.hp-area-marker__avatars {
+  position: absolute;
+  z-index: 4;
+  bottom: -0.38rem;
+  left: 50%;
+  display: flex;
+  transform: translateX(-50%);
+}
+
+.hp-area-marker__avatars img {
+  height: 1rem;
+  width: 1rem;
+  border: 1px solid var(--hp-paper);
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+.hp-area-marker__avatars img + img {
+  margin-left: -0.3rem;
+}
+
+.hp-area-marker__dot,
+.hp-child-marker__dot {
+  position: absolute;
+  z-index: 5;
+  right: 0.25rem;
+  bottom: 0.28rem;
+  height: 0.58rem;
+  width: 0.58rem;
+  border-radius: 9999px;
+  background: var(--hp-sunset);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hp-paper) 82%, transparent);
+}
+
+/* Compact dot pin used at low zoom so every place is always rendered without
+   cluttering the overview. Cross-fades into the full marker as you zoom in. */
+.hp-child-marker--dot {
+  display: grid;
+  place-items: center;
+}
+.hp-child-marker__dot-pin {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--marker-color) 92%, var(--hp-paper));
+  border: 2px solid color-mix(in srgb, var(--hp-paper) 92%, transparent);
+  box-shadow: 0 1px 5px rgba(23, 20, 17, 0.3);
+  transition:
+    width 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hp-child-marker__dot-pin.is-selected {
+  width: 18px;
+  height: 18px;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--marker-color) 28%, transparent),
+    0 1px 7px rgba(23, 20, 17, 0.32);
+}
+
+.hp-real-map .hp-child-marker__guide {
+  stroke-linecap: round;
+  stroke-dasharray: 4 5;
+  filter: drop-shadow(0 1px 1px rgba(23, 20, 17, 0.28));
+}
+
+.hp-real-map .hp-child-marker__anchor {
+  paint-order: stroke fill;
+  filter: drop-shadow(0 1px 2px rgba(23, 20, 17, 0.3));
+}
+
+@keyframes hp-live-ring {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  55% {
+    transform: scale(1.08);
+    opacity: 0.46;
+  }
+}

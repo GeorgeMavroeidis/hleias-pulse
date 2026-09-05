@@ -1,0 +1,54 @@
+/* Shared utilities: hp-* color tokens, scrollbar hiding, focus, motion queries. */
+
+@theme inline {
+  --color-hp-bg: var(--hp-bg);
+  --color-hp-paper: var(--hp-paper);
+  --color-hp-ink: var(--hp-ink);
+  --color-hp-muted: var(--hp-muted);
+  --color-hp-sea: var(--hp-sea);
+  --color-hp-deep: var(--hp-deep);
+  --color-hp-olive: var(--hp-olive);
+  --color-hp-sunset: var(--hp-sunset);
+  --color-hp-night: var(--hp-night);
+  --color-hp-purple: var(--hp-purple);
+}
+
+.hp-dot-pulse {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hp-sunset) 18%, transparent);
+}
+
+.hp-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hp-no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--hp-sunset) !important;
+  outline-offset: 2px !important;
+}
+
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+    line-height: 1.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

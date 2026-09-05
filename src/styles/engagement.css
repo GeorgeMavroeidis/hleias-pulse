@@ -1,0 +1,289 @@
+/* Engagement layer: motion, glow, skeletons, night theme, scrollbars. */
+
+/* =====================================================================
+   Engagement layer — motion, glow, skeletons, night theme
+   ===================================================================== */
+
+/* Live "ping" ring used by the activity ticker + live dots */
+.hp-live-ping {
+  animation: hp-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes hp-ping {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--hp-sunset) 45%, transparent);
+  }
+  70% {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 0.7rem color-mix(in srgb, var(--hp-sunset) 0%, transparent);
+  }
+  100% {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* Map: hotness heat glow rendered under live/hot clusters */
+.hp-marker-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--glow-color, var(--hp-sunset)) 55%, transparent) 0%,
+    color-mix(in srgb, var(--glow-color, var(--hp-sunset)) 18%, transparent) 38%,
+    transparent 68%
+  );
+  animation: hp-glow-breathe 3.6s ease-in-out infinite;
+}
+@keyframes hp-glow-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+}
+
+/* Tier A: a softer, slower breath than the tier B/C glow. */
+.hp-marker-glow--soft {
+  animation-duration: 5.4s;
+  opacity: 0.7;
+}
+
+/* Map: "you are here" pulsing dot */
+.hp-user-dot {
+  position: relative;
+  border-radius: 9999px;
+  background: var(--hp-sunset);
+  border: 2.5px solid var(--hp-paper);
+  box-shadow:
+    0 0 0 1px rgba(23, 20, 17, 0.25),
+    0 4px 10px rgba(23, 20, 17, 0.3);
+}
+.hp-user-dot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  border: 2px solid var(--hp-sunset);
+  opacity: 0.5;
+  animation: hp-user-pulse 2.2s ease-out infinite;
+}
+@keyframes hp-user-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Map: route line "marching ants" */
+.hp-real-map .hp-route-line {
+  stroke-linecap: round;
+  animation: hp-dash 0.9s linear infinite;
+  filter: drop-shadow(0 1px 2px rgba(23, 20, 17, 0.25));
+}
+@keyframes hp-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* Map: decorative animated sea shimmer (purely aesthetic — NOT real sea state).
+   The polygon is filled with an SVG <pattern> of drifting wavy lines. */
+.hp-real-map .hp-sea-shimmer {
+  fill: url(#hp-waves);
+  fill-opacity: 1;
+}
+.hp-sea-shimmer__tint {
+  fill: var(--hp-sea);
+  fill-opacity: 0.12;
+}
+.hp-sea-shimmer__waves {
+  stroke: var(--hp-sea);
+  animation: hp-sea-drift 7s linear infinite;
+}
+.hp-sea-shimmer__wave-a {
+  stroke-width: 1.4;
+  stroke-opacity: 0.5;
+}
+.hp-sea-shimmer__wave-b {
+  stroke-width: 1.1;
+  stroke-opacity: 0.3;
+}
+@keyframes hp-sea-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-28px);
+  }
+}
+
+.hp-real-map .hp-route-stop {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 2px solid var(--hp-paper);
+  border-radius: 9999px;
+  background: var(--hp-sunset);
+  color: var(--hp-paper);
+  font-family: var(--hp-font-display);
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 5px 14px rgba(23, 20, 17, 0.24);
+}
+.hp-route-stop-marker {
+  border: 0;
+  background: transparent;
+}
+
+/* Map: drop-pin crosshair while adding a spot */
+.hp-real-map.hp-dropping-pin {
+  cursor: crosshair;
+}
+.hp-real-map.hp-dropping-pin .leaflet-container {
+  cursor: crosshair;
+}
+.hp-pin-target {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 25;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  color: var(--hp-sunset);
+  filter: drop-shadow(0 6px 8px rgba(23, 20, 17, 0.35));
+  animation: hp-pin-bob 1.6s ease-in-out infinite;
+}
+@keyframes hp-pin-bob {
+  0%,
+  100% {
+    transform: translate(-50%, -100%);
+  }
+  50% {
+    transform: translate(-50%, -112%);
+  }
+}
+
+/* Skeleton shimmer */
+.hp-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--hp-ink) 6%, var(--hp-paper));
+}
+.hp-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--hp-paper) 60%, transparent),
+    transparent
+  );
+  animation: hp-shimmer 1.4s infinite;
+}
+@keyframes hp-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Pull-to-refresh indicator */
+.hp-ptr {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, 0);
+  transition: transform 0.2s ease;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Night theme: swap tile filter + darken chrome when the "Tonight" pulse is on */
+.hp-app-shell.is-night {
+  --hp-bg: #161327;
+  --hp-paper: #211b3a;
+  --hp-ink: #f3ecdc;
+  --hp-muted: #a79fc4;
+}
+.hp-app-shell.is-night .hp-real-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) saturate(0.7);
+}
+
+/* Smoother scrollbars on touch + nicer text selection */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--hp-ink) 18%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--hp-ink) 18%, transparent);
+  border-radius: 9999px;
+}
+::selection {
+  background: color-mix(in srgb, var(--hp-sunset) 30%, transparent);
+}
+
+/* Tighter, crisper display headings app-wide */
+h1,
+h2,
+h3 {
+  font-family: var(--hp-font-display);
+  letter-spacing: 0;
+}
+
+/* Gentle entrance utility for feed/cards (used via framer-motion fallback) */
+.hp-rise {
+  animation: hp-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes hp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* TopBar "Deals" pill: a subtle, periodic attention pulse — a soft sunset
+   glow plus a micro-bounce that rests for most of the cycle, so it draws
+   the eye toward offers without nagging. */
+.hp-deals-pill {
+  animation: hp-deals-pulse 3.4s ease-in-out infinite;
+}
+@keyframes hp-deals-pulse {
+  0%,
+  68%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--hp-sunset) 0%, transparent);
+  }
+  78% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--hp-sunset) 22%, transparent);
+  }
+  88% {
+    transform: scale(0.99);
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--hp-sunset) 0%, transparent);
+  }
+}

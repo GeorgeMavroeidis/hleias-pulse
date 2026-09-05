@@ -1,0 +1,224 @@
+/* Place Stories: rail bubbles, full-screen viewer, progress, story ring. */
+
+/* =====================================================================
+   Place Stories
+   ===================================================================== */
+
+/* Rail bubble — ring drawn via inline gradient background on .hp-story-bubble__ring */
+.hp-story-bubble {
+  position: relative;
+}
+.hp-story-bubble__ring {
+  position: relative;
+  border-radius: 9999px;
+  padding: 2.5px;
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hp-story-bubble:hover .hp-story-bubble__ring {
+  transform: scale(1.03);
+}
+.hp-story-bubble__thumb {
+  position: relative;
+  border-radius: 9999px;
+  overflow: hidden;
+  border: 2px solid var(--hp-paper);
+  background: color-mix(in srgb, var(--hp-ink) 12%, var(--hp-paper));
+}
+.hp-story-bubble__count {
+  position: absolute;
+  right: -0.18rem;
+  bottom: -0.18rem;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.28rem;
+  border-radius: 9999px;
+  background: var(--hp-ink);
+  color: var(--hp-paper);
+  font-size: 0.6rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--hp-paper);
+}
+.hp-story-bubble__live {
+  position: absolute;
+  left: -0.12rem;
+  top: -0.12rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  padding: 0.12rem 0.32rem;
+  border-radius: 9999px;
+  background: var(--hp-sunset);
+  color: var(--hp-paper);
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 2px var(--hp-paper);
+  animation: hp-story-live-pulse 2.4s ease-in-out infinite;
+}
+.hp-story-bubble__live::before {
+  content: "";
+  width: 0.32rem;
+  height: 0.32rem;
+  border-radius: 9999px;
+  background: var(--hp-paper);
+}
+@keyframes hp-story-live-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--hp-paper),
+      0 0 0 0 rgba(224, 106, 50, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--hp-paper),
+      0 0 0 4px rgba(224, 106, 50, 0);
+  }
+}
+
+/* ---- Full-screen viewer ---- */
+.hp-story-viewer {
+  position: absolute;
+  inset: 0;
+  z-index: 95;
+  background: #0b0a09;
+  overflow: hidden;
+}
+.hp-story-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.hp-story-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 480px;
+  margin-inline: auto;
+  overflow: hidden;
+  background: #0b0a09;
+}
+.hp-story-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.hp-story-scrim-top {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 30%;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  pointer-events: none;
+}
+.hp-story-scrim-bottom {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 52%;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.82) 6%,
+    rgba(0, 0, 0, 0.32) 45%,
+    rgba(0, 0, 0, 0)
+  );
+  pointer-events: none;
+}
+
+/* Progress bars */
+.hp-story-progress {
+  position: absolute;
+  inset-inline: 0.6rem;
+  top: calc(env(safe-area-inset-top, 0px) + 0.7rem);
+  z-index: 6;
+  display: flex;
+  gap: 0.25rem;
+}
+.hp-story-progress__bar {
+  flex: 1 1 0;
+  height: 2.5px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.32);
+  overflow: hidden;
+}
+.hp-story-progress__fill {
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: #fff8ec;
+  border-radius: 9999px;
+}
+.hp-story-progress__fill.is-full {
+  transform: scaleX(1);
+}
+.hp-story-progress__fill.is-running {
+  animation: hp-story-fill linear forwards;
+  animation-duration: var(--hp-story-duration, 7s);
+}
+.hp-story-progress__fill.is-paused {
+  animation-play-state: paused;
+}
+@keyframes hp-story-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Story gesture layer */
+.hp-story-touch-layer {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+/* Map child marker — story ring */
+.hp-child-marker__story-ring {
+  position: absolute;
+  inset: -0.5rem;
+  z-index: 0;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--hp-paper), var(--hp-paper)) padding-box,
+    linear-gradient(135deg, #f0a85f 0%, #9b6fe6 100%) border-box;
+  opacity: 0.95;
+  animation: hp-story-ring-pulse 2.6s ease-in-out infinite;
+}
+@keyframes hp-story-ring-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  50% {
+    transform: scale(1.07);
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hp-story-bubble__live,
+  .hp-child-marker__story-ring {
+    animation: none;
+  }
+  .hp-story-progress__fill.is-running {
+    animation: none;
+    transform: scaleX(1);
+  }
+}

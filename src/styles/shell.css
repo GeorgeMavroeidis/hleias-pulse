@@ -1,0 +1,22 @@
+/* App shell and sheet containers (safe-area padding, brand type). */
+
+.hp-brand {
+  font-family: var(--hp-font-display);
+}
+
+.hp-app-shell {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.hp-place-detail-sheet {
+  top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+}
+
+.hp-fullscreen-modal {
+  top: env(safe-area-inset-top, 0px);
+}
+
+.hp-composer-sheet {
+  max-height: calc(88vh - env(safe-area-inset-top, 0px));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}

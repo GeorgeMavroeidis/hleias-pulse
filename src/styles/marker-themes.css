@@ -1,0 +1,791 @@
+/* Marker animation themes (calm / pulse / signal) and their keyframes. */
+
+.hp-marker-core,
+.hp-marker-effects,
+.hp-marker-field,
+.hp-marker-wave,
+.hp-marker-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.hp-marker-core {
+  z-index: 1;
+  opacity: var(--hp-marker-core-opacity, 1);
+  transform: translateZ(0) scale(var(--hp-theme-core-scale, 1));
+  transform-origin: center;
+  transition:
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hp-marker-effects {
+  z-index: 0;
+  /* Only the outer Leaflet crossfade attenuates the entire marker. */
+  opacity: 1;
+  transition: opacity 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hp-marker-field,
+.hp-marker-wave,
+.hp-marker-sweep {
+  transform: translateZ(0);
+  transform-origin: center;
+}
+
+.hp-marker-wave::before,
+.hp-marker-wave::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  content: "";
+  opacity: 0;
+  transform: scale(0.88);
+  transform-origin: center;
+}
+
+.hp-marker-sweep {
+  opacity: 0;
+}
+
+:is(
+  .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+  .hp-animation-theme-option[data-theme-preview="pulse"],
+  .hp-appearance-trigger[data-active-theme="pulse"]
+) {
+  --hp-effect-primary: #ff6848;
+  --hp-effect-secondary: #ffb547;
+  --hp-theme-core-scale: 1;
+  --hp-moving-cycle: 3.6s;
+  --hp-hot-cycle: 2.8s;
+  --hp-live-cycle: 2.2s;
+  --hp-selected-cycle: 2.4s;
+  --hp-moving-peak: 0.82;
+  --hp-hot-peak: 0.88;
+  --hp-live-peak: 0.92;
+  --hp-selected-peak: 0.96;
+  --hp-moving-beat: 1.025;
+  --hp-hot-beat: 1.04;
+  --hp-live-beat: 1.05;
+  --hp-selected-beat: 1.055;
+  --hp-moving-extent: 1.65;
+  --hp-hot-extent: 1.85;
+  --hp-live-extent: 2;
+  --hp-selected-extent: 2.05;
+}
+
+:is(
+  .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+  .hp-animation-theme-option[data-theme-preview="signal"],
+  .hp-appearance-trigger[data-active-theme="signal"]
+) {
+  --hp-effect-primary: #9b78ff;
+  --hp-effect-secondary: #34d9e8;
+  --hp-theme-core-scale: 0.92;
+  --hp-moving-cycle: 4.8s;
+  --hp-hot-cycle: 3.8s;
+  --hp-live-cycle: 3.2s;
+  --hp-selected-cycle: 3.4s;
+  --hp-moving-peak: 0.82;
+  --hp-hot-peak: 0.86;
+  --hp-live-peak: 0.9;
+  --hp-selected-peak: 0.94;
+  --hp-moving-beat: 1.02;
+  --hp-hot-beat: 1.03;
+  --hp-live-beat: 1.04;
+  --hp-selected-beat: 1.05;
+  --hp-moving-extent: 1.85;
+  --hp-hot-extent: 1.85;
+  --hp-live-extent: 1.85;
+  --hp-selected-extent: 1.85;
+}
+
+:is(
+  .hp-app-shell[data-marker-animation-theme="calm"] :where(.hp-real-map),
+  .hp-animation-theme-option[data-theme-preview="calm"],
+  .hp-appearance-trigger[data-active-theme="calm"]
+) {
+  --hp-effect-primary: #35bdb2;
+  --hp-effect-secondary: #bdece4;
+  --hp-theme-core-scale: 0.96;
+  --hp-moving-cycle: 8s;
+  --hp-hot-cycle: 7.2s;
+  --hp-live-cycle: 6.4s;
+  --hp-selected-cycle: 5.4s;
+}
+
+:is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview) {
+  --hp-motion-cycle: var(--hp-moving-cycle);
+  --hp-local-peak: var(--hp-moving-peak, 0.64);
+  --hp-core-beat: var(--hp-moving-beat, 1);
+  --hp-local-extent: var(--hp-moving-extent, 1.5);
+  --hp-far-peak: 0.64;
+  --hp-wave-opacity: calc(
+    var(--hp-far-peak) + (var(--hp-local-peak) - var(--hp-far-peak)) *
+      var(--hp-map-wave-strength, 1)
+  );
+  --hp-wave-extent: min(
+    calc(1.5 + (var(--hp-local-extent) - 1.5) * var(--hp-map-theme-detail, 1)),
+    var(--hp-wave-extent-cap, 3)
+  );
+  --hp-wave-stroke: calc(1.5px / var(--hp-marker-render-scale, 1));
+  --hp-field-opacity: 0.55;
+  --hp-core-highlight: 0.14;
+  --hp-motion-delay: calc(var(--hp-motion-cycle) * var(--hp-motion-phase, 0) * -1);
+}
+
+:is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview).is-selected {
+  --hp-motion-cycle: var(--hp-selected-cycle);
+  --hp-local-peak: var(--hp-selected-peak, 0.74);
+  --hp-core-beat: var(--hp-selected-beat, 1);
+  --hp-local-extent: var(--hp-selected-extent, 1.5);
+  --hp-far-peak: 0.74;
+  --hp-wave-stroke: calc(1.75px / var(--hp-marker-render-scale, 1));
+  --hp-field-opacity: 0.68;
+  --hp-core-highlight: 0.18;
+  --hp-motion-delay: 0s;
+}
+
+.hp-marker-field {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--hp-effect-secondary) 46%, transparent) 35%,
+    color-mix(in srgb, var(--hp-effect-primary) 22%, transparent) 60%,
+    transparent 100%
+  );
+  opacity: var(--hp-field-opacity);
+}
+
+.hp-marker-wave::before,
+.hp-marker-wave::after {
+  border-width: var(--hp-wave-stroke);
+  border-color: var(--hp-effect-primary);
+}
+
+.hp-marker-wave::after {
+  border-color: var(--hp-effect-secondary);
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="calm"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="calm"]
+  )
+  .hp-marker-field {
+  inset: -38%;
+  opacity: 0.44;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="calm"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="calm"]
+  )
+  :is(.hp-marker-wave, .hp-marker-sweep) {
+  display: none;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="calm"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="calm"]
+  )
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live, .is-selected)
+  .hp-marker-field {
+  animation: hp-marker-calm-field var(--hp-motion-cycle) ease-in-out var(--hp-motion-delay) infinite;
+  will-change: transform, opacity;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="calm"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="calm"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview).is-selected
+  .hp-marker-field {
+  animation-name: hp-marker-calm-selected;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  .hp-marker-field {
+  inset: -13%;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  .hp-marker-wave {
+  inset: 0;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live, .is-selected)
+  .hp-marker-wave::before {
+  animation: hp-marker-coast-wave var(--hp-motion-cycle) cubic-bezier(0.2, 0.72, 0.24, 1)
+    var(--hp-motion-delay) infinite;
+  will-change: transform, opacity;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  :is(.is-pulse-hot, .is-pulse-live, .is-selected)
+  .hp-marker-wave::after {
+  animation: hp-marker-coast-wave var(--hp-motion-cycle) cubic-bezier(0.2, 0.72, 0.24, 1)
+    calc(var(--hp-motion-delay) + var(--hp-motion-cycle) * 0.5) infinite;
+  will-change: transform, opacity;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  :is(.is-pulse-live, .is-selected)
+  .hp-marker-wave::after {
+  /* Primary peak at 8%; the second live/selected beat peaks at 26%. */
+  animation-delay: calc(var(--hp-motion-delay) + var(--hp-motion-cycle) * 0.18);
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live, .is-selected)
+  .hp-marker-core {
+  animation: hp-marker-coast-core var(--hp-motion-cycle) ease-in-out var(--hp-motion-delay) infinite;
+  will-change: transform;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  .is-pulse-hot
+  .hp-marker-core {
+  animation-name: hp-marker-coast-hot-core;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  .is-pulse-live
+  .hp-marker-core {
+  animation-name: hp-marker-coast-live-core;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview).is-selected
+  .hp-marker-wave::before,
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview).is-selected
+  .hp-marker-wave::after {
+  animation-name: hp-marker-coast-selected-wave;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview).is-selected
+  .hp-marker-core {
+  animation-name: hp-marker-coast-selected-core;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  .hp-marker-field {
+  inset: -11%;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  .hp-marker-wave {
+  /* 92% of the shell = actual Night core, not a second expanded inset. */
+  inset: 4%;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  .hp-marker-wave::after {
+  display: none;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  .hp-marker-sweep {
+  inset: 2%;
+  border: var(--hp-wave-stroke) solid transparent;
+  border-right-color: var(--hp-effect-primary);
+  border-top-color: var(--hp-effect-secondary);
+  opacity: 0.4;
+  transform: rotate(-42deg);
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  .hp-marker-core::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle at 40% 35%, var(--hp-paper), var(--hp-effect-secondary));
+  opacity: 0;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live, .is-selected)
+  .hp-marker-wave::before {
+  animation: hp-marker-signal-beacon var(--hp-motion-cycle) linear var(--hp-motion-delay) infinite;
+  will-change: transform, opacity;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live, .is-selected)
+  .hp-marker-sweep {
+  animation: hp-marker-signal-sweep var(--hp-motion-cycle) linear var(--hp-motion-delay) infinite;
+  will-change: transform, opacity;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live, .is-selected)
+  .hp-marker-core::after {
+  animation: hp-marker-signal-core var(--hp-motion-cycle) linear var(--hp-motion-delay) infinite;
+  will-change: opacity;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  :is(.is-pulse-moving, .is-pulse-hot, .is-pulse-live, .is-selected)
+  .hp-marker-core {
+  animation: hp-marker-signal-core-beat var(--hp-motion-cycle) ease-in-out var(--hp-motion-delay)
+    infinite;
+  will-change: transform;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview).is-selected
+  .hp-marker-wave::before {
+  animation-name: hp-marker-signal-selected-beacon;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview).is-selected
+  .hp-marker-sweep {
+  animation-name: hp-marker-signal-selected-sweep;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview).is-selected
+  .hp-marker-core::after {
+  animation-name: hp-marker-signal-selected-core;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview).is-selected
+  .hp-marker-core {
+  animation-name: hp-marker-signal-selected-core-beat;
+}
+
+.hp-app-shell[data-marker-animation-theme="calm"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell)
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-paper) 44%, transparent);
+  background: color-mix(in srgb, var(--hp-paper) 12%, transparent);
+  box-shadow: 0 0.08rem 0.28rem rgba(16, 36, 61, 0.075);
+}
+
+.hp-app-shell[data-marker-animation-theme="calm"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-sunset) 38%, var(--hp-paper));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--hp-paper) 70%, transparent),
+    0 0 0.62rem rgb(224 106 50 / 0.09);
+}
+
+.hp-app-shell[data-marker-animation-theme="calm"]
+  :is(.hp-area-marker__collage, .hp-child-marker__media) {
+  opacity: calc(var(--hp-map-media-opacity) * 0.92);
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell)
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-paper) 72%, transparent);
+  box-shadow:
+    0 0.1rem 0.24rem rgba(16, 36, 61, 0.14),
+    0 0 0.46rem rgb(224 106 50 / 0.08);
+}
+
+.hp-app-shell[data-marker-animation-theme="pulse"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-sunset) 62%, var(--hp-paper));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--hp-sunset) 40%, var(--hp-paper)),
+    0 0 0.54rem rgb(224 106 50 / 0.16),
+    0 0.12rem 0.3rem rgba(16, 36, 61, 0.15);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell)
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-paper) 84%, var(--hp-sunset));
+  background: color-mix(in srgb, var(--hp-ink) 48%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--hp-ink) 72%, transparent),
+    0 0.08rem 0.18rem rgba(16, 19, 31, 0.28),
+    0 0 0.34rem rgb(224 106 50 / 0.1);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__shell, .hp-child-marker__shell).is-selected
+  :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+  border-color: color-mix(in srgb, var(--hp-sunset) 78%, var(--hp-paper));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--hp-ink) 70%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--hp-sunset) 48%, transparent),
+    0 0 0.42rem rgb(224 106 50 / 0.16);
+}
+
+.hp-app-shell[data-marker-animation-theme="signal"]
+  :is(.hp-area-marker__collage, .hp-child-marker__media)::after {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hp-ink) 55%, transparent);
+}
+
+.hp-app-shell .is-marker-dense:not(.is-selected) .hp-marker-field {
+  opacity: 0.3;
+  animation: none;
+  will-change: auto;
+}
+
+.hp-app-shell .is-marker-dense:not(.is-selected) .hp-marker-wave::after,
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="pulse"]
+  )
+  .hp-map-identity-far
+  :is(.hp-area-marker__shell, .hp-child-marker__shell, .hp-animation-theme-preview):not(
+    .is-selected
+  )
+  .hp-marker-wave::after {
+  display: none;
+  animation: none;
+  will-change: auto;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"],
+    .hp-app-shell[data-marker-animation-theme="signal"]
+  )
+  .is-motion-suppressed:not(.is-selected)
+  :is(.hp-marker-core, .hp-marker-sweep),
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"],
+    .hp-app-shell[data-marker-animation-theme="signal"]
+  )
+  .is-motion-suppressed:not(.is-selected)
+  .hp-marker-core::after,
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"],
+    .hp-app-shell[data-marker-animation-theme="signal"]
+  )
+  .is-motion-suppressed:not(.is-selected)
+  .hp-marker-wave::before,
+:is(
+    .hp-app-shell[data-marker-animation-theme="pulse"],
+    .hp-app-shell[data-marker-animation-theme="signal"]
+  )
+  .is-motion-suppressed:not(.is-selected)
+  .hp-marker-wave::after {
+  animation: none;
+  will-change: auto;
+}
+
+:is(
+    .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+    .hp-animation-theme-option[data-theme-preview="signal"]
+  )
+  .is-motion-suppressed:not(.is-selected)
+  .hp-marker-sweep {
+  opacity: 0.4;
+}
+
+.hp-app-shell .hp-map-is-moving .hp-marker-effects {
+  opacity: 0.2 !important;
+}
+
+:is(.hp-map-is-moving, .hp-pulse-paused, .is-viewport-paused)
+  :is(.hp-marker-core, .hp-marker-field, .hp-marker-wave, .hp-marker-sweep),
+:is(.hp-map-is-moving, .hp-pulse-paused, .is-viewport-paused) .hp-marker-wave::before,
+:is(.hp-map-is-moving, .hp-pulse-paused, .is-viewport-paused) .hp-marker-wave::after,
+:is(.hp-map-is-moving, .hp-pulse-paused, .is-viewport-paused) .hp-marker-core::after {
+  animation-play-state: paused !important;
+  will-change: auto !important;
+}
+
+@keyframes hp-marker-calm-field {
+  0%,
+  100% {
+    opacity: 0.44;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.58;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes hp-marker-calm-selected {
+  0%,
+  100% {
+    opacity: 0.52;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.64;
+    transform: scale(1.14);
+  }
+}
+
+@keyframes hp-marker-coast-wave {
+  0% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  8% {
+    opacity: var(--hp-wave-opacity);
+  }
+  62%,
+  100% {
+    opacity: 0;
+    transform: scale(var(--hp-wave-extent));
+  }
+}
+
+@keyframes hp-marker-coast-core {
+  0%,
+  20%,
+  100% {
+    transform: translateZ(0) scale(var(--hp-theme-core-scale, 1));
+  }
+  8% {
+    transform: translateZ(0) scale(calc(var(--hp-theme-core-scale, 1) * var(--hp-core-beat)));
+  }
+}
+
+@keyframes hp-marker-coast-hot-core {
+  0%,
+  20%,
+  50%,
+  70%,
+  100% {
+    transform: translateZ(0) scale(var(--hp-theme-core-scale, 1));
+  }
+  8%,
+  58% {
+    transform: translateZ(0) scale(calc(var(--hp-theme-core-scale, 1) * var(--hp-core-beat)));
+  }
+}
+
+@keyframes hp-marker-coast-live-core {
+  0%,
+  18%,
+  40%,
+  100% {
+    transform: translateZ(0) scale(var(--hp-theme-core-scale, 1));
+  }
+  8%,
+  26% {
+    transform: translateZ(0) scale(calc(var(--hp-theme-core-scale, 1) * var(--hp-core-beat)));
+  }
+}
+
+@keyframes hp-marker-signal-beacon {
+  0%,
+  12% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  14% {
+    opacity: var(--hp-wave-opacity);
+  }
+  38%,
+  100% {
+    opacity: 0;
+    transform: scale(var(--hp-wave-extent));
+  }
+}
+
+@keyframes hp-marker-signal-sweep {
+  0%,
+  6% {
+    opacity: 0;
+    transform: rotate(-42deg);
+  }
+  8% {
+    opacity: var(--hp-wave-opacity);
+  }
+  28%,
+  100% {
+    opacity: 0;
+    transform: rotate(318deg);
+  }
+}
+
+@keyframes hp-marker-signal-core {
+  0% {
+    opacity: 0;
+  }
+  2% {
+    opacity: var(--hp-core-highlight);
+  }
+  8%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes hp-marker-signal-core-beat {
+  0%,
+  8%,
+  100% {
+    transform: translateZ(0) scale(var(--hp-theme-core-scale, 1));
+  }
+  2% {
+    transform: translateZ(0) scale(calc(var(--hp-theme-core-scale, 1) * var(--hp-core-beat)));
+  }
+}
+
+@keyframes hp-marker-coast-selected-wave {
+  0% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  8% {
+    opacity: var(--hp-wave-opacity);
+  }
+  62%,
+  100% {
+    opacity: 0;
+    transform: scale(var(--hp-wave-extent));
+  }
+}
+
+@keyframes hp-marker-coast-selected-core {
+  0%,
+  18%,
+  40%,
+  100% {
+    transform: translateZ(0) scale(var(--hp-theme-core-scale, 1));
+  }
+  8%,
+  26% {
+    transform: translateZ(0) scale(calc(var(--hp-theme-core-scale, 1) * var(--hp-core-beat)));
+  }
+}
+
+@keyframes hp-marker-signal-selected-beacon {
+  0%,
+  12% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  14% {
+    opacity: var(--hp-wave-opacity);
+  }
+  38%,
+  100% {
+    opacity: 0;
+    transform: scale(var(--hp-wave-extent));
+  }
+}
+
+@keyframes hp-marker-signal-selected-sweep {
+  0%,
+  6% {
+    opacity: 0;
+    transform: rotate(-42deg);
+  }
+  8% {
+    opacity: var(--hp-wave-opacity);
+  }
+  28%,
+  100% {
+    opacity: 0;
+    transform: rotate(318deg);
+  }
+}
+
+@keyframes hp-marker-signal-selected-core {
+  0% {
+    opacity: 0;
+  }
+  2% {
+    opacity: var(--hp-core-highlight);
+  }
+  8%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes hp-marker-signal-selected-core-beat {
+  0%,
+  8%,
+  100% {
+    transform: translateZ(0) scale(var(--hp-theme-core-scale, 1));
+  }
+  2% {
+    transform: translateZ(0) scale(calc(var(--hp-theme-core-scale, 1) * var(--hp-core-beat)));
+  }
+}

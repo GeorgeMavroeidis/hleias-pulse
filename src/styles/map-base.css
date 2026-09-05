@@ -1,0 +1,263 @@
+/* Map integration layer: leaflet chrome, marker hit areas, selection, focus. */
+
+/* Mavroeidis map, discovery and marker-theme integration layer. */
+
+.hp-real-map .leaflet-container {
+  z-index: 0;
+  height: 100%;
+  width: 100%;
+  background: #f2efe9;
+  font-family: var(--hp-font-body);
+}
+
+.hp-real-map .leaflet-control-attribution {
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--hp-paper) 88%, transparent);
+  color: var(--hp-muted);
+  font-size: 9px;
+  line-height: 1.5;
+  margin: 0 0 0.5rem var(--hp-safe-left);
+  padding: 0.125rem 0.45rem;
+  transform: translateY(calc(0px - var(--hp-map-bottom-overlay-height, 0px)));
+}
+
+.hp-real-map .leaflet-control-attribution a {
+  color: var(--hp-deep);
+  font-weight: 700;
+}
+
+.hp-real-map .leaflet-tile-pane {
+  /* Warm CARTO Voyager toward the hp-paper identity */
+  filter: saturate(0.82) brightness(1.03) sepia(0.06) hue-rotate(-6deg);
+  opacity: 1;
+}
+
+.hp-real-map {
+  --hp-map-fill-scale: 1.4;
+  --hp-map-medium: 0;
+  --hp-map-detail: 0;
+  --hp-map-rich: 0;
+  --hp-map-ultra: 0;
+  --hp-map-child-scale: 0.24;
+  --hp-map-nearby-scale: 0.24;
+  --hp-map-area-scale: 0.38;
+  --hp-map-activity-scale: 0.58;
+  --hp-map-media-opacity: 0.82;
+  --hp-map-media-scale: 0.94;
+  --hp-map-rich-scale: 0.8;
+  --hp-map-dot-opacity: 0.35;
+  --hp-map-solo-scale: 0.38;
+  --hp-map-surface-opacity: 0.78;
+  --hp-map-aura-opacity: 0.34;
+  --hp-map-ring-opacity: 0.72;
+  --hp-map-copy-offset: 0.2rem;
+  --hp-map-pulse-moving-peak: 1.12;
+  --hp-map-pulse-hot-peak: 1.22;
+  --hp-map-pulse-live-peak: 1.3;
+  --hp-map-theme-detail: 0;
+}
+
+.hp-area-marker,
+.hp-activity-cluster,
+.hp-child-marker {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  overflow: visible !important;
+  pointer-events: auto;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.hp-area-marker::before,
+.hp-activity-cluster::before,
+.hp-child-marker::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+:is(.hp-area-marker, .hp-activity-cluster).is-selection-anchor::before {
+  pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  .hp-area-marker::before,
+  .hp-activity-cluster::before,
+  .hp-child-marker::before {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.hp-area-marker:focus,
+.hp-activity-cluster:focus,
+.hp-child-marker:focus {
+  outline: none;
+}
+
+.hp-area-marker__shell,
+.hp-child-marker__shell {
+  --hp-marker-aura-opacity: var(--hp-map-aura-opacity);
+  --hp-marker-core-opacity: var(--hp-map-surface-opacity, 1);
+  --hp-marker-tier-presence: var(--hp-presence-quiet, 1);
+  --hp-marker-presence: min(var(--hp-marker-tier-presence), var(--hp-marker-presence-cap, 2));
+  --hp-marker-interaction-scale: 1;
+  --hp-marker-lens-opacity-target: 1;
+  --hp-marker-lens-opacity: var(--hp-marker-lens-opacity-target);
+  --hp-marker-lens-scale-target: 1;
+  --hp-marker-lens-scale: var(--hp-marker-lens-scale-target);
+  --hp-marker-render-scale: calc(
+    var(--hp-marker-zoom-scale, 1) * var(--hp-marker-presence) *
+      var(--hp-marker-interaction-scale) * var(--hp-marker-lens-scale) * var(--hp-map-fill-scale, 1)
+  );
+  --hp-marker-core-render-scale: calc(
+    var(--hp-marker-render-scale) * var(--hp-theme-core-scale, 1)
+  );
+  --hp-marker-rim-size: 1.25px;
+  --hp-marker-rim-width: calc(var(--hp-marker-rim-size) / var(--hp-marker-core-render-scale));
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  width: var(--marker-size);
+  height: var(--marker-size);
+  min-width: var(--marker-size);
+  max-width: var(--marker-size);
+  min-height: var(--marker-size);
+  max-height: var(--marker-size);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border-radius: 9999px;
+  overflow: visible;
+  /* The entire enlarged core remains clickable; decorative descendants never
+     intercept the map outside the core. The outer icon retains its 32/44px minimum. */
+  pointer-events: inherit;
+  opacity: var(--hp-marker-lens-opacity);
+  transform: translate(-50%, -50%) translateZ(0) scale(var(--hp-marker-render-scale));
+  transform-origin: center;
+  transition:
+    transform var(--hp-motion-state, 160ms) var(--hp-ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    opacity var(--hp-motion-state, 160ms) var(--hp-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+  will-change: auto;
+}
+
+:is(.hp-area-marker__shell, .hp-child-marker__shell):is(.is-hot, .is-live, .is-selected) {
+  --hp-marker-rim-size: 1.5px;
+}
+
+.hp-area-marker__shell {
+  --hp-marker-zoom-scale: var(--hp-map-area-scale);
+}
+
+.hp-activity-cluster .hp-area-marker__shell {
+  --hp-marker-zoom-scale: var(--hp-map-activity-scale);
+}
+
+.hp-child-marker__shell {
+  --hp-marker-zoom-scale: var(--hp-map-nearby-scale);
+}
+
+.hp-child-marker__shell.is-selected {
+  --hp-marker-zoom-scale: var(--hp-map-child-scale);
+}
+
+.hp-child-marker__shell.is-solo:not(.is-selected) {
+  --hp-marker-zoom-scale: var(--hp-map-solo-scale);
+}
+
+.hp-area-marker__shell *,
+.hp-child-marker__shell * {
+  pointer-events: none;
+}
+
+.hp-area-marker__shell.is-selected,
+.hp-child-marker__shell.is-selected {
+  --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.08));
+  --hp-marker-core-opacity: 1;
+  --hp-marker-interaction-scale: 1.1;
+  --hp-marker-lens-opacity: 1 !important;
+  --hp-marker-lens-scale: 1;
+  transition-duration: 140ms;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform, opacity;
+}
+
+.hp-real-map.has-marker-selection
+  :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
+  --hp-marker-aura-opacity: max(0.22, calc(var(--hp-map-aura-opacity) - 0.08));
+  --hp-marker-core-opacity: max(0.76, calc(var(--hp-map-surface-opacity, 1) - 0.08));
+  transition-duration: 140ms;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (hover: hover) {
+  :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):hover
+    :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
+    --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
+    --hp-marker-core-opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
+    --hp-marker-lens-opacity: max(0.9, var(--hp-marker-lens-opacity-target));
+    --hp-marker-interaction-scale: 1.02;
+    transition-duration: 110ms;
+    transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform, opacity;
+  }
+
+  :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):hover
+    :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected)
+    :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+    opacity: min(1, calc(var(--hp-map-ring-opacity, 1) + 0.06));
+  }
+}
+
+@media (hover: none) {
+  :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):active
+    :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected) {
+    --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
+    --hp-marker-core-opacity: min(1, calc(var(--hp-map-surface-opacity, 1) + 0.06));
+    --hp-marker-lens-opacity: max(0.9, var(--hp-marker-lens-opacity-target));
+    --hp-marker-interaction-scale: 1.02;
+    transition-duration: 70ms;
+    transition-timing-function: linear;
+    will-change: transform, opacity;
+  }
+
+  :is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):active
+    :is(.hp-area-marker__shell, .hp-child-marker__shell):not(.is-selected)
+    :is(.hp-area-marker__ring, .hp-child-marker__ring) {
+    opacity: min(1, calc(var(--hp-map-ring-opacity, 1) + 0.06));
+  }
+}
+
+:is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker)[aria-pressed="true"] {
+  z-index: 2400 !important;
+}
+
+:is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):focus-visible:not(
+    [aria-pressed="true"]
+  ) {
+  z-index: 2300 !important;
+}
+
+:is(.hp-area-marker, .hp-activity-cluster, .hp-child-marker):focus-visible:not(
+    [aria-pressed="true"]
+  )
+  :is(.hp-area-marker__shell, .hp-child-marker__shell) {
+  --hp-marker-aura-opacity: min(0.68, calc(var(--hp-map-aura-opacity) + 0.03));
+  --hp-marker-core-opacity: max(0.94, var(--hp-map-surface-opacity, 1));
+  --hp-marker-lens-opacity: max(0.9, var(--hp-marker-lens-opacity-target));
+  --hp-marker-interaction-scale: 1.02;
+  transition-duration: 110ms;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform, opacity;
+}
+
+.hp-real-map .leaflet-zoom-anim :is(.hp-area-marker__shell, .hp-child-marker__shell) {
+  will-change: transform, opacity;
+}
