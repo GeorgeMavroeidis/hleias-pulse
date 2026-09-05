@@ -1,8 +1,3 @@
-// NOTE: `content_reports` and `user_blocks` were added by hand, because the
-// migration that creates them (20260905130000_add_user_moderation.sql) has not
-// been applied yet and the generator can only see the live schema. Regenerate
-// this file once that migration runs and these two entries become real.
-
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
