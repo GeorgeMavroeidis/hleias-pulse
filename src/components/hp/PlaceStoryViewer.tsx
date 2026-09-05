@@ -7,8 +7,9 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Bookmark, Flag, Map as MapIcon, Share2, X } from "lucide-react";
+import { Bookmark, Map as MapIcon, Share2, X } from "lucide-react";
 import { ImageBox } from "./ImageBox";
+import { ContentMenu } from "./ContentMenu";
 import {
   STORY_AUTHOR_COLOR,
   STORY_AUTHOR_LABEL,
@@ -263,6 +264,8 @@ export function PlaceStoryViewer({
   });
   const [atEnd, setAtEnd] = useState(false);
   const [paused, setPaused] = useState(false);
+  // The story advances on a timer; hold it while the moderation menu is open.
+  const [menuOpen, setMenuOpen] = useState(false);
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [transitionDirection, setTransitionDirection] = useState(1);
 
@@ -552,7 +555,7 @@ export function PlaceStoryViewer({
               count={group.stories.length}
               activeIndex={storyIndex}
               durationMs={storyDurationMs(story.kind)}
-              paused={paused || atEnd}
+              paused={paused || atEnd || menuOpen}
               onComplete={next}
             />
 
@@ -647,13 +650,20 @@ export function PlaceStoryViewer({
                   >
                     <Share2 size={15} />
                   </button>
-                  <button
-                    type="button"
-                    aria-label={language === "GR" ? "Αναφορά story" : "Report story"}
-                    className="grid h-10 w-10 place-items-center rounded-full border border-white/30 text-white backdrop-blur-sm"
-                  >
-                    <Flag size={15} />
-                  </button>
+                  <ContentMenu
+                    tone="light"
+                    placement="above"
+                    onOpenChange={setMenuOpen}
+                    className="[&>button]:h-10 [&>button]:w-10"
+                    target={{
+                      type: "story",
+                      id: story.id,
+                      authorUserId: story.userId,
+                      authorName: story.authorName,
+                      authorAvatarUrl: story.authorAvatarUrl,
+                      summary: story.caption || group.placeName,
+                    }}
+                  />
                 </div>
                 <p className="mt-2 text-center text-[9px] font-medium text-white/40">
                   {language === "GR"

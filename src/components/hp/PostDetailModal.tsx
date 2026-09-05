@@ -15,6 +15,7 @@ import { authorTypeColor, type Author, type Place, type Post, type Comment } fro
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
 import { openStreetMapUrl } from "./pulse-shared";
+import { ContentMenu } from "./ContentMenu";
 
 export function PostDetailModal({
   post,
@@ -121,6 +122,16 @@ export function PostDetailModal({
                         {p.name} · {post.time}
                       </div>
                     </div>
+                    <ContentMenu
+                      target={{
+                        type: "post",
+                        id: post.id,
+                        authorUserId: post.userId,
+                        authorName: a.name,
+                        authorAvatarUrl: a.avatarUrl,
+                        summary: post.text,
+                      }}
+                    />
                   </div>
                   <p className="mt-3 text-[14px] leading-snug text-hp-ink">{post.text}</p>
                   <div className="mt-2 flex flex-wrap gap-1">

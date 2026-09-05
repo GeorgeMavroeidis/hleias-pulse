@@ -21,6 +21,7 @@ import {
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
 import { EventCard } from "./EventCard";
+import { useModeration } from "./use-moderation";
 import { useI18n } from "@/lib/i18n";
 
 type Filter = "all" | "mine" | MeetCategory;
@@ -54,19 +55,24 @@ export function MeetScreen({
   onCreate,
 }: Props) {
   const { t } = useI18n();
+  const moderation = useModeration();
   const [filter, setFilter] = useState<Filter>("all");
 
   const filtered = useMemo(() => {
     const now = Date.now();
-    return events
-      .filter((e) => +new Date(e.happensAt) >= now - 60 * 60 * 1000) // hide long-past
-      .filter((e) => {
-        if (filter === "all") return true;
-        if (filter === "mine") return rsvp[e.id] === "going" || rsvp[e.id] === "maybe";
-        return e.category === filter;
-      })
-      .sort((a, b) => +new Date(a.happensAt) - +new Date(b.happensAt));
-  }, [events, filter, rsvp]);
+    return (
+      events
+        .filter((e) => +new Date(e.happensAt) >= now - 60 * 60 * 1000) // hide long-past
+        // Blocked hosts are filtered server-side; muted ones are hidden here.
+        .filter((e) => !moderation.isHidden(e.userId))
+        .filter((e) => {
+          if (filter === "all") return true;
+          if (filter === "mine") return rsvp[e.id] === "going" || rsvp[e.id] === "maybe";
+          return e.category === filter;
+        })
+        .sort((a, b) => +new Date(a.happensAt) - +new Date(b.happensAt))
+    );
+  }, [events, filter, moderation, rsvp]);
 
   const mineCount = events.filter((e) => rsvp[e.id]).length;
 

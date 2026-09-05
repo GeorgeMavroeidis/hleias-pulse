@@ -32,6 +32,8 @@ import {
 import { type PulseData } from "@/lib/hp-api";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
+import { ContentMenu } from "./ContentMenu";
+import { useModeration } from "./use-moderation";
 import { type PlaceStoryGroup } from "@/lib/hp/place-stories";
 import type { PlaceBusinessProfile } from "@/lib/hp/business-types";
 import { openStreetMapUrl } from "./pulse-shared";
@@ -94,9 +96,12 @@ export function PlaceDetailModal({
       businessProfile.menuUrl ||
       businessProfile.photos.length > 0),
   );
+  const moderation = useModeration();
   const placeStories = place
     ? (storyGroups.find((group) => group.placeId === place.id)?.stories ?? [])
     : [];
+  // Blocked authors are filtered server-side; muted ones are hidden here.
+  const visiblePosts = posts.filter((post) => !moderation.isHidden(post.userId));
 
   return (
     <AnimatePresence>
@@ -131,14 +136,25 @@ export function PlaceDetailModal({
                 rounded="rounded-none"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent" />
-              <button
-                type="button"
-                onClick={onClose}
-                className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
-                aria-label={t("Close")}
-              >
-                <X size={16} />
-              </button>
+              <div className="absolute right-3 top-3 flex items-center gap-1.5">
+                <ContentMenu
+                  tone="light"
+                  target={{
+                    type: "place",
+                    id: place.id,
+                    authorUserId: place.userId,
+                    summary: place.name,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
+                  aria-label={t("Close")}
+                >
+                  <X size={16} />
+                </button>
+              </div>
               <div className="absolute bottom-3 left-4 right-4 text-hp-paper">
                 <span
                   className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
@@ -331,12 +347,12 @@ export function PlaceDetailModal({
                   Recent posts
                 </h3>
                 <div className="flex flex-col gap-2">
-                  {posts.length === 0 && (
+                  {visiblePosts.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-hp-ink/10 p-4 text-center text-[12px] text-hp-muted">
                       No recent posts here yet. Be first.
                     </div>
                   )}
-                  {posts.map((p) => {
+                  {visiblePosts.map((p) => {
                     const a = findPostAuthor(p);
                     return (
                       <div
@@ -360,6 +376,17 @@ export function PlaceDetailModal({
                             {a.type}
                           </span>
                           <span className="ml-auto text-[10px] text-hp-muted">{p.time}</span>
+                          <ContentMenu
+                            className="-my-1"
+                            target={{
+                              type: "post",
+                              id: p.id,
+                              authorUserId: p.userId,
+                              authorName: a.name,
+                              authorAvatarUrl: a.avatarUrl,
+                              summary: p.text,
+                            }}
+                          />
                         </div>
                         <p className="mt-1 text-[13px] text-hp-ink">{p.text}</p>
                       </div>

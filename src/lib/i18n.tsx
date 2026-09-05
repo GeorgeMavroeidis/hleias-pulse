@@ -747,6 +747,89 @@ const EL: Record<string, string> = {
   "Places in this area": "Σημεία σε αυτή την περιοχή",
   Town: "Πόλη",
   Nightlife: "Νυχτερινή ζωή",
+
+  // Report, block, mute — App Store Guideline 1.2
+  "Sign in to report or block": "Συνδέσου για αναφορά ή μπλοκάρισμα",
+  "More options": "Περισσότερες επιλογές",
+  "Mute account": "Σίγαση λογαριασμού",
+  "Unmute account": "Άρση σίγασης",
+  "Block account": "Μπλοκάρισμα λογαριασμού",
+  "Unblock account": "Άρση μπλοκαρίσματος",
+  "Account blocked": "Ο λογαριασμός μπλοκαρίστηκε",
+  "Account unblocked": "Το μπλοκάρισμα αφαιρέθηκε",
+  "Account muted": "Ο λογαριασμός τέθηκε σε σίγαση",
+  "Account unmuted": "Η σίγαση αφαιρέθηκε",
+  "Could not update this account. Try again.":
+    "Δεν έγινε η ενέργεια για αυτόν τον λογαριασμό. Δοκίμασε ξανά.",
+
+  // Report sheet
+  "Report content": "Αναφορά περιεχομένου",
+  "Tell us what is wrong with {target}. Reports are private.":
+    "Πες μας τι δεν πάει καλά με {target}. Οι αναφορές είναι ιδιωτικές.",
+  "this post": "αυτή τη δημοσίευση",
+  "this comment": "αυτό το σχόλιο",
+  "this place": "αυτό το σημείο",
+  "this story": "αυτό το story",
+  "this gathering": "αυτή τη συνάντηση",
+  "this event": "αυτή την εκδήλωση",
+  "this account": "αυτόν τον λογαριασμό",
+  "Reason for the report": "Λόγος αναφοράς",
+  "Spam or advertising": "Spam ή διαφήμιση",
+  "Repeated or irrelevant promotion.": "Επαναλαμβανόμενη ή άσχετη προώθηση.",
+  "Harassment or bullying": "Παρενόχληση ή εκφοβισμός",
+  "Targets a person or group.": "Στοχοποιεί άτομο ή ομάδα.",
+  "Hate speech": "Ρητορική μίσους",
+  "Attacks an identity or origin.": "Επίθεση σε ταυτότητα ή καταγωγή.",
+  "Sexual content": "Σεξουαλικό περιεχόμενο",
+  "Not appropriate for this app.": "Δεν ταιριάζει σε αυτή την εφαρμογή.",
+  "Violence or threats": "Βία ή απειλές",
+  "Threatens or glorifies harm.": "Απειλεί ή εξυμνεί τη βία.",
+  "False information": "Ψευδής πληροφορία",
+  "Wrong place, hours, or event.": "Λάθος σημείο, ώρες ή εκδήλωση.",
+  "Something else": "Κάτι άλλο",
+  "Tell us in your own words.": "Πες μας το με δικά σου λόγια.",
+  "Add detail (optional)": "Πρόσθεσε λεπτομέρειες (προαιρετικό)",
+  "What should we look at?": "Τι να κοιτάξουμε;",
+  "Also block {name}": "Μπλόκαρε και τον/την {name}",
+  "Also block this account": "Μπλόκαρε και αυτόν τον λογαριασμό",
+  "Send report": "Αποστολή αναφοράς",
+  Cancel: "Ακύρωση",
+  "Report sent": "Η αναφορά στάλθηκε",
+  "We review reports within {hours} hours and act on what breaks the rules.":
+    "Εξετάζουμε τις αναφορές μέσα σε {hours} ώρες και ενεργούμε σε ό,τι παραβιάζει τους κανόνες.",
+  "Could not send the report. Try again.": "Η αναφορά δεν στάλθηκε. Δοκίμασε ξανά.",
+  "Urgent or serious? Write to us at": "Επείγον ή σοβαρό; Γράψε μας στο",
+
+  // Blocked and muted list
+  "Blocked and muted": "Μπλοκαρισμένοι και σε σίγαση",
+  "Blocked accounts cannot see or reach you. Muted accounts stay visible to others but not to you.":
+    "Οι μπλοκαρισμένοι λογαριασμοί δεν σε βλέπουν και δεν σε προσεγγίζουν. Οι λογαριασμοί σε σίγαση παραμένουν ορατοί στους άλλους, αλλά όχι σε εσένα.",
+  "You have not blocked or muted anyone.": "Δεν έχεις μπλοκάρει ούτε θέσει σε σίγαση κανέναν.",
+  Blocked: "Μπλοκαρισμένοι",
+  Muted: "Σε σίγαση",
+  blocked: "μπλοκαρισμένοι",
+  muted: "σε σίγαση",
+  Unblock: "Άρση μπλοκ",
+  Unmute: "Άρση σίγασης",
+  "Blocked account": "Μπλοκαρισμένος λογαριασμός",
+
+  // Safety and contact — account surface
+  "Safety and contact": "Ασφάλεια και επικοινωνία",
+  "Content policy": "Πολιτική περιεχομένου",
+  "What is allowed, and what we remove.": "Τι επιτρέπεται και τι αφαιρούμε.",
+  "No harassment, threats, or targeting a person.":
+    "Καμία παρενόχληση, απειλή ή στοχοποίηση προσώπου.",
+  "No hate speech about origin, religion, gender, or sexuality.":
+    "Καμία ρητορική μίσους για καταγωγή, θρησκεία, φύλο ή σεξουαλικότητα.",
+  "No sexual or graphically violent content.": "Κανένα σεξουαλικό ή ωμά βίαιο περιεχόμενο.",
+  "No spam, fake places, or invented events.":
+    "Κανένα spam, ψεύτικα σημεία ή επινοημένες εκδηλώσεις.",
+  "Post about Ilia, and post things that are true.":
+    "Δημοσίευσε για την Ηλεία, και δημοσίευσε πράγματα που ισχύουν.",
+  "Anyone can report content from the ... menu. We review reports within {hours} hours and remove what breaks these rules. Repeat offenders lose their account.":
+    "Οποιοσδήποτε μπορεί να αναφέρει περιεχόμενο από το μενού «...». Εξετάζουμε τις αναφορές μέσα σε {hours} ώρες και αφαιρούμε ό,τι παραβιάζει αυτούς τους κανόνες. Όποιος επιμένει χάνει τον λογαριασμό του.",
+  "Read the full policy": "Διάβασε ολόκληρη την πολιτική",
+  "Contact us": "Επικοινωνία",
 };
 
 function interpolate(message: string, params?: TranslationParams) {

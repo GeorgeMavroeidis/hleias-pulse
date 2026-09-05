@@ -12,6 +12,7 @@ import {
   type Lang,
 } from "@/lib/hp/cultural-events-types";
 import { CulturalEventCard } from "./CulturalEventCard";
+import { useModeration } from "./use-moderation";
 
 type Filter = "upcoming" | "past" | CulturalEventType;
 
@@ -32,11 +33,14 @@ interface Props {
 
 export function CulturalEventsScreen({ events, lang, onOpenDetail, canCreate, onCreate }: Props) {
   const [filter, setFilter] = useState<Filter>("upcoming");
+  const moderation = useModeration();
   const s = CULTURAL_EVENTS_STRINGS;
 
   const filtered = useMemo(() => {
     return events
       .filter((e) => {
+        // Blocked organisers are filtered server-side; muted ones are hidden here.
+        if (moderation.isHidden(e.userId)) return false;
         if (filter === "upcoming") return !isEventPast(e);
         if (filter === "past") return isEventPast(e);
         return e.eventType === filter;
@@ -46,7 +50,7 @@ export function CulturalEventsScreen({ events, lang, onOpenDetail, canCreate, on
           ? +new Date(b.eventDate) - +new Date(a.eventDate)
           : +new Date(a.eventDate) - +new Date(b.eventDate),
       );
-  }, [events, filter]);
+  }, [events, filter, moderation]);
 
   const chips: { id: Filter; label: string; Icon?: LucideIcon }[] = [
     { id: "upcoming", label: tr(lang, s.upcoming) },
