@@ -75,6 +75,7 @@ import {
   getMyOrganizerStatus,
   getMyPlaceClaims,
   getPlaceBusinessProfile,
+  isAuthRequiredError,
   issueDealCode,
   redeemDealCode,
   setPlaceDeal,
@@ -223,6 +224,23 @@ import { PostDetailModal } from "./PostDetailModal";
 import { RouteArticleModal } from "./RouteArticleModal";
 import { CreateComposerModal } from "./CreateComposerModal";
 import { BottomNav } from "./BottomNav";
+
+// Accounts are required for every write. Each gated action names itself so the
+// toast tells the user what they were trying to do, in their own language.
+const SIGN_IN_PROMPTS = {
+  post: "Sign in to post",
+  comment: "Sign in to comment",
+  place: "Sign in to add a place",
+  story: "Sign in to post a story",
+  host: "Sign in to host a gathering",
+  rsvp: "Sign in to RSVP",
+  like: "Sign in to like",
+  save: "Sign in to save",
+  visit: "Sign in to mark a visit",
+  dealCode: "Sign in to get a code",
+} as const;
+
+type SignInAction = keyof typeof SIGN_IN_PROMPTS;
 
 export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
@@ -636,7 +654,7 @@ export function PulseApp() {
     setAppearanceOpen(false);
   }, [tab]);
 
-  const requireProfile = (action = "post") => {
+  const requireProfile = (action: SignInAction = "post") => {
     if (account.status === "ready") return true;
     if (account.status === "needsProfile") {
       setProfileOpen(true);
@@ -644,8 +662,20 @@ export function PulseApp() {
       return false;
     }
     setAuthOpen(true);
-    showToast(language === "GR" ? "Συνδέσου για να συνεχίσεις" : `Sign in to ${action}`);
+    showToast(t(SIGN_IN_PROMPTS[action]));
     return false;
+  };
+
+  // A session can expire between the up-front guard and the request landing.
+  // Route that case back to the sign-in sheet rather than a misleading
+  // "could not save".
+  const handleWriteError = (error: unknown, fallbackMessage: string) => {
+    if (isAuthRequiredError(error)) {
+      setAuthOpen(true);
+      showToast(t("Your session expired. Sign in again."));
+      return;
+    }
+    showToast(fallbackMessage);
   };
 
   const shareItem = (target: ShareTarget) => {
@@ -1034,6 +1064,10 @@ export function PulseApp() {
   }, [allPosts, areaPreview, dataStatus, placeById, placePreview, placeStoryGroups, routeById]);
 
   const toggleSave = (id: string) => {
+    if (account.status !== "ready") {
+      requireProfile("save");
+      return;
+    }
     const wasSaved = savedIds.includes(id);
     const nextSaved = !wasSaved;
     setSavedIds((arr) => (wasSaved ? arr.filter((x) => x !== id) : [...arr, id]));
@@ -1041,10 +1075,14 @@ export function PulseApp() {
     void setSavedItem({ type: "place", id }, nextSaved).catch((error) => {
       console.warn("Could not persist place save.", error);
       setSavedIds((arr) => (wasSaved ? [...arr, id] : arr.filter((x) => x !== id)));
-      showToast(t("Could not save"));
+      handleWriteError(error, t("Could not save"));
     });
   };
   const toggleVisited = (id: string) => {
+    if (account.status !== "ready") {
+      requireProfile("visit");
+      return;
+    }
     const wasVisited = visitedPlaceIds.includes(id);
     const nextVisited = !wasVisited;
     setVisitedPlaceIds((arr) => (wasVisited ? arr.filter((x) => x !== id) : [...arr, id]));
@@ -1052,17 +1090,22 @@ export function PulseApp() {
     void setVisited(id, nextVisited).catch((error) => {
       console.warn("Could not persist place visit.", error);
       setVisitedPlaceIds((arr) => (wasVisited ? [...arr, id] : arr.filter((x) => x !== id)));
-      showToast(t("Could not save"));
+      handleWriteError(error, t("Could not save"));
     });
   };
   const toggleLike = (id: string) => {
+    if (account.status !== "ready") {
+      requireProfile("like");
+      return;
+    }
     const nextLiked = !likes[id];
     setLikes((m) => ({ ...m, [id]: nextLiked }));
     setPostLikes((m) => ({ ...m, [id]: m[id] ?? allPosts.find((p) => p.id === id)?.likes ?? 0 }));
     void setPostLike(id, nextLiked).catch((error) => {
       console.warn("Could not persist post like.", error);
       setLikes((m) => ({ ...m, [id]: !nextLiked }));
-      showToast(
+      handleWriteError(
+        error,
         language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση του like" : "Could not save like",
       );
     });
@@ -1102,7 +1145,7 @@ export function PulseApp() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast(t("Could not post comment"));
+        handleWriteError(error, t("Could not post comment"));
       });
   };
   const addPostComment = (id: string, text: string) => {
@@ -1140,10 +1183,14 @@ export function PulseApp() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast(t("Could not post comment"));
+        handleWriteError(error, t("Could not post comment"));
       });
   };
   const toggleSavePost = (id: string) => {
+    if (account.status !== "ready") {
+      requireProfile("save");
+      return;
+    }
     const wasSaved = !!savedPosts[id];
     const nextSaved = !wasSaved;
     setSavedPosts((m) => ({ ...m, [id]: nextSaved }));
@@ -1159,12 +1206,17 @@ export function PulseApp() {
     void setSavedItem({ type: "post", id }, nextSaved).catch((error) => {
       console.warn("Could not persist post save.", error);
       setSavedPosts((m) => ({ ...m, [id]: wasSaved }));
-      showToast(
+      handleWriteError(
+        error,
         language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση της δημοσίευσης" : "Could not save post",
       );
     });
   };
   const toggleSaveRoute = (id: string) => {
+    if (account.status !== "ready") {
+      requireProfile("save");
+      return;
+    }
     const wasSaved = !!savedRoutes[id];
     const nextSaved = !wasSaved;
     setSavedRoutes((m) => ({ ...m, [id]: nextSaved }));
@@ -1180,7 +1232,8 @@ export function PulseApp() {
     void setSavedItem({ type: "route", id }, nextSaved).catch((error) => {
       console.warn("Could not persist route save.", error);
       setSavedRoutes((m) => ({ ...m, [id]: wasSaved }));
-      showToast(
+      handleWriteError(
+        error,
         language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση της διαδρομής" : "Could not save route",
       );
     });
@@ -1220,7 +1273,7 @@ export function PulseApp() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast(t("Could not post comment"));
+        handleWriteError(error, t("Could not post comment"));
       });
   };
   const addLocalPost = async ({
@@ -1257,7 +1310,7 @@ export function PulseApp() {
   };
   const addLocalPlace = async (input: CreatePulsePlaceInput) => {
     if (account.status !== "ready") {
-      requireProfile("add a place");
+      requireProfile("place");
       throw new Error("Profile required.");
     }
     const place = await createPulsePlace({
@@ -1283,7 +1336,7 @@ export function PulseApp() {
   };
   const addLocalStory = async (input: CreateStoryInput) => {
     if (account.status !== "ready") {
-      requireProfile("post a story");
+      requireProfile("story");
       throw new Error("Profile required.");
     }
     const place = findPlace(input.placeId);
@@ -1429,16 +1482,19 @@ export function PulseApp() {
     showToast(t("Deal saved"));
   };
 
-  // Stage B3: user taps "Get code" in the APP DEAL callout. Any session works
-  // (issueDealCode calls ensurePulseUserId first). A repeat tap for the same
-  // deal returns the existing live code.
+  // Stage B3: user taps "Get code" in the APP DEAL callout. A real account is
+  // required. A repeat tap for the same deal returns the existing live code.
   const handleGetDealCode = async () => {
     if (!openPlace || issuingDealCode) return;
+    if (account.status !== "ready") {
+      requireProfile("dealCode");
+      return;
+    }
     setIssuingDealCode(true);
     try {
       setDealCodeModal(await issueDealCode(openPlace.id));
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t("Could not get a code."));
+      handleWriteError(error, error instanceof Error ? error.message : t("Could not get a code."));
     } finally {
       setIssuingDealCode(false);
     }
@@ -1447,6 +1503,10 @@ export function PulseApp() {
   // Business side: redeem a code typed into "My places". Refreshes the counters
   // on success; the sheet surfaces the failure inline.
   const handleRedeemDealCode = async (code: string) => {
+    if (account.status !== "ready") {
+      requireProfile("post");
+      return;
+    }
     await redeemDealCode(code);
     setMyDealStats(await getMyDealStats().catch(() => myDealStats));
     showToast(t("Code redeemed"));
@@ -1545,7 +1605,7 @@ export function PulseApp() {
     void setCulturalEventLike(id, nextLiked).catch((error) => {
       console.warn("Could not persist cultural event like.", error);
       setCulturalEventLikes((m) => ({ ...m, [id]: !nextLiked }));
-      showToast(t("Could not save"));
+      handleWriteError(error, t("Could not save"));
     });
   };
 
@@ -1584,13 +1644,13 @@ export function PulseApp() {
           ...m,
           [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
         }));
-        showToast(t("Could not post comment"));
+        handleWriteError(error, t("Could not post comment"));
       });
   };
 
   const toggleMeetRsvp = (event: MeetEvent, next: RsvpStatus) => {
     if (account.status !== "ready") {
-      requireProfile("RSVP");
+      requireProfile("rsvp");
       return;
     }
 
@@ -1636,7 +1696,7 @@ export function PulseApp() {
         ...data,
         meetEvents: data.meetEvents.map((item) => (item.id === event.id ? event : item)),
       }));
-      showToast(t("Could not save RSVP"));
+      handleWriteError(error, t("Could not save RSVP"));
     });
   };
 

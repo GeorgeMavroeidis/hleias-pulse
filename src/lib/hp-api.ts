@@ -414,6 +414,25 @@ function assertSupabase() {
   return supabase;
 }
 
+// Accounts are required: there is no anonymous fallback. Every write path
+// throws this when there is no Supabase session, and the UI opens the sign-in
+// sheet instead of surfacing a raw AuthApiError.
+export class AuthRequiredError extends Error {
+  constructor(message = "Sign in required.") {
+    super(message);
+    this.name = "AuthRequiredError";
+  }
+}
+
+// The name check covers a duplicated module instance across bundle chunks,
+// where `instanceof` alone is not reliable in the static build.
+export function isAuthRequiredError(error: unknown): error is AuthRequiredError {
+  return (
+    error instanceof AuthRequiredError ||
+    (typeof error === "object" && error !== null && (error as Error).name === "AuthRequiredError")
+  );
+}
+
 // crypto.randomUUID() only exists in secure contexts (HTTPS/localhost) and
 // on newer browser engines, so it can be missing when testing over plain
 // HTTP (e.g. a LAN IP) or on an older WebView. Fall back to
@@ -429,16 +448,18 @@ function randomIdSuffix(length = 8): string {
     .padEnd(length, "0");
 }
 
-async function ensurePulseUserId() {
+// Nullable read of the current session user. Background writes that must never
+// interrupt the user use this directly and no-op when it returns null.
+async function currentPulseUserId(): Promise<string | null> {
   const client = assertSupabase();
   const sessionResult = await client.auth.getSession();
   if (sessionResult.error) throw sessionResult.error;
-  if (sessionResult.data.session?.user.id) return sessionResult.data.session.user.id;
+  return sessionResult.data.session?.user.id ?? null;
+}
 
-  const signInResult = await client.auth.signInAnonymously();
-  if (signInResult.error) throw signInResult.error;
-  const userId = signInResult.data.user?.id;
-  if (!userId) throw new Error("Anonymous sign-in did not return a user.");
+async function ensurePulseUserId(): Promise<string> {
+  const userId = await currentPulseUserId();
+  if (!userId) throw new AuthRequiredError();
   return userId;
 }
 
@@ -1507,9 +1528,9 @@ export async function setPlaceDeal(
 
 // ---- Trackable coupons (stage B3) -----------------------------------------
 
-// Take a coupon code for the active deal at a place. Any signed-in session
-// (anonymous included) can call it; ensurePulseUserId() guarantees one. A
-// repeat call for the same deal returns the caller's existing live code.
+// Take a coupon code for the active deal at a place. Requires a real account —
+// ensurePulseUserId() throws AuthRequiredError without one. A repeat call for
+// the same deal returns the caller's existing live code.
 export async function issueDealCode(placeId: string): Promise<DealCode> {
   const client = assertSupabase();
   await ensurePulseUserId();
@@ -1707,12 +1728,15 @@ export async function updatePulseCulturalEvent(
   return mapCulturalEvent(result.data);
 }
 
+// Fired by scroll position, not by a gesture. A signed-out reader must never be
+// interrupted for it, so it no-ops instead of demanding an account.
 export async function markPulseStoriesSeen(storyIds: string[]) {
   const uniqueStoryIds = Array.from(new Set(storyIds)).filter(Boolean);
   if (uniqueStoryIds.length === 0) return;
 
   const client = assertSupabase();
-  const userId = await ensurePulseUserId();
+  const userId = await currentPulseUserId();
+  if (!userId) return;
   const result = await client.from("story_views").upsert(
     uniqueStoryIds.map((storyId) => ({
       story_id: storyId,
@@ -1725,9 +1749,12 @@ export async function markPulseStoriesSeen(storyIds: string[]) {
   if (result.error) throw result.error;
 }
 
+// Called as a side effect of other actions, never on its own gesture. Signed-out
+// callers get the empty streak rather than an AuthRequiredError.
 export async function recordPulseActivityDay(): Promise<StreakState> {
   const client = assertSupabase();
-  const userId = await ensurePulseUserId();
+  const userId = await currentPulseUserId();
+  if (!userId) return emptyPulseUserState().streak;
   const today = dayKey(new Date());
 
   const upsertResult = await client

@@ -584,7 +584,7 @@ export function CreateComposerModal({
                       {t("Sign in to post")}
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Saves can be private, public posts need a profile")}
+                      {t("You need an account to post and to save")}
                     </span>
                   </span>
                   <button

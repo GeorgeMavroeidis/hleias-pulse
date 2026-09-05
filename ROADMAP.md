@@ -76,14 +76,15 @@ App Store launch · ready for summer 2027.
 | ✅ | **Image URLs made CORS-safe.** `Special:FilePath` sends no ACAO header, so the thumbnail cache never worked and full 1200–2000px originals were downloaded for 48px markers. | PR #30 |
 | ✅ | `ROADMAP.md` + `CLAUDE.md`, ownership lanes, CODEOWNERS | PR #24, #31 |
 | ✅ | All three branches synced; `main` is the single source of truth | — |
+| ✅ | **`PulseApp.tsx` split** into per-screen files — 7,011 lines down to ~2,400. | PR #34 |
+| ✅ | **Accounts-required flow.** `ensurePulseUserId()` no longer falls back to `signInAnonymously()`; it throws a typed `AuthRequiredError`. Every gated handler opens the sign-in sheet with Greek-first, per-action copy instead of a raw `AuthApiError`. Background writes no-op when signed out. | this PR |
 
 ### Not done
 
 | | What | Owner |
 |---|---|---|
 | ⬜ | **Report / block / mute.** Apple Guideline 1.2 — guaranteed rejection without it. All new files. | **Margaris** |
-| ⬜ | **Accounts-required flow.** Decision made: no anonymous posting. 24 write paths must open the sign-in sheet instead of throwing a raw `AuthApiError`. | Mavroeidis |
-| ⬜ | **Split `PulseApp.tsx`** (7,011 lines) and `styles.css` (3,967). The gate before two people can work in parallel. | Mavroeidis |
+| ⬜ | **Split `styles.css`** (3,967 lines). `PulseApp.tsx` is done; the stylesheet is the remaining single-file bottleneck. | Mavroeidis |
 | ⬜ | **Apply the image migration.** `20260904210000` is merged but not run against the database. | Mavroeidis |
 | ⬜ | **Branch protection** on `main` + require Code Owner review. Without it CI and CODEOWNERS are advisory. | Mavroeidis |
 | ⬜ | `/ship` git automation · repoint the two stale smoke scripts · delete ~15 audit accounts · fix the "roday" typo | Mavroeidis |
@@ -138,5 +139,5 @@ App Store launch · ready for summer 2027.
 ## Open decisions
 
 - [ ] Billing model — flat monthly partnership vs. per-redemption
-- [ ] Anonymous browsing: enable anonymous auth, or require an account to write
+- [x] Anonymous browsing: browsing stays open; **writing requires an account** (2026-09-05)
 - [ ] Web build: keep at parity with iOS, or let it lag during Stage 2

@@ -201,8 +201,21 @@ const EL: Record<string, string> = {
   "Profile identity will be stored with this contribution":
     "Η ταυτότητα του προφίλ σου θα αποθηκευτεί με αυτή την καταχώριση",
   "Sign in to post": "Συνδέσου για να δημοσιεύσεις",
-  "Saves can be private, public posts need a profile":
-    "Τα αποθηκευμένα μένουν ιδιωτικά· οι δημόσιες δημοσιεύσεις θέλουν προφίλ",
+
+  // Accounts-required flow — one prompt per gated action, plus the toast for a
+  // session that expires mid-use.
+  "Sign in to comment": "Συνδέσου για να σχολιάσεις",
+  "Sign in to save": "Συνδέσου για να αποθηκεύσεις",
+  "Sign in to like": "Συνδέσου για να πατήσεις «Μου αρέσει»",
+  "Sign in to mark a visit": "Συνδέσου για να καταγράψεις επίσκεψη",
+  "Sign in to add a place": "Συνδέσου για να προσθέσεις σημείο",
+  "Sign in to post a story": "Συνδέσου για να ανεβάσεις story",
+  "Sign in to host a gathering": "Συνδέσου για να διοργανώσεις συνάντηση",
+  "Sign in to RSVP": "Συνδέσου για να δηλώσεις συμμετοχή",
+  "Sign in to get a code": "Συνδέσου για να πάρεις κωδικό",
+  "Your session expired. Sign in again.": "Η σύνδεσή σου έληξε. Συνδέσου ξανά.",
+  "You need an account to post and to save":
+    "Χρειάζεσαι λογαριασμό για να δημοσιεύσεις και να αποθηκεύσεις",
   "Using {place} image": "Με την εικόνα του {place}",
   "Story photo · using {place} image": "Φωτό story · με την εικόνα του {place}",
   "Shows full-screen, 9:16. Swap in your own photo later — this previews with the place image.":

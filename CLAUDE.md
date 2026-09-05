@@ -118,7 +118,7 @@ npm run test:map-visuals
 npm run ios:sync && npm run ios:open
 ```
 
-## Known issues (last verified 2026-09-04, end of day)
+## Known issues (last verified 2026-09-05)
 
 Ordered by severity. Verified against the live project, not inherited from docs.
 
@@ -126,26 +126,33 @@ Ordered by severity. Verified against the live project, not inherited from docs.
    dashboard. Apple Guideline 1.2 requires content filtering, a report mechanism, user
    blocking and published contact info for every UGC app. Guaranteed App Store rejection
    without it. **Margaris owns this — it is the current Week 1 task.**
-2. **🟠 Signed-out users hit a raw `AuthApiError` on any write.** `ensurePulseUserId()`
-   (`src/lib/hp-api.ts`) falls back to `signInAnonymously()`, which is disabled on the
-   project, and it gates **24 write paths**. **Decision made: accounts are required — we are
-   not enabling anonymous posting.** The work is to make those paths open the sign-in sheet
-   instead of throwing. Not yet implemented.
-3. **🟠 The image migration is written but not applied.**
+2. **🟠 The image migration is written but not applied.**
    `20260904210000_cors_friendly_image_urls.sql` is merged to `main`; the live database
    still holds the old `commons.wikimedia.org` URLs. Until it runs, marker images download
    at full 1200-2000px size on every visit. Needs `supabase db push`.
-4. **🟡 Two smoke scripts target the wrong database.** `smoke-auth-profile.ts` and
+3. **🟡 Two smoke scripts target the wrong database.** `smoke-auth-profile.ts` and
    `smoke-live-surfaces.ts` hardcode `projectRef = "uihwsndveblfgmlhdngi"`; the app uses
    `kfxfnqryfmuxiwlswyyn`, and that other project does not exist in the account.
-5. **🟡 `PulseApp.tsx` is ~7,000 lines**, `styles.css` ~4,000. Splitting them is the
-   prerequisite for two people working in parallel. Next task after report/block.
-   **Do not start new work inside `PulseApp.tsx` until the split lands.**
-6. **🟡 Third-party hotlinked images.** Some place photos come from `visit-olympia.gr`,
+4. **🟡 `styles.css` is still ~4,000 lines.** `PulseApp.tsx` was split in `21dc19e` and is
+   now ~2,400; the stylesheet is the remaining single-file bottleneck for parallel work.
+5. **🟡 Third-party hotlinked images.** Some place photos come from `visit-olympia.gr`,
    `visitkatakolon.gr` and `justforonesummer.com`. CORS and licensing both unresolved.
-7. **🟡 Leftover test data.** ~15 `@hleiaspulse-audit.test` accounts and a few issued deal
+6. **🟡 Leftover test data.** ~15 `@hleiaspulse-audit.test` accounts and a few issued deal
    codes from the 2026-09-04 audit need deleting. The Lechaina deal reads "roday".
-8. **🟡 `main` is not branch-protected.** CI runs but nothing enforces it.
+   No deal is currently live, so the in-app deal callout has nothing to show.
+7. **🟡 `main` is not branch-protected.** CI runs but nothing enforces it.
+
+### Fixed on 2026-09-05 — do not re-diagnose
+
+- **Signed-out writes no longer throw a raw `AuthApiError`.** `ensurePulseUserId()`
+  (`src/lib/hp-api.ts`) no longer falls back to `signInAnonymously()`. **Accounts are
+  required.** Without a session it throws `AuthRequiredError`; use the exported
+  `isAuthRequiredError()` to detect it — never match on the message. Every gated UI
+  handler in `PulseApp.tsx` now calls `requireProfile(action)` before touching state, so
+  the sign-in sheet opens and nothing flickers. `handleWriteError()` catches a session
+  that expires mid-request and routes it to the same sheet. The two background writes
+  (`markPulseStoriesSeen`, `recordPulseActivityDay`) no-op when signed out — they must
+  never open a sheet unprompted.
 
 ### Fixed on 2026-09-04 — do not re-diagnose
 
