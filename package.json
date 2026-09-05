@@ -12,6 +12,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "audit:rls": "tsx scripts/audit-rls.ts",
+    "check:secrets": "tsx scripts/check-secrets.ts",
     "build:static": "vite build --config vite.static.config.ts",
     "deploy:worker": "npm run build:static && npx wrangler deploy",
     "ios:sync": "npm run build:static && cap sync ios",
