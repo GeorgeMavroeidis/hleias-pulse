@@ -28,7 +28,7 @@ The frontend should read from Supabase and write user actions back to Supabase w
 - User-created places, posts, comments, likes, and saved items write to Supabase through anonymous/authenticated sessions.
 - `.env` contains a local `SUPABASE_DB_PASSWORD` and must stay uncommitted.
 - Supabase project files, migrations, generated types, and seed SQL now exist in the repo.
-- Supabase project ref: `uihwsndveblfgmlhdngi`.
+- Supabase project ref: `kfxfnqryfmuxiwlswyyn`.
 
 ## Guardrails
 
@@ -48,14 +48,14 @@ Commands:
 npm install @supabase/supabase-js
 npm install --save-dev supabase
 npx supabase init
-npx supabase link --project-ref uihwsndveblfgmlhdngi --password "$SUPABASE_DB_PASSWORD"
+npx supabase link --project-ref kfxfnqryfmuxiwlswyyn --password "$SUPABASE_DB_PASSWORD"
 npx supabase db pull remote_schema_snapshot --schema public --password "$SUPABASE_DB_PASSWORD"
 ```
 
 Acceptance checks:
 
 - `supabase/` exists locally.
-- The repo is linked to project `uihwsndveblfgmlhdngi`.
+- The repo is linked to project `kfxfnqryfmuxiwlswyyn`.
 - Existing remote schema is captured before local migrations are pushed.
 - No secret values appear in git diff.
 

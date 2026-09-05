@@ -87,7 +87,7 @@ App Store launch · ready for summer 2027.
 | ⬜ | **Split `styles.css`** (3,967 lines). `PulseApp.tsx` is done; the stylesheet is the remaining single-file bottleneck. | Mavroeidis |
 | ⬜ | **Apply the image migration.** `20260904210000` is merged but not run against the database. | Mavroeidis |
 | ⬜ | **Branch protection** on `main` + require Code Owner review. Without it CI and CODEOWNERS are advisory. | Mavroeidis |
-| ⬜ | `/ship` git automation · repoint the two stale smoke scripts · delete ~15 audit accounts · fix the "roday" typo | Mavroeidis |
+| ⬜ | `/ship` git automation · delete ~15 audit accounts · fix the "roday" typo | Mavroeidis |
 
 > **Gate still stands:** Week 2 does not start until `PulseApp.tsx` is split and CI is enforced.
 
