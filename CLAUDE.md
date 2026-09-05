@@ -130,20 +130,23 @@ Ordered by severity. Verified against the live project, not inherited from docs.
    `20260904210000_cors_friendly_image_urls.sql` is merged to `main`; the live database
    still holds the old `commons.wikimedia.org` URLs. Until it runs, marker images download
    at full 1200-2000px size on every visit. Needs `supabase db push`.
-3. **🟡 Two smoke scripts target the wrong database.** `smoke-auth-profile.ts` and
-   `smoke-live-surfaces.ts` hardcode `projectRef = "uihwsndveblfgmlhdngi"`; the app uses
-   `kfxfnqryfmuxiwlswyyn`, and that other project does not exist in the account.
-4. **🟡 `styles.css` is still ~4,000 lines.** `PulseApp.tsx` was split in `21dc19e` and is
+3. **🟡 `styles.css` is still ~4,000 lines.** `PulseApp.tsx` was split in `21dc19e` and is
    now ~2,400; the stylesheet is the remaining single-file bottleneck for parallel work.
-5. **🟡 Third-party hotlinked images.** Some place photos come from `visit-olympia.gr`,
+4. **🟡 Third-party hotlinked images.** Some place photos come from `visit-olympia.gr`,
    `visitkatakolon.gr` and `justforonesummer.com`. CORS and licensing both unresolved.
-6. **🟡 Leftover test data.** ~15 `@hleiaspulse-audit.test` accounts and a few issued deal
+5. **🟡 Leftover test data.** ~15 `@hleiaspulse-audit.test` accounts and a few issued deal
    codes from the 2026-09-04 audit need deleting. The Lechaina deal reads "roday".
    No deal is currently live, so the in-app deal callout has nothing to show.
-7. **🟡 `main` is not branch-protected.** CI runs but nothing enforces it.
+6. **🟡 `main` is not branch-protected.** CI runs but nothing enforces it.
 
 ### Fixed on 2026-09-05 — do not re-diagnose
 
+- **The smoke scripts now target the real database.** `smoke-auth-profile.ts` and
+  `smoke-live-surfaces.ts` hardcoded `projectRef = "uihwsndveblfgmlhdngi"`, a project that
+  does not exist in the account. Both now use `kfxfnqryfmuxiwlswyyn`, matching
+  `src/lib/supabase/client.ts`. The same wrong ref was corrected across `USER.md`,
+  `SUPABASE_BACKEND_PLAN.md`, `AUTH_BACKEND_IMPLEMENTATION.md` and
+  `supabase/remote_schema_snapshot.md`.
 - **Signed-out writes no longer throw a raw `AuthApiError`.** `ensurePulseUserId()`
   (`src/lib/hp-api.ts`) no longer falls back to `signInAnonymously()`. **Accounts are
   required.** Without a session it throws `AuthRequiredError`; use the exported

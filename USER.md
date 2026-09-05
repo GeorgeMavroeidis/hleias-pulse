@@ -64,7 +64,7 @@ Current stack:
 - Lucide icons
 - Framer Motion
 - Supabase JS client
-- Supabase project ref: `uihwsndveblfgmlhdngi`
+- Supabase project ref: `kfxfnqryfmuxiwlswyyn`
 
 Important current files:
 

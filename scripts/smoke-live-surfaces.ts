@@ -13,7 +13,7 @@ import {
 } from "../src/lib/hp-api";
 import { supabase } from "../src/lib/supabase/client";
 
-const projectRef = "uihwsndveblfgmlhdngi";
+const projectRef = "kfxfnqryfmuxiwlswyyn";
 
 function readSupabaseClientConfig() {
   const source = readFileSync("src/lib/supabase/client.ts", "utf8");

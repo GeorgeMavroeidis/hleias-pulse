@@ -4,7 +4,7 @@ Last updated: 2026-06-17
 
 Project: ΗΛΕΙΑ PULSE
 
-Supabase project ref: `uihwsndveblfgmlhdngi`
+Supabase project ref: `kfxfnqryfmuxiwlswyyn`
 
 Status: auth/profile backend, account UI, and live Supabase-backed social surfaces implemented and smoke-tested against the linked remote Supabase project.
 
@@ -241,7 +241,7 @@ The remote project has email confirmations disabled for the early build.
 Evidence:
 
 - `supabase/config.toml` has `[auth.email].enable_confirmations = false`.
-- `npx supabase config push --project-ref uihwsndveblfgmlhdngi` updated the remote auth config.
+- `npx supabase config push --project-ref kfxfnqryfmuxiwlswyyn` updated the remote auth config.
 - Public signup smoke returned an immediate session after the config push.
 - `npm run smoke:auth-profile` logs in through normal email/password auth without an email confirmation click.
 

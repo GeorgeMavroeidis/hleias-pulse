@@ -13,7 +13,7 @@ type SmokeState = {
   userId?: string;
 };
 
-const projectRef = "uihwsndveblfgmlhdngi";
+const projectRef = "kfxfnqryfmuxiwlswyyn";
 
 function readEnvValue(name: string) {
   try {
