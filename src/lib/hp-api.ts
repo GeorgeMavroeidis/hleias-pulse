@@ -1899,3 +1899,144 @@ export async function setCulturalEventLike(eventId: string, liked: boolean) {
 
   if (result.error && result.error.code !== "23505") throw result.error;
 }
+
+// ---------------------------------------------------------------------------
+// Moderation — report, block, mute
+//
+// These six functions and the three types above them are the real
+// implementation of the contract stubbed in
+// `src/components/hp/moderation-api-stub.ts`. Signatures match that file
+// exactly, so the swap is one import line in `moderation-store.ts`.
+//
+// Storage: `content_reports` and `user_blocks`
+// (supabase/migrations/20260905130000_add_user_moderation.sql).
+// ---------------------------------------------------------------------------
+
+export type ReportTargetType =
+  | "post"
+  | "comment"
+  | "place"
+  | "story"
+  | "meet_event"
+  | "cultural_event"
+  | "profile";
+
+export type ReportReason =
+  | "spam"
+  | "harassment"
+  | "hate"
+  | "sexual"
+  | "violence"
+  | "false_info"
+  | "other";
+
+export interface ReportContentInput {
+  targetType: ReportTargetType;
+  targetId: string;
+  reason: ReportReason;
+  note?: string;
+}
+
+const REPORT_NOTE_MAX = 1000;
+
+/**
+ * File a report. Reporting the same target twice updates the existing report
+ * rather than adding a duplicate, which matches the unique constraint and keeps
+ * "how many distinct people reported this" an honest number.
+ */
+export async function reportContent(input: ReportContentInput): Promise<void> {
+  const client = assertSupabase();
+  const reporterId = await ensurePulseUserId();
+  const note = input.note?.trim();
+
+  const result = await client.from("content_reports").upsert(
+    {
+      reporter_id: reporterId,
+      target_type: input.targetType,
+      target_id: input.targetId,
+      reason: input.reason,
+      note: note ? note.slice(0, REPORT_NOTE_MAX) : null,
+    },
+    { onConflict: "reporter_id,target_type,target_id" },
+  );
+
+  if (result.error) throw result.error;
+}
+
+async function setBlockKind(userId: string, kind: "block" | "mute"): Promise<void> {
+  const client = assertSupabase();
+  const blockerId = await ensurePulseUserId();
+  if (userId === blockerId) throw new Error("A user cannot block or mute themselves");
+
+  // One row per pair, so blocking someone you had muted replaces the mute
+  // instead of leaving both flags set.
+  const result = await client
+    .from("user_blocks")
+    .upsert(
+      { blocker_id: blockerId, blocked_id: userId, kind },
+      { onConflict: "blocker_id,blocked_id" },
+    );
+
+  if (result.error) throw result.error;
+}
+
+async function clearBlockKind(userId: string, kind: "block" | "mute"): Promise<void> {
+  const client = assertSupabase();
+  const blockerId = await ensurePulseUserId();
+
+  // Scoped to `kind` so unblocking never silently clears a mute, and vice
+  // versa. Matches the stub, where unblockUser() only touched the blocked set.
+  const result = await client
+    .from("user_blocks")
+    .delete()
+    .eq("blocker_id", blockerId)
+    .eq("blocked_id", userId)
+    .eq("kind", kind);
+
+  if (result.error) throw result.error;
+}
+
+export async function blockUser(userId: string): Promise<void> {
+  await setBlockKind(userId, "block");
+}
+
+export async function unblockUser(userId: string): Promise<void> {
+  await clearBlockKind(userId, "block");
+}
+
+export async function muteUser(userId: string): Promise<void> {
+  await setBlockKind(userId, "mute");
+}
+
+export async function unmuteUser(userId: string): Promise<void> {
+  await clearBlockKind(userId, "mute");
+}
+
+/**
+ * Read the signed-in user's block and mute lists.
+ *
+ * Returns empty lists when signed out rather than throwing: the moderation
+ * store calls this on every identity change, including sign-out, and a
+ * background read must never open the sign-in sheet unprompted.
+ */
+export async function getMyBlocks(): Promise<{ blocked: string[]; muted: string[] }> {
+  const client = assertSupabase();
+  const blockerId = await currentPulseUserId();
+  if (!blockerId) return { blocked: [], muted: [] };
+
+  const result = await client
+    .from("user_blocks")
+    .select("blocked_id, kind")
+    .eq("blocker_id", blockerId);
+
+  if (result.error) throw result.error;
+
+  const blocked: string[] = [];
+  const muted: string[] = [];
+  for (const row of result.data ?? []) {
+    if (row.kind === "block") blocked.push(row.blocked_id);
+    else muted.push(row.blocked_id);
+  }
+
+  return { blocked, muted };
+}

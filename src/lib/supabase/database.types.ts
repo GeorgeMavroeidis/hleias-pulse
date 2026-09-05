@@ -1,3 +1,8 @@
+// NOTE: `content_reports` and `user_blocks` were added by hand, because the
+// migration that creates them (20260905130000_add_user_moderation.sql) has not
+// been applied yet and the generator can only see the live schema. Regenerate
+// this file once that migration runs and these two entries become real.
+
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
@@ -260,6 +265,42 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      content_reports: {
+        Row: {
+          created_at: string;
+          id: string;
+          note: string | null;
+          reason: string;
+          reporter_id: string;
+          status: string;
+          target_id: string;
+          target_type: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          reason: string;
+          reporter_id: string;
+          status?: string;
+          target_id: string;
+          target_type: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          reason?: string;
+          reporter_id?: string;
+          status?: string;
+          target_id?: string;
+          target_type?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       cultural_events: {
         Row: {
@@ -1288,6 +1329,27 @@ export type Database = {
           activity_day?: string;
           created_at?: string;
           user_id?: string;
+        };
+        Relationships: [];
+      };
+      user_blocks: {
+        Row: {
+          blocked_id: string;
+          blocker_id: string;
+          created_at: string;
+          kind: string;
+        };
+        Insert: {
+          blocked_id: string;
+          blocker_id: string;
+          created_at?: string;
+          kind: string;
+        };
+        Update: {
+          blocked_id?: string;
+          blocker_id?: string;
+          created_at?: string;
+          kind?: string;
         };
         Relationships: [];
       };
