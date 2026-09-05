@@ -17,6 +17,7 @@
     "ios:sync": "npm run build:static && cap sync ios",
     "ios:open": "cap open ios",
     "smoke:auth-profile": "tsx scripts/smoke-auth-profile.ts",
+    "smoke:deal-race": "tsx scripts/smoke-deal-race.ts",
     "smoke:live-surfaces": "tsx scripts/smoke-live-surfaces.ts",
     "smoke:post-write": "tsx scripts/smoke-post-write.ts",
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
