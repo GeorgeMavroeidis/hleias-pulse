@@ -1,0 +1,212 @@
+/* Map overlays: reduced motion, story ring, ping, user dot, route, pin, night. */
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.hp-marker-core, .hp-marker-field, .hp-marker-wave, .hp-marker-sweep),
+  .hp-marker-wave::before,
+  .hp-marker-wave::after,
+  .hp-marker-core::after {
+    animation: none !important;
+    will-change: auto !important;
+  }
+
+  :is(
+      .hp-app-shell[data-marker-animation-theme="calm"] :where(.hp-real-map),
+      .hp-animation-theme-option[data-theme-preview="calm"]
+    )
+    .hp-marker-field {
+    opacity: 0.52;
+    transform: scale(1.04);
+  }
+
+  :is(
+      .hp-app-shell[data-marker-animation-theme="calm"] :where(.hp-real-map),
+      .hp-animation-theme-option[data-theme-preview="calm"]
+    )
+    .is-selected
+    .hp-marker-field {
+    opacity: 0.64;
+  }
+
+  :is(
+      .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+      .hp-animation-theme-option[data-theme-preview="pulse"]
+    )
+    .hp-marker-wave::before {
+    opacity: 0.72;
+    transform: scale(1.18);
+  }
+
+  :is(
+      .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
+      .hp-animation-theme-option[data-theme-preview="pulse"]
+    )
+    .hp-marker-wave::after {
+    opacity: 0.48;
+    transform: scale(1.4);
+  }
+
+  :is(
+      .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+      .hp-animation-theme-option[data-theme-preview="signal"]
+    )
+    .hp-marker-wave::before {
+    opacity: 0.7;
+    transform: scale(1.18);
+  }
+
+  :is(
+      .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
+      .hp-animation-theme-option[data-theme-preview="signal"]
+    )
+    .hp-marker-sweep {
+    opacity: 0.75;
+    transform: rotate(-42deg);
+  }
+}
+
+.hp-child-marker__story-ring {
+  position: absolute;
+  inset: -0.5rem;
+  z-index: 0;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--hp-paper), var(--hp-paper)) padding-box,
+    linear-gradient(135deg, #f0a85f 0%, #9b6fe6 100%) border-box;
+  opacity: var(--hp-map-rich);
+  transition: opacity 90ms linear;
+}
+
+@keyframes hp-ping {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--hp-sunset) 45%, transparent);
+  }
+  70% {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 0.7rem color-mix(in srgb, var(--hp-sunset) 0%, transparent);
+  }
+  100% {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.hp-user-dot {
+  position: relative;
+  border-radius: 9999px;
+  background: var(--hp-sunset);
+  border: 2.5px solid var(--hp-paper);
+  box-shadow:
+    0 0 0 1px rgba(23, 20, 17, 0.25),
+    0 4px 10px rgba(23, 20, 17, 0.3);
+}
+
+.hp-user-dot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  border: 2px solid var(--hp-sunset);
+  opacity: 0.5;
+  animation: hp-user-pulse 2.2s ease-out infinite;
+}
+
+@keyframes hp-user-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.hp-real-map .hp-route-line {
+  stroke-linecap: round;
+  animation: hp-dash 0.9s linear infinite;
+  filter: drop-shadow(0 1px 2px rgba(23, 20, 17, 0.25));
+}
+
+@keyframes hp-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.hp-real-map .hp-route-stop {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 2px solid var(--hp-paper);
+  border-radius: 9999px;
+  background: var(--hp-sunset);
+  color: var(--hp-paper);
+  font-family: var(--hp-font-display);
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 5px 14px rgba(23, 20, 17, 0.24);
+}
+
+.hp-route-stop-marker {
+  border: 0;
+  background: transparent;
+}
+
+.hp-real-map.hp-dropping-pin {
+  cursor: crosshair;
+}
+
+.hp-real-map.hp-dropping-pin .leaflet-container {
+  cursor: crosshair;
+}
+
+.hp-pin-target {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 25;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  color: var(--hp-sunset);
+  filter: drop-shadow(0 6px 8px rgba(23, 20, 17, 0.35));
+  animation: hp-pin-bob 1.6s ease-in-out infinite;
+}
+
+@keyframes hp-pin-bob {
+  0%,
+  100% {
+    transform: translate(-50%, -100%);
+  }
+  50% {
+    transform: translate(-50%, -112%);
+  }
+}
+
+.hp-app-shell.is-night .hp-real-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) saturate(0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hp-area-marker__shell,
+  .hp-child-marker__shell,
+  .hp-area-marker__collage,
+  .hp-child-marker__media,
+  .hp-area-marker__copy,
+  .hp-child-marker__copy,
+  .hp-area-marker__status,
+  .hp-child-marker__status,
+  .hp-area-marker__avatars,
+  .hp-child-marker__avatars {
+    transition: none;
+  }
+  .hp-live-ping,
+  .hp-user-dot::after,
+  .hp-real-map .hp-route-line,
+  .hp-pin-target,
+  .hp-shimmer::after {
+    animation: none;
+  }
+}

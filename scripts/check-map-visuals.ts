@@ -123,7 +123,13 @@ console.log(
 );
 
 // Source contracts complement (not replace) real browser visual/DOM checks.
-const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+// styles.css is an index of per-surface partials. Inline them in import order
+// so these contracts keep auditing the whole cascade rather than the entry file.
+const stylesUrl = new URL("../src/styles.css", import.meta.url);
+const css = readFileSync(stylesUrl, "utf8").replace(
+  /^@import "(\.[^"]+)";$/gm,
+  (_match, specifier: string) => readFileSync(new URL(specifier, stylesUrl), "utf8"),
+);
 const mapSource = readFileSync(
   new URL("../src/components/hp/SocialMap.tsx", import.meta.url),
   "utf8",
