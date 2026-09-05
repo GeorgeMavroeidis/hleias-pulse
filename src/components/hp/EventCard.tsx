@@ -22,6 +22,7 @@ import {
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
 import { ImageBox } from "./ImageBox";
+import { ContentMenu } from "./ContentMenu";
 import { useI18n, type AppLanguage } from "@/lib/i18n";
 
 const CATEGORY_ICONS: Record<MeetCategory, LucideIcon> = {
@@ -128,6 +129,17 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
           <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-hp-deep">
             <Clock size={11} /> {formatWhen(event.happensAt, language)}
           </span>
+          <ContentMenu
+            className="-my-1 -mr-1"
+            target={{
+              type: "meet_event",
+              id: event.id,
+              authorUserId: event.userId,
+              authorName: event.hostName,
+              authorAvatarUrl: event.hostAvatar,
+              summary: event.title,
+            }}
+          />
         </div>
 
         {/* Social proof */}

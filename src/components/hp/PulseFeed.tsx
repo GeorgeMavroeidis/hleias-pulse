@@ -18,6 +18,8 @@ import { type PlaceStoryGroup } from "@/lib/hp/place-stories";
 import { LiveTicker } from "./LiveTicker";
 import { TrendingHero } from "./TrendingHero";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
+import { ContentMenu } from "./ContentMenu";
+import { useModeration } from "./use-moderation";
 
 export function PulseFeed({
   posts,
@@ -59,12 +61,15 @@ export function PulseFeed({
   findPostAuthor: (post: Post) => Author;
 }) {
   const { t } = useI18n();
+  const moderation = useModeration();
   const [filter, setFilter] = useState("Now");
   const filters = ["Now", "Tonight", "Weekend", "Local tips"];
   const visiblePosts = posts.filter((post) => {
     const place = findPlace(post.placeId);
     const author = findPostAuthor(post);
     if (!place) return false;
+    // Blocked authors are filtered server-side; muted ones are hidden here.
+    if (moderation.isHidden(post.userId)) return false;
     if (filter === "Now") {
       return (
         place.status === "busy" ||
@@ -175,6 +180,16 @@ export function PulseFeed({
                 >
                   <Bookmark size={16} fill={sv ? "currentColor" : "none"} />
                 </button>
+                <ContentMenu
+                  target={{
+                    type: "post",
+                    id: post.id,
+                    authorUserId: post.userId,
+                    authorName: a.name,
+                    authorAvatarUrl: a.avatarUrl,
+                    summary: post.text,
+                  }}
+                />
               </div>
 
               <button

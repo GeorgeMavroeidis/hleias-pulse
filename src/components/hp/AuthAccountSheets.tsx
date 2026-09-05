@@ -21,6 +21,7 @@ import type { OrganizerStatus } from "@/lib/hp/cultural-events-types";
 import type { BusinessStatus } from "@/lib/hp/business-types";
 import { useI18n } from "@/lib/i18n";
 import { Field, IdentitySegments, SectionHeader, fieldClass } from "./blend-ui";
+import { SafetySection } from "./SafetySection";
 import {
   normalizeHandle,
   profileAvatarUrl,
@@ -997,27 +998,34 @@ export function AccountSheet({
             </div>
 
             {!userId ? (
-              <div className="rounded-3xl border border-hp-ink/10 bg-hp-paper p-4 text-center">
-                <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-hp-sunset text-hp-paper">
-                  <UserCircle2 size={24} />
+              <>
+                <div className="rounded-3xl border border-hp-ink/10 bg-hp-paper p-4 text-center">
+                  <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-hp-sunset text-hp-paper">
+                    <UserCircle2 size={24} />
+                  </div>
+                  <h4 className="text-[15px] font-black text-hp-ink">
+                    {t("Sign in to create a profile")}
+                  </h4>
+                  <p className="mt-1 text-[12px] text-hp-muted">
+                    Saved items can stay private, but posting needs a real profile.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenAuth();
+                    }}
+                    className="mt-4 w-full rounded-full bg-hp-ink py-3 text-[13px] font-bold text-hp-paper"
+                  >
+                    {t("Sign in")}
+                  </button>
                 </div>
-                <h4 className="text-[15px] font-black text-hp-ink">
-                  {t("Sign in to create a profile")}
-                </h4>
-                <p className="mt-1 text-[12px] text-hp-muted">
-                  Saved items can stay private, but posting needs a real profile.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenAuth();
-                  }}
-                  className="mt-4 w-full rounded-full bg-hp-ink py-3 text-[13px] font-bold text-hp-paper"
-                >
-                  {t("Sign in")}
-                </button>
-              </div>
+                {/* Contact details and the content policy stay reachable without
+                    an account — Apple checks for them from a signed-out state. */}
+                <div className="mt-5 text-left">
+                  <SafetySection showBlockedList={false} />
+                </div>
+              </>
             ) : (
               <form onSubmit={submit} className="hp-stagger space-y-6">
                 {/* ── Identity: gradient hero + the one identity control ── */}
@@ -1201,6 +1209,10 @@ export function AccountSheet({
                     </button>
                   </div>
                 </section>
+
+                {/* Safety, blocked accounts, and published contact details.
+                    App Store Guideline 1.2 requires all three inside the app. */}
+                <SafetySection />
 
                 {message && (
                   <p className="rounded-2xl bg-hp-olive/10 px-3 py-2 text-[12px] font-semibold text-hp-olive">

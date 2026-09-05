@@ -224,6 +224,8 @@ import { PostDetailModal } from "./PostDetailModal";
 import { RouteArticleModal } from "./RouteArticleModal";
 import { CreateComposerModal } from "./CreateComposerModal";
 import { BottomNav } from "./BottomNav";
+import { useModerationBridge, type UserLabel } from "./use-moderation";
+import { ModerationSheets } from "./ModerationSheets";
 
 // Accounts are required for every write. Each gated action names itself so the
 // toast tells the user what they were trying to do, in their own language.
@@ -238,6 +240,7 @@ const SIGN_IN_PROMPTS = {
   save: "Sign in to save",
   visit: "Sign in to mark a visit",
   dealCode: "Sign in to get a code",
+  report: "Sign in to report or block",
 } as const;
 
 type SignInAction = keyof typeof SIGN_IN_PROMPTS;
@@ -294,6 +297,9 @@ export function PulseApp() {
   const [composerPin, setComposerPin] = useState<{ lat: number; lng: number } | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  // Mirrors whether a moderation sheet is up, so the shell behind it goes inert
+  // like it does for every other modal.
+  const [moderationSheetOpen, setModerationSheetOpen] = useState(false);
   const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
   const [account, setAccount] = useState<PulseAccountState>({ status: "loading" });
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
@@ -942,6 +948,56 @@ export function PulseApp() {
     () => buildActivityTicks(allPosts, placeById, meetEvents),
     [allPosts, meetEvents, placeById],
   );
+
+  // Blocks and mutes are keyed by auth user id, but the blocked list has to show
+  // a name a person recognises. Loaded content is the only place those two are
+  // paired, so index it once and let the moderation sheet look names up.
+  const userLabelsById = useMemo(() => {
+    const map = new Map<string, UserLabel>();
+    const add = (userId: string | null | undefined, name?: string, avatarUrl?: string | null) => {
+      if (!userId || !name || map.has(userId)) return;
+      map.set(userId, { name, avatarUrl });
+    };
+    for (const post of allPosts) {
+      const base = authorById.get(post.authorId) ?? pulseData.authors[0] ?? fallbackAuthor;
+      const author = displayAuthorForPost(post, base, profilesById);
+      add(post.userId, author.name, author.avatarUrl);
+    }
+    for (const place of places) add(place.userId, place.name);
+    for (const event of meetEvents) add(event.userId, event.hostName, event.hostAvatar);
+    for (const event of culturalEvents) add(event.userId, event.organizerName);
+    for (const group of placeStoryGroups) {
+      for (const story of group.stories) {
+        add(story.userId, story.authorName, story.authorAvatarUrl);
+      }
+    }
+    return map;
+  }, [
+    allPosts,
+    authorById,
+    culturalEvents,
+    meetEvents,
+    placeStoryGroups,
+    places,
+    profilesById,
+    pulseData.authors,
+  ]);
+
+  const resolveUserLabel = useCallback(
+    (userId: string) => userLabelsById.get(userId) ?? null,
+    [userLabelsById],
+  );
+
+  // Report / block / mute. The state lives in moderation-store.ts; this hands it
+  // the app-level callbacks and keeps the lists in step with the account.
+  useModerationBridge({
+    currentUserId: accountStorageUserId,
+    requireProfile: () => requireProfile("report"),
+    showToast,
+    onWriteError: handleWriteError,
+    resolveUserLabel,
+    onSheetOpenChange: setModerationSheetOpen,
+  });
   const activeRoute = useMemo(
     () => (activeRouteId ? (routeById.get(activeRouteId) ?? null) : null),
     [activeRouteId, routeById],
@@ -1897,7 +1953,8 @@ export function PulseApp() {
     profileOpen ||
     authOpen ||
     passwordRecoveryOpen ||
-    onboardingOpen,
+    onboardingOpen ||
+    moderationSheetOpen,
   );
   const renderActiveTab = () => {
     if (tab === "map") {
@@ -2438,6 +2495,8 @@ export function PulseApp() {
             savedPlaceIds={savedIds}
           />
         )}
+
+        <ModerationSheets />
 
         <Toast msg={toast} />
       </div>

@@ -22,6 +22,7 @@ import {
   type Lang,
 } from "@/lib/hp/cultural-events-types";
 import { ImageBox } from "./ImageBox";
+import { ContentMenu } from "./ContentMenu";
 
 const TYPE_ICONS: Record<CulturalEventType, LucideIcon> = {
   theater: Drama,
@@ -94,6 +95,17 @@ export function CulturalEventCard({ event, lang, onOpenDetail }: Props) {
             </span>
           )}
         </div>
+        <ContentMenu
+          className="absolute right-2 top-2"
+          tone="light"
+          target={{
+            type: "cultural_event",
+            id: event.id,
+            authorUserId: event.userId,
+            authorName: event.organizerName,
+            summary: title,
+          }}
+        />
         <div className="absolute bottom-2 left-3 right-3 text-hp-paper">
           <h3 className="text-[16px] font-black leading-tight drop-shadow-sm">{title}</h3>
           <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] font-bold text-hp-paper/85">
