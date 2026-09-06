@@ -251,6 +251,7 @@ Modules, with status verified against the code (not against prior claims):
   `smoke:deal-race`, `smoke:live-surfaces`, `smoke:moderation`, `smoke:post-write`
 - Admin privilege model (owner / editor / moderator, `has_admin_role`, the audit
   log): `npm run smoke:admin`
+- Organizer / business self-verification guards: `npm run smoke:verification-guards`
 - Unit tests: `npm run test:intelligence`, `npm run test:discovery`
 - Map visuals check: `npm run test:map-visuals`
 - Generate Supabase seed data: `npm run supabase:generate-seed`
@@ -263,7 +264,8 @@ Modules, with status verified against the code (not against prior claims):
 Supabase project**, creates real rows and real users, and cleans up in a `finally`.
 Several also shell out to `npx supabase … api-keys` for a `service_role` key from
 your local CLI session, and `smoke:admin` / `smoke:block-enforcement` /
-`smoke:deal-race` / `smoke:moderation` / `audit:rls` additionally need
+`smoke:deal-race` / `smoke:moderation` / `smoke:verification-guards` /
+`audit:rls` additionally need
 `SUPABASE_DB_PASSWORD` in `.env` for a direct `pg` connection — via the pooler
 (`aws-0-eu-central-1.pooler.supabase.com`, user `postgres.<ref>`), because this
 project has no `db.<ref>.supabase.co` direct host. None of them can run in CI,
