@@ -282,7 +282,9 @@ mute (wired + server-enforced + `smoke:moderation`). Treat all of it as
 
 - **`ROADMAP.md`** — the ordered plan: the three stages (REPAIR → BUILD →
   DEPLOY), what each stage is done-when, and a short "Next up" list. **Read it at
-  the start of a session.** It is the answer to "what's next".
+  the start of a session.** It is the answer to "what's next". Note the standing
+  constraint at the top: **no spending until February 2027** — free tiers only,
+  and don't propose next steps that need a paid account before then.
 - **`IDEAS.md`** — the unordered backlog and the open product/technical
   questions. Feeds into the roadmap.
 - **`SECURITY.md`** — the security checklist and the reasoning behind the

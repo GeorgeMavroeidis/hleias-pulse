@@ -6,49 +6,71 @@
 > unordered backlog and the open product/technical questions live in `IDEAS.md`;
 > the security checklist lives in `SECURITY.md`.
 >
-> `v1 — 2026-09-06`. Drafted by the coding agent from the codebase and history.
-> **The timeline, the billing model, and the order of "Next up" are product
-> calls — Mavroeidis sets those, not the agent.** Everything marked ⚠️ is a
-> placeholder waiting on that.
+> `v1 — 2026-09-06`, budget constraint added `2026-09-07`. Drafted by the coding
+> agent from the codebase and history. **The timeline, the billing model, and
+> the order of "Next up" are product calls — Mavroeidis sets those, not the
+> agent.** Everything marked ⚠️ is a placeholder waiting on that.
 
 **Target:** ready for the 2027 tourist season in Ilia — the season runs roughly
 April–October, so the app needs real content and a public build **by spring
 2027**. ⚠️ *Set the exact date you're working back from.*
 
+## Budget constraint — no spending until February 2027
+
+**Nothing that costs money happens before February 2027.** That includes:
+- the **Apple Developer Program** (~€99/year — unavoidable to put the app on
+  iPhones, TestFlight included),
+- any **paid tier** of a hosting, database, monitoring, or push service,
+- paid fonts, assets, domains.
+
+Until February we use **free tiers only** and do work that costs nothing. The
+paid items below are marked ⏸ and parked behind this gate — they are not
+cancelled, just deferred.
+
+**Timeline risk to be aware of (Mavroeidis's call, not the agent's):** the Apple
+side — Developer account approval, first signed build, a TestFlight round, then
+App Store review — realistically needs **6–10 weeks** from a standing start. If
+paid work begins in February and the season target is spring 2027, that path is
+tight. Options: accept a later-in-season launch, find the ~€99 sooner, or ship
+the web build first and the iOS app during the season.
+
 ---
 
 ## Right now
 
-**Stage 1 (REPAIR) is done. We're at the start of Stage 2 (BUILD).**
+**Stage 1 (REPAIR) is done. We're in Stage 2 (BUILD).**
 
-Current focus: **get a real build onto a real iPhone** (TestFlight). Almost
-everything else in Stage 2 needs testers who aren't us, so this unblocks the
-rest.
+Current focus (Oct 2026 – Jan 2027): **the free work** — code, tests, and
+free-tier services. The paid/Apple track starts in February.
 
-## Next up (ordered)
+## Next up (ordered) — free work first
 
-1. **First TestFlight build.** Open an Apple Developer account, produce a signed
-   build, install it on a real device, invite 5–10 real testers.
-2. **Confirm the web deploy works end to end.** `npm run deploy:worker` uploads
-   to Cloudflare — nobody has verified the deployed site actually runs, only that
-   the script exists.
-3. **Story expiry.** Expired stories are still readable straight off the table
+1. **Story expiry.** Expired stories are still readable straight off the table
    (the 6h/24h cutoff lives only in `get_pulse_bootstrap()`, not the row-security
    policy) and nothing ever deletes them. Add the cutoff to the policy **and**
-   decide a deletion schedule — this is user photos tied to a location, so EU
-   privacy law applies. See `IDEAS.md` → Security.
-4. **Decide the billing model** — flat monthly partnership fee vs. a cut per
-   redeemed deal. This blocks the business-facing half of Stage 2 (onboarding
-   flow, the owner's dashboard, what numbers it shows). ⚠️ *Your call.*
-5. **Error tracking + rate limiting.** Error tracking (e.g. Sentry) so a crash in
-   the wild is visible; rate limiting so a single account can't run up abuse or
-   cost. Both are cheap now and expensive to retrofit under load.
-6. **Test coverage for the untested modules** — `admin` (the whole
-   owner/editor/moderator permission model), cultural events / organizers,
-   business verification, routes. The admin surface is the sharpest gap: it's the
-   one area with its own privilege-escalation path and nothing exercises it.
+   decide a deletion schedule — user photos tied to a location, so EU privacy law
+   applies. One migration + a cleanup job. See `IDEAS.md` → Security.
+2. **Test coverage for the untested modules**, starting with `admin` — the whole
+   owner/editor/moderator permission model has zero tests and it's the one
+   surface with its own privilege-escalation path. Then cultural events /
+   organizers, business verification, routes. Pure code, no migration, no cost.
+3. **Confirm the web deploy works end to end.** `npm run deploy:worker` uploads
+   to Cloudflare (free tier) — nobody has verified the deployed site actually
+   runs, only that the script exists. May need a free Cloudflare account first.
+4. **Error tracking + rate limiting.** Error tracking on a free tier (e.g. Sentry
+   ~5k errors/month free) so a crash in the wild is visible; rate limiting at the
+   app or database layer (no paid service needed) so one account can't run up
+   abuse or cost.
+5. **Web push notifications.** A reason to come back. Web push is free; Apple push
+   (APNs) needs the Developer account, so that half is ⏸ until February.
+6. ⏸ **First TestFlight build** — *blocked until February* (needs the paid Apple
+   Developer account). Everything else that can be done without it should be done
+   by then: build config, app icons, privacy-policy text, App Store copy.
+7. ⏸ **Decide the billing model** — flat monthly fee vs. per-redemption cut.
+   Doesn't block the free work; needed before the business dashboard. ⚠️ *Your
+   call, any time.*
 
-Keep this list to ~6. When something lands, tick it in the stage below and pull
+Keep this list to ~6–7. When something lands, tick it in the stage below and pull
 the next item up from `IDEAS.md`.
 
 ---
@@ -75,15 +97,20 @@ team.
 
 **Objective:** make it worth opening a second time.
 
-Work: TestFlight build + Apple Developer account · confirm the web deploy ·
-story expiry + retention · notifications (a reason to come back) · the
-business-onboarding flow and the owner's redemption dashboard (gated on the
-billing decision) · error tracking + rate limiting · fill the test-coverage
-gaps · App Store compliance groundwork (privacy policy, data-use labels).
+Split by the budget gate:
+
+- **Oct 2026 – Jan 2027 (free):** story expiry + retention · test-coverage gaps ·
+  confirm the web deploy (free tier) · error tracking + rate limiting on free
+  tiers · web push notifications · App Store groundwork that costs nothing
+  (privacy-policy text, icons, store copy) · start recruiting locals (Stage 3
+  work, but the lead time is long).
+- **Feb 2027 onward (paid unlocked):** Apple Developer account · first TestFlight
+  build + real testers · Apple push notifications · the business-onboarding flow
+  and owner's dashboard (also needs the billing decision).
 
 **Done when:**
 - A first-time user in Pyrgos understands what the app is for within 30 seconds.
-- Apple accepts a TestFlight build and real testers are using it.
+- Apple accepts a TestFlight build and real testers are using it. *(Feb+)*
 - A real café or shop owner has run a real deal redemption, start to finish.
 - Story expiry and moderation are trustworthy — expired content is gone, a
   reported item reaches a moderator, a block actually holds.
@@ -110,10 +137,13 @@ is slow and can't be compressed near the deadline.
 
 ## What a deadline can't compress
 
+- **The February budget gate** — no Apple Developer account, no paid services
+  before then. Everything on the paid track starts in February at the earliest.
 - **Apple review** — days to weeks per submission, and a rejection restarts the
-  clock. Submit the first TestFlight build early.
+  clock. Once the account exists, submit the first TestFlight build immediately.
 - **Real locals and real businesses** — weeks of conversations. No amount of
-  engineering speed substitutes for this.
+  engineering speed substitutes for this. This is why recruiting starts now, not
+  after the app is done.
 - **Database migrations** — each one needs explicit approval and goes in one at a
   time (see `CLAUDE.md` → Guardrails). Don't batch a stack of schema changes for
   the week before launch.
@@ -122,8 +152,10 @@ is slow and can't be compressed near the deadline.
 
 - [ ] **Billing model** — flat monthly partnership fee vs. per-redemption cut.
       Blocks the business-facing Stage 2 work.
-- [ ] **Web build** — keep it at full parity with iOS, or let it lag while Stage
-      2 focuses on the app?
+- [ ] **Web build** — the budget gate makes it the near-term focus by default
+      (it can ship on free hosting now; the iOS app can't). Confirm that's the
+      intent, and decide whether it stays at full feature parity once the iOS
+      track opens in February.
 - [ ] **iOS identity** — the bundle id and display name are still
       `com.theodoros.iliapulse` / "Ilia Pulse". Rebrand to "Hleias Pulse", or
       keep the internal id and only change the visible name?
