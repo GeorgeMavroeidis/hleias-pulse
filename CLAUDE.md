@@ -300,9 +300,11 @@ Not yet confirmed as actually shipped, even though the tooling exists:
 - Open pull requests (with a summary of what changed and why)
 
 **Still needs a human:**
-- Merging a PR into `main` — this is the one checkpoint that catches a mistake
-  before it's live for both of you; auto-merging removes the entire point of
-  having PRs
+- Merging a PR into `main` — **Mavroeidis's call, and his alone.** `main` no
+  longer requires a second maintainer's approval; it requires CI green (the
+  `lint · typecheck · test · build` check) and resolved conversations. So the
+  gate is "checks pass + he decides it ships", not "the other person signs off".
+  A human still clicks merge — never automation.
 - Force-pushing, rewriting history, or deleting branches
 - Pushing directly to `main`, bypassing PRs entirely
 
@@ -352,6 +354,8 @@ instead of a silent runtime bug later.
 model, a new dependency, anything user-facing that ships. For low-stakes
 implementation details the builder decides and notes it for the other to review
 later; don't let "discuss first" block a small call when one of you is offline.
+**When something ships is Mavroeidis's call** — he merges to `main` when he
+judges it ready, without waiting on a second sign-off.
 
 **Workflow:**
 - Branch per task, small commits, PR into `main`

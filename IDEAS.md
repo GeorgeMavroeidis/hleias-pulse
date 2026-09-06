@@ -66,13 +66,15 @@
   worth doing a bit earlier than the rest of this list
 - ~~CI pipeline (auto-run tests)~~ — **already built.**
   `.github/workflows/ci.yml` runs lint → secret scan → typecheck → the three
-  offline test suites → build, on every PR and every push to `main`. Two gaps
-  remain, and they are the real items:
+  offline test suites → build, on every PR and every push to `main`. One gap
+  left:
   - **CD** — no deploy job. `deploy:worker` is still run by hand.
-  - **Branch protection** — CI runs but nothing forces it green before merge.
-    One settings change on `main` (require the CI check to pass). CODEOWNERS
-    review is optional now that both maintainers own everything — turn it on
-    only if you want a hard "someone else looked at it" gate.
+
+  ~~Branch protection~~ is configured (2026-09-06): `main` requires the
+  `lint · typecheck · test · build` check green and resolved conversations,
+  blocks force-push/delete, and enforces for admins. **Required approvals: 0** —
+  Mavroeidis merges solo, no second sign-off. Bump it back to 1 only if you
+  decide you want a hard "someone else looked at it" gate.
 - Rate limiting — add before public launch, prevents abuse/cost spikes; not
   needed while it's just the two of you testing
 - Caching / CDN for the Map and Stories feeds — static assets already get
