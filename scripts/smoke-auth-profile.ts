@@ -33,7 +33,7 @@ function readEnvValue(name: string) {
 function readSupabaseClientConfig() {
   const source = readFileSync("src/lib/supabase/client.ts", "utf8");
   const url = source.match(/const supabaseUrl = "([^"]+)"/)?.[1];
-  const publishableKey = source.match(/const supabasePublishableKey =\s*\n\s*"([^"]+)"/)?.[1];
+  const publishableKey = source.match(/const supabasePublishableKey\s*=\s*"([^"]+)"/)?.[1];
 
   if (!url || !publishableKey) {
     throw new Error("Could not read Supabase URL/publishable key from src/lib/supabase/client.ts.");

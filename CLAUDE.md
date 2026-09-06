@@ -104,7 +104,7 @@ real boundary is *client code vs. database*, and it falls on a clean seam:
 | UI | `src/components/hp/**` (product), `src/components/admin/**`, `src/components/ui/**` (shadcn) | 40+ files; no Supabase imports of its own |
 | Data access | `src/lib/hp-api.ts` (2042 lines), `src/lib/admin-api.ts` (339), `src/lib/hp-auth.ts` | these three are the **only** files that import the Supabase client — verified, zero component does |
 | Domain types / logic | `src/lib/hp-model.ts`, `src/lib/hp/**` | pure, testable — this is what the unit tests cover |
-| Backend | `supabase/migrations/**` (30 migrations, 29 tables) | tables, RLS policies, Postgres functions, triggers |
+| Backend | `supabase/migrations/**` (30 migrations, 30 tables, 115 RLS policies) | tables, RLS policies, Postgres functions, triggers. `supabase/policy-snapshot.json` is the committed baseline for `audit:rls --check` |
 | Generated contract | `src/lib/supabase/database.types.ts` | `supabase gen types typescript` output — the thing that makes a schema change a compile error (see Team Notes) |
 
 **Route files are not where the split happens** — there are only three of them
@@ -227,8 +227,11 @@ Modules, with status verified against the code (not against prior claims):
 Supabase project**, creates real rows and real users, and cleans up in a `finally`.
 Several also shell out to `npx supabase … api-keys` for a `service_role` key from
 your local CLI session, and `smoke:block-enforcement` / `smoke:deal-race` /
-`smoke:moderation` / `audit:rls` additionally need `SUPABASE_DB_PASSWORD` for a
-direct `pg` connection. None of them can run in CI, and none should be run
+`smoke:moderation` / `audit:rls` additionally need `SUPABASE_DB_PASSWORD` in
+`.env` for a direct `pg` connection — via the pooler
+(`aws-0-eu-central-1.pooler.supabase.com`, user `postgres.<ref>`), because this
+project has no `db.<ref>.supabase.co` direct host. None of them can run in CI,
+and none should be run
 casually against production.
 
 ## Current Priorities / Phase
@@ -243,22 +246,27 @@ so treat this as "functionally works," not "safe for strangers yet":
 - Cultural events, organizer verification, place claims
 - The Deal pipeline: issue a code → redeem it → recorded in `deal_redemptions`
 - The `/admin` moderation workspace
-- Reporting, blocking and muting — **wired to Supabase on 2026-09-06.** This was
-  listed as working for weeks while the UI called an in-memory stub; it is real
-  now, and `smoke:moderation` exists specifically so it cannot silently regress.
-  `smoke:moderation` writes to the live project and has not been run yet — run it
-  before treating this as verified.
+- Reporting, blocking and muting — **wired to Supabase and verified end to end on
+  2026-09-06** (`smoke:moderation`, run against the live project). Was listed as
+  working for weeks while the UI called an in-memory stub; `smoke:moderation`
+  exists specifically so it cannot silently regress. Note the deliberate
+  behaviour it locks in: once a moderator moves a report off `status = 'open'`,
+  the reporter cannot touch the row, and re-filing surfaces "already reviewed"
+  rather than reopening it (`content_reports_update_own`, `20260905160000`).
 
 Not yet confirmed as actually shipped, even though the tooling exists:
 - iOS app via Capacitor (`ios:sync` / `ios:open` scripts exist)
 - Live deployment to Cloudflare (`deploy:worker` script exists)
 
 **Before opening this to real outside users:**
-- Run `smoke:moderation` against the live project — the moderation swap is
-  committed but has not been exercised end to end yet
-- Generate and commit `supabase/policy-snapshot.json`. Without it
-  `npm run audit:rls -- --check` exits 1 and the RLS drift gate is inert — which
-  is the check that would have caught `meet_events` gaining a second INSERT policy
+- ~~Run `smoke:moderation`~~ — done 2026-09-06, passes.
+- ~~Generate and commit `supabase/policy-snapshot.json`~~ — done 2026-09-06;
+  `audit:rls --check` passes. Re-run `npm run audit:rls` (no flag) to refresh the
+  baseline after any migration that touches a policy, and state the resulting
+  per-table per-command counts in the PR.
+- **Expired stories are readable straight off the `stories` table** — the 6h/24h
+  filter lives only in `get_pulse_bootstrap()`, not the SELECT policy, and nothing
+  deletes them. See IDEAS.md → Security. GDPR applies (user media, location).
 - A hardening pass on everything above — you already suspect the rough edges;
   better you find them than a stranger does
 - Confirm the iOS build and Cloudflare deployment actually work end-to-end, not

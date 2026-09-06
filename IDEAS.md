@@ -31,27 +31,31 @@
   decide a retention/deletion story — this is user media tied to a location, so
   GDPR applies.
 
-- **A reporter can reopen or rewrite a report a moderator already closed.**
-  `content_reports_update_own` (`20260905130000_add_user_moderation.sql`) is
-  `using (reporter_id = auth.uid())` with no status restriction, and
-  `with check (... and status = 'open')`. The USING side lets a reporter update an
-  `actioned` or `dismissed` row; the WITH CHECK side permits the new status to be
-  `'open'`. So a closed report can be flipped back open, and its `reason`, `note`,
-  `target_type` and `target_id` rewritten after the fact. See Open Questions for
-  whether to narrow it or drop it.
+- ~~**A reporter can reopen or rewrite a report a moderator already closed.**~~
+  **Already fixed in the live DB, and this audit note was wrong about the state.**
+  `20260905160000_close_rls_audit_gaps.sql` narrowed `content_reports_update_own`
+  to `using (reporter_id = auth.uid() and status = 'open')` — the note above
+  describes the earlier `20260905130000` version, which is not what is live.
+  Verified 2026-09-06: re-filing a report a moderator has `actioned` raises
+  `42501` on the USING clause, and `smoke:moderation` now asserts that
+  `reportContent()` surfaces it as a plain "already reviewed" message and leaves
+  the actioned row untouched.
 
-- **`audit:rls`'s drift gate has never had a baseline.**
-  `supabase/policy-snapshot.json` does not exist and is not in git history, so
-  `npm run audit:rls -- --check` cannot pass — it exits 1 with "does not exist
-  yet". Only the no-arg write mode has ever been run. The entire reason the script
-  was written (catch a table silently gaining a second INSERT policy, the way
-  `meet_events` did) is currently inert. Generate the snapshot and commit it.
+- ~~**`audit:rls`'s drift gate has never had a baseline.**~~ **Fixed 2026-09-06.**
+  `supabase/policy-snapshot.json` is generated and committed;
+  `npm run audit:rls -- --check` passes ("Live policy state matches"). It also
+  turned out all four `pg`-based scripts (`audit:rls`, `smoke:block-enforcement`,
+  `smoke:deal-race`, `smoke:moderation`) were pointed at `db.<ref>.supabase.co`,
+  which does not resolve for this pooler-only project — all four now use
+  `aws-0-eu-central-1.pooler.supabase.com` with user `postgres.<ref>`.
 
-- **Good news worth recording, so nobody re-audits it from scratch:** all 29
-  tables have RLS enabled _and_ at least one policy — zero coverage gaps — and
-  every SECURITY DEFINER function has an explicit `search_path`, which
-  `audit-rls.ts` calls out as its own privilege-escalation route. There are no
-  Supabase Edge Functions to audit.
+- **Good news worth recording, so nobody re-audits it from scratch** (snapshot,
+  2026-09-06): all **30** tables have RLS enabled _and_ at least one policy —
+  `rlsDisabled` is empty, zero coverage gaps — 115 policies total, and all 17
+  SECURITY DEFINER functions have an explicit `search_path`, which `audit-rls.ts`
+  calls out as its own privilege-escalation route. No Supabase Edge Functions to
+  audit. `meet_events` INSERT is a single policy and `content_reports` UPDATE is
+  two (own + admin) — both PR #47 gaps are closed.
 
 ## Architecture / Tech Debt
 
@@ -118,11 +122,13 @@
   policy hides them; deletion is what GDPR retention actually wants. Probably
   both — but the deletion half needs a decision on whether the media in Storage
   goes with the row.
-- Should `content_reports_update_own` be narrowed to
-  `using (... and status = 'open')`, or dropped outright? A reporter arguably has
-  no business editing a filed report at all. The only consumer is the
-  `reportContent()` upsert, which exists to dedupe re-reports, not to allow
-  revision — and that path can be satisfied without a general UPDATE grant.
+- ~~Should `content_reports_update_own` be narrowed to
+  `using (... and status = 'open')`, or dropped outright?~~ **Decided 2026-09-06:
+  keep it narrowed (it already is, via `20260905160000`).** A reporter may still
+  correct a report they just filed, up until a moderator picks it up; after that
+  the row is theirs no longer. `reportContent()` and `smoke:moderation` are
+  aligned with this. Dropping the policy entirely was considered and rejected —
+  the "fix a typo in the reason right after filing" case is worth keeping.
 - ~~What does the `live-surfaces` module/smoke test actually cover?~~ — **answered**,
   see Architecture in CLAUDE.md. It is not a module: it is the
   `20260617161000_make_live_surfaces_supabase.sql` migration (the cutover off mock

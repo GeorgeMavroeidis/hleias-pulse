@@ -1941,9 +1941,16 @@ export interface ReportContentInput {
 const REPORT_NOTE_MAX = 1000;
 
 /**
- * File a report. Reporting the same target twice updates the existing report
- * rather than adding a duplicate, which matches the unique constraint and keeps
- * "how many distinct people reported this" an honest number.
+ * File a report. Reporting the same target twice updates the existing open
+ * report in place (the unique key is reporter + target, not reason), rather than
+ * adding a duplicate — keeping "how many distinct people reported this" honest.
+ *
+ * Once a moderator moves the report off `status = 'open'`, the reporter can no
+ * longer touch the row — `content_reports_update_own` is
+ * `using (reporter_id = auth.uid() and status = 'open')`
+ * (20260905160000_close_rls_audit_gaps.sql), which deliberately stops a reporter
+ * reopening or rewriting an actioned report. Re-filing the same pair then trips
+ * that policy; this surfaces it as a plain message instead of a raw 42501.
  */
 export async function reportContent(input: ReportContentInput): Promise<void> {
   const client = assertSupabase();
@@ -1957,19 +1964,19 @@ export async function reportContent(input: ReportContentInput): Promise<void> {
       target_id: input.targetId,
       reason: input.reason,
       note: note ? note.slice(0, REPORT_NOTE_MAX) : null,
-      // Set explicitly, and not just on insert. On the conflict path this is an
-      // UPDATE, and content_reports_update_own's WITH CHECK requires the NEW row
-      // to have status = 'open'. Leaving it out keeps whatever the moderator
-      // last set, so re-reporting a target whose report was already actioned or
-      // dismissed fails the policy and the user sees "Could not send the
-      // report." Re-reporting is exactly the signal a closed report was closed
-      // too early, so reopening it is also the behaviour we want.
-      status: "open",
     },
     { onConflict: "reporter_id,target_type,target_id" },
   );
 
-  if (result.error) throw result.error;
+  if (result.error) {
+    // 42501 here means the conflict-update path hit content_reports_update_own's
+    // USING clause: the reporter already filed this exact pair and a moderator
+    // has since moved it off 'open'. Nothing more for the reporter to do.
+    if (result.error.code === "42501") {
+      throw new Error("You have already reported this, and a moderator has reviewed it.");
+    }
+    throw result.error;
+  }
 }
 
 async function setBlockKind(userId: string, kind: "block" | "mute"): Promise<void> {

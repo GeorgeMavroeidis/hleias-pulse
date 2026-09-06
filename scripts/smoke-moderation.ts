@@ -18,10 +18,12 @@
  * What it asserts, as user A against user B:
  *
  *   reportContent()    writes a row A can read back
- *   re-report          updates in place, never duplicates (the unique
- *                      constraint / onConflict path)
- *   re-report reopens  a report a moderator already actioned — the WITH CHECK
- *                      edge case in content_reports_update_own
+ *   re-report          updates the open report in place, never duplicates (the
+ *                      unique constraint / onConflict path)
+ *   actioned report    is locked to the reporter: re-filing the same pair is
+ *                      refused with a friendly message (not a raw 42501) and
+ *                      the actioned row is left untouched — content_reports_
+ *                      update_own's `status = 'open'` USING clause
  *   blockUser()        lands a real `kind='block'` row, verified over `pg`,
  *                      not just read back through the same client that wrote it
  *   getMyBlocks()      returns it after a fresh sign-in
@@ -79,7 +81,7 @@ function readEnvValue(name: string) {
 function readSupabaseClientConfig() {
   const source = readFileSync("src/lib/supabase/client.ts", "utf8");
   const url = source.match(/const supabaseUrl = "([^"]+)"/)?.[1];
-  const publishableKey = source.match(/const supabasePublishableKey =\s*\n\s*"([^"]+)"/)?.[1];
+  const publishableKey = source.match(/const supabasePublishableKey\s*=\s*"([^"]+)"/)?.[1];
 
   if (!url || !publishableKey) {
     throw new Error("Could not read Supabase URL/publishable key from src/lib/supabase/client.ts.");
@@ -115,11 +117,16 @@ function createPgClient() {
     throw new Error("SUPABASE_DB_PASSWORD is missing. Put it in .env, like the other smokes.");
   }
 
+  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
+  // not resolve. withPg() opens a fresh connection per assertion and this script
+  // runs only plain queries (no `set role`), so transaction mode (port 6543) is
+  // the right fit — session mode stalls on the rapid connect/end churn.
+  // User is postgres.<ref>.
   return new pg.Client({
-    host: `db.${projectRef}.supabase.co`,
-    port: 5432,
+    host: "aws-0-eu-central-1.pooler.supabase.com",
+    port: 6543,
     database: "postgres",
-    user: "postgres",
+    user: `postgres.${projectRef}`,
     password,
     ssl: { rejectUnauthorized: false },
   });
@@ -228,30 +235,43 @@ async function main() {
     assert(afterSecond.rows[0].reason === "harassment", "Re-report did not update the reason.");
     console.log("[report] re-report updated in place, no duplicate");
 
-    // Regression guard for the WITH CHECK edge case: once a moderator closes a
-    // report, re-reporting takes the UPDATE path, and content_reports_update_own
-    // requires the NEW row to be status='open'. Without an explicit status in
-    // the upsert payload this fails the policy and the user sees only "Could
-    // not send the report."
+    // Once a moderator moves the report off 'open', the reporter is locked out
+    // of the row: content_reports_update_own is
+    //   using (reporter_id = auth.uid() and status = 'open')
+    // (20260905160000_close_rls_audit_gaps.sql), which deliberately stops a
+    // reporter reopening or rewriting an actioned report. Re-filing the same
+    // pair must fail cleanly with reportContent()'s friendly message — never a
+    // raw 42501 — and must not touch the actioned row.
     await withPg((client) =>
       client.query(
         "update public.content_reports set status = 'actioned' where reporter_id = $1 and target_id = $2",
         [userA, userB],
       ),
     );
-    await reportContent({ targetType: "profile", targetId: userB, reason: "hate" });
-    const afterReopen = await withPg((client) =>
-      client.query<{ status: string }>(
-        "select status from public.content_reports where reporter_id = $1 and target_id = $2",
+    let rejected: unknown;
+    try {
+      await reportContent({ targetType: "profile", targetId: userB, reason: "hate" });
+    } catch (error) {
+      rejected = error;
+    }
+    assert(
+      rejected instanceof Error && /already reported this/i.test(rejected.message),
+      `Re-reporting an actioned report should reject with the friendly message, got: ${
+        rejected instanceof Error ? rejected.message : String(rejected)
+      }`,
+    );
+    const afterBlocked = await withPg((client) =>
+      client.query<{ reason: string; status: string }>(
+        "select reason, status from public.content_reports where reporter_id = $1 and target_id = $2",
         [userA, userB],
       ),
     );
-    assert(afterReopen.rowCount === 1, "Re-report after actioning lost or duplicated the row.");
+    assert(afterBlocked.rowCount === 1, "The actioned report was lost or duplicated.");
     assert(
-      afterReopen.rows[0].status === "open",
-      `Re-reporting an actioned report left status=${afterReopen.rows[0].status}, not 'open'.`,
+      afterBlocked.rows[0].status === "actioned" && afterBlocked.rows[0].reason === "harassment",
+      `The actioned report was mutated: status=${afterBlocked.rows[0].status} reason=${afterBlocked.rows[0].reason}.`,
     );
-    console.log("[report] re-reporting an actioned report reopens it");
+    console.log("[report] re-reporting an actioned report is refused, row untouched");
 
     // -- blocks and mutes ---------------------------------------------------
     const blockKind = async () =>
@@ -337,8 +357,12 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(
-    `smoke_moderation_failed ${error instanceof Error ? error.message : String(error)}`,
-  );
+  const detail =
+    error instanceof Error
+      ? (error.stack ?? error.message)
+      : typeof error === "object" && error !== null
+        ? JSON.stringify(error, null, 2)
+        : String(error);
+  console.error(`smoke_moderation_failed ${detail}`);
   process.exit(1);
 });
