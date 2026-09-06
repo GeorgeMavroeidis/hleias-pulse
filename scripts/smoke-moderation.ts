@@ -20,9 +20,10 @@
  *   reportContent()    writes a row A can read back
  *   re-report          updates the open report in place, never duplicates (the
  *                      unique constraint / onConflict path)
- *   actioned report    is locked to the reporter: re-filing the same pair is
- *                      refused with a friendly message (not a raw 42501) and
- *                      the actioned row is left untouched — content_reports_
+ *   actioned report    is locked to the reporter: re-filing the same pair
+ *                      throws ReportAlreadyReviewedError (not a raw 42501; the
+ *                      store turns it into a plain toast, not a retry prompt)
+ *                      and the actioned row is left untouched — content_reports_
  *                      update_own's `status = 'open'` USING clause
  *   blockUser()        lands a real `kind='block'` row, verified over `pg`,
  *                      not just read back through the same client that wrote it
@@ -47,6 +48,7 @@ import { supabase } from "../src/lib/supabase/client";
 import {
   blockUser,
   getMyBlocks,
+  isReportAlreadyReviewedError,
   muteUser,
   reportContent,
   unblockUser,
@@ -255,9 +257,9 @@ async function main() {
       rejected = error;
     }
     assert(
-      rejected instanceof Error && /already reported this/i.test(rejected.message),
-      `Re-reporting an actioned report should reject with the friendly message, got: ${
-        rejected instanceof Error ? rejected.message : String(rejected)
+      isReportAlreadyReviewedError(rejected),
+      `Re-reporting an actioned report should throw ReportAlreadyReviewedError, got: ${
+        rejected instanceof Error ? `${rejected.name}: ${rejected.message}` : String(rejected)
       }`,
     );
     const afterBlocked = await withPg((client) =>

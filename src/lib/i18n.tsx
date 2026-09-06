@@ -830,6 +830,8 @@ const EL: Record<string, string> = {
   "We review reports within {hours} hours and act on what breaks the rules.":
     "Εξετάζουμε τις αναφορές μέσα σε {hours} ώρες και ενεργούμε σε ό,τι παραβιάζει τους κανόνες.",
   "Could not send the report. Try again.": "Η αναφορά δεν στάλθηκε. Δοκίμασε ξανά.",
+  "You have already reported this. A moderator has reviewed it.":
+    "Το έχεις ήδη αναφέρει. Ένας συντονιστής το έχει εξετάσει.",
   "Urgent or serious? Write to us at": "Επείγον ή σοβαρό; Γράψε μας στο",
 
   // Blocked and muted list

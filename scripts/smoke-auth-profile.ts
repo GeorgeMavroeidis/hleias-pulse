@@ -69,11 +69,14 @@ function createPgClient() {
     throw new Error("SUPABASE_DB_PASSWORD is missing.");
   }
 
+  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
+  // not resolve. Session mode (port 5432), user postgres.<ref>. This script runs
+  // plain statements (no `set role`), so mode is not load-bearing here.
   return new pg.Client({
-    host: `db.${projectRef}.supabase.co`,
+    host: "aws-0-eu-central-1.pooler.supabase.com",
     port: 5432,
     database: "postgres",
-    user: "postgres",
+    user: `postgres.${projectRef}`,
     password,
     ssl: { rejectUnauthorized: false },
   });
