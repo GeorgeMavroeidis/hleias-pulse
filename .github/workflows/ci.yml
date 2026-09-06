@@ -30,6 +30,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # CLAUDE.md's hard rule is that no .env, password, service-role key or
+      # token is ever committed. Nothing enforced it until now: lint, typecheck
+      # and build all pass happily on a file full of credentials. Offline and
+      # dependency-free, so it costs CI nothing.
+      - name: Secret scan
+        run: npm run check:secrets
+
       - name: Typecheck
         run: npx tsc --noEmit
 
