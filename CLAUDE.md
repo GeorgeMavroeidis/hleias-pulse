@@ -104,7 +104,7 @@ real boundary is *client code vs. database*, and it falls on a clean seam:
 | UI | `src/components/hp/**` (product), `src/components/admin/**`, `src/components/ui/**` (shadcn) | 40+ files; no Supabase imports of its own |
 | Data access | `src/lib/hp-api.ts` (2042 lines), `src/lib/admin-api.ts` (339), `src/lib/hp-auth.ts` | these three are the **only** files that import the Supabase client — verified, zero component does |
 | Domain types / logic | `src/lib/hp-model.ts`, `src/lib/hp/**` | pure, testable — this is what the unit tests cover |
-| Backend | `supabase/migrations/**` (30 migrations, 30 tables) | tables, RLS policies, Postgres functions, triggers |
+| Backend | `supabase/migrations/**` (30 migrations, 29 tables) | tables, RLS policies, Postgres functions, triggers |
 | Generated contract | `src/lib/supabase/database.types.ts` | `supabase gen types typescript` output — the thing that makes a schema change a compile error (see Team Notes) |
 
 **Route files are not where the split happens** — there are only three of them
@@ -116,9 +116,9 @@ The seam that *is* under strain is component size, not layering:
 `AdminDashboard.tsx` is 3241 lines, `PulseApp.tsx` 2631, `SocialMap.tsx` 2335.
 `PulseApp.tsx` holds the app shell and most product flows and is being split.
 
-One real leak to know about: `src/components/hp/moderation-store.ts` and
-`ReportSheet.tsx` import from a UI-local stub (`moderation-api-stub.ts`) instead of
-`hp-api.ts` — see the `moderation` module below.
+That boundary held everywhere except moderation, which spent a while importing a
+UI-local stub instead of `hp-api.ts`. Closed on 2026-09-06 — the stub is deleted
+and `smoke:moderation` now fails if anyone re-points those imports at one.
 
 Modules, with status verified against the code (not against prior claims):
 
@@ -132,16 +132,17 @@ Modules, with status verified against the code (not against prior claims):
   the lens/ranking logic).
 - `map` — geospatial + "what's hot" trending (`area-intelligence`) — **working
   end-to-end**, covered by `test:intelligence` and `test:map-visuals`
-- `moderation` — ⚠️ **not working end-to-end. The backend is done; the UI is not
-  wired to it.** `hp-api.ts` exports the real `reportContent` / `blockUser` /
-  `unblockUser` / `muteUser` / `unmuteUser` / `getMyBlocks` against
-  `content_reports` and `user_blocks`, and server-side block enforcement is a live
-  RLS policy that `smoke:block-enforcement` verifies by querying Postgres directly.
-  But `moderation-store.ts:11` and `ReportSheet.tsx:7` still import
-  `./moderation-api-stub`, whose entire state is two module-level `Set`s. **In the
-  running app a report reaches nobody and a block dies on reload.** The stub's own
-  header says the fix: change those two imports to `@/lib/hp-api` and delete the
-  file. App Store reviewers test blocking by hand — this is a rejection risk.
+- `moderation` — report, block, mute. **Working end-to-end as of 2026-09-06.**
+  `hp-api.ts` owns `reportContent` / `blockUser` / `unblockUser` / `muteUser` /
+  `unmuteUser` / `getMyBlocks` over `content_reports` and `user_blocks`, and blocks
+  are enforced server-side by RLS, not by client filtering. Two smoke tests cover
+  it, and the difference between them is the lesson: `smoke:block-enforcement`
+  asserts the *policy* over `pg`, and stayed green the whole time the feature did
+  nothing at all, because the UI imported an in-memory stub and never reached those
+  tables. `smoke:moderation` asserts the path **the user actually takes** — it
+  imports the real `hp-api` functions and the real singleton client, then verifies
+  committed state over `pg`, and fails if anyone re-points those imports at a stub.
+  Assert at the layer the user goes through, not only the one underneath it.
 - `deals` — listings, discount codes, redemption — **working end-to-end**, covered
   by `smoke:deal-race` (race-condition testing on redemption). Full pipeline:
   a user claims a place → admin verifies the business → `setPlaceDeal` publishes
@@ -213,7 +214,7 @@ Modules, with status verified against the code (not against prior claims):
 - Deploy to Cloudflare: `npm run deploy:worker` (static assets — see Tech Stack)
 - iOS: sync build → `npm run ios:sync`, open in Xcode → `npm run ios:open`
 - Smoke tests: `npm run smoke:auth-profile`, `smoke:block-enforcement`,
-  `smoke:deal-race`, `smoke:live-surfaces`, `smoke:post-write`
+  `smoke:deal-race`, `smoke:live-surfaces`, `smoke:moderation`, `smoke:post-write`
 - Unit tests: `npm run test:intelligence`, `npm run test:discovery`
 - Map visuals check: `npm run test:map-visuals`
 - Generate Supabase seed data: `npm run supabase:generate-seed`
@@ -226,8 +227,9 @@ Modules, with status verified against the code (not against prior claims):
 Supabase project**, creates real rows and real users, and cleans up in a `finally`.
 Several also shell out to `npx supabase … api-keys` for a `service_role` key from
 your local CLI session, and `smoke:block-enforcement` / `smoke:deal-race` /
-`audit:rls` additionally need `SUPABASE_DB_PASSWORD` for a direct `pg` connection.
-None of them can run in CI, and none should be run casually against production.
+`smoke:moderation` / `audit:rls` additionally need `SUPABASE_DB_PASSWORD` for a
+direct `pg` connection. None of them can run in CI, and none should be run
+casually against production.
 
 ## Current Priorities / Phase
 **Status: internal testing only — no outside users yet.**
@@ -241,20 +243,22 @@ so treat this as "functionally works," not "safe for strangers yet":
 - Cultural events, organizer verification, place claims
 - The Deal pipeline: issue a code → redeem it → recorded in `deal_redemptions`
 - The `/admin` moderation workspace
-
-⚠️ **Corrected — this was listed as working and is not:**
-- **Blocking / reporting / muting.** The database side works and is enforced by
-  RLS; the UI still calls an in-memory stub, so nothing a user does persists.
-  It is a two-import fix, described under `moderation` in Architecture. Until then,
-  don't count it as shipped, and don't put the app in front of App Store review.
+- Reporting, blocking and muting — **wired to Supabase on 2026-09-06.** This was
+  listed as working for weeks while the UI called an in-memory stub; it is real
+  now, and `smoke:moderation` exists specifically so it cannot silently regress.
+  `smoke:moderation` writes to the live project and has not been run yet — run it
+  before treating this as verified.
 
 Not yet confirmed as actually shipped, even though the tooling exists:
 - iOS app via Capacitor (`ios:sync` / `ios:open` scripts exist)
 - Live deployment to Cloudflare (`deploy:worker` script exists)
 
 **Before opening this to real outside users:**
-- Wire moderation to `hp-api.ts` — highest-value item on this list, and the
-  smallest
+- Run `smoke:moderation` against the live project — the moderation swap is
+  committed but has not been exercised end to end yet
+- Generate and commit `supabase/policy-snapshot.json`. Without it
+  `npm run audit:rls -- --check` exits 1 and the RLS drift gate is inert — which
+  is the check that would have caught `meet_events` gaining a second INSERT policy
 - A hardening pass on everything above — you already suspect the rough edges;
   better you find them than a stranger does
 - Confirm the iOS build and Cloudflare deployment actually work end-to-end, not

@@ -26,8 +26,11 @@ What changed and why.
 
 - [ ] Changes Supabase migrations — **needs Mavroeidis**
 - [ ] Changes auth, payments or security — **needs Mavroeidis**
-- [ ] Changes deployment or build configuration — **needs Mavroeidis**
+- [ ] Changes build or deploy config — `vite*.config.ts`, `wrangler.toml`,
+      `package.json`, `.github/` — **needs Mavroeidis**
 - [ ] Changes a screen, component or user-facing copy — **needs Margaris**
+- [ ] Changes the iOS shell — `ios/` or `capacitor.config.ts` — **needs Margaris**
+      (mobile sits in the frontend lane; see CODEOWNERS)
 
 ### If this PR creates or drops an RLS policy
 
