@@ -175,6 +175,15 @@ export async function saveAdminPlace(place: Database["public"]["Tables"]["places
   return result.data;
 }
 
+// Hard-deletes a place. Posts, comments, stories and meet events reference a
+// place by id, so Postgres refuses this while any of them survive — the caller
+// surfaces that error rather than cascading, because silently deleting a
+// location's whole history is not something an admin should trigger by accident.
+export async function deleteAdminPlace(id: string) {
+  const result = await supabase.from("places").delete().eq("id", id);
+  if (result.error) throw result.error;
+}
+
 export async function saveAdminStory(story: Database["public"]["Tables"]["stories"]["Insert"]) {
   const result = await supabase.from("stories").upsert(story).select("*").single();
   if (result.error) throw result.error;

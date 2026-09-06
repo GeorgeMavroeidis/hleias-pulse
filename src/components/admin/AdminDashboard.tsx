@@ -1,6 +1,7 @@
 import { Children, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  ArrowRight,
   Check,
   ChevronRight,
   CircleAlert,
@@ -14,11 +15,12 @@ import {
   ShieldCheck,
   Store,
   Ticket,
+  Trash2,
   UserCheck,
   Users,
   X,
 } from "lucide-react";
-import { AdminMapPicker } from "./AdminMapPicker";
+import { AdminPlacesMap } from "./AdminPlacesMap";
 import {
   EMPTY_ADMIN_DATA,
   type AdminBusiness,
@@ -42,6 +44,7 @@ import {
   clearPlaceDeal,
   getClaimRedemptionCounts,
   createAdminBusiness,
+  deleteAdminPlace,
   editAdminComment,
   editAdminPost,
   getAdminRole,
@@ -580,118 +583,467 @@ function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeratio
   );
 }
 
-function PlacesPanel({ data, onSaved, setNotice }: PanelProps) {
-  const [selected, setSelected] = useState<AdminPlace | null>(null);
-  const [query, setQuery] = useState("");
-  const visible = data.places.filter((item) =>
-    `${item.name} ${item.area} ${item.type}`.toLowerCase().includes(query.toLowerCase()),
+const PLACE_TYPES = ["beach", "culture", "food", "local", "nature", "night", "sunset", "village"];
+
+// `crowd`, `budget` and `best_time` are free-text columns with no enum behind them
+// and no seed data to derive one from, so these are suggestions offered through a
+// datalist — never a closed <select>. An existing value that is not on the list has
+// to survive a save untouched.
+const CROWD_SUGGESTIONS = ["quiet", "low", "medium", "busy", "packed"];
+const BUDGET_SUGGESTIONS = ["free", "€", "€€", "€€€"];
+const BEST_TIME_SUGGESTIONS = ["morning", "afternoon", "sunset", "evening", "night", "anytime"];
+
+const THIN_COPY_LENGTH = 40;
+const ILIA_FALLBACK = { lat: 37.68, lng: 21.52 };
+const selectFilterClass =
+  "w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 shadow-sm outline-none focus:border-orange-500";
+
+function suggestionsFrom(
+  places: AdminPlace[],
+  pick: (place: AdminPlace) => string,
+  extra: string[],
+) {
+  return Array.from(
+    new Set([...places.map(pick), ...extra].map((value) => value.trim()).filter(Boolean)),
   );
+}
+
+function SuggestField({
+  label,
+  value,
+  onChange,
+  options,
+  listId,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  listId: string;
+}) {
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_460px]">
-      <div>
-        <SectionHeader
-          title="Places"
-          detail="Map locations and their public details."
-          action={
-            <ActionButton onClick={() => setSelected(null)}>
-              <MapPin size={16} /> Add place
-            </ActionButton>
-          }
-        />
-        <SearchInput value={query} onChange={setQuery} placeholder="Search places, areas, types…" />
-        <div className="mt-4 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-          <div className="divide-y divide-slate-100">
-            {visible.length ? (
-              visible.map((place) => (
-                <button
-                  key={place.id}
-                  type="button"
-                  onClick={() => setSelected(place)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"
-                >
-                  <img
-                    className="h-11 w-11 rounded-lg object-cover bg-slate-100"
-                    src={place.image_url}
-                    alt=""
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-bold">{place.name}</span>
-                    <span className="block truncate text-xs text-slate-500">
-                      {place.area} · {place.type}
-                    </span>
-                  </span>
-                  <StatusBadge status={place.moderation_status} />
-                  <ChevronRight size={16} className="text-slate-400" />
-                </button>
-              ))
-            ) : (
-              <EmptyState>No places match this search.</EmptyState>
-            )}
+    <Field label={label}>
+      <input
+        className={inputClass}
+        value={value}
+        list={listId}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <datalist id={listId}>
+        {options.map((option) => (
+          <option key={option} value={option} />
+        ))}
+      </datalist>
+    </Field>
+  );
+}
+
+function swap<T>(list: T[], from: number, to: number) {
+  if (to < 0 || to >= list.length) return list;
+  const next = [...list];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
+
+function IconButton({
+  children,
+  label,
+  tone = "default",
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode;
+  label: string;
+  tone?: "default" | "danger";
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded p-1 transition disabled:cursor-not-allowed disabled:opacity-30 ${
+        tone === "danger" ? "text-red-600 hover:bg-red-50" : "text-slate-600 hover:bg-slate-100"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function CountTile({
+  label,
+  value,
+  tone = "plain",
+}: {
+  label: string;
+  value: number;
+  tone?: "plain" | "warn";
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200">
+      <div
+        className={`text-xl font-black tabular-nums ${
+          tone === "warn" && value > 0 ? "text-amber-600" : "text-slate-900"
+        }`}
+      >
+        {value}
+      </div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500">
+        {t(label)}
+      </div>
+    </div>
+  );
+}
+
+function PlacesPanel({ data, onSaved, setNotice }: PanelProps) {
+  const { t } = useI18n();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [qualityFilter, setQualityFilter] = useState("all");
+  // Whether the map mirrors the filtered list or always shows every pin.
+  const [mapScope, setMapScope] = useState<"all" | "filtered">("all");
+  // The draft position lives here, not in the editor, because the map and the two
+  // number fields both write to it and both have to stay in step.
+  const [draft, setDraft] = useState(ILIA_FALLBACK);
+
+  const selected = selectedId
+    ? (data.places.find((place) => place.id === selectedId) ?? null)
+    : null;
+
+  // Selecting a place on the map or in the list re-seeds the draft pin.
+  useEffect(() => {
+    const next = data.places.find((place) => place.id === selectedId);
+    setDraft(
+      next && Number.isFinite(next.lat) && Number.isFinite(next.lng)
+        ? { lat: next.lat, lng: next.lng }
+        : ILIA_FALLBACK,
+    );
+  }, [selectedId, data.places]);
+
+  // Sort by name rather than keeping the `updated_at desc` load order: a working
+  // list must not reshuffle under the cursor every time a place is saved.
+  const sorted = useMemo(
+    () => [...data.places].sort((a, b) => a.name.localeCompare(b.name, "el")),
+    [data.places],
+  );
+
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return sorted.filter((place) => {
+      const haystack =
+        `${place.name} ${place.greek_name} ${place.area} ${place.type}`.toLowerCase();
+      if (needle && !haystack.includes(needle)) return false;
+      if (typeFilter !== "all" && place.type !== typeFilter) return false;
+      if (statusFilter !== "all" && place.moderation_status !== statusFilter) return false;
+      if (qualityFilter === "no-image" && place.image_url.trim()) return false;
+      if (qualityFilter === "thin-copy" && place.short.trim().length >= THIN_COPY_LENGTH) {
+        return false;
+      }
+      return true;
+    });
+  }, [sorted, query, typeFilter, statusFilter, qualityFilter]);
+
+  const counts = useMemo(
+    () => ({
+      total: data.places.length,
+      published: data.places.filter((place) => place.moderation_status === "published").length,
+      hidden: data.places.filter((place) => place.moderation_status === "hidden").length,
+      noImage: data.places.filter((place) => !place.image_url.trim()).length,
+      thinCopy: data.places.filter((place) => place.short.trim().length < THIN_COPY_LENGTH).length,
+    }),
+    [data.places],
+  );
+
+  return (
+    <div>
+      <SectionHeader
+        title="Places"
+        detail="Map locations and their public details."
+        action={
+          <ActionButton onClick={() => setSelectedId(null)}>
+            <MapPin size={16} /> Add place
+          </ActionButton>
+        }
+      />
+
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <CountTile label="Locations" value={counts.total} />
+        <CountTile label="Published" value={counts.published} />
+        <CountTile label="Hidden" value={counts.hidden} />
+        <CountTile label="No photo" value={counts.noImage} tone="warn" />
+        <CountTile label="Thin copy" value={counts.thinCopy} tone="warn" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)_400px]">
+        <aside className="min-w-0">
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Search places, areas, types…"
+          />
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <select
+              className={selectFilterClass}
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value)}
+              aria-label={t("All types")}
+            >
+              <option value="all">{t("All types")}</option>
+              {PLACE_TYPES.map((item) => (
+                <option key={item} value={item}>
+                  {t(PLACE_TYPE_LABEL_KEYS[item] ?? item)}
+                </option>
+              ))}
+            </select>
+            <select
+              className={selectFilterClass}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              aria-label={t("All states")}
+            >
+              <option value="all">{t("All states")}</option>
+              <option value="published">{t("Published")}</option>
+              <option value="pending">{t("Pending")}</option>
+              <option value="hidden">{t("Hidden")}</option>
+            </select>
+            <select
+              className={selectFilterClass}
+              value={qualityFilter}
+              onChange={(event) => setQualityFilter(event.target.value)}
+              aria-label={t("Any quality")}
+            >
+              <option value="all">{t("Any quality")}</option>
+              <option value="no-image">{t("No photo")}</option>
+              <option value="thin-copy">{t("Thin copy")}</option>
+            </select>
           </div>
+
+          <div className="mt-3 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto xl:max-h-[600px]">
+              {visible.length ? (
+                visible.map((place) => {
+                  const isSelected = place.id === selectedId;
+                  const noImage = !place.image_url.trim();
+                  const thinCopy = place.short.trim().length < THIN_COPY_LENGTH;
+                  return (
+                    <button
+                      key={place.id}
+                      type="button"
+                      onClick={() => setSelectedId(place.id)}
+                      className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition ${
+                        isSelected
+                          ? "bg-orange-50 ring-1 ring-inset ring-orange-300"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      {noImage ? (
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                          <ImagePlus size={15} />
+                        </span>
+                      ) : (
+                        <img
+                          className="h-10 w-10 shrink-0 rounded-lg bg-slate-100 object-cover"
+                          src={place.image_url}
+                          alt=""
+                        />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold">{place.name}</span>
+                        <span className="block truncate text-xs text-slate-500">
+                          {place.area} · {t(PLACE_TYPE_LABEL_KEYS[place.type] ?? place.type)}
+                        </span>
+                        {(noImage || thinCopy) && (
+                          <span className="block truncate text-[11px] font-bold text-amber-600">
+                            {[noImage ? t("No photo") : "", thinCopy ? t("Thin copy") : ""]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        )}
+                      </span>
+                      <StatusBadge status={place.moderation_status} />
+                    </button>
+                  );
+                })
+              ) : (
+                <EmptyState>No places match this search.</EmptyState>
+              )}
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            {visible.length} / {data.places.length} {t("shown")}
+          </p>
+        </aside>
+
+        <div className="min-w-0">
+          <div className="mb-2 flex gap-1 rounded-lg bg-slate-100 p-1">
+            {(["all", "filtered"] as const).map((scope) => (
+              <button
+                key={scope}
+                type="button"
+                onClick={() => setMapScope(scope)}
+                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-bold transition ${
+                  mapScope === scope ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                }`}
+              >
+                {scope === "all"
+                  ? `${t("All pins")} (${data.places.length})`
+                  : `${t("Filtered only")} (${visible.length})`}
+              </button>
+            ))}
+          </div>
+          <AdminPlacesMap
+            places={mapScope === "all" ? data.places : visible}
+            selectedId={selectedId}
+            draftLat={draft.lat}
+            draftLng={draft.lng}
+            onSelectPlace={setSelectedId}
+            onMoveDraft={(lat, lng) =>
+              setDraft({ lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) })
+            }
+          />
+        </div>
+
+        <div className="min-w-0 xl:col-span-2 2xl:col-span-1">
+          <PlaceEditor
+            key={selected?.id ?? "new"}
+            place={selected}
+            places={data.places}
+            lat={draft.lat}
+            lng={draft.lng}
+            onMove={(lat, lng) => setDraft({ lat, lng })}
+            onSaved={onSaved}
+            onCreated={setSelectedId}
+            onDeleted={() => setSelectedId(null)}
+            setNotice={setNotice}
+          />
         </div>
       </div>
-      <PlaceEditor
-        key={selected?.id ?? "new"}
-        place={selected}
-        onSaved={onSaved}
-        setNotice={setNotice}
-      />
     </div>
   );
 }
 
 function PlaceEditor({
   place,
+  places,
+  lat,
+  lng,
+  onMove,
   onSaved,
+  onCreated,
+  onDeleted,
   setNotice,
 }: {
   place: AdminPlace | null;
+  places: AdminPlace[];
+  lat: number;
+  lng: number;
+  onMove: (lat: number, lng: number) => void;
   onSaved: () => Promise<void>;
+  onCreated: (id: string) => void;
+  onDeleted: () => void;
   setNotice: (notice: Notice) => void;
 }) {
   const { t } = useI18n();
+  const [tab, setTab] = useState<"basics" | "details">("basics");
   const [name, setName] = useState(place?.name ?? "");
   const [greekName, setGreekName] = useState(place?.greek_name ?? "");
   const [area, setArea] = useState(place?.area ?? "");
   const [type, setType] = useState(place?.type ?? "beach");
-  const [lat, setLat] = useState(place?.lat ?? 37.68);
-  const [lng, setLng] = useState(place?.lng ?? 21.52);
   const [short, setShort] = useState(place?.short ?? "");
   const [mood, setMood] = useState(place?.mood ?? "");
-  const [imageUrl, setImageUrl] = useState(place?.image_url ?? "");
+  // The gallery is the single source of truth: photos[0] is the primary photo and
+  // is what gets written back to `image_url`, which every non-admin reader still uses.
+  const [photos, setPhotos] = useState<string[]>(() => {
+    if (place?.photos?.length) return [...place.photos];
+    return place?.image_url ? [place.image_url] : [];
+  });
+  const imageUrl = photos[0] ?? "";
+  const initialPhotos = place?.photos?.length ? place.photos.join(" ") : (place?.image_url ?? "");
   const [tagText, setTagText] = useState(place?.tags.join(", ") ?? "");
   const [crowd, setCrowd] = useState(place?.crowd ?? "medium");
   const [budget, setBudget] = useState(place?.budget ?? "free");
   const [bestTime, setBestTime] = useState(place?.best_time ?? "sunset");
   const [pulse, setPulse] = useState(place?.pulse ?? 5);
+  const [hotness, setHotness] = useState(place?.hotness ?? 5);
   const [status, setStatus] = useState(place?.moderation_status ?? "published");
   const [saving, setSaving] = useState(false);
-  const upload = async (file: File | null) => {
-    if (!file) return;
+
+  const areaOptions = useMemo(() => suggestionsFrom(places, (item) => item.area, []), [places]);
+  const crowdOptions = useMemo(
+    () => suggestionsFrom(places, (item) => item.crowd, CROWD_SUGGESTIONS),
+    [places],
+  );
+  const budgetOptions = useMemo(
+    () => suggestionsFrom(places, (item) => item.budget, BUDGET_SUGGESTIONS),
+    [places],
+  );
+  const bestTimeOptions = useMemo(
+    () => suggestionsFrom(places, (item) => item.best_time, BEST_TIME_SUGGESTIONS),
+    [places],
+  );
+
+  // Compared against the loaded row so the header can say whether there is
+  // anything worth saving, rather than leaving it to memory.
+  const dirty =
+    name !== (place?.name ?? "") ||
+    greekName !== (place?.greek_name ?? "") ||
+    area !== (place?.area ?? "") ||
+    type !== (place?.type ?? "beach") ||
+    short !== (place?.short ?? "") ||
+    mood !== (place?.mood ?? "") ||
+    photos.join(" ") !== initialPhotos ||
+    tagText !== (place?.tags.join(", ") ?? "") ||
+    crowd !== (place?.crowd ?? "medium") ||
+    budget !== (place?.budget ?? "free") ||
+    bestTime !== (place?.best_time ?? "sunset") ||
+    Number(pulse) !== (place?.pulse ?? 5) ||
+    Number(hotness) !== (place?.hotness ?? 5) ||
+    status !== (place?.moderation_status ?? "published") ||
+    (place ? lat !== place.lat || lng !== place.lng : false);
+
+  const upload = async (files: FileList | null) => {
+    if (!files?.length) return;
     try {
       setSaving(true);
-      setImageUrl(await uploadContentMedia(file, "places"));
+      const uploaded: string[] = [];
+      for (const file of Array.from(files)) uploaded.push(await uploadContentMedia(file, "places"));
+      setPhotos((current) => [...current, ...uploaded]);
       setNotice({ tone: "success", message: t("Image uploaded. Save the place to attach it.") });
     } catch (error) {
-      setNotice({
-        tone: "error",
-        message: error instanceof Error ? error.message : t("Could not upload image."),
-      });
+      setNotice({ tone: "error", message: describeError(error, t("Could not upload image.")) });
     } finally {
       setSaving(false);
     }
   };
-  const save = async (event: React.FormEvent) => {
-    event.preventDefault();
+
+  const persist = async (nextStatus: string) => {
     if (!name.trim() || !area.trim() || !short.trim() || !imageUrl.trim()) {
+      setTab("basics");
       setNotice({ tone: "error", message: t("Name, area, description, and image are required.") });
+      return;
+    }
+    const id = place?.id ?? `place-${slug(name)}`;
+    // `saveAdminPlace` upserts on the id, and a new id is derived from the name —
+    // so without this guard two places with the same name overwrite each other.
+    if (!place && places.some((item) => item.id === id)) {
+      setNotice({
+        tone: "error",
+        message: t("A place with this name already exists. Pick a different name."),
+      });
       return;
     }
     try {
       setSaving(true);
       const point = placeCoordinates(lat, lng);
       await saveAdminPlace({
-        id: place?.id ?? `place-${slug(name)}`,
+        id,
         name: name.trim(),
         greek_name: greekName.trim() || name.trim(),
         area: area.trim(),
@@ -701,196 +1053,350 @@ function PlaceEditor({
         ...point,
         pulse: Number(pulse),
         mood: mood.trim() || short.trim(),
-        crowd,
-        budget,
-        best_time: bestTime,
+        crowd: crowd.trim(),
+        budget: budget.trim(),
+        best_time: bestTime.trim(),
         tags: tags(tagText),
         short: short.trim(),
         image_url: imageUrl.trim(),
-        hotness: Number(pulse),
+        photos: photos.map((photo) => photo.trim()).filter(Boolean),
+        hotness: Number(hotness),
         comment_count: place?.comment_count ?? 0,
         recent_post_count: place?.recent_post_count ?? 0,
         status: Number(pulse) >= 9 ? "busy" : Number(pulse) >= 7 ? "popular" : "active",
-        moderation_status: status,
-        created_by_identity: "LOCAL",
+        moderation_status: nextStatus,
+        created_by_identity: place?.created_by_identity ?? "LOCAL",
       });
+      setStatus(nextStatus);
       await onSaved();
+      // Keep a freshly created place on screen instead of dropping back to a blank form.
+      if (!place) onCreated(id);
       setNotice({ tone: "success", message: t("Place saved.") });
+    } catch (error) {
+      setNotice({ tone: "error", message: describeError(error, t("Could not save place.")) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const destroy = async () => {
+    if (!place) return;
+    if (!window.confirm(t("Delete this place permanently? This cannot be undone."))) return;
+    try {
+      setSaving(true);
+      await deleteAdminPlace(place.id);
+      onDeleted();
+      await onSaved();
+      setNotice({ tone: "success", message: t("Place deleted.") });
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : t("Could not save place."),
+        message: describeError(
+          error,
+          t("Could not delete this place. Hide it instead if content still points to it."),
+        ),
       });
     } finally {
       setSaving(false);
     }
   };
+
   return (
     <form
-      onSubmit={save}
-      className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void persist(status);
+      }}
+      className="self-start overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"
     >
-      <h3 className="text-base font-black">{t(place ? "Edit place" : "New place")}</h3>
-      <div className="mt-4 grid gap-3">
-        <Field label="Name">
-          <input
-            className={inputClass}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </Field>
-        <Field label="Greek name">
-          <input
-            className={inputClass}
-            value={greekName}
-            onChange={(event) => setGreekName(event.target.value)}
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Area">
-            <input
-              className={inputClass}
-              value={area}
-              onChange={(event) => setArea(event.target.value)}
-            />
-          </Field>
-          <Field label="Type">
-            <select
-              className={inputClass}
-              value={type}
-              onChange={(event) => setType(event.target.value)}
-            >
-              {["beach", "culture", "food", "local", "nature", "night", "sunset", "village"].map(
-                (item) => (
-                  <option key={item} value={item}>
-                    {t(PLACE_TYPE_LABEL_KEYS[item] ?? item)}
-                  </option>
-                ),
-              )}
-            </select>
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Latitude">
-            <input
-              className={inputClass}
-              type="number"
-              step="any"
-              value={lat}
-              onChange={(event) => setLat(Number(event.target.value))}
-            />
-          </Field>
-          <Field label="Longitude">
-            <input
-              className={inputClass}
-              type="number"
-              step="any"
-              value={lng}
-              onChange={(event) => setLng(Number(event.target.value))}
-            />
-          </Field>
-        </div>
-        <AdminMapPicker
-          lat={lat}
-          lng={lng}
-          onChange={(nextLat, nextLng) => {
-            setLat(Number(nextLat.toFixed(6)));
-            setLng(Number(nextLng.toFixed(6)));
-          }}
-        />
-        <Field label="Description">
-          <textarea
-            className={inputClass}
-            rows={3}
-            value={short}
-            onChange={(event) => setShort(event.target.value)}
-          />
-        </Field>
-        <Field label="Mood">
-          <input
-            className={inputClass}
-            value={mood}
-            onChange={(event) => setMood(event.target.value)}
-          />
-        </Field>
-        <Field label="Tags (comma-separated)">
-          <input
-            className={inputClass}
-            value={tagText}
-            onChange={(event) => setTagText(event.target.value)}
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Pulse">
-            <input
-              className={inputClass}
-              type="number"
-              min="1"
-              max="10"
-              value={pulse}
-              onChange={(event) => setPulse(Number(event.target.value))}
-            />
-          </Field>
-          <Field label="Visibility">
-            <select
-              className={inputClass}
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              <option value="published">{t("Published")}</option>
-              <option value="pending">{t("Pending")}</option>
-              <option value="hidden">{t("Hidden")}</option>
-            </select>
-          </Field>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Crowd">
-            <input
-              className={inputClass}
-              value={crowd}
-              onChange={(event) => setCrowd(event.target.value)}
-            />
-          </Field>
-          <Field label="Budget">
-            <input
-              className={inputClass}
-              value={budget}
-              onChange={(event) => setBudget(event.target.value)}
-            />
-          </Field>
-          <Field label="Best time">
-            <input
-              className={inputClass}
-              value={bestTime}
-              onChange={(event) => setBestTime(event.target.value)}
-            />
-          </Field>
-        </div>
-        <Field label="Image">
-          <div className="mt-1 flex items-center gap-2">
-            <input
-              className={inputClass}
-              value={imageUrl}
-              onChange={(event) => setImageUrl(event.target.value)}
-              placeholder={t("Image URL")}
-            />
-            <label className="shrink-0 cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700">
-              <ImagePlus size={16} />
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                onChange={(event) => void upload(event.target.files?.[0] ?? null)}
-              />
-            </label>
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-black">{place ? place.name : t("New place")}</h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {dirty ? t("Unsaved changes") : place ? t("Saved") : t("Nothing entered yet")}
+            </p>
           </div>
-        </Field>
-        {imageUrl && (
-          <img className="h-28 w-full rounded-lg object-cover" src={imageUrl} alt={t("Preview")} />
+          <StatusBadge status={status} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <ActionButton type="submit" disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </ActionButton>
+          <ActionButton
+            tone="muted"
+            disabled={saving || status === "published"}
+            onClick={() => void persist("published")}
+          >
+            Publish
+          </ActionButton>
+          <ActionButton
+            tone="muted"
+            disabled={saving || status === "hidden"}
+            onClick={() => void persist("hidden")}
+          >
+            Hide
+          </ActionButton>
+          {place && (
+            <ActionButton tone="danger" disabled={saving} onClick={() => void destroy()}>
+              <Trash2 size={15} /> Delete
+            </ActionButton>
+          )}
+        </div>
+        <div className="mt-3 flex gap-1 rounded-lg bg-slate-100 p-1">
+          {(["basics", "details"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setTab(item)}
+              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-bold transition ${
+                tab === item ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+              }`}
+            >
+              {t(item === "basics" ? "Basics" : "Details")}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3 p-4">
+        {tab === "basics" ? (
+          <>
+            <Field label="Name">
+              <input
+                className={inputClass}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </Field>
+            <Field label="Greek name">
+              <input
+                className={inputClass}
+                value={greekName}
+                onChange={(event) => setGreekName(event.target.value)}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <SuggestField
+                label="Area"
+                value={area}
+                onChange={setArea}
+                options={areaOptions}
+                listId="admin-place-areas"
+              />
+              <Field label="Type">
+                <select
+                  className={inputClass}
+                  value={type}
+                  onChange={(event) => setType(event.target.value)}
+                >
+                  {PLACE_TYPES.map((item) => (
+                    <option key={item} value={item}>
+                      {t(PLACE_TYPE_LABEL_KEYS[item] ?? item)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Latitude">
+                <input
+                  className={inputClass}
+                  type="number"
+                  step="any"
+                  value={lat}
+                  onChange={(event) => onMove(Number(event.target.value), lng)}
+                />
+              </Field>
+              <Field label="Longitude">
+                <input
+                  className={inputClass}
+                  type="number"
+                  step="any"
+                  value={lng}
+                  onChange={(event) => onMove(lat, Number(event.target.value))}
+                />
+              </Field>
+            </div>
+            <p className="-mt-1 text-xs text-slate-500">
+              {t("Drag the pin on the map to set the exact position.")}
+            </p>
+            <Field label="Description">
+              <textarea
+                className={inputClass}
+                rows={4}
+                value={short}
+                onChange={(event) => setShort(event.target.value)}
+              />
+            </Field>
+            {short.trim().length > 0 && short.trim().length < THIN_COPY_LENGTH && (
+              <p className="-mt-1 text-xs font-bold text-amber-600">
+                {t("This description is very short.")}
+              </p>
+            )}
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className={labelClass}>{t("Photos")}</span>
+                <label className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                  <span className="flex items-center gap-1.5">
+                    <ImagePlus size={14} /> {t("Upload")}
+                  </span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(event) => {
+                      void upload(event.target.files);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+
+              <Field label="Primary image URL">
+                <input
+                  className={inputClass}
+                  value={imageUrl}
+                  onChange={(event) =>
+                    setPhotos((current) => {
+                      const next = [...current];
+                      next[0] = event.target.value;
+                      return next;
+                    })
+                  }
+                  placeholder={t("Image URL")}
+                />
+              </Field>
+
+              {photos.length ? (
+                <ul className="mt-3 grid grid-cols-2 gap-2">
+                  {photos.map((photo, index) => (
+                    <li
+                      key={`${photo}-${index}`}
+                      className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+                    >
+                      <img className="h-20 w-full object-cover" src={photo} alt="" />
+                      <div className="flex items-center justify-between gap-1 px-1.5 py-1">
+                        <span className="truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                          {index === 0 ? t("Primary") : `#${index + 1}`}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-0.5">
+                          <IconButton
+                            label={t("Move earlier")}
+                            disabled={index === 0}
+                            onClick={() => setPhotos((c) => swap(c, index, index - 1))}
+                          >
+                            <ArrowLeft size={13} />
+                          </IconButton>
+                          <IconButton
+                            label={t("Move later")}
+                            disabled={index === photos.length - 1}
+                            onClick={() => setPhotos((c) => swap(c, index, index + 1))}
+                          >
+                            <ArrowRight size={13} />
+                          </IconButton>
+                          <IconButton
+                            label={t("Make primary")}
+                            disabled={index === 0}
+                            onClick={() =>
+                              setPhotos((c) => [c[index], ...c.filter((_, i) => i !== index)])
+                            }
+                          >
+                            <Check size={13} />
+                          </IconButton>
+                          <IconButton
+                            label={t("Remove photo")}
+                            tone="danger"
+                            onClick={() => setPhotos((c) => c.filter((_, i) => i !== index))}
+                          >
+                            <Trash2 size={13} />
+                          </IconButton>
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-xs text-slate-500">{t("No photos yet.")}</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <Field label="Mood">
+              <input
+                className={inputClass}
+                value={mood}
+                onChange={(event) => setMood(event.target.value)}
+              />
+            </Field>
+            <Field label="Tags (comma-separated)">
+              <input
+                className={inputClass}
+                value={tagText}
+                onChange={(event) => setTagText(event.target.value)}
+              />
+            </Field>
+            <div className="grid grid-cols-3 gap-3">
+              <SuggestField
+                label="Crowd"
+                value={crowd}
+                onChange={setCrowd}
+                options={crowdOptions}
+                listId="admin-place-crowd"
+              />
+              <SuggestField
+                label="Budget"
+                value={budget}
+                onChange={setBudget}
+                options={budgetOptions}
+                listId="admin-place-budget"
+              />
+              <SuggestField
+                label="Best time"
+                value={bestTime}
+                onChange={setBestTime}
+                options={bestTimeOptions}
+                listId="admin-place-best-time"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Pulse">
+                <input
+                  className={inputClass}
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={pulse}
+                  onChange={(event) => setPulse(Number(event.target.value))}
+                />
+              </Field>
+              <Field label="Hotness">
+                <input
+                  className={inputClass}
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={hotness}
+                  onChange={(event) => setHotness(Number(event.target.value))}
+                />
+              </Field>
+            </div>
+            <Field label="Visibility">
+              <select
+                className={inputClass}
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+              >
+                <option value="published">{t("Published")}</option>
+                <option value="pending">{t("Pending")}</option>
+                <option value="hidden">{t("Hidden")}</option>
+              </select>
+            </Field>
+          </>
         )}
-        <ActionButton type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save place"}
-        </ActionButton>
       </div>
     </form>
   );

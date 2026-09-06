@@ -372,6 +372,38 @@ const EL: Record<string, string> = {
   "Could not update organizer.": "Δεν ήταν δυνατή η ενημέρωση του διοργανωτή.",
   // Admin: remaining panels (Places / Stories / Meet / Routes / Moderation / Team)
   "Add place": "Προσθήκη σημείου",
+  Upload: "Ανέβασμα",
+  "Primary image URL": "URL κύριας φωτογραφίας",
+  Primary: "Κύρια",
+  "Move earlier": "Μετακίνηση πιο μπροστά",
+  "Move later": "Μετακίνηση πιο πίσω",
+  "Make primary": "Όρισε ως κύρια",
+  "No photos yet.": "Καμία φωτογραφία ακόμα.",
+  Delete: "Διαγραφή",
+  "Delete this place permanently? This cannot be undone.":
+    "Οριστική διαγραφή του σημείου; Η ενέργεια δεν αναιρείται.",
+  "Place deleted.": "Το σημείο διαγράφηκε.",
+  "Could not delete this place. Hide it instead if content still points to it.":
+    "Δεν έγινε η διαγραφή. Αν υπάρχει περιεχόμενο που δείχνει σε αυτό το σημείο, κρύψ' το αντί να το σβήσεις.",
+  "All pins": "Όλες οι πινέζες",
+  "Filtered only": "Μόνο τα φιλτραρισμένα",
+  Locations: "Σημεία",
+  "No photo": "Χωρίς φωτογραφία",
+  "Thin copy": "Λιτό κείμενο",
+  "All types": "Όλοι οι τύποι",
+  "All states": "Όλες οι καταστάσεις",
+  "Any quality": "Κάθε ποιότητα",
+  shown: "εμφανίζονται",
+  Hotness: "Ένταση",
+  "Unsaved changes": "Μη αποθηκευμένες αλλαγές",
+  "Nothing entered yet": "Δεν έχει συμπληρωθεί τίποτα ακόμα",
+  "Click a pin to open it, or click the map to move the selected place.":
+    "Πάτησε μια πινέζα για να την ανοίξεις, ή πάτησε στον χάρτη για να μετακινήσεις το επιλεγμένο σημείο.",
+  "Drag the pin on the map to set the exact position.":
+    "Σύρε την πινέζα στον χάρτη για να ορίσεις την ακριβή θέση.",
+  "This description is very short.": "Η περιγραφή είναι πολύ σύντομη.",
+  "A place with this name already exists. Pick a different name.":
+    "Υπάρχει ήδη σημείο με αυτό το όνομα. Διάλεξε άλλο.",
   "Add story": "Προσθήκη story",
   "Add route": "Προσθήκη διαδρομής",
   Edit: "Επεξεργασία",
