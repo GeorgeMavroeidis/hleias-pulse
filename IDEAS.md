@@ -69,8 +69,10 @@
   offline test suites → build, on every PR and every push to `main`. Two gaps
   remain, and they are the real items:
   - **CD** — no deploy job. `deploy:worker` is still run by hand.
-  - **Branch protection** — CI runs but nothing forces it green before merge, and
-    nothing enforces CODEOWNERS review. One settings change on `main`.
+  - **Branch protection** — CI runs but nothing forces it green before merge.
+    One settings change on `main` (require the CI check to pass). CODEOWNERS
+    review is optional now that both maintainers own everything — turn it on
+    only if you want a hard "someone else looked at it" gate.
 - Rate limiting — add before public launch, prevents abuse/cost spikes; not
   needed while it's just the two of you testing
 - Caching / CDN for the Map and Stories feeds — static assets already get
@@ -110,13 +112,13 @@
 - iOS bundle id / app display name currently say "Ilia Pulse" / com.theodoros.iliapulse
   — confirmed brand name is "Hleias Pulse," so decide whether to update these to match
   or leave the internal identifier as-is intentionally.
-- Should `src/components/admin/` really sit in Margaris's lane? CODEOWNERS was
-  rewritten to match Team Notes' layer split, which sends every component to
-  Margaris — including the admin workspace, which verifies businesses, resolves
-  place claims and writes `admin_audit_logs`. It renders, so a layer split says
-  frontend; its blast radius says security surface. Same question, weaker, for
-  `SocialMap.tsx`. Decide before branch protection is switched on, because that
-  is the moment it starts blocking merges.
+- ~~Should `src/components/admin/` really sit in Margaris's lane?~~ **Moot as of
+  2026-09-06 — ownership lanes were dropped entirely.** Both maintainers are
+  full-stack with full access; CODEOWNERS is now a single shared line that only
+  auto-requests both as reviewers. The admin workspace still deserves careful
+  review because of its blast radius (it verifies businesses, resolves place
+  claims, writes `admin_audit_logs`), but that is a "look here first" note, not
+  an owner.
 - Should the `stories` expiry predicate move into the RLS policy, or should
   expired stories be deleted on a schedule (pg_cron, or an external job)? The
   policy hides them; deletion is what GDPR retention actually wants. Probably

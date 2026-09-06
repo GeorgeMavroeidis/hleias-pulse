@@ -276,9 +276,9 @@ Not yet confirmed as actually shipped, even though the tooling exists:
   three offline test suites → build, on every PR and every push to `main`. What is
   missing is CD (no deploy job) and branch protection (nothing forces CI green
   before merge).
-- ⚠️ This file points at `IDEAS.md` here and again under Team Notes. **There is no
-  `IDEAS.md` in the repo, and none in git history.** Either create it or drop the
-  two references.
+- `IDEAS.md` and `SECURITY.md` (repo root) hold the running backlog and the
+  security posture. Not auto-loaded — open them explicitly when planning or
+  doing a security pass.
 
 ## Guardrails — do NOT do these without explicit human approval
 - Ship a table without a Row Level Security (RLS) policy — an RLS-less table on
@@ -318,32 +318,44 @@ against its current docs when it sets this up — that format is version-specifi
 enough that it's not worth hand-copying from anywhere, including here.
 
 ## Team Notes
-Two contributors — split by backend/frontend, not by backend module.
+Two maintainers, both **full-stack with full access to the whole repo**. No
+ownership lanes, no per-area gatekeeping — either of you may touch any file.
+`.github/CODEOWNERS` is one shared line that only auto-requests both of you as
+reviewers; it grants and restricts nothing.
 
-**Roles:**
-- You: own the entire backend (all modules above — users, stories, map, myths, deals, payments)
-- Buddy: owns frontend/mobile — consumes the backend API
-- Local business partnerships, content moderation, community-building: **not yet
-  assigned** — decide before Phase 3 (Deals). See IDEAS.md → Open Questions.
+**Whose session is this? (attribution, not permission.)** Both maintainers are
+called Giorgos, so a first name tells you nothing. Before committing, check that
+git knows who you are:
 
-**The real collision point isn't an API contract — you share one codebase.** Since
-it's a single TanStack Start app (not separate frontend/backend services), what
-actually needs to stay in sync is the Supabase schema and its generated
-TypeScript types. When you change a table, regenerate types
-(`supabase gen types typescript`) so your buddy's code gets a compiler error
-immediately if something it depends on changed shape, instead of a silent runtime
-bug discovered later. That's your equivalent of the API contract.
+```sh
+git config user.email
+```
 
-**Decisions:** talked through together, not unilaterally. Worth flagging: this can
-bottleneck small calls if one of you is offline when it comes up — you may want a
-lighter default for low-stakes implementation details (builder decides, flags it in
-the handoff for the other to review later), reserving "talk it through together" for
-anything costly to reverse.
+| Email | Who | GitHub |
+|---|---|---|
+| `128294142+GeorgeMavroeidis@users.noreply.github.com` | **Mavroeidis** | `@GeorgeMavroeidis` |
+| `giorgosmargaris1234@gmail.com` | **Margaris** | `@GeorgeMargaris` |
+
+If it returns nothing, **stop and ask which maintainer this is** before
+committing — an unset identity produces commits attributed to a machine-local
+address that GitHub cannot link to either account. This decides whose name is on
+the commit, not what you're allowed to edit.
+
+**The real collision point is the schema, not a lane.** You share one codebase
+and one database. What has to stay in sync is the Supabase schema and its
+generated types: after any migration, regenerate them (`supabase gen types
+typescript` → `src/lib/supabase/database.types.ts`) so the other person's code
+gets a compile error immediately if something it depends on changed shape,
+instead of a silent runtime bug later.
+
+**Decisions:** talk through anything costly to reverse — schema shape, auth
+model, a new dependency, anything user-facing that ships. For low-stakes
+implementation details the builder decides and notes it for the other to review
+later; don't let "discuss first" block a small call when one of you is offline.
 
 **Workflow:**
 - Branch per task, small commits, PR into `main`
 - Pull `main` before starting any new session
-- End every session by updating "Current Priorities" above with what's done,
-  what's WIP, and what's blocked — this is the handoff for async work
-- Shared task list (GitHub Issues or similar) is the source of truth for what's next
-- CI (tests + lint) runs on every PR before merge
+- End a session by updating "Current Priorities / Phase" above with what's done,
+  what's WIP, and what's blocked — the handoff for async work
+- CI (lint · secret scan · typecheck · tests · build) runs on every PR

@@ -17,20 +17,16 @@ What changed and why.
 - [ ] No change to `.gitignore`
 - [ ] No production deployment was performed
 
-## Lanes
+## Extra eyes
 
-- [ ] I stayed inside my lane (see [CODEOWNERS](../.github/CODEOWNERS)), or the owner has
-      approved the crossing
+Both maintainers own the whole repo, so nothing here *requires* the other's sign-off.
+Tick what applies — it just tells the reviewer where to look hardest:
 
-## Review flags
-
-- [ ] Changes Supabase migrations — **needs Mavroeidis**
-- [ ] Changes auth, payments or security — **needs Mavroeidis**
+- [ ] Changes Supabase migrations
+- [ ] Changes auth, payments, or security (RLS, tokens, session handling)
 - [ ] Changes build or deploy config — `vite*.config.ts`, `wrangler.toml`,
-      `package.json`, `.github/` — **needs Mavroeidis**
-- [ ] Changes a screen, component or user-facing copy — **needs Margaris**
-- [ ] Changes the iOS shell — `ios/` or `capacitor.config.ts` — **needs Margaris**
-      (mobile sits in the frontend lane; see CODEOWNERS)
+      `package.json`, `.github/`, `ios/`, `capacitor.config.ts`
+- [ ] Changes a user-facing screen or copy
 
 ### If this PR creates or drops an RLS policy
 

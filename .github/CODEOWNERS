@@ -1,63 +1,11 @@
-# Ownership lanes for ΗΛΕΙΑ PULSE.
+# Shared ownership. Both maintainers are full-stack with full access to the
+# whole repo — there are no per-person lanes and no required cross-lane review.
 #
-# This file is the enforced version of CLAUDE.md's Team Notes. The split is by
-# LAYER, not by feature: Mavroeidis owns everything that talks to Supabase or
-# builds the app; Margaris owns everything that renders, and consumes that API.
+# This file exists only so GitHub auto-requests both of us as reviewers on
+# every PR, so nothing merges completely unseen. It grants nothing and
+# restricts nothing.
 #
-# GitHub applies the LAST matching pattern, so order here is deliberate:
-# broad default first, then the backend claims, then the frontend claims that
-# override them (the i18n files live under src/lib/ but are product copy).
-#
-# Turn this into enforcement rather than documentation: Settings -> Branches ->
-# rule on `main` -> "Require review from Code Owners". GitHub then blocks a
-# merge that touches the other person's lane without their approval.
-#
-# Both of us are called Giorgos. @GeorgeMavroeidis is Mavroeidis,
-# @GeorgeMargaris is Margaris. Read the surname, not the first name.
+# Both maintainers are called Giorgos. @GeorgeMavroeidis is Mavroeidis,
+# @GeorgeMargaris is Margaris.
 
-# ---------------------------------------------------------------- default ---
-# Anything not claimed below needs Mavroeidis, who owns the repo's plumbing.
-*                                       @GeorgeMavroeidis
-
-# ------------------------------------------- Mavroeidis: the backend layer ---
-# Data access, domain logic, the database, and the build. Nothing here renders.
-/src/lib/                               @GeorgeMavroeidis
-/supabase/                              @GeorgeMavroeidis
-/scripts/                               @GeorgeMavroeidis
-/.github/                               @GeorgeMavroeidis
-
-# Build, deploy and dependency surface.
-/package.json                           @GeorgeMavroeidis
-/package-lock.json                      @GeorgeMavroeidis
-/vite.config.ts                         @GeorgeMavroeidis
-/vite.static.config.ts                  @GeorgeMavroeidis
-/wrangler.toml                          @GeorgeMavroeidis
-
-# ---------------------------------- Margaris: the frontend / mobile layer ---
-# Everything a user looks at, plus the shells that mount it. These override the
-# default above, and the src/lib/ claim for the two copy files at the end.
-/src/components/                        @GeorgeMargaris
-/src/routes/                            @GeorgeMargaris
-/src/hooks/                             @GeorgeMargaris
-/src/styles/                            @GeorgeMargaris
-/src/styles.css                         @GeorgeMargaris
-/public/                                @GeorgeMargaris
-
-# The production entry point. `npm run build` builds from here, not src/routes/,
-# so this is the mount that actually ships. It was previously unowned.
-/cloudflare-static-src/                 @GeorgeMargaris
-
-# Mobile shell. Capacitor wraps the same static build into the iOS app.
-/capacitor.config.ts                    @GeorgeMargaris
-/ios/                                   @GeorgeMargaris
-
-# Product copy. Sits under src/lib/, but the words belong to the product voice,
-# and last match wins.
-/src/lib/i18n.tsx                       @GeorgeMargaris
-/src/lib/hp/i18n.ts                     @GeorgeMargaris
-
-# ------------------------------------------------------ shared, by design ---
-# Either of us may propose changes; both should see them.
-/CLAUDE.md                              @GeorgeMavroeidis @GeorgeMargaris
-/IDEAS.md                               @GeorgeMavroeidis @GeorgeMargaris
-/SECURITY.md                            @GeorgeMavroeidis @GeorgeMargaris
+*                                       @GeorgeMavroeidis @GeorgeMargaris
