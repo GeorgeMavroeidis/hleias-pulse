@@ -18,6 +18,7 @@
     "deploy:worker": "npm run build:static && npx wrangler deploy",
     "ios:sync": "npm run build:static && cap sync ios",
     "ios:open": "cap open ios",
+    "smoke:admin": "tsx scripts/smoke-admin.ts",
     "smoke:auth-profile": "tsx scripts/smoke-auth-profile.ts",
     "smoke:block-enforcement": "tsx scripts/smoke-block-enforcement.ts",
     "smoke:deal-race": "tsx scripts/smoke-deal-race.ts",
