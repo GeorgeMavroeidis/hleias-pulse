@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -118,7 +120,6 @@ import {
   type MapDiscoveryViewport,
 } from "./SocialMap";
 import { PlaceStoryRail } from "./PlaceStoryRail";
-import { PlaceStoryViewer } from "./PlaceStoryViewer";
 import {
   buildPlaceStoryGroups,
   storyPlaceIdSet,
@@ -128,13 +129,6 @@ import {
 } from "@/lib/hp/place-stories";
 import { LiveTicker } from "./LiveTicker";
 import { TrendingHero } from "./TrendingHero";
-import { MeetScreen } from "./MeetScreen";
-import { CulturalEventsScreen } from "./CulturalEventsScreen";
-import { DealsScreen } from "./DealsScreen";
-import { OrganizerEventComposer } from "./OrganizerEventComposer";
-import { OrganizerEventsSheet } from "./OrganizerEventsSheet";
-import { BusinessPlacesSheet } from "./BusinessPlacesSheet";
-import { DealCodeModal } from "./DealCodeModal";
 import type {
   BusinessStatus,
   DealCode,
@@ -143,7 +137,6 @@ import type {
   PlaceBusinessProfileFields,
   PlaceClaim,
 } from "@/lib/hp/business-types";
-import { CulturalEventDetailModal } from "./CulturalEventDetailModal";
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet, PasswordRecoverySheet } from "./AuthAccountSheets";
 import { IdentitySegments, SectionHeader, fieldClass } from "./blend-ui";
@@ -217,15 +210,67 @@ import {
 import { Toast, TopBar, VibeChips, DiscoveryLensRail } from "./PulseTopBar";
 import { MapBottomSheet, type DiscoverySuggestion } from "./MapBottomSheet";
 import { PulseFeed, MustSeeTodayDeck, LocalDiscoveryCard } from "./PulseFeed";
-import { RoutesScreen, ActiveRouteGuide } from "./RoutesScreen";
-import { SavedScreen } from "./SavedScreen";
-import { PlaceDetailModal } from "./PlaceDetailModal";
-import { PostDetailModal } from "./PostDetailModal";
-import { RouteArticleModal } from "./RouteArticleModal";
-import { CreateComposerModal } from "./CreateComposerModal";
 import { BottomNav } from "./BottomNav";
 import { useModerationBridge, type UserLabel } from "./use-moderation";
 import { ModerationSheets } from "./ModerationSheets";
+
+// Screens and modals below are not needed to paint the first "map" tab, so they are
+// split into their own chunks and only fetched the first time the user actually
+// reaches them (a non-default tab, or an open-state that flips true for the first
+// time). This keeps the initial PulseApp bundle limited to what first paint needs.
+// See the `useEverTrue` gate further down for the always-mounted modals.
+const RoutesScreen = lazy(() =>
+  import("./RoutesScreen").then((module) => ({ default: module.RoutesScreen })),
+);
+const ActiveRouteGuide = lazy(() =>
+  import("./RoutesScreen").then((module) => ({ default: module.ActiveRouteGuide })),
+);
+const SavedScreen = lazy(() =>
+  import("./SavedScreen").then((module) => ({ default: module.SavedScreen })),
+);
+const DealsScreen = lazy(() =>
+  import("./DealsScreen").then((module) => ({ default: module.DealsScreen })),
+);
+const MeetScreen = lazy(() =>
+  import("./MeetScreen").then((module) => ({ default: module.MeetScreen })),
+);
+const CulturalEventsScreen = lazy(() =>
+  import("./CulturalEventsScreen").then((module) => ({ default: module.CulturalEventsScreen })),
+);
+const PlaceStoryViewer = lazy(() =>
+  import("./PlaceStoryViewer").then((module) => ({ default: module.PlaceStoryViewer })),
+);
+const PlaceDetailModal = lazy(() =>
+  import("./PlaceDetailModal").then((module) => ({ default: module.PlaceDetailModal })),
+);
+const PostDetailModal = lazy(() =>
+  import("./PostDetailModal").then((module) => ({ default: module.PostDetailModal })),
+);
+const RouteArticleModal = lazy(() =>
+  import("./RouteArticleModal").then((module) => ({ default: module.RouteArticleModal })),
+);
+const CreateComposerModal = lazy(() =>
+  import("./CreateComposerModal").then((module) => ({ default: module.CreateComposerModal })),
+);
+const OrganizerEventComposer = lazy(() =>
+  import("./OrganizerEventComposer").then((module) => ({
+    default: module.OrganizerEventComposer,
+  })),
+);
+const OrganizerEventsSheet = lazy(() =>
+  import("./OrganizerEventsSheet").then((module) => ({ default: module.OrganizerEventsSheet })),
+);
+const BusinessPlacesSheet = lazy(() =>
+  import("./BusinessPlacesSheet").then((module) => ({ default: module.BusinessPlacesSheet })),
+);
+const DealCodeModal = lazy(() =>
+  import("./DealCodeModal").then((module) => ({ default: module.DealCodeModal })),
+);
+const CulturalEventDetailModal = lazy(() =>
+  import("./CulturalEventDetailModal").then((module) => ({
+    default: module.CulturalEventDetailModal,
+  })),
+);
 
 // Accounts are required for every write. Each gated action names itself so the
 // toast tells the user what they were trying to do, in their own language.
@@ -244,6 +289,19 @@ const SIGN_IN_PROMPTS = {
 } as const;
 
 type SignInAction = keyof typeof SIGN_IN_PROMPTS;
+
+// A handful of modals stay permanently mounted (they run their own AnimatePresence
+// exit transition off an `open`/`item` prop, so unmounting them on close would cut
+// that animation short). To still keep their code out of the initial bundle, this
+// tracks whether `open` has ever been true and only then mounts the lazy component
+// — once mounted it stays mounted, so later opens/closes animate exactly as before.
+function useEverTrue(value: boolean): boolean {
+  const [everTrue, setEverTrue] = useState(value);
+  useEffect(() => {
+    if (value) setEverTrue(true);
+  }, [value]);
+  return everTrue;
+}
 
 export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
@@ -327,6 +385,17 @@ export function PulseApp() {
   const [storyViewer, setStoryViewer] = useState<{ placeId: string; storyId?: string } | null>(
     null,
   );
+
+  // Gate first-load of the always-mounted, lazily-chunked modals — see `useEverTrue`.
+  const placeDetailEverOpened = useEverTrue(!!openPlace);
+  const postDetailEverOpened = useEverTrue(!!openPost);
+  const routeArticleEverOpened = useEverTrue(!!openRoute);
+  const createComposerEverOpened = useEverTrue(createOpen);
+  const organizerComposerEverOpened = useEverTrue(organizerComposerOpen);
+  const organizerEventsEverOpened = useEverTrue(myEventsOpen);
+  const businessPlacesEverOpened = useEverTrue(businessPlacesOpen);
+  const dealCodeEverOpened = useEverTrue(!!dealCodeModal);
+  const culturalEventDetailEverOpened = useEverTrue(!!openCulturalEvent);
 
   const places = pulseData.places;
   const posts = pulseData.posts;
@@ -1991,14 +2060,16 @@ export function PulseApp() {
           />
           <AnimatePresence>
             {activeRoute && (
-              <ActiveRouteGuide
-                route={activeRoute}
-                stopIndex={activeRouteStopIndex}
-                findPlace={findPlace}
-                onOpenStop={centerRouteStop}
-                onNext={nextRouteStop}
-                onClose={() => setActiveRouteId(null)}
-              />
+              <Suspense fallback={null}>
+                <ActiveRouteGuide
+                  route={activeRoute}
+                  stopIndex={activeRouteStopIndex}
+                  findPlace={findPlace}
+                  onOpenStop={centerRouteStop}
+                  onNext={nextRouteStop}
+                  onClose={() => setActiveRouteId(null)}
+                />
+              </Suspense>
             )}
           </AnimatePresence>
           <MapBottomSheet
@@ -2088,16 +2159,18 @@ export function PulseApp() {
     if (tab === "routes") {
       return (
         <div className="h-full overflow-y-auto">
-          <RoutesScreen
-            routes={routes}
-            onOpenRoute={setOpenRoute}
-            savedRoutes={savedRoutes}
-            routeComments={routeComments}
-            findAuthor={findAuthor}
-            showMustSee={readyProfile(account)?.defaultIdentity === "TOURIST"}
-            places={places}
-            onOpenPlace={setOpenPlace}
-          />
+          <Suspense fallback={null}>
+            <RoutesScreen
+              routes={routes}
+              onOpenRoute={setOpenRoute}
+              savedRoutes={savedRoutes}
+              routeComments={routeComments}
+              findAuthor={findAuthor}
+              showMustSee={readyProfile(account)?.defaultIdentity === "TOURIST"}
+              places={places}
+              onOpenPlace={setOpenPlace}
+            />
+          </Suspense>
         </div>
       );
     }
@@ -2132,52 +2205,60 @@ export function PulseApp() {
             })}
           </div>
           <div className="min-h-0 flex-1">
-            {meetSubTab === "community" ? (
-              <MeetScreen
-                events={meetEvents}
-                rsvp={rsvpMap}
-                findPlace={findPlace}
-                onToggleRsvp={toggleMeetRsvp}
-                onOpenPlace={jumpToMap}
-                onCreate={() => openComposer("event")}
-              />
-            ) : (
-              <CulturalEventsScreen
-                events={culturalEvents}
-                lang={language}
-                onOpenDetail={setOpenCulturalEvent}
-                canCreate={organizerStatus?.verificationStatus === "verified"}
-                onCreate={() => setOrganizerComposerOpen(true)}
-              />
-            )}
+            <Suspense fallback={null}>
+              {meetSubTab === "community" ? (
+                <MeetScreen
+                  events={meetEvents}
+                  rsvp={rsvpMap}
+                  findPlace={findPlace}
+                  onToggleRsvp={toggleMeetRsvp}
+                  onOpenPlace={jumpToMap}
+                  onCreate={() => openComposer("event")}
+                />
+              ) : (
+                <CulturalEventsScreen
+                  events={culturalEvents}
+                  lang={language}
+                  onOpenDetail={setOpenCulturalEvent}
+                  canCreate={organizerStatus?.verificationStatus === "verified"}
+                  onCreate={() => setOrganizerComposerOpen(true)}
+                />
+              )}
+            </Suspense>
           </div>
         </div>
       );
     }
 
     if (tab === "deals") {
-      return <DealsScreen deals={deals} places={places} onOpenPlace={setOpenPlace} />;
+      return (
+        <Suspense fallback={null}>
+          <DealsScreen deals={deals} places={places} onOpenPlace={setOpenPlace} />
+        </Suspense>
+      );
     }
 
     return (
       <div className="h-full overflow-y-auto">
-        <SavedScreen
-          savedPlaceIds={savedIds}
-          savedPostIds={savedPostIds}
-          savedRouteIds={savedRouteIds}
-          places={places}
-          posts={allPosts}
-          routes={routes}
-          onOpenPlace={setOpenPlace}
-          onOpenPost={setOpenPost}
-          onOpenRoute={setOpenRoute}
-          onUnsavePlace={toggleSave}
-          onUnsavePost={toggleSavePost}
-          onUnsaveRoute={toggleSaveRoute}
-          findPlace={findPlace}
-          findAuthor={findAuthor}
-          findPostAuthor={findPostAuthor}
-        />
+        <Suspense fallback={null}>
+          <SavedScreen
+            savedPlaceIds={savedIds}
+            savedPostIds={savedPostIds}
+            savedRouteIds={savedRouteIds}
+            places={places}
+            posts={allPosts}
+            routes={routes}
+            onOpenPlace={setOpenPlace}
+            onOpenPost={setOpenPost}
+            onOpenRoute={setOpenRoute}
+            onUnsavePlace={toggleSave}
+            onUnsavePost={toggleSavePost}
+            onUnsaveRoute={toggleSaveRoute}
+            findPlace={findPlace}
+            findAuthor={findAuthor}
+            findPostAuthor={findPostAuthor}
+          />
+        </Suspense>
       </div>
     );
   };
@@ -2261,144 +2342,187 @@ export function PulseApp() {
           <BottomNav tab={tab} setTab={setTab} />
         </div>
 
-        <PlaceDetailModal
-          place={openPlace}
-          events={events}
-          onClose={() => setOpenPlace(null)}
-          onSave={toggleSave}
-          saved={openPlace ? savedIds.includes(openPlace.id) : false}
-          visited={openPlace ? visitedPlaceIds.includes(openPlace.id) : false}
-          onToggleVisited={toggleVisited}
-          posts={openPlace ? allPosts.filter((p) => p.placeId === openPlace.id) : []}
-          onOpenMap={jumpToMap}
-          onShare={sharePlace}
-          comments={openPlace ? (placeComments[openPlace.id] ?? []) : []}
-          onComment={addPlaceComment}
-          findAuthor={findAuthor}
-          findPostAuthor={findPostAuthor}
-          storyGroups={placeStoryGroups}
-          onOpenStory={(placeId) => setStoryViewer({ placeId })}
-          businessProfile={openPlaceBusinessProfile}
-          showClaimCta={
-            !!openPlace &&
-            !pulseData.claimedPlaceIds.includes(openPlace.id) &&
-            !myPlaceClaims.some(
-              (claim) => claim.placeId === openPlace.id && claim.status !== "rejected",
-            )
-          }
-          onClaimPlace={claimFromPlaceDetail}
-          onGetDealCode={handleGetDealCode}
-          gettingDealCode={issuingDealCode}
-        />
-        <DealCodeModal code={dealCodeModal} onClose={() => setDealCodeModal(null)} />
-        <PostDetailModal
-          post={openPost}
-          onClose={() => setOpenPost(null)}
-          onOpenMap={jumpToMap}
-          onLike={() => openPost && toggleLike(openPost.id)}
-          liked={openPost ? !!likes[openPost.id] : false}
-          likeCount={
-            openPost ? (postLikes[openPost.id] ?? openPost.likes) + (likes[openPost.id] ? 1 : 0) : 0
-          }
-          comments={openPost ? [...openPost.comments, ...(postComments[openPost.id] ?? [])] : []}
-          onComment={(t) => openPost && addPostComment(openPost.id, t)}
-          saved={openPost ? !!savedPosts[openPost.id] : false}
-          onSave={() => openPost && toggleSavePost(openPost.id)}
-          onShare={sharePost}
-          findPlace={findPlace}
-          findAuthor={findAuthor}
-          findPostAuthor={findPostAuthor}
-        />
-        <RouteArticleModal
-          route={openRoute}
-          onClose={() => setOpenRoute(null)}
-          onOpenMap={jumpToMap}
-          onMapRoute={startRouteOnMap}
-          saved={openRoute ? !!savedRoutes[openRoute.id] : false}
-          comments={openRoute ? (routeComments[openRoute.id] ?? []) : []}
-          onSave={() => openRoute && toggleSaveRoute(openRoute.id)}
-          onShare={() => openRoute && shareRoute(openRoute)}
-          onComment={(text) => openRoute && addRouteComment(openRoute.id, text)}
-          findPlace={findPlace}
-          findAuthor={findAuthor}
-        />
-        <CreateComposerModal
-          open={createOpen}
-          initialMode={composerMode}
-          prefillPlace={composerPin}
-          places={places}
-          vibeChips={vibeChips}
-          account={account}
-          onClose={() => {
-            setCreateOpen(false);
-            setComposerPin(null);
-          }}
-          onRequireAccount={() => {
-            requireProfile("post");
-          }}
-          onPost={addLocalPost}
-          onPlace={addLocalPlace}
-          onStory={addLocalStory}
-          onEvent={addMeetEvent}
-        />
+        {placeDetailEverOpened && (
+          <Suspense fallback={null}>
+            <PlaceDetailModal
+              place={openPlace}
+              events={events}
+              onClose={() => setOpenPlace(null)}
+              onSave={toggleSave}
+              saved={openPlace ? savedIds.includes(openPlace.id) : false}
+              visited={openPlace ? visitedPlaceIds.includes(openPlace.id) : false}
+              onToggleVisited={toggleVisited}
+              posts={openPlace ? allPosts.filter((p) => p.placeId === openPlace.id) : []}
+              onOpenMap={jumpToMap}
+              onShare={sharePlace}
+              comments={openPlace ? (placeComments[openPlace.id] ?? []) : []}
+              onComment={addPlaceComment}
+              findAuthor={findAuthor}
+              findPostAuthor={findPostAuthor}
+              storyGroups={placeStoryGroups}
+              onOpenStory={(placeId) => setStoryViewer({ placeId })}
+              businessProfile={openPlaceBusinessProfile}
+              showClaimCta={
+                !!openPlace &&
+                !pulseData.claimedPlaceIds.includes(openPlace.id) &&
+                !myPlaceClaims.some(
+                  (claim) => claim.placeId === openPlace.id && claim.status !== "rejected",
+                )
+              }
+              onClaimPlace={claimFromPlaceDetail}
+              onGetDealCode={handleGetDealCode}
+              gettingDealCode={issuingDealCode}
+            />
+          </Suspense>
+        )}
+        {dealCodeEverOpened && (
+          <Suspense fallback={null}>
+            <DealCodeModal code={dealCodeModal} onClose={() => setDealCodeModal(null)} />
+          </Suspense>
+        )}
+        {postDetailEverOpened && (
+          <Suspense fallback={null}>
+            <PostDetailModal
+              post={openPost}
+              onClose={() => setOpenPost(null)}
+              onOpenMap={jumpToMap}
+              onLike={() => openPost && toggleLike(openPost.id)}
+              liked={openPost ? !!likes[openPost.id] : false}
+              likeCount={
+                openPost
+                  ? (postLikes[openPost.id] ?? openPost.likes) + (likes[openPost.id] ? 1 : 0)
+                  : 0
+              }
+              comments={
+                openPost ? [...openPost.comments, ...(postComments[openPost.id] ?? [])] : []
+              }
+              onComment={(t) => openPost && addPostComment(openPost.id, t)}
+              saved={openPost ? !!savedPosts[openPost.id] : false}
+              onSave={() => openPost && toggleSavePost(openPost.id)}
+              onShare={sharePost}
+              findPlace={findPlace}
+              findAuthor={findAuthor}
+              findPostAuthor={findPostAuthor}
+            />
+          </Suspense>
+        )}
+        {routeArticleEverOpened && (
+          <Suspense fallback={null}>
+            <RouteArticleModal
+              route={openRoute}
+              onClose={() => setOpenRoute(null)}
+              onOpenMap={jumpToMap}
+              onMapRoute={startRouteOnMap}
+              saved={openRoute ? !!savedRoutes[openRoute.id] : false}
+              comments={openRoute ? (routeComments[openRoute.id] ?? []) : []}
+              onSave={() => openRoute && toggleSaveRoute(openRoute.id)}
+              onShare={() => openRoute && shareRoute(openRoute)}
+              onComment={(text) => openRoute && addRouteComment(openRoute.id, text)}
+              findPlace={findPlace}
+              findAuthor={findAuthor}
+            />
+          </Suspense>
+        )}
+        {createComposerEverOpened && (
+          <Suspense fallback={null}>
+            <CreateComposerModal
+              open={createOpen}
+              initialMode={composerMode}
+              prefillPlace={composerPin}
+              places={places}
+              vibeChips={vibeChips}
+              account={account}
+              onClose={() => {
+                setCreateOpen(false);
+                setComposerPin(null);
+              }}
+              onRequireAccount={() => {
+                requireProfile("post");
+              }}
+              onPost={addLocalPost}
+              onPlace={addLocalPlace}
+              onStory={addLocalStory}
+              onEvent={addMeetEvent}
+            />
+          </Suspense>
+        )}
 
-        <OrganizerEventComposer
-          key={editingCulturalEvent?.id ?? "new"}
-          open={organizerComposerOpen}
-          lang={language}
-          event={editingCulturalEvent}
-          onClose={() => {
-            setOrganizerComposerOpen(false);
-            setEditingCulturalEvent(null);
-          }}
-          onSubmit={addCulturalEvent}
-          onUpdate={editCulturalEvent}
-        />
+        {organizerComposerEverOpened && (
+          <Suspense fallback={null}>
+            <OrganizerEventComposer
+              key={editingCulturalEvent?.id ?? "new"}
+              open={organizerComposerOpen}
+              lang={language}
+              event={editingCulturalEvent}
+              onClose={() => {
+                setOrganizerComposerOpen(false);
+                setEditingCulturalEvent(null);
+              }}
+              onSubmit={addCulturalEvent}
+              onUpdate={editCulturalEvent}
+            />
+          </Suspense>
+        )}
 
-        <OrganizerEventsSheet
-          open={myEventsOpen}
-          lang={language}
-          events={myCulturalEvents}
-          onClose={() => setMyEventsOpen(false)}
-          onEdit={(ev) => {
-            setEditingCulturalEvent(ev);
-            setMyEventsOpen(false);
-            setOrganizerComposerOpen(true);
-          }}
-        />
+        {organizerEventsEverOpened && (
+          <Suspense fallback={null}>
+            <OrganizerEventsSheet
+              open={myEventsOpen}
+              lang={language}
+              events={myCulturalEvents}
+              onClose={() => setMyEventsOpen(false)}
+              onEdit={(ev) => {
+                setEditingCulturalEvent(ev);
+                setMyEventsOpen(false);
+                setOrganizerComposerOpen(true);
+              }}
+            />
+          </Suspense>
+        )}
 
-        <BusinessPlacesSheet
-          open={businessPlacesOpen}
-          onClose={() => setBusinessPlacesOpen(false)}
-          places={places}
-          claims={myPlaceClaims}
-          otherClaimedPlaceIds={pulseData.claimedPlaceIds}
-          onClaim={handleClaimPlace}
-          onSaveProfile={handleSavePlaceProfile}
-          onUploadPhoto={uploadBusinessPhoto}
-          onSaveDeal={handleSaveDeal}
-          dealStats={myDealStats}
-          onRedeemCode={handleRedeemDealCode}
-        />
+        {businessPlacesEverOpened && (
+          <Suspense fallback={null}>
+            <BusinessPlacesSheet
+              open={businessPlacesOpen}
+              onClose={() => setBusinessPlacesOpen(false)}
+              places={places}
+              claims={myPlaceClaims}
+              otherClaimedPlaceIds={pulseData.claimedPlaceIds}
+              onClaim={handleClaimPlace}
+              onSaveProfile={handleSavePlaceProfile}
+              onUploadPhoto={uploadBusinessPhoto}
+              onSaveDeal={handleSaveDeal}
+              dealStats={myDealStats}
+              onRedeemCode={handleRedeemDealCode}
+            />
+          </Suspense>
+        )}
 
-        <CulturalEventDetailModal
-          event={openCulturalEvent}
-          lang={language}
-          onClose={() => setOpenCulturalEvent(null)}
-          onOpenMap={jumpToMap}
-          onLike={() => openCulturalEvent && toggleCulturalEventLike(openCulturalEvent.id)}
-          liked={openCulturalEvent ? !!culturalEventLikes[openCulturalEvent.id] : false}
-          likeCount={
-            openCulturalEvent
-              ? (culturalEventLikeCounts[openCulturalEvent.id] ?? openCulturalEvent.likesCount) +
-                (culturalEventLikes[openCulturalEvent.id] ? 1 : 0)
-              : 0
-          }
-          comments={openCulturalEvent ? (culturalEventComments[openCulturalEvent.id] ?? []) : []}
-          onComment={(text) =>
-            openCulturalEvent && addCulturalEventComment(openCulturalEvent.id, text)
-          }
-        />
+        {culturalEventDetailEverOpened && (
+          <Suspense fallback={null}>
+            <CulturalEventDetailModal
+              event={openCulturalEvent}
+              lang={language}
+              onClose={() => setOpenCulturalEvent(null)}
+              onOpenMap={jumpToMap}
+              onLike={() => openCulturalEvent && toggleCulturalEventLike(openCulturalEvent.id)}
+              liked={openCulturalEvent ? !!culturalEventLikes[openCulturalEvent.id] : false}
+              likeCount={
+                openCulturalEvent
+                  ? (culturalEventLikeCounts[openCulturalEvent.id] ??
+                      openCulturalEvent.likesCount) +
+                    (culturalEventLikes[openCulturalEvent.id] ? 1 : 0)
+                  : 0
+              }
+              comments={
+                openCulturalEvent ? (culturalEventComments[openCulturalEvent.id] ?? []) : []
+              }
+              onComment={(text) =>
+                openCulturalEvent && addCulturalEventComment(openCulturalEvent.id, text)
+              }
+            />
+          </Suspense>
+        )}
 
         <AuthSheet
           open={authOpen}
@@ -2479,21 +2603,23 @@ export function PulseApp() {
         />
 
         {storyViewer && (
-          <PlaceStoryViewer
-            groups={placeStoryGroups}
-            startPlaceId={storyViewer.placeId}
-            startStoryId={storyViewer.storyId}
-            markSeen={markSeen}
-            onClose={() => setStoryViewer(null)}
-            onOpenPlace={jumpToMap}
-            onOpenPlaceDetails={(id) => {
-              const place = findPlace(id);
-              if (place) setOpenPlace(place);
-            }}
-            onShare={shareStory}
-            onToggleSave={toggleSave}
-            savedPlaceIds={savedIds}
-          />
+          <Suspense fallback={null}>
+            <PlaceStoryViewer
+              groups={placeStoryGroups}
+              startPlaceId={storyViewer.placeId}
+              startStoryId={storyViewer.storyId}
+              markSeen={markSeen}
+              onClose={() => setStoryViewer(null)}
+              onOpenPlace={jumpToMap}
+              onOpenPlaceDetails={(id) => {
+                const place = findPlace(id);
+                if (place) setOpenPlace(place);
+              }}
+              onShare={shareStory}
+              onToggleSave={toggleSave}
+              savedPlaceIds={savedIds}
+            />
+          </Suspense>
         )}
 
         <ModerationSheets />
