@@ -1903,10 +1903,11 @@ export async function setCulturalEventLike(eventId: string, liked: boolean) {
 // ---------------------------------------------------------------------------
 // Moderation — report, block, mute
 //
-// These six functions and the three types above them are the real
-// implementation of the contract stubbed in
-// `src/components/hp/moderation-api-stub.ts`. Signatures match that file
-// exactly, so the swap is one import line in `moderation-store.ts`.
+// These six functions and the three types above them are what
+// `moderation-store.ts` and `ReportSheet.tsx` import. They replaced an
+// in-memory stub (`moderation-api-stub.ts`, deleted) whose state lived in two
+// module-level Sets, so until the swap a report reached nobody and a block died
+// on reload. Covered end to end by `npm run smoke:moderation`.
 //
 // Storage: `content_reports` and `user_blocks`
 // (supabase/migrations/20260905130000_add_user_moderation.sql).
@@ -1956,6 +1957,14 @@ export async function reportContent(input: ReportContentInput): Promise<void> {
       target_id: input.targetId,
       reason: input.reason,
       note: note ? note.slice(0, REPORT_NOTE_MAX) : null,
+      // Set explicitly, and not just on insert. On the conflict path this is an
+      // UPDATE, and content_reports_update_own's WITH CHECK requires the NEW row
+      // to have status = 'open'. Leaving it out keeps whatever the moderator
+      // last set, so re-reporting a target whose report was already actioned or
+      // dismissed fails the policy and the user sees "Could not send the
+      // report." Re-reporting is exactly the signal a closed report was closed
+      // too early, so reopening it is also the behaviour we want.
+      status: "open",
     },
     { onConflict: "reporter_id,target_type,target_id" },
   );

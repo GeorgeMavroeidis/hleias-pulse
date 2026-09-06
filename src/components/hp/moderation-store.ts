@@ -8,7 +8,7 @@ import {
   type ReportContentInput,
   type ReportReason,
   type ReportTargetType,
-} from "./moderation-api-stub";
+} from "@/lib/hp-api";
 
 export type { ReportReason, ReportTargetType };
 

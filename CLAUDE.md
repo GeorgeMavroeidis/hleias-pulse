@@ -1,238 +1,337 @@
-# CLAUDE.md — ΗΛΕΙΑ PULSE
+# CLAUDE.md
 
-Instructions for AI agents (Claude Code, Codex) working in this repo.
-**Read [ROADMAP.md](ROADMAP.md) for what we are building and in what order.**
+> Read automatically by Claude Code at the start of every session.
+> Commit this to git so every contributor's session starts from the same context.
 
-## What this is
+## Project Overview
+**Hleias Pulse** — a hyperlocal social app for the Ilia region of Greece, blending
+elements of Twitter (short posts), Google Maps (location), and Instagram (photo/video
+stories). Locals post real-time recommendations and happenings tied to a location;
+tourists browse those posts to find authentic, local-approved things to do and see.
 
-A mobile-first social map of the Ilia region, Greece. Think Google Maps × Instagram ×
-Twitter, for locals and tourists. Locals surface what is actually happening; tourists get
-recommendations from real people instead of review sites. Partner shops and cafés run deals
-that users redeem in-app — that is the revenue model.
+Core sections — the four bottom-nav tabs (`TAB_ITEMS` in
+`src/components/hp/pulse-shared.ts`):
+- **Map** — Leaflet map of the region, clustered markers, "what's hot" scoring
+- **Pulse** — the main feed: short posts tied to a place (`Post` in `hp-model.ts`)
+- **Routes** — curated multi-stop itineraries with a step-by-step active guide
+- **Meet** — two sub-tabs: community meetups (RSVP-able) and cultural events
+  (published by verified organizers)
 
-Ships as an **iOS app first** (Capacitor shell), with a Cloudflare static web build.
+Reachable, but not bottom-nav tabs:
+- **Deals** — local businesses offer discounts, redeemed in-app by code; planned
+  revenue source (commission or paid placement)
+- **Saved** — the user's bookmarks
+- **Stories** — ephemeral photo/video pinned to a place (6h or 24h expiry), shown
+  as a rail on the map and place sheets. These are **not** the main feed — the feed
+  is Pulse. `Post` and `StoryItem` are separate types with separate tables.
+- **`/admin`** — a moderation and content workspace (see Architecture)
 
-## Stack
+Stage: **actively in development**, well past concept stage — real code, tests, and
+deployment tooling already exist (see below, sourced from actual project files).
+Goal: unite locals, help tourists, monetize via Deals.
 
-React 19 · Vite 7 · TanStack Start/Router · Tailwind 4 · Leaflet · Supabase (Postgres + Auth
-+ Storage + RLS) · Capacitor (iOS) · TypeScript
+## Tech Stack (corrected — read directly from actual project files)
+- **Framework:** React 19 + Vite 7. TanStack Start / Router / Query are installed
+  and wired into the `vite dev` entry, but read the next bullet before you rely on
+  any of them — **the shipped app uses none of them.** There is no separate backend
+  server (Fastify/Express), and there are no server functions in use either: the
+  only `createServerFn` in the repo is the untouched Lovable example in
+  `src/lib/api/example.functions.ts`, which nothing imports (same for
+  `src/lib/config.server.ts`). **All server-side logic is Supabase** — RLS policies
+  and Postgres functions, called straight from the browser.
+- **Two entry points, and production uses the plain one.** `npm run build` runs
+  `build:static` → `vite.static.config.ts`, whose root is `cloudflare-static-src/`.
+  That entry (`main.tsx`) is a bare `createRoot` that mounts `PulseApp`, choosing
+  the admin screen with a `window.location.pathname` check — no router, no SSR, no
+  `QueryClientProvider`. The TanStack Start path (`src/routes/`, `src/router.tsx`,
+  `src/start.ts`, `src/server.ts`) only runs under `npm run dev`. Both iOS and
+  Cloudflare ship the static build, so **dev and production run different entry
+  code**; a change that only works in `vite dev` is not shipped.
+- **TanStack Query is effectively unused.** It is provider-wrapped in
+  `src/routes/__root.tsx`, but there is not one `useQuery`, `useMutation` or
+  `queryOptions` call in `src/`. Data loading is plain `async` calls into
+  `hp-api.ts` from `useEffect`. Don't describe caching behaviour the app doesn't have.
+- **Database & backend platform:** Supabase (Postgres + Auth + Storage +
+  auto-generated APIs), as established. The browser client is
+  `src/lib/supabase/client.ts`; project ref `kfxfnqryfmuxiwlswyyn`, URL and
+  publishable key hardcoded there on purpose (a publishable key is public — the
+  secret to never commit is the `service_role` key). A raw `pg` driver is also
+  present as a **devDependency**, used only by `scripts/audit-rls.ts` and three
+  smoke scripts — it never enters the app bundle. Seed generation
+  (`generate-supabase-seed.ts`) does not use `pg`; it emits SQL.
+- **Permissions:** Postgres Row Level Security (RLS) — enforced by an actual
+  `audit:rls` script already in the repo. See Guardrails below.
+- **UI:** Tailwind CSS 4 + shadcn/ui ("new-york" style, `slate` base) on Radix UI
+  primitives, Lucide icons. Forms via react-hook-form + zod (**zod 3**, not 4).
+  Framer Motion (animation), Sonner (toasts), Vaul (drawers), Embla (carousels),
+  cmdk (command palette), Recharts (**2.x**, not 3). Also in use: date-fns,
+  `qrcode` (deal redemption codes), input-otp, react-day-picker,
+  react-resizable-panels. `src/styles.css` is an import barrel over 16 per-surface
+  files in `src/styles/`.
+- **Maps:** Leaflet + Supercluster (marker clustering) — not Mapbox/Google Maps.
+  `npm run build:ionian-land` (mapshaper, a devDependency) generates the region's
+  coastline data into `src/lib/hp/ionian-land.ts`.
+- **Mobile:** Capacitor 8 wraps the same web build into a native iOS shell — one
+  codebase, not a separate native app. App id `com.theodoros.iliapulse`, app name
+  "Ilia Pulse". Its `webDir` is `cloudflare-static-dist`, so **iOS ships the exact
+  same static bundle Cloudflare does** — `ios:sync` runs `build:static` first.
+- **Hosting/deploy:** Cloudflare, via Wrangler — the production build is a static
+  SPA (not the SSR build), deployed with SPA fallback routing. Note `wrangler.toml`
+  declares no worker `main`, only `[assets]` — so despite its name, `deploy:worker`
+  uploads static assets, it does not deploy any server code. Worker name is `ilias`.
+- **Scaffold origin:** initially generated via Lovable.dev's TanStack Start
+  starter config (`@lovable.dev/vite-tanstack-config`) — some build wiring is
+  managed by that package; there's a comment in `vite.config.ts` warning not to
+  hand-duplicate what it already provides.
+- **Tooling:** TypeScript (`strict: true`), ESLint 9 (flat config), Prettier — all
+  already configured. Two caveats: `noUnusedLocals` and `noUnusedParameters` are
+  both **off**, and `tsconfig.json`'s `include` covers only `src/**` plus two config
+  files — so `npx tsc --noEmit` does **not** typecheck `scripts/**` or
+  `cloudflare-static-src/**`, and the latter is the production entry point.
+- **Tests:** no test framework — `node:test` via `tsx --test`, plus hand-rolled
+  assertion scripts. Two suites (`test:intelligence`, `test:discovery`) are real
+  unit tests over pure functions; the rest are scripts.
 
-## Which of the two of us are you working for?
+## Architecture
 
-Two people share this repo and **both are called Giorgos**. Never infer from a first
-name. Before you edit anything, establish whose session this is:
+**Is frontend separated from backend? Yes — but not the way this file used to
+imply, and not by folder-per-service.** There is no server tier to separate: the
+shipped app is a client-side React SPA that talks straight to Supabase. So the
+real boundary is *client code vs. database*, and it falls on a clean seam:
 
-```sh
-git config user.email
-```
-
-| Email | Who | Lane |
+| Layer | Where | Notes |
 |---|---|---|
-| `128294142+GeorgeMavroeidis@users.noreply.github.com` | **Mavroeidis** (`@GeorgeMavroeidis`) | Data, map, security, infra |
-| `giorgosmargaris1234@gmail.com` | **Margaris** (`@GeorgeMargaris`) | Product surface, UI, copy |
+| UI | `src/components/hp/**` (product), `src/components/admin/**`, `src/components/ui/**` (shadcn) | 40+ files; no Supabase imports of its own |
+| Data access | `src/lib/hp-api.ts` (2042 lines), `src/lib/admin-api.ts` (339), `src/lib/hp-auth.ts` | these three are the **only** files that import the Supabase client — verified, zero component does |
+| Domain types / logic | `src/lib/hp-model.ts`, `src/lib/hp/**` | pure, testable — this is what the unit tests cover |
+| Backend | `supabase/migrations/**` (30 migrations, 30 tables) | tables, RLS policies, Postgres functions, triggers |
+| Generated contract | `src/lib/supabase/database.types.ts` | `supabase gen types typescript` output — the thing that makes a schema change a compile error (see Team Notes) |
 
-If that command returns nothing, **stop and ask which of them you are working for.**
-Do not guess, and do not commit until it is set — an unset identity produces commits
-attributed to a machine-local address that GitHub cannot link to either account.
+**Route files are not where the split happens** — there are only three of them
+(`src/routes/__root.tsx`, `index.tsx`, `admin.tsx`), each a thin shell that renders
+one component, and none of them run in production anyway (see Tech Stack). Nothing
+is interleaved in a route file because the routes are essentially empty.
 
-## Ownership lanes — enforced, not advisory
+The seam that *is* under strain is component size, not layering:
+`AdminDashboard.tsx` is 3241 lines, `PulseApp.tsx` 2631, `SocialMap.tsx` 2335.
+`PulseApp.tsx` holds the app shell and most product flows and is being split.
 
-`.github/CODEOWNERS` encodes these lanes and GitHub enforces them once branch
-protection requires Code Owner review. This table is the human-readable version.
+One real leak to know about: `src/components/hp/moderation-store.ts` and
+`ReportSheet.tsx` import from a UI-local stub (`moderation-api-stub.ts`) instead of
+`hp-api.ts` — see the `moderation` module below.
 
-### If you are working for MAVROEIDIS
+Modules, with status verified against the code (not against prior claims):
 
-**You may edit:** `src/lib/**` (except the two i18n files) · `src/lib/supabase/**` ·
-`supabase/**` · `scripts/**` · `.github/**` · `src/components/hp/SocialMap.tsx` ·
-`src/components/hp/ImageBox.tsx` · `src/components/admin/**` · build, deploy, Capacitor
-and dependency config.
+- `users` — accounts, profiles (Supabase Auth) — **working end-to-end** (internal
+  testing), covered by `smoke:auth-profile`
+- `posts` / `stories` — **two different things, don't merge them.** `posts` are the
+  short place-tagged entries in the Pulse feed (`Post`, `posts` + `comments`
+  tables); `stories` are ephemeral photo/video pinned to a place with a 6h or 24h
+  expiry (`StoryItem`, `stories` + `story_views`). Both **working end-to-end**,
+  covered by `smoke:post-write` and `test:discovery` (`src/lib/hp/discovery.ts`,
+  the lens/ranking logic).
+- `map` — geospatial + "what's hot" trending (`area-intelligence`) — **working
+  end-to-end**, covered by `test:intelligence` and `test:map-visuals`
+- `moderation` — ⚠️ **not working end-to-end. The backend is done; the UI is not
+  wired to it.** `hp-api.ts` exports the real `reportContent` / `blockUser` /
+  `unblockUser` / `muteUser` / `unmuteUser` / `getMyBlocks` against
+  `content_reports` and `user_blocks`, and server-side block enforcement is a live
+  RLS policy that `smoke:block-enforcement` verifies by querying Postgres directly.
+  But `moderation-store.ts:11` and `ReportSheet.tsx:7` still import
+  `./moderation-api-stub`, whose entire state is two module-level `Set`s. **In the
+  running app a report reaches nobody and a block dies on reload.** The stub's own
+  header says the fix: change those two imports to `@/lib/hp-api` and delete the
+  file. App Store reviewers test blocking by hand — this is a rejection risk.
+- `deals` — listings, discount codes, redemption — **working end-to-end**, covered
+  by `smoke:deal-race` (race-condition testing on redemption). Full pipeline:
+  a user claims a place → admin verifies the business → `setPlaceDeal` publishes
+  the offer → `issueDealCode` mints a per-user code (rendered as a QR via `qrcode`)
+  → `redeem_deal_code()` burns it atomically into `deal_redemptions`. Migration
+  `20260905170000_deal_requires_verified_business.sql` gates deals on a verified
+  business; confirm it is applied before trusting that gate.
+- `meets` — **RSVP-able local gatherings.** Any signed-in user creates one from the
+  Meet tab: it hangs off an existing place (`meet_events.place_id` → `places`,
+  lat/lng mirrored so it plots on the map), and carries a start time, duration
+  (15–1440 min), one of eight categories (`panigyri`, `beach`, `music`, `sunset`,
+  `sport`, `cleanup`, `food`, `social`), a vibe string, a price string, optional
+  capacity, description, cover image and tags. Other users RSVP `going` or `maybe`
+  (`event_rsvps`, PK `(event_id, user_id)`); a Postgres trigger recomputes
+  `going_count`/`maybe_count` on every change, added to seed counts so demo events
+  don't read as empty. Hosting an event auto-RSVPs the host as `going`.
+  `MeetScreen.tsx` filters by category or "mine", hides anything more than an hour
+  past, and drops muted hosts client-side (blocked hosts are already filtered by
+  RLS). New events default to `moderation_status = 'pending'` and surface in the
+  admin queue. The Meet tab's **second sub-tab is a separate module** — cultural
+  events, below. Covered by `smoke:live-surfaces`.
+- `cultural_events` / `organizers` — a parallel events track for institutions
+  (municipalities, cultural associations) rather than individuals. Publishing
+  requires an `organizers` row with `verification_status = 'verified'`; events get
+  posters, comments and reactions, and can link to a place. Seeded with real
+  municipal organizers (`20260827130000`). Not previously listed in this file.
+- `admin` — a full moderation and content workspace at `/admin`
+  (`AdminDashboard.tsx`, `admin-api.ts`, `admin_members` + `admin_audit_logs`).
+  Roles are `owner` / `editor` / `moderator`; it approves or hides every
+  user-generated type, verifies organizers and businesses, resolves place claims,
+  and edits places on a map. **Not previously listed in this file at all** — it is
+  a large surface with its own privilege model, so treat it as a first-class module.
+- `routes` — curated multi-stop itineraries (`routes` + `route_stops`,
+  `RoutesScreen.tsx`) with an active step-by-step guide. Also previously unlisted.
+- `live-surfaces` — **not a module. It is a smoke test, and the migration it is
+  named after.** `20260617161000_make_live_surfaces_supabase.sql` was the cutover
+  that moved the app's "live" surfaces off local mock data into Supabase — it
+  enriched `stories` (author, media, expiry, moderation status) and created
+  `meet_events`, `event_rsvps`, `story_views` and `user_activity_days`.
+  `smoke:live-surfaces` is the corresponding end-to-end check of the per-user live
+  state those tables back: bootstrap load → create a story → mark it seen → create
+  a Meet event → change its RSVP → record an activity day and confirm the streak
+  increments, then delete every fixture it made. Nothing in `src/` is called
+  "live-surfaces"; don't look for a folder.
+- `payments` *(future)* — commission/monetization logic, kept isolated so it's easy
+  to lock down and audit separately. **Confirmed genuinely absent:** the only trace
+  of it in the repo is a commented-out `stripeSecretKey` line in the unused
+  `config.server.ts`. No payment provider, no money-handling code, nothing to audit
+  yet. Deals currently move no money — they issue and burn codes.
 
-**Do not edit without asking Margaris:** anything else under `src/components/hp/`,
-`src/components/ui/`, `public/`, `src/lib/i18n.tsx`, `src/lib/hp/i18n.ts`.
+## Conventions & Patterns
+- TypeScript in strict mode. (There are **no** Supabase Edge Functions in this repo
+  — no `supabase/functions/` directory — so this rule is about app and script code.)
+- Every table gets an RLS policy before it ships — no exceptions (see Guardrails).
+- Schema changes go through Supabase migrations — never hand-edit the database via
+  the dashboard for anything permanent.
+- Tests required for anything touching money (Deals/payments) or auth.
 
-His work is the product surface. Changing a screen out from under him is how two
-people produce one merge conflict.
+## Commands
+*(real scripts, from package.json)*
+- Install: `npm install`
+- Dev server: `npm run dev`
+- Build (production, static): `npm run build`
+- Preview build: `npm run preview`
+- Lint: `npm run lint` / Format: `npm run format`
+- Typecheck: `npx tsc --noEmit` (no npm script for it, but CI runs it)
+- Audit RLS policies: `npm run audit:rls`
+- Check for leaked secrets: `npm run check:secrets`
+- Deploy to Cloudflare: `npm run deploy:worker` (static assets — see Tech Stack)
+- iOS: sync build → `npm run ios:sync`, open in Xcode → `npm run ios:open`
+- Smoke tests: `npm run smoke:auth-profile`, `smoke:block-enforcement`,
+  `smoke:deal-race`, `smoke:live-surfaces`, `smoke:post-write`
+- Unit tests: `npm run test:intelligence`, `npm run test:discovery`
+- Map visuals check: `npm run test:map-visuals`
+- Generate Supabase seed data: `npm run supabase:generate-seed`
+- Rebuild coastline geometry: `npm run build:ionian-land`
+- Build the TanStack Start (dev-path) bundle instead: `npm run build:tanstack`
 
-### If you are working for MARGARIS
+**Which of these run offline.** `lint`, `check:secrets`, `tsc --noEmit`,
+`test:intelligence`, `test:discovery`, `test:map-visuals` and `build` need nothing
+— that is exactly the set CI runs. **Every `smoke:*` script hits the live
+Supabase project**, creates real rows and real users, and cleans up in a `finally`.
+Several also shell out to `npx supabase … api-keys` for a `service_role` key from
+your local CLI session, and `smoke:block-enforcement` / `smoke:deal-race` /
+`audit:rls` additionally need `SUPABASE_DB_PASSWORD` for a direct `pg` connection.
+None of them can run in CI, and none should be run casually against production.
 
-**You may edit:** `src/components/hp/**` (except `SocialMap.tsx` and `ImageBox.tsx`) ·
-`src/components/ui/**` · `public/**` · `src/lib/i18n.tsx` · `src/lib/hp/i18n.ts`.
+## Current Priorities / Phase
+**Status: internal testing only — no outside users yet.**
 
-**Do not edit without asking Mavroeidis:** `src/lib/**`, `supabase/**`, `scripts/**`,
-`.github/**`, `SocialMap.tsx`, `src/components/admin/**`, and anything to do with
-build, deploy, auth, payments or security.
+Working end-to-end today — though you flagged possible loopholes/errors yourself,
+so treat this as "functionally works," not "safe for strangers yet":
+- Signing up & profile
+- Posting to the Pulse feed, commenting, and posting Stories
+- Map with live trending
+- Meets — create, RSVP, RSVP change *(scope now written up — see Architecture)*
+- Cultural events, organizer verification, place claims
+- The Deal pipeline: issue a code → redeem it → recorded in `deal_redemptions`
+- The `/admin` moderation workspace
 
-He owns the data layer and the security model. If your feature needs a new query, a
-new column, or a change to `hp-api.ts`, **do not write it yourself** — describe the
-shape you need and let him add it. That boundary is what keeps the API stable enough
-for two people to build against.
+⚠️ **Corrected — this was listed as working and is not:**
+- **Blocking / reporting / muting.** The database side works and is enforced by
+  RLS; the UI still calls an in-memory stub, so nothing a user does persists.
+  It is a two-import fix, described under `moderation` in Architecture. Until then,
+  don't count it as shipped, and don't put the app in front of App Store review.
 
-### When you need to cross the line
+Not yet confirmed as actually shipped, even though the tooling exists:
+- iOS app via Capacitor (`ios:sync` / `ios:open` scripts exist)
+- Live deployment to Cloudflare (`deploy:worker` script exists)
 
-Do not quietly edit the other lane, and do not work around it by duplicating logic on
-your own side. Say what you need and stop:
+**Before opening this to real outside users:**
+- Wire moderation to `hp-api.ts` — highest-value item on this list, and the
+  smallest
+- A hardening pass on everything above — you already suspect the rough edges;
+  better you find them than a stranger does
+- Confirm the iOS build and Cloudflare deployment actually work end-to-end, not
+  just that the scripts exist
+- Error tracking and rate limiting are both still absent. **CI, however, already
+  exists** — `.github/workflows/ci.yml` runs lint → secret scan → typecheck → the
+  three offline test suites → build, on every PR and every push to `main`. What is
+  missing is CD (no deploy job) and branch protection (nothing forces CI green
+  before merge).
+- ⚠️ This file points at `IDEAS.md` here and again under Team Notes. **There is no
+  `IDEAS.md` in the repo, and none in git history.** Either create it or drop the
+  two references.
 
-> "This needs a `reports` table and a `createReport()` in `hp-api.ts`. That is
-> Mavroeidis's lane — I have not touched it. Here is the exact shape required: …"
+## Guardrails — do NOT do these without explicit human approval
+- Ship a table without a Row Level Security (RLS) policy — an RLS-less table on
+  Supabase is readable/writable by anyone with your public API key, which is
+  effectively everyone. This is the #1 way Supabase apps leak all their data.
+- Touch payment/commission logic
+- Modify the production database schema directly (Supabase migrations only)
+- Change auth/login logic
+- Deploy to production
+- Store more location precision than a feature actually needs — location is personal
+  data under EU/Greek privacy law (GDPR); handle it carefully
+- **Process rule:** run `npm run audit:rls` and `npm run check:secrets` before every
+  deploy — both scripts already exist, so this costs nothing but discipline
 
-A blocked task reported clearly is worth more than a merge conflict delivered quietly.
+## Git Automation
+**Fully automatic, no need to ask:**
+- Stage and commit changes, with clear descriptive commit messages
+- Push to feature branches
+- Open pull requests (with a summary of what changed and why)
 
-## Workflow — non-negotiable
+**Still needs a human:**
+- Merging a PR into `main` — this is the one checkpoint that catches a mistake
+  before it's live for both of you; auto-merging removes the entire point of
+  having PRs
+- Force-pushing, rewriting history, or deleting branches
+- Pushing directly to `main`, bypassing PRs entirely
 
-```sh
-git fetch origin && git switch main && git pull --ff-only origin main
-git switch -c <feat|fix|chore|docs>/<short-name>
-```
+*(deploying to production and touching payment/auth code already require a
+human — see Guardrails above; a PR merge into `main` feeds directly into that)*
 
-- `main` is the only long-lived branch. **Never commit or push to it directly.**
-- Open a PR into `main`. CI must be green. Delete the branch after merge.
-- **Small PRs, merged daily.** A branch older than 48h is a merge conflict waiting to happen.
-- Never force-push a shared branch.
-- One task per session. Do not let scope sprawl across unrelated files.
+**To make this a hard rule, not just advice Claude can drift from over a long
+session:** ask Claude Code to set up `.claude/settings.json` with a `permissions`
+block — auto-allow routine git commands (`git add`, `git commit`, `git push` to a
+branch, opening a PR) and deny the risky ones outright (`git push --force`,
+direct pushes to `main`). Have it verify the exact permission-pattern syntax
+against its current docs when it sets this up — that format is version-specific
+enough that it's not worth hand-copying from anywhere, including here.
 
-## Hard rules
+## Team Notes
+Two contributors — split by backend/frontend, not by backend module.
 
-- **Ask George explicitly before adding, changing, or applying any Supabase migration.**
-- Never commit `.env`, passwords, service-role keys, or API tokens.
-- Never deploy to production without George's explicit approval.
-- `src/lib/i18n.tsx` + `useI18n()` is the **only** translation system. Do not introduce
-  `useLang()` / `language-context`.
-- Greek-first copy. Conservative and concrete — no fake "live" claims, no invented metrics,
-  no hype language.
-- Do not mass-reformat files. It creates fake conflicts. Prettier config is settled.
-- Do not stage `src/routeTree.gen.ts` for line-ending-only changes.
+**Roles:**
+- You: own the entire backend (all modules above — users, stories, map, myths, deals, payments)
+- Buddy: owns frontend/mobile — consumes the backend API
+- Local business partnerships, content moderation, community-building: **not yet
+  assigned** — decide before Phase 3 (Deals). See IDEAS.md → Open Questions.
 
-## Verify, don't assume
+**The real collision point isn't an API contract — you share one codebase.** Since
+it's a single TanStack Start app (not separate frontend/backend services), what
+actually needs to stay in sync is the Supabase schema and its generated
+TypeScript types. When you change a table, regenerate types
+(`supabase gen types typescript`) so your buddy's code gets a compiler error
+immediately if something it depends on changed shape, instead of a silent runtime
+bug discovered later. That's your equivalent of the API contract.
 
-Docs in this repo have been wrong before. `HANDOFF.md` claimed posting worked; it does not
-(see Known Issues). **Run the thing before reporting it works.**
+**Decisions:** talked through together, not unilaterally. Worth flagging: this can
+bottleneck small calls if one of you is offline when it comes up — you may want a
+lighter default for low-stakes implementation details (builder decides, flags it in
+the handoff for the other to review later), reserving "talk it through together" for
+anything costly to reverse.
 
-```sh
-npm run dev                  # http://localhost:8080
-npx tsc --noEmit             # typecheck
-npm run lint                 # 0 errors expected (3 known warnings)
-npm run build                # static/Cloudflare build
-npm run test:intelligence    # 8 tests
-npm run test:discovery       # 9 tests
-npm run test:map-visuals
-npm run check:secrets        # no committed .env / key / token (also runs in CI)
-npm run ios:sync && npm run ios:open
-```
-
-Security checks. These talk to the live database, so they need `SUPABASE_DB_PASSWORD` in
-`.env` and stay out of CI:
-
-```sh
-npm run audit:rls            # snapshot policies/grants; --check to diff against the file
-npm run smoke:block-enforcement
-npm run smoke:deal-race
-```
-
-## Known issues (last verified 2026-09-05, security pass)
-
-Ordered by severity. Verified against the live project, not inherited from docs.
-
-1. **🔴 Report / block / mute does not persist.** The UI shipped in PR #40 against
-   `src/components/hp/moderation-api-stub.ts`, which keeps everything in two module-level
-   `Set`s. A report is a `console.warn` that reaches nobody; a block dies on reload — the
-   one thing an App Store reviewer tests by hand. Apple Guideline 1.2 rejection risk.
-   **The backend is done and live**: `content_reports` and `user_blocks` exist
-   (`20260905130000`), and `hp-api.ts` exports `reportContent` / `blockUser` /
-   `unblockUser` / `muteUser` / `unmuteUser` / `getMyBlocks` with signatures matching the
-   stub exactly. What is left is one import line in `moderation-store.ts:11`
-   (`./moderation-api-stub` → `@/lib/hp-api`), the same swap in `ReportSheet.tsx:7`, and
-   deleting the stub. **Margaris's lane.**
-2. **🟠 A rejected business's deal and phone are publicly readable.** Claim `07d272ed…`
-   on `lechaina` is `approved` with `deal_active = true` under business `"gm"`, whose
-   verification is `rejected`. Anonymous callers get the deal text and the phone number,
-   and the map shows a deal badge for a code `redeem_deal_code()` can never accept.
-   Fix in PR #49, **not yet pushed to the database.**
-3. **🟠 Two RLS policy gaps are open in production.** `meet_events` carries a second
-   INSERT policy that lets any authenticated user publish straight past moderation, and
-   `content_reports` lets a reporter reopen a report a moderator already dismissed.
-   Fix in PR #47, **not yet pushed to the database.**
-4. **🟡 Third-party hotlinked images.** Some place photos come from `visit-olympia.gr`,
-   `visitkatakolon.gr` and `justforonesummer.com`. CORS and licensing both unresolved.
-5. **🟡 Leftover test data.** ~15 `@hleiaspulse-audit.test` accounts and a few issued deal
-   codes from the 2026-09-04 audit need deleting.
-6. **🟡 `main` is not branch-protected.** CI runs but nothing enforces it.
-7. **🟡 Auth is soft.** Password minimum 6, HIBP leaked-password check off, CAPTCHA off,
-   email confirmation off. Deliberate for early testing per `USER.md`, but accounts are
-   free to create, which is what makes any policy gap cheap to exploit.
-
-### Security posture — read before touching `supabase/**`
-
-`anon` holds a blanket SELECT grant from Supabase's default privileges on tables the
-migrations never granted it. An anonymous query to `content_reports`, `user_blocks`,
-`admin_members`, `deal_redemptions`, `user_preferences` or `user_security_events` returns
-HTTP 200 with zero rows — **not** `permission denied`. **RLS is the only boundary.** Every
-policy slip is instantly public, so run `npm run audit:rls` before and after any migration
-that touches a policy, and state the resulting per-table per-command policy counts in the
-PR description.
-
-### Fixed on 2026-09-05 — do not re-diagnose
-
-- **The CORS image migration is applied.** `20260904210000_cors_friendly_image_urls.sql`
-  and `20260905090000_remaining_cors_image_urls.sql` are both live;
-  `supabase migration list --linked` shows local and remote matching on all 24. Marker
-  images no longer download at full size.
-- **`styles.css` is split.** It is 23 lines now — an import barrel over 16 per-surface
-  files under `src/styles/` (`41ca2d8`). It is no longer a bottleneck for parallel work.
-- **The Lechaina deal typo is fixed.** It reads "only for today!", not "roday".
-- **The smoke scripts now target the real database.** `smoke-auth-profile.ts` and
-  `smoke-live-surfaces.ts` hardcoded `projectRef = "uihwsndveblfgmlhdngi"`, a project that
-  does not exist in the account. Both now use `kfxfnqryfmuxiwlswyyn`, matching
-  `src/lib/supabase/client.ts`. The same wrong ref was corrected across `USER.md`,
-  `SUPABASE_BACKEND_PLAN.md`, `AUTH_BACKEND_IMPLEMENTATION.md` and
-  `supabase/remote_schema_snapshot.md`.
-- **Signed-out writes no longer throw a raw `AuthApiError`.** `ensurePulseUserId()`
-  (`src/lib/hp-api.ts`) no longer falls back to `signInAnonymously()`. **Accounts are
-  required.** Without a session it throws `AuthRequiredError`; use the exported
-  `isAuthRequiredError()` to detect it — never match on the message. Every gated UI
-  handler in `PulseApp.tsx` now calls `requireProfile(action)` before touching state, so
-  the sign-in sheet opens and nothing flickers. `handleWriteError()` catches a session
-  that expires mid-request and routes it to the same sheet. The two background writes
-  (`markPulseStoriesSeen`, `recordPulseActivityDay`) no-op when signed out — they must
-  never open a sheet unprompted.
-
-### Fixed on 2026-09-04 — do not re-diagnose
-
-- **Posting, commenting, places, stories and meet events.** All five failed with
-  `[42501] new row violates row-level security policy`. The write was always fine; the
-  `.insert(...).select(...)` read-back had no matching SELECT policy for an author's own
-  `pending` row. Fixed by `20260904190000_authors_can_read_own_content.sql`.
-- **Map basemap.** CARTO began returning an "API KEY REQUIRED" watermark tile with HTTP 200.
-  Now defaults to keyless OpenStreetMap, overridable via `VITE_MAP_TILE_URL`. A keyed
-  provider is still needed before public launch.
-- **Migration history.** All 20 migrations had been applied by hand and were untracked;
-  history is repaired and the CLI now manages the schema. A duplicate version number was
-  also resolved.
-
-Verified working end to end: signup, bootstrap reads (51 places), create post, add comment,
-create place, create story, create meet event, meet RSVP, and the full deal-coupon pipeline
-(`issue_deal_code` → `redeem_deal_code` → `deal_redemptions`).
-
-## Key files
-
-| Path | What |
-|---|---|
-| `src/components/hp/PulseApp.tsx` | App shell and product flows (being split) |
-| `src/components/hp/SocialMap.tsx` | Leaflet map, markers, clustering |
-| `src/components/hp/AuthAccountSheets.tsx` | Active auth + account UI |
-| `src/components/admin/AdminDashboard.tsx` | Admin workspace |
-| `src/lib/hp-api.ts` | All Supabase-backed app data access |
-| `src/lib/admin-api.ts` | Admin data access and roles |
-| `src/lib/hp/discovery.ts`, `area-intelligence.ts` | Discovery lenses, area scoring |
-| `src/lib/i18n.tsx` | Greek/English translations |
-| `src/lib/supabase/client.ts` | Browser Supabase client |
-| `vite.static.config.ts` | Cloudflare static build |
-
-`src/components/hp/ProfileSheet.tsx` is legacy. The live account surface is `AuthAccountSheets.tsx`.
-
-## Model guidance
-
-- **Opus** — architecture, gnarly debugging, security review, planning, reviewing large diffs.
-- **Sonnet** — the daily driver: implementing specified tasks, refactors, tests, UI.
-- **Haiku** — renames, formatting, mechanical edits.
-
-*Opus decides, Sonnet builds.* Use plan mode for anything large; `/code-review` before merging.
+**Workflow:**
+- Branch per task, small commits, PR into `main`
+- Pull `main` before starting any new session
+- End every session by updating "Current Priorities" above with what's done,
+  what's WIP, and what's blocked — this is the handoff for async work
+- Shared task list (GitHub Issues or similar) is the source of truth for what's next
+- CI (tests + lint) runs on every PR before merge

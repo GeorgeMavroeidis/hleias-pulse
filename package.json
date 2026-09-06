@@ -22,6 +22,7 @@
     "smoke:block-enforcement": "tsx scripts/smoke-block-enforcement.ts",
     "smoke:deal-race": "tsx scripts/smoke-deal-race.ts",
     "smoke:live-surfaces": "tsx scripts/smoke-live-surfaces.ts",
+    "smoke:moderation": "tsx scripts/smoke-moderation.ts",
     "smoke:post-write": "tsx scripts/smoke-post-write.ts",
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
