@@ -175,11 +175,58 @@ export async function saveAdminPlace(place: Database["public"]["Tables"]["places
   return result.data;
 }
 
-// Hard-deletes a place. Posts, comments, stories and meet events reference a
-// place by id, so Postgres refuses this while any of them survive — the caller
-// surfaces that error rather than cascading, because silently deleting a
-// location's whole history is not something an admin should trigger by accident.
+// Tables whose rows are destroyed by Postgres, without warning, when their place
+// is deleted — every one of these FKs is `on delete cascade`. Ordered worst
+// first: a business claim carries the partner's deal text, phone and photos.
+//
+// Not listed, because Postgres already refuses the delete while they exist:
+// posts, meet_events, events and route_stops (`on delete restrict`) and
+// deal_redemptions (no action). Also not listed: place_avatars, saved_items and
+// user_place_visits, which are decoration and per-user state — losing those with
+// the place is the intended behaviour, not a surprise.
+const PLACE_CASCADE_CHECKS = [
+  { column: "place_id", label: "business claim", table: "place_business_profiles" },
+  { column: "place_id", label: "story", table: "stories" },
+  { column: "place_id", label: "comment", table: "comments" },
+] as const;
+
+/**
+ * Hard-deletes a place, refusing while content would be silently destroyed.
+ *
+ * Postgres only protects some of this. posts, meet_events, events, route_stops
+ * and deal_redemptions block the delete themselves, so those need no help. But
+ * comments, stories and place_business_profiles are `on delete cascade`: without
+ * the pre-flight below, deleting a place with no posts but three stories and an
+ * approved business claim succeeds and takes all four rows with it, behind a
+ * dialog that says "this cannot be undone".
+ *
+ * This is a guard, not a boundary. Authorisation is RLS ("Editors can manage
+ * places", owner/editor only) and that is what actually stops a non-admin. A
+ * direct PostgREST call still cascades, and a user deleting their own published
+ * place through "Users can delete own places" never passes through here at all.
+ * Closing that properly means changing the three FKs to `on delete restrict`,
+ * which is a migration and needs George's explicit approval.
+ */
 export async function deleteAdminPlace(id: string) {
+  const blocking: string[] = [];
+
+  for (const check of PLACE_CASCADE_CHECKS) {
+    const result = await supabase
+      .from(check.table)
+      .select("id", { count: "exact", head: true })
+      .eq(check.column, id);
+    if (result.error) throw result.error;
+    const count = result.count ?? 0;
+    if (count > 0) blocking.push(`${count} ${check.label}${count === 1 ? "" : "s"}`);
+  }
+
+  if (blocking.length) {
+    throw new Error(
+      `Deleting this place would also delete ${blocking.join(", ")}. ` +
+        "Remove or reassign them first, or hide the place instead.",
+    );
+  }
+
   const result = await supabase.from("places").delete().eq("id", id);
   if (result.error) throw result.error;
 }
