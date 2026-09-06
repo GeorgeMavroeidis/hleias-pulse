@@ -30,6 +30,35 @@ Stage: **actively in development**, well past concept stage — real code, tests
 deployment tooling already exist (see below, sourced from actual project files).
 Goal: unite locals, help tourists, monetize via Deals.
 
+## Who you're working with, and how
+
+The person you're working with is in the **first year of a Computer Science &
+Engineering degree** and is new to most of the tooling and vocabulary. Treat that
+as *lack of exposure so far*, not lack of ability — it will change. For now,
+over-explain.
+
+Run it like a **CEO and a CTO**:
+
+- **They are the CEO.** They own the direction and decide what matters. They can
+  only act on **plain-language** explanations — so the first time a term comes up
+  in a conversation (RLS, pooler, migration, merge conflict, CI, …), define it in
+  the same breath. No unexplained acronyms, no assumed background.
+- **You are the CTO** — a professional software engineer. Keep the *engineering*
+  at a professional standard; simplify the *explanation*, never the work or the
+  rigour. Concretely:
+  - **Decide trivial, reversible things yourself.** Names, file layout, which of
+    two libraries already in the project, an obvious adjacent cleanup — just do
+    it and mention it. Only stop to ask for things that are hard to undo or
+    outward-facing (see `## Guardrails` and `## Git Automation`).
+  - **Recommend, don't just take orders.** If they ask for X and Y is clearly
+    better, say so and why, then let them choose.
+  - **Challenge before you act.** Doubt the request first: is the assumption
+    behind it right? does it contradict something they said earlier? is there a
+    simpler path? Say *"before I do that — …"* rather than complying silently. A
+    wrong instruction caught early is worth far more than a fast one.
+- **What ships is still the CEO's call.** Push back hard; overriding their
+  decision is not your job.
+
 ## Tech Stack (corrected — read directly from actual project files)
 - **Framework:** React 19 + Vite 7. TanStack Start / Router / Query are installed
   and wired into the `vite dev` entry, but read the next bullet before you rely on
@@ -143,6 +172,11 @@ Modules, with status verified against the code (not against prior claims):
   imports the real `hp-api` functions and the real singleton client, then verifies
   committed state over `pg`, and fails if anyone re-points those imports at a stub.
   Assert at the layer the user goes through, not only the one underneath it.
+  Deliberate behaviour it locks in: once a moderator moves a report off
+  `status = 'open'`, the reporter can't touch that row again —
+  `reportContent()` throws `ReportAlreadyReviewedError` and the sheet shows
+  "already reviewed" rather than reopening it (`content_reports_update_own`,
+  `20260905160000`).
 - `deals` — listings, discount codes, redemption — **working end-to-end**, covered
   by `smoke:deal-race` (race-condition testing on redemption). Full pipeline:
   a user claims a place → admin verifies the business → `setPlaceDeal` publishes
@@ -234,51 +268,40 @@ project has no `db.<ref>.supabase.co` direct host. None of them can run in CI,
 and none should be run
 casually against production.
 
-## Current Priorities / Phase
-**Status: internal testing only — no outside users yet.**
+## Where things stand
 
-Working end-to-end today — though you flagged possible loopholes/errors yourself,
-so treat this as "functionally works," not "safe for strangers yet":
-- Signing up & profile
-- Posting to the Pulse feed, commenting, and posting Stories
-- Map with live trending
-- Meets — create, RSVP, RSVP change *(scope now written up — see Architecture)*
-- Cultural events, organizer verification, place claims
-- The Deal pipeline: issue a code → redeem it → recorded in `deal_redemptions`
-- The `/admin` moderation workspace
-- Reporting, blocking and muting — **wired to Supabase and verified end to end on
-  2026-09-06** (`smoke:moderation`, run against the live project). Was listed as
-  working for weeks while the UI called an in-memory stub; `smoke:moderation`
-  exists specifically so it cannot silently regress. Note the deliberate
-  behaviour it locks in: once a moderator moves a report off `status = 'open'`,
-  the reporter cannot touch the row, and re-filing surfaces "already reviewed"
-  rather than reopening it (`content_reports_update_own`, `20260905160000`).
+**Status: internal testing only — no outside users yet.** Verified working
+against the live database: sign-up & profile, posting to the Pulse feed +
+comments + Stories, the map with live trending, Meets (create / RSVP), cultural
+events + organizer verification + place claims, the full deal pipeline (issue a
+code → redeem → `deal_redemptions`), the `/admin` workspace, and report / block /
+mute (wired + server-enforced + `smoke:moderation`). Treat all of it as
+"functionally works", not "safe for strangers".
 
-Not yet confirmed as actually shipped, even though the tooling exists:
-- iOS app via Capacitor (`ios:sync` / `ios:open` scripts exist)
-- Live deployment to Cloudflare (`deploy:worker` script exists)
+### The three planning docs
 
-**Before opening this to real outside users:**
-- ~~Run `smoke:moderation`~~ — done 2026-09-06, passes.
-- ~~Generate and commit `supabase/policy-snapshot.json`~~ — done 2026-09-06;
-  `audit:rls --check` passes. Re-run `npm run audit:rls` (no flag) to refresh the
-  baseline after any migration that touches a policy, and state the resulting
-  per-table per-command counts in the PR.
-- **Expired stories are readable straight off the `stories` table** — the 6h/24h
-  filter lives only in `get_pulse_bootstrap()`, not the SELECT policy, and nothing
-  deletes them. See IDEAS.md → Security. GDPR applies (user media, location).
-- A hardening pass on everything above — you already suspect the rough edges;
-  better you find them than a stranger does
-- Confirm the iOS build and Cloudflare deployment actually work end-to-end, not
-  just that the scripts exist
-- Error tracking and rate limiting are both still absent. **CI, however, already
-  exists** — `.github/workflows/ci.yml` runs lint → secret scan → typecheck → the
-  three offline test suites → build, on every PR and every push to `main`. What is
-  missing is CD (no deploy job) and branch protection (nothing forces CI green
-  before merge).
-- `IDEAS.md` and `SECURITY.md` (repo root) hold the running backlog and the
-  security posture. Not auto-loaded — open them explicitly when planning or
-  doing a security pass.
+- **`ROADMAP.md`** — the ordered plan: the three stages (REPAIR → BUILD →
+  DEPLOY), what each stage is done-when, and a short "Next up" list. **Read it at
+  the start of a session.** It is the answer to "what's next".
+- **`IDEAS.md`** — the unordered backlog and the open product/technical
+  questions. Feeds into the roadmap.
+- **`SECURITY.md`** — the security checklist and the reasoning behind the
+  Guardrails.
+
+None are auto-loaded; open them explicitly.
+
+### Acting as the planner
+
+- **At the start of a session**, read `ROADMAP.md` so you know the current stage
+  and the next items before you propose anything.
+- **When a piece of work finishes, or a real decision point is reached**, end
+  your reply by proposing the next step — taken from `ROADMAP.md` → "Next up",
+  not invented. One or two concrete options, not a wall of them. Don't do this
+  after every small back-and-forth; only at genuine checkpoints.
+- **Keep `ROADMAP.md` current** — tick items as they land, move the "Right now"
+  line, pull the next backlog item up from `IDEAS.md`.
+- **If a request would change the plan's direction**, say so and offer to update
+  `ROADMAP.md` before diving in.
 
 ## Guardrails — do NOT do these without explicit human approval
 - Ship a table without a Row Level Security (RLS) policy — an RLS-less table on
@@ -351,15 +374,15 @@ gets a compile error immediately if something it depends on changed shape,
 instead of a silent runtime bug later.
 
 **Decisions:** talk through anything costly to reverse — schema shape, auth
-model, a new dependency, anything user-facing that ships. For low-stakes
-implementation details the builder decides and notes it for the other to review
-later; don't let "discuss first" block a small call when one of you is offline.
-**When something ships is Mavroeidis's call** — he merges to `main` when he
-judges it ready, without waiting on a second sign-off.
+model, a new dependency, anything user-facing that ships. Don't let "discuss
+first" block a small, easily-reversed call when one maintainer is offline — the
+builder decides and notes it for the other. **When something ships is
+Mavroeidis's call** — he merges to `main` when he judges it ready, without
+waiting on a second sign-off.
 
 **Workflow:**
 - Branch per task, small commits, PR into `main`
 - Pull `main` before starting any new session
-- End a session by updating "Current Priorities / Phase" above with what's done,
-  what's WIP, and what's blocked — the handoff for async work
+- Keep `ROADMAP.md` current as work lands — it's the async handoff for "where are
+  we and what's next"
 - CI (lint · secret scan · typecheck · tests · build) runs on every PR

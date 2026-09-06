@@ -4,6 +4,9 @@
 > you want it read, e.g. "check IDEAS.md before we plan the next phase." Dump
 > anything here, half-formed or not; no need to organize while brainstorming.
 > Clean-up (turning an idea into a real task) happens later, on your own time.
+>
+> The **ordered** plan (stages, what's next, done-when) lives in `ROADMAP.md`.
+> This file is the unordered feed that flows into it.
 
 ## New Feature Ideas
 
@@ -60,7 +63,7 @@
 ## Architecture / Tech Debt
 
 <!-- Things that work today but should be revisited —
-     e.g. "myths module needs real scope before Phase 2" -->
+     e.g. "myths module needs real scope before Stage 2 (see ROADMAP.md)" -->
 
 - Error tracking (e.g. Sentry) — set up before public launch, cheap insurance,
   worth doing a bit earlier than the rest of this list
@@ -110,7 +113,8 @@
 <!-- Unresolved product or technical questions, yours or your buddy's -->
 
 - Who owns local business partnerships, content moderation, and
-  community-building? Unassigned as of now — needs deciding before Phase 3 (Deals).
+  community-building? Unassigned as of now — needs deciding before Stage 3
+  (see `ROADMAP.md` → Open decisions).
 - iOS bundle id / app display name currently say "Ilia Pulse" / com.theodoros.iliapulse
   — confirmed brand name is "Hleias Pulse," so decide whether to update these to match
   or leave the internal identifier as-is intentionally.
