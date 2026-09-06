@@ -4,7 +4,7 @@ import { Check, Flag, ShieldAlert } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { SectionHeader } from "./blend-ui";
 import { REPORT_RESPONSE_HOURS, SUPPORT_EMAIL } from "./safety-config";
-import type { ReportContentInput, ReportReason } from "./moderation-api-stub";
+import type { ReportContentInput, ReportReason } from "@/lib/hp-api";
 import type { ModerationTarget } from "./use-moderation";
 
 /* Reason list. English keys, Greek comes from src/lib/i18n.tsx. Order matters:

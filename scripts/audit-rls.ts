@@ -64,11 +64,13 @@ function createPgClient() {
     );
   }
 
+  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
+  // not resolve. Session mode (port 5432), user postgres.<ref>.
   return new pg.Client({
-    host: `db.${projectRef}.supabase.co`,
+    host: "aws-0-eu-central-1.pooler.supabase.com",
     port: 5432,
     database: "postgres",
-    user: "postgres",
+    user: `postgres.${projectRef}`,
     password,
     ssl: { rejectUnauthorized: false },
   });

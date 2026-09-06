@@ -1,0 +1,1070 @@
+{
+  "definerFunctions": [
+    {
+      "name": "blocked_user_ids",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "current_admin_role",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "current_business_id",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "current_organizer_id",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "handle_event_rsvp_counts",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "handle_new_auth_user",
+      "searchPath": "search_path=\"\""
+    },
+    {
+      "name": "has_admin_role",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "issue_deal_code",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "moderate_content",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "prevent_business_self_verification",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "prevent_last_owner_removal",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "prevent_organizer_self_verification",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "redeem_deal_code",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "refresh_meet_event_rsvp_counts",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "review_place_claim",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "set_place_deal",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "write_admin_audit_log",
+      "searchPath": "search_path=public"
+    }
+  ],
+  "grants": {
+    "admin_audit_logs": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "admin_members": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "authors": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "businesses": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "comments": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "content_reports": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "cultural_event_likes": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "cultural_events": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "deal_redemptions": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "event_rsvps": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "events": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "meet_events": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "organizers": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "place_avatars": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "place_business_profiles": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "places": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "post_likes": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "posts": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "profiles": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "route_stops": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "routes": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "saved_items": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "stories": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "story_views": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "user_activity_days": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "user_blocks": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "user_place_visits": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "user_preferences": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "user_security_events": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "vibe_chips": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    }
+  },
+  "policies": {
+    "admin_audit_logs": {
+      "SELECT": [
+        "Admins can read audit logs [authenticated]"
+      ]
+    },
+    "admin_members": {
+      "DELETE": [
+        "Owners can remove team members [authenticated]"
+      ],
+      "INSERT": [
+        "Owners can add team members [authenticated]"
+      ],
+      "SELECT": [
+        "Admin members can read their membership [authenticated]"
+      ],
+      "UPDATE": [
+        "Owners can update team members [authenticated]"
+      ]
+    },
+    "authors": {
+      "SELECT": [
+        "Public can read authors [anon,authenticated]"
+      ]
+    },
+    "businesses": {
+      "ALL": [
+        "Editors can manage businesses [authenticated]"
+      ],
+      "INSERT": [
+        "Users can apply to become a business [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all businesses [authenticated]",
+        "Public can read verified businesses [anon,authenticated]",
+        "Users can read own business application [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own business profile [authenticated]"
+      ]
+    },
+    "comments": {
+      "ALL": [
+        "Editors can manage comments [authenticated]"
+      ],
+      "DELETE": [
+        "Users can delete own comments [authenticated]"
+      ],
+      "INSERT": [
+        "Authenticated users can submit comments [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all comments [authenticated]",
+        "Public can read published comments [anon,authenticated]",
+        "Users can read own comments [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own pending comments [authenticated]"
+      ]
+    },
+    "content_reports": {
+      "INSERT": [
+        "content_reports_insert_own [authenticated]"
+      ],
+      "SELECT": [
+        "content_reports_admin_read [authenticated]",
+        "content_reports_select_own [authenticated]"
+      ],
+      "UPDATE": [
+        "content_reports_admin_write [authenticated]",
+        "content_reports_update_own [authenticated]"
+      ]
+    },
+    "cultural_event_likes": {
+      "DELETE": [
+        "Users can delete own cultural event likes [authenticated]"
+      ],
+      "INSERT": [
+        "Users can create own cultural event likes [authenticated]"
+      ],
+      "SELECT": [
+        "Users can read own cultural event likes [authenticated]"
+      ]
+    },
+    "cultural_events": {
+      "ALL": [
+        "Editors can manage cultural events [authenticated]"
+      ],
+      "DELETE": [
+        "Organizers can delete own pending cultural events [authenticated]"
+      ],
+      "INSERT": [
+        "Verified organizers can submit cultural events [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all cultural events [authenticated]",
+        "Public can read published cultural events [anon,authenticated]",
+        "Users can read own cultural event submissions [authenticated]"
+      ],
+      "UPDATE": [
+        "Organizers can update own pending cultural events [authenticated]"
+      ]
+    },
+    "deal_redemptions": {
+      "ALL": [
+        "Editors can manage deal redemptions [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all deal redemptions [authenticated]",
+        "Business can read redemptions for its claims [authenticated]",
+        "Users can read own deal redemptions [authenticated]"
+      ]
+    },
+    "event_rsvps": {
+      "DELETE": [
+        "Users can delete own event RSVPs [authenticated]"
+      ],
+      "INSERT": [
+        "Users can create own event RSVPs [authenticated]"
+      ],
+      "SELECT": [
+        "Users can read own event RSVPs [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own event RSVPs [authenticated]"
+      ]
+    },
+    "events": {
+      "SELECT": [
+        "Public can read events [anon,authenticated]"
+      ]
+    },
+    "meet_events": {
+      "ALL": [
+        "Editors can manage meet events [authenticated]"
+      ],
+      "DELETE": [
+        "Users can delete own meet events [authenticated]"
+      ],
+      "INSERT": [
+        "Authenticated users can submit meet events [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all meet events [authenticated]",
+        "Public can read published meet events [anon,authenticated]",
+        "Users can read own meet events [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own pending meet events [authenticated]"
+      ]
+    },
+    "organizers": {
+      "ALL": [
+        "Editors can manage organizers [authenticated]"
+      ],
+      "INSERT": [
+        "Users can apply to become an organizer [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all organizers [authenticated]",
+        "Public can read verified organizers [anon,authenticated]",
+        "Users can read own organizer application [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own organizer profile [authenticated]"
+      ]
+    },
+    "place_avatars": {
+      "DELETE": [
+        "Users can delete avatars for own places [authenticated]"
+      ],
+      "INSERT": [
+        "Users can create avatars for own places [authenticated]"
+      ],
+      "SELECT": [
+        "Public can read place avatars [anon,authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update avatars for own places [authenticated]"
+      ]
+    },
+    "place_business_profiles": {
+      "ALL": [
+        "Editors can manage place business profiles [authenticated]"
+      ],
+      "INSERT": [
+        "Business can submit a place claim [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all place business profiles [authenticated]",
+        "Business can read own claims [authenticated]",
+        "Public can read approved place business profiles [anon,authenticated]"
+      ],
+      "UPDATE": [
+        "Business can edit own pending claim [authenticated]"
+      ]
+    },
+    "places": {
+      "ALL": [
+        "Editors can manage places [authenticated]"
+      ],
+      "DELETE": [
+        "Users can delete own places [authenticated]"
+      ],
+      "INSERT": [
+        "Authenticated users can submit places [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all places [authenticated]",
+        "Public can read published places [anon,authenticated]",
+        "Users can read own places [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own pending places [authenticated]"
+      ]
+    },
+    "post_likes": {
+      "DELETE": [
+        "Users can delete own post likes [authenticated]"
+      ],
+      "INSERT": [
+        "Users can create own post likes [authenticated]"
+      ],
+      "SELECT": [
+        "Users can read own post likes [authenticated]"
+      ]
+    },
+    "posts": {
+      "ALL": [
+        "Editors can manage posts [authenticated]"
+      ],
+      "DELETE": [
+        "Users can delete own posts [authenticated]"
+      ],
+      "INSERT": [
+        "Authenticated users can submit posts [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all posts [authenticated]",
+        "Public can read published posts [anon,authenticated]",
+        "Users can read own posts [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own pending posts [authenticated]"
+      ]
+    },
+    "profiles": {
+      "INSERT": [
+        "Users can insert own profile [authenticated]"
+      ],
+      "SELECT": [
+        "Public can read profiles [anon,authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own profile [authenticated]"
+      ]
+    },
+    "route_stops": {
+      "ALL": [
+        "Editors can manage route stops [authenticated]"
+      ],
+      "SELECT": [
+        "Public can read route stops [anon,authenticated]"
+      ]
+    },
+    "routes": {
+      "ALL": [
+        "Editors can manage routes [authenticated]"
+      ],
+      "SELECT": [
+        "Public can read routes [anon,authenticated]"
+      ]
+    },
+    "saved_items": {
+      "DELETE": [
+        "Users can delete own saved items [authenticated]"
+      ],
+      "INSERT": [
+        "Users can create own saved items [authenticated]"
+      ],
+      "SELECT": [
+        "Users can read own saved items [authenticated]"
+      ]
+    },
+    "stories": {
+      "ALL": [
+        "Editors can manage stories [authenticated]"
+      ],
+      "DELETE": [
+        "Users can delete own stories [authenticated]"
+      ],
+      "INSERT": [
+        "Authenticated users can submit stories [authenticated]"
+      ],
+      "SELECT": [
+        "Admins can read all stories [authenticated]",
+        "Public can read published stories [anon,authenticated]",
+        "Users can read own stories [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own pending stories [authenticated]"
+      ]
+    },
+    "story_views": {
+      "DELETE": [
+        "Users can delete own story views [authenticated]"
+      ],
+      "INSERT": [
+        "Users can create own story views [authenticated]"
+      ],
+      "SELECT": [
+        "Users can read own story views [authenticated]"
+      ]
+    },
+    "user_activity_days": {
+      "INSERT": [
+        "Users can create own activity days [authenticated]"
+      ],
+      "SELECT": [
+        "Users can read own activity days [authenticated]"
+      ]
+    },
+    "user_blocks": {
+      "ALL": [
+        "user_blocks_all_own [authenticated]"
+      ]
+    },
+    "user_place_visits": {
+      "DELETE": [
+        "Users can delete own place visits [authenticated]"
+      ],
+      "INSERT": [
+        "Users can create own place visits [public]"
+      ],
+      "SELECT": [
+        "Users can read own place visits [public]"
+      ]
+    },
+    "user_preferences": {
+      "DELETE": [
+        "Users can delete own preferences [authenticated]"
+      ],
+      "INSERT": [
+        "Users can insert own preferences [authenticated]"
+      ],
+      "SELECT": [
+        "Users can read own preferences [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own preferences [authenticated]"
+      ]
+    },
+    "user_security_events": {
+      "SELECT": [
+        "Users can read own security events [authenticated]"
+      ]
+    },
+    "vibe_chips": {
+      "SELECT": [
+        "Public can read vibe chips [anon,authenticated]"
+      ]
+    }
+  },
+  "rlsDisabled": [],
+  "tables": [
+    "admin_audit_logs",
+    "admin_members",
+    "authors",
+    "businesses",
+    "comments",
+    "content_reports",
+    "cultural_event_likes",
+    "cultural_events",
+    "deal_redemptions",
+    "event_rsvps",
+    "events",
+    "meet_events",
+    "organizers",
+    "place_avatars",
+    "place_business_profiles",
+    "places",
+    "post_likes",
+    "posts",
+    "profiles",
+    "route_stops",
+    "routes",
+    "saved_items",
+    "stories",
+    "story_views",
+    "user_activity_days",
+    "user_blocks",
+    "user_place_visits",
+    "user_preferences",
+    "user_security_events",
+    "vibe_chips"
+  ]
+}

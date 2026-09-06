@@ -52,11 +52,14 @@ function createPgClient() {
   const password = readEnvValue("SUPABASE_DB_PASSWORD");
   if (!password) throw new Error("SUPABASE_DB_PASSWORD is missing.");
 
+  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
+  // not resolve. Session mode (port 5432) so `set local role` in actAs behaves
+  // exactly as a direct connection would. User is postgres.<ref>.
   return new pg.Client({
-    host: `db.${projectRef}.supabase.co`,
+    host: "aws-0-eu-central-1.pooler.supabase.com",
     port: 5432,
     database: "postgres",
-    user: "postgres",
+    user: `postgres.${projectRef}`,
     password,
     ssl: { rejectUnauthorized: false },
   });

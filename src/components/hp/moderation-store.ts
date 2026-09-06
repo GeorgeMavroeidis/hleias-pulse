@@ -1,6 +1,7 @@
 import {
   blockUser,
   getMyBlocks,
+  isReportAlreadyReviewedError,
   muteUser,
   reportContent,
   unblockUser,
@@ -8,7 +9,7 @@ import {
   type ReportContentInput,
   type ReportReason,
   type ReportTargetType,
-} from "./moderation-api-stub";
+} from "@/lib/hp-api";
 
 export type { ReportReason, ReportTargetType };
 
@@ -171,6 +172,15 @@ export async function submitReport(
     if (alsoBlockUserId) await applyBlock(alsoBlockUserId);
     return true;
   } catch (error) {
+    // A moderator already actioned an earlier report of this target. There is
+    // nothing to retry, so say so plainly instead of the generic write-error
+    // toast, which invites a resubmit that fails identically every time.
+    if (isReportAlreadyReviewedError(error)) {
+      bridge.showToast(
+        bridge.translate("You have already reported this. A moderator has reviewed it."),
+      );
+      return false;
+    }
     bridge.onWriteError(error, bridge.translate("Could not send the report. Try again."));
     return false;
   }
