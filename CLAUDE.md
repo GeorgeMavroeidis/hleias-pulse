@@ -115,32 +115,70 @@ npm run build                # static/Cloudflare build
 npm run test:intelligence    # 8 tests
 npm run test:discovery       # 9 tests
 npm run test:map-visuals
+npm run check:secrets        # no committed .env / key / token (also runs in CI)
 npm run ios:sync && npm run ios:open
 ```
 
-## Known issues (last verified 2026-09-05)
+Security checks. These talk to the live database, so they need `SUPABASE_DB_PASSWORD` in
+`.env` and stay out of CI:
+
+```sh
+npm run audit:rls            # snapshot policies/grants; --check to diff against the file
+npm run smoke:block-enforcement
+npm run smoke:deal-race
+```
+
+## Known issues (last verified 2026-09-05, security pass)
 
 Ordered by severity. Verified against the live project, not inherited from docs.
 
-1. **🔴 No user-facing report / block / mute.** Moderation exists only in the admin
-   dashboard. Apple Guideline 1.2 requires content filtering, a report mechanism, user
-   blocking and published contact info for every UGC app. Guaranteed App Store rejection
-   without it. **Margaris owns this — it is the current Week 1 task.**
-2. **🟠 The image migration is written but not applied.**
-   `20260904210000_cors_friendly_image_urls.sql` is merged to `main`; the live database
-   still holds the old `commons.wikimedia.org` URLs. Until it runs, marker images download
-   at full 1200-2000px size on every visit. Needs `supabase db push`.
-3. **🟡 `styles.css` is still ~4,000 lines.** `PulseApp.tsx` was split in `21dc19e` and is
-   now ~2,400; the stylesheet is the remaining single-file bottleneck for parallel work.
+1. **🔴 Report / block / mute does not persist.** The UI shipped in PR #40 against
+   `src/components/hp/moderation-api-stub.ts`, which keeps everything in two module-level
+   `Set`s. A report is a `console.warn` that reaches nobody; a block dies on reload — the
+   one thing an App Store reviewer tests by hand. Apple Guideline 1.2 rejection risk.
+   **The backend is done and live**: `content_reports` and `user_blocks` exist
+   (`20260905130000`), and `hp-api.ts` exports `reportContent` / `blockUser` /
+   `unblockUser` / `muteUser` / `unmuteUser` / `getMyBlocks` with signatures matching the
+   stub exactly. What is left is one import line in `moderation-store.ts:11`
+   (`./moderation-api-stub` → `@/lib/hp-api`), the same swap in `ReportSheet.tsx:7`, and
+   deleting the stub. **Margaris's lane.**
+2. **🟠 A rejected business's deal and phone are publicly readable.** Claim `07d272ed…`
+   on `lechaina` is `approved` with `deal_active = true` under business `"gm"`, whose
+   verification is `rejected`. Anonymous callers get the deal text and the phone number,
+   and the map shows a deal badge for a code `redeem_deal_code()` can never accept.
+   Fix in PR #49, **not yet pushed to the database.**
+3. **🟠 Two RLS policy gaps are open in production.** `meet_events` carries a second
+   INSERT policy that lets any authenticated user publish straight past moderation, and
+   `content_reports` lets a reporter reopen a report a moderator already dismissed.
+   Fix in PR #47, **not yet pushed to the database.**
 4. **🟡 Third-party hotlinked images.** Some place photos come from `visit-olympia.gr`,
    `visitkatakolon.gr` and `justforonesummer.com`. CORS and licensing both unresolved.
 5. **🟡 Leftover test data.** ~15 `@hleiaspulse-audit.test` accounts and a few issued deal
-   codes from the 2026-09-04 audit need deleting. The Lechaina deal reads "roday".
-   No deal is currently live, so the in-app deal callout has nothing to show.
+   codes from the 2026-09-04 audit need deleting.
 6. **🟡 `main` is not branch-protected.** CI runs but nothing enforces it.
+7. **🟡 Auth is soft.** Password minimum 6, HIBP leaked-password check off, CAPTCHA off,
+   email confirmation off. Deliberate for early testing per `USER.md`, but accounts are
+   free to create, which is what makes any policy gap cheap to exploit.
+
+### Security posture — read before touching `supabase/**`
+
+`anon` holds a blanket SELECT grant from Supabase's default privileges on tables the
+migrations never granted it. An anonymous query to `content_reports`, `user_blocks`,
+`admin_members`, `deal_redemptions`, `user_preferences` or `user_security_events` returns
+HTTP 200 with zero rows — **not** `permission denied`. **RLS is the only boundary.** Every
+policy slip is instantly public, so run `npm run audit:rls` before and after any migration
+that touches a policy, and state the resulting per-table per-command policy counts in the
+PR description.
 
 ### Fixed on 2026-09-05 — do not re-diagnose
 
+- **The CORS image migration is applied.** `20260904210000_cors_friendly_image_urls.sql`
+  and `20260905090000_remaining_cors_image_urls.sql` are both live;
+  `supabase migration list --linked` shows local and remote matching on all 24. Marker
+  images no longer download at full size.
+- **`styles.css` is split.** It is 23 lines now — an import barrel over 16 per-surface
+  files under `src/styles/` (`41ca2d8`). It is no longer a bottleneck for parallel work.
+- **The Lechaina deal typo is fixed.** It reads "only for today!", not "roday".
 - **The smoke scripts now target the real database.** `smoke-auth-profile.ts` and
   `smoke-live-surfaces.ts` hardcoded `projectRef = "uihwsndveblfgmlhdngi"`, a project that
   does not exist in the account. Both now use `kfxfnqryfmuxiwlswyyn`, matching
