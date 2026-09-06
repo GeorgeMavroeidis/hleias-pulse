@@ -754,6 +754,7 @@ export type Database = {
           lat: number;
           lng: number;
           moderation_status: string;
+          photos: string[];
           mood: string;
           name: string;
           profile_id: string | null;
@@ -784,6 +785,7 @@ export type Database = {
           lat: number;
           lng: number;
           moderation_status?: string;
+          photos?: string[];
           mood: string;
           name: string;
           profile_id?: string | null;
@@ -814,6 +816,7 @@ export type Database = {
           lat?: number;
           lng?: number;
           moderation_status?: string;
+          photos?: string[];
           mood?: string;
           name?: string;
           profile_id?: string | null;
