@@ -965,7 +965,9 @@ function PlaceEditor({
     return place?.image_url ? [place.image_url] : [];
   });
   const imageUrl = photos[0] ?? "";
-  const initialPhotos = place?.photos?.length ? place.photos.join(" ") : (place?.image_url ?? "");
+  const initialPhotos = place?.photos?.length
+    ? place.photos.join("\u0000")
+    : (place?.image_url ?? "");
   const [tagText, setTagText] = useState(place?.tags.join(", ") ?? "");
   const [crowd, setCrowd] = useState(place?.crowd ?? "medium");
   const [budget, setBudget] = useState(place?.budget ?? "free");
@@ -998,7 +1000,7 @@ function PlaceEditor({
     type !== (place?.type ?? "beach") ||
     short !== (place?.short ?? "") ||
     mood !== (place?.mood ?? "") ||
-    photos.join(" ") !== initialPhotos ||
+    photos.join("\u0000") !== initialPhotos ||
     tagText !== (place?.tags.join(", ") ?? "") ||
     crowd !== (place?.crowd ?? "medium") ||
     budget !== (place?.budget ?? "free") ||
