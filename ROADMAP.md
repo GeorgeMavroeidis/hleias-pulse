@@ -45,11 +45,20 @@ free-tier services. The paid/Apple track starts in February.
 
 ## Next up (ordered) — free work first
 
-1. **Story expiry.** Expired stories are still readable straight off the table
-   (the 6h/24h cutoff lives only in `get_pulse_bootstrap()`, not the row-security
-   policy) and nothing ever deletes them. Add the cutoff to the policy **and**
-   decide a deletion schedule — user photos tied to a location, so EU privacy law
-   applies. One migration + a cleanup job. See `IDEAS.md` → Security.
+1. **Story expiry.** *Half of this is further along than this list implies —
+   check before planning it as fresh work.* The policy half exists:
+   `20260907140000_enforce_story_expiry_rls.sql` ("enforce story expiry inside
+   the RLS policy, not just the RPC") is written and reported applied to the
+   live database, but it sits unmerged on `origin/fix/enforce-story-expiry-rls`
+   (`c38fe8f`), so `main` does not have it. **Merging that branch is the actual
+   next step, not writing the migration.**
+
+   Still genuinely open: nothing ever *deletes* an expired story. Hiding it
+   behind a policy is not the same as erasing it, and these are user photos tied
+   to a location, so EU privacy law wants a retention schedule and real
+   deletion — including whatever the media is doing in Storage. That half needs
+   a decision and a cleanup job. See `IDEAS.md` → Security, and
+   → Architecture / Tech Debt for the drift this uncovered.
 2. **Test coverage for the untested modules** — *mostly done (2026-09-07).*
    `smoke:admin` now covers the whole owner/editor/moderator permission model,
    including the privilege-escalation path; `smoke:verification-guards` covers

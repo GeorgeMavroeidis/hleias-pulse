@@ -177,6 +177,41 @@
 <!-- Things that work today but should be revisited —
      e.g. "myths module needs real scope before Stage 2 (see ROADMAP.md)" -->
 
+### Migration drift — production is ahead of `main`, and in one case ahead of git
+
+Found 2026-09-07 while renumbering the audit FK migration off a version that was
+already taken. Two separate problems, one worse than the other.
+
+- **`20260907150000` (`add_question_post_kind`) is applied to the live database
+  and has no migration file anywhere in this repository.** Searched every commit
+  reachable from every local and remote-tracking ref — no file at that version
+  exists. So a clean checkout plus `supabase db push` does **not** reproduce
+  production. Whatever that migration did, nothing in version control can
+  recreate it, review it, or roll it back. This is the one to fix first: either
+  find the file and commit it, or dump the applied definition out of the
+  database and write the migration retroactively.
+
+- **`20260907140000` (`enforce_story_expiry_rls`) is applied to the live
+  database but its file sits on an unmerged branch**,
+  `origin/fix/enforce-story-expiry-rls` (`c38fe8f`). Less severe — the file
+  exists and is reviewable — but `main` still does not contain a migration that
+  production has been running since 2026-09-07. Anyone reading `main` to
+  understand the schema is reading a version that has not existed for a while.
+
+  *(Verified directly: the file's location, its absence from `main`, and the
+  complete absence of any `20260907150000_*` file. The claim that both versions
+  are marked applied in `supabase_migrations.schema_migrations` comes from the
+  session that queried production; this session has opened no database
+  connection.)*
+
+  **The general rule this earns:** applying a migration to production before its
+  branch merges makes the version number unavailable to everyone else while
+  leaving no trace they can see. It is what silently stole `20260907140000` from
+  the audit fix — Supabase keys applied migrations on **version**, not filename,
+  so `supabase db push` would have matched the two, skipped ours, and reported
+  success. A refused UPDATE reports success; so does a migration that never ran.
+  Push the branch before applying it, or reserve the version some other way.
+
 - Error tracking (e.g. Sentry) — set up before public launch, cheap insurance,
   worth doing a bit earlier than the rest of this list
 - ~~CI pipeline (auto-run tests)~~ — **already built.**
