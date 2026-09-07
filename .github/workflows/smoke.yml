@@ -1,19 +1,29 @@
-# The smoke suite, against the live Supabase project.
+# The smoke suite, against a CI-only Supabase project — never production.
 #
-# Deliberately a SEPARATE workflow from ci.yml, for one reason that is easy to
-# get wrong: ci.yml sets `cancel-in-progress: true` at workflow level, which is
-# correct for a build — a superseded run is wasted work. It would be actively
-# harmful here. A cancelled job is killed without unwinding, so the `finally`
-# block that deletes every fixture never runs, and the run leaks real rows and
-# real auth users into production. That is the same failure shape as the
-# unhandled `error` event that leaked four test accounts on 2026-09-07: the
-# process dies without the stack unwinding, so no cleanup executes.
+# WHY A SECOND PROJECT, and not the real one. These scripts need a service_role
+# key, which bypasses every RLS policy: total read/write on whatever it points
+# at. A GitHub Environment gates deployments; it does not stop someone who can
+# land a workflow-file edit from reading the secret, and any third-party action
+# in this job runs with it in scope. Pointed at production that is a breach
+# waiting to happen; pointed at a disposable project it costs a rebuild. The
+# scripts also create real users and rows and undo them in a `finally`, which is
+# a poor thing to do to the database serving your users on every pull request.
 #
-# Hence `cancel-in-progress: false`, and a group name with no `${{ github.ref }}`
-# in it: these scripts claim shared rows from one production database — for
-# example smoke-deal-race takes "an auth user who does not already own a
-# business" and "a place with no live claim" — so two runs on different branches
-# would fight over the same rows. One at a time, repo-wide.
+# scripts/lib/env.ts enforces this rather than trusting the config below:
+# assertTargetIsSafeForCI() throws if CI is set and the target is still the
+# production ref, so a misconfigured secret fails loudly instead of quietly
+# writing to production.
+#
+# WHY A SEPARATE WORKFLOW FROM ci.yml. ci.yml sets cancel-in-progress: true,
+# which is right for a build and harmful here: a cancelled job is killed without
+# unwinding, so the `finally` that deletes every fixture never runs. That is the
+# same failure shape as an unhandled 'error' event on a pg.Client, which is what
+# leaked four test accounts on 2026-09-07.
+#
+# WHY THE GROUP HAS NO github.ref IN IT. Several scripts claim the first
+# matching row they find — smoke-deal-race takes "an auth user with no business"
+# and "a place with no live claim" — so two runs on different branches would
+# fight over the same rows. One at a time, repo-wide.
 name: Smoke
 
 on:
@@ -28,22 +38,23 @@ concurrency:
 
 jobs:
   smoke:
-    name: smoke · live database
+    name: smoke · CI database
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     # A fork PR never receives repository secrets, so this job would fail with a
-    # confusing "missing credentials" error rather than an honest skip. Say so.
+    # confusing "missing credentials" error rather than an honest skip.
     if: >-
       github.event_name == 'push' ||
       github.event.pull_request.head.repo.full_name == github.repository
 
-    # The service_role key bypasses every RLS policy, so it lives in an
-    # Environment rather than repo-wide secrets: access is reviewable, and can be
-    # gated on a required reviewer if that is ever wanted.
-    environment: live-database
+    environment: ci-database
 
     env:
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
@@ -60,24 +71,45 @@ jobs:
 
       # Fail with a sentence someone can act on, rather than nine scripts each
       # dying on their own obscure error.
-      - name: Check credentials are present
+      - name: Check CI project is configured
         run: |
           missing=""
-          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || missing="$missing SUPABASE_SERVICE_ROLE_KEY"
-          [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing SUPABASE_DB_PASSWORD"
+          for v in SUPABASE_PROJECT_REF SUPABASE_URL SUPABASE_PUBLISHABLE_KEY \
+                   SUPABASE_DB_HOST SUPABASE_SERVICE_ROLE_KEY SUPABASE_DB_PASSWORD; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
           if [ -n "$missing" ]; then
             echo "Missing secret(s):$missing"
-            echo "Add them to the 'live-database' environment in repo settings."
+            echo "Add them to the 'ci-database' environment. They must describe the"
+            echo "CI-only Supabase project, never the production one."
             exit 1
           fi
-          echo "Both credentials present."
+          echo "CI project configured."
 
-      # Sequential on purpose. These share one production database and several
-      # of them claim the first matching row they find, so running them in
-      # parallel makes them fight each other rather than test anything.
+      # Bring the CI database up to the migration list before testing against it.
       #
-      # Every script cleans up in a `finally`. If a step below fails, read its
-      # output for a "cleanup failed — remove it by hand" line before re-running.
+      # This is the part that makes CI a STRONGER check than a local run rather
+      # than a duplicate of one: the schema is rebuilt from supabase/migrations
+      # every time, so a migration that changes an invariant other tests depend
+      # on shows up here. That is exactly what went unnoticed on 2026-09-07, when
+      # new AFTER DELETE audit triggers silently changed what every fixture
+      # leaves behind and broke cleanup in three scripts.
+      #
+      # --db-url avoids `supabase link`, which would need an access token on top
+      # of everything above. The URL carries the password, so it is built inside
+      # the step and never echoed.
+      - name: Apply migrations to the CI database
+        run: |
+          npx --yes supabase db push --db-url \
+            "postgresql://postgres.${SUPABASE_PROJECT_REF}:${SUPABASE_DB_PASSWORD}@${SUPABASE_DB_HOST}:5432/postgres" \
+            --include-all
+
+      # Sequential on purpose. These share one database and several claim the
+      # first matching row they find, so running them in parallel makes them
+      # fight each other rather than test anything.
+      #
+      # Every script cleans up in a `finally`. On failure, read its output for a
+      # "cleanup failed — remove it by hand" line before re-running.
       - name: smoke · auth + profile
         run: npm run smoke:auth-profile
 
@@ -105,7 +137,9 @@ jobs:
       - name: smoke · routes
         run: npm run smoke:routes
 
-      # The policy snapshot is the committed baseline for RLS. Drift here means
-      # somebody changed a policy without updating supabase/policy-snapshot.json.
+      # The committed baseline for RLS. Drift means a policy changed without
+      # supabase/policy-snapshot.json being updated — and because the CI database
+      # is rebuilt from the migration list, this also proves the migrations alone
+      # reproduce the policy set, not just the database somebody edited by hand.
       - name: RLS snapshot check
         run: npm run audit:rls -- --check

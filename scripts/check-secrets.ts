@@ -41,7 +41,13 @@ const RULES: Rule[] = [
   {
     hint: "Postgres connection string with credentials in it.",
     name: "postgres-url-with-password",
-    pattern: /\bpostgres(?:ql)?:\/\/[^\s:@/]+:[^\s:@/]+@/,
+    // The password segment excludes $ { } so that a URL assembled from
+    // variables — `postgres://user:${SUPABASE_DB_PASSWORD}@host` in a CI step,
+    // for instance — is not reported as a hardcoded credential. It is not one:
+    // the secret lives in the secret store and only its name appears here. The
+    // SUPABASE_DB_PASSWORD rule above already draws the line in the same place
+    // and for the same reason. A literal password still matches.
+    pattern: /\bpostgres(?:ql)?:\/\/[^\s:@/]+:[^\s:@/${}]+@/,
   },
   {
     hint: "Private key block.",

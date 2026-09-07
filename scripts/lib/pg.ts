@@ -42,14 +42,23 @@
  */
 import pg from "pg";
 
-import { projectRef, readEnvValue } from "./env";
+import { assertTargetIsSafeForCI, projectRef, readEnvValue } from "./env";
 
 export type PoolerMode = "session" | "transaction";
 
-const POOLER_HOST = "aws-0-eu-central-1.pooler.supabase.com";
+/**
+ * The pooler host is REGION-specific — `aws-0-<region>.pooler.supabase.com` —
+ * so a second project in another region needs a different one. Overridable for
+ * exactly that reason; the default is this project's own region.
+ */
+const POOLER_HOST = readEnvValue("SUPABASE_DB_HOST") ?? "aws-0-eu-central-1.pooler.supabase.com";
 const POOLER_PORT: Record<PoolerMode, number> = { session: 5432, transaction: 6543 };
 
 function clientConfig(mode: PoolerMode): pg.ClientConfig {
+  // The other chokepoint, alongside readServiceRoleKey(). Direct Postgres access
+  // is write access, so CI must not reach production through it either.
+  assertTargetIsSafeForCI();
+
   const password = readEnvValue("SUPABASE_DB_PASSWORD");
   if (!password) {
     throw new Error(

@@ -13,8 +13,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-export const projectRef = "kfxfnqryfmuxiwlswyyn";
-
 /**
  * Read `name` from `.env`, falling back to the real environment.
  *
@@ -37,10 +35,54 @@ export function readEnvValue(name: string) {
 }
 
 /**
+ * The live project these scripts point at unless told otherwise.
+ *
+ * Kept as the default on purpose: a maintainer running a smoke script on their
+ * own machine means the real database, and having to set three variables first
+ * would just get skipped.
+ */
+export const PRODUCTION_PROJECT_REF = "kfxfnqryfmuxiwlswyyn";
+
+/** Which project the scripts act on. Override to point CI at its own project. */
+export const projectRef = readEnvValue("SUPABASE_PROJECT_REF") ?? PRODUCTION_PROJECT_REF;
+
+/**
+ * Refuse to touch production from CI.
+ *
+ * The smoke scripts create and delete real rows and real auth users. Running
+ * them on every pull request is fine against a disposable CI project and is not
+ * fine against the database serving users — and the difference between those
+ * two is a handful of environment variables that somebody will eventually get
+ * wrong. This makes that mistake loud instead of destructive.
+ *
+ * Called from the two chokepoints every script passes through: the service_role
+ * key (which grants write access over PostgREST) and the Postgres client config
+ * (which grants it directly).
+ */
+export function assertTargetIsSafeForCI() {
+  if (!process.env.CI) return;
+  if (projectRef === PRODUCTION_PROJECT_REF) {
+    throw new Error(
+      "Refusing to run against the production Supabase project from CI. These scripts " +
+        "create and delete real rows and real auth users. Point CI at its own project by " +
+        "setting SUPABASE_PROJECT_REF, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY and " +
+        "SUPABASE_DB_HOST to the CI project's values.",
+    );
+  }
+}
+
+/**
  * Scrape the URL and publishable key out of the app's own client module, so a
  * smoke script can never drift onto a different project than the app uses.
  */
 export function readSupabaseClientConfig() {
+  // Env first, so CI can be pointed at its own project. Falling back to the
+  // app's own client module keeps a local run on exactly the project the app
+  // uses, with no chance of drifting onto a different one.
+  const envUrl = readEnvValue("SUPABASE_URL");
+  const envKey = readEnvValue("SUPABASE_PUBLISHABLE_KEY");
+  if (envUrl && envKey) return { publishableKey: envKey, url: envUrl };
+
   const source = readFileSync("src/lib/supabase/client.ts", "utf8");
   const url = source.match(/const supabaseUrl = "([^"]+)"/)?.[1];
   const publishableKey = source.match(/const supabasePublishableKey\s*=\s*"([^"]+)"/)?.[1];
@@ -67,6 +109,8 @@ export function readSupabaseClientConfig() {
  * has to keep a copy of the key in their `.env`.
  */
 export function readServiceRoleKey() {
+  assertTargetIsSafeForCI();
+
   const fromEnv = readEnvValue("SUPABASE_SERVICE_ROLE_KEY");
   if (fromEnv) {
     if (fromEnv.length < 100) {

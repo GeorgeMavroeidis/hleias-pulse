@@ -251,8 +251,28 @@ coordination failed four times, and three of the four are now caught by
   keyed on `entity_id`.
   **The general rule:** a new `AFTER DELETE` trigger writing to a table with no
   FK back to its subject changes the cleanup contract of every existing fixture.
-  _Prevention:_ `.github/workflows/smoke.yml` now runs the smoke suite on every
-  PR, so this class is caught automatically rather than by a reader.
+  _Prevention:_ `.github/workflows/smoke.yml` runs the smoke suite on every PR,
+  against a **CI-only Supabase project**, with the schema rebuilt from
+  `supabase/migrations` first — so a migration that changes an invariant other
+  tests depend on now fails a check instead of waiting to be noticed by a reader.
+
+- **Setup still owed before that workflow can pass.** Create a second (free)
+  Supabase project used only by CI, then add six values to a `ci-database`
+  GitHub Environment: `SUPABASE_PROJECT_REF`, `SUPABASE_URL`,
+  `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_HOST` (the pooler host is
+  region-specific, so a project in another region needs a different one),
+  `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_PASSWORD`. **All six must describe
+  the CI project, never production.**
+  Why a second project rather than pointing CI at the real one: a service_role
+  key bypasses every RLS policy, and a GitHub Environment does not stop somebody
+  who can land a workflow-file edit from reading the secret, nor a third-party
+  action in that job from exfiltrating it. Against a disposable project a leak
+  costs a rebuild; against production it is a breach. `assertTargetIsSafeForCI()`
+  in `scripts/lib/env.ts` refuses to run when `CI` is set and the target is still
+  the production ref, so a misconfigured secret fails loudly rather than quietly
+  writing to the database serving users. Raised by the "TypeScript coverage"
+  session, which pointed out that "run the smokes in CI" and "give CI a
+  production service_role key" are two separate decisions.
 
 ## Open Questions
 
