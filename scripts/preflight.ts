@@ -14,6 +14,10 @@
  * warning here means "a human should look", not "this is broken".
  */
 import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
+
+import { readEnvValue } from "./lib/env";
+import { createPgSession } from "./lib/pg";
 
 type Level = "pass" | "warn" | "fail";
 
@@ -273,7 +277,9 @@ function checkMigrationOrder() {
       "warn",
       "migrations",
       `this branch adds ${ours.map((m) => m.version).join(", ")}, but ${earlier.join("; ")} — ` +
-        "merge those first, or the applied order will not match the numbering.",
+        "merge those first, or the applied order will not match the numbering. " +
+        "If that version is already applied to the database, the db-applied check below is " +
+        "the authority, not this one.",
     );
   }
 
@@ -284,11 +290,136 @@ function checkMigrationOrder() {
   );
 }
 
+/**
+ * 6. Would `supabase db push` actually run our pending migrations — or silently
+ *    decide they are already applied?
+ *
+ * This is the one failure in this file that is completely silent, and it is why
+ * the git-based check above is not enough on its own.
+ *
+ * Supabase records applied migrations in supabase_migrations.schema_migrations
+ * BY VERSION — the 14-digit prefix — not by filename. If some other migration
+ * already took your version number, `db push` matches your file to that row,
+ * skips it, and reports success. Nothing fails. Everybody believes the fix
+ * shipped.
+ *
+ * That happened on 2026-09-07. `20260907140000_audit_log_survives_actor_deletion.sql`
+ * sat on an unpushed branch while `20260907140000_enforce_story_expiry_rls` was
+ * applied to production from a different branch. Pushing would have skipped the
+ * audit fix in silence: the foreign key would stay, both `actor := null` guards
+ * would keep running, and the audit trail would keep recording "nobody".
+ *
+ * Note what the git-based check cannot do here. The colliding migration was
+ * applied to production from a branch that was never merged — so comparing
+ * against origin refs can miss it entirely. The remote's applied list is the
+ * only authority. Same lesson as the rest of this repo's test suite: assert
+ * against the layer that actually decides, not the one that looks like it does.
+ */
+async function checkAppliedMigrations() {
+  if (!existsSync("supabase/migrations")) {
+    return record("pass", "db-applied", "no migrations directory");
+  }
+  if (localOnly) {
+    return record("warn", "db-applied", "skipped (--local or CI) — applied list not consulted");
+  }
+  if (!readEnvValue("SUPABASE_DB_PASSWORD")) {
+    return record(
+      "warn",
+      "db-applied",
+      "skipped — no SUPABASE_DB_PASSWORD, so the remote applied list could not be read. " +
+        "A version collision would not be caught.",
+    );
+  }
+
+  const db = createPgSession("session", "preflight");
+  let applied: Map<string, string>;
+  try {
+    const rows = await db.withPg((client) =>
+      client.query<{ version: string; name: string | null }>(
+        "select version, name from supabase_migrations.schema_migrations",
+      ),
+    );
+    applied = new Map(rows.rows.map((r) => [r.version, r.name ?? ""]));
+  } catch (error) {
+    return record(
+      "warn",
+      "db-applied",
+      `could not read the applied list: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  } finally {
+    await db.close();
+  }
+
+  const local = readdirSync("supabase/migrations")
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+
+  // Same version + different name = a different migration owns that number, and
+  // ours would be skipped without a word. Same version + same name = already
+  // applied, which is entirely normal.
+  const collisions = local
+    .map((file) => ({
+      file,
+      version: file.slice(0, 14),
+      name: file.slice(15).replace(/\.sql$/, ""),
+    }))
+    .filter((m) => {
+      const appliedName = applied.get(m.version);
+      return appliedName !== undefined && appliedName !== m.name;
+    });
+
+  if (collisions.length) {
+    // The next free number has to clear everything that exists anywhere — the
+    // applied list AND the migrations already sitting in this repo. Suggesting
+    // "highest applied + 1" would have proposed a version our own pending
+    // route_stops migration already holds.
+    const highest =
+      [...applied.keys(), ...local.map((f) => f.slice(0, 14))].sort().at(-1) ?? "00000000000000";
+    const next = String(BigInt(highest) + 10000n);
+    return record(
+      "fail",
+      "db-applied",
+      collisions
+        .map(
+          (c) =>
+            `${c.file} would be SKIPPED: version ${c.version} is already applied as ` +
+            `'${applied.get(c.version)}'. db push matches by version, not name, so it would ` +
+            `report success and change nothing. Rename it to ${next}_${c.name}.sql`,
+        )
+        .join(" | "),
+    );
+  }
+
+  // Cheaper, louder companion: a pending migration numbered below something
+  // already applied is out of order. Not silent, but still wasteful.
+  const highestApplied = [...applied.keys()].sort().at(-1);
+  const pending = local.map((f) => f.slice(0, 14)).filter((v) => !applied.has(v));
+  const outOfOrder = highestApplied ? pending.filter((v) => v < highestApplied) : [];
+
+  if (outOfOrder.length) {
+    return record(
+      "fail",
+      "db-applied",
+      `${outOfOrder.join(", ")} are unapplied but sort below ${highestApplied}, which is ` +
+        "already applied. Renumber them above it.",
+    );
+  }
+
+  record(
+    "pass",
+    "db-applied",
+    pending.length
+      ? `${pending.length} pending (${pending.join(", ")}), no version collisions`
+      : "nothing pending",
+  );
+}
+
 checkBranch();
 checkIdentity();
 checkNoSecretsStaged();
 checkPushCredential();
 checkMigrationOrder();
+await checkAppliedMigrations();
 
 const icon: Record<Level, string> = { pass: "ok  ", warn: "WARN", fail: "FAIL" };
 for (const { level, name, detail } of results) {
