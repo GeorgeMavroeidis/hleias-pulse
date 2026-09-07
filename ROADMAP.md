@@ -56,7 +56,12 @@ free-tier services. The paid/Apple track starts in February.
    organizer and business self-verification; `smoke:routes` covers routes /
    route stops. Left: cultural-event publishing, place claims, `saved_items`.
    Pure code, no migration, no cost. That pass also turned up an audit-trail
-   gap — see `IDEAS.md` → Security, 2026-09-07 — and a CI blind spot, now
+   gap — **closed 2026-09-07**: `businesses`, `organizers` and `admin_members`
+   now carry audit triggers (`20260907120000`, applied live), and the admin API
+   no longer reports a refused write as a success. One decision left for you,
+   in `IDEAS.md` → Security: whether an audit row should keep naming its actor
+   after that person deletes their account. Also from that pass, a CI blind
+   spot, now
    closed: `tsconfig.json` only ever covered `src/**`, so neither `scripts/**`
    nor `cloudflare-static-src/**` (the production entry) was typechecked.
    There are now two projects and a `npm run typecheck` that runs both.

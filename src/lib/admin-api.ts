@@ -71,6 +71,56 @@ function required<T>(value: T | null, message: string): T {
   return value;
 }
 
+/**
+ * Postgres refuses a privileged write in two very different ways, and only one
+ * of them is loud. An INSERT that fails a policy's WITH CHECK raises 42501. An
+ * UPDATE or DELETE that fails a policy's USING clause simply matches no rows:
+ * nothing changes, and PostgREST reports success. So a moderator clicking
+ * "Verify" on a business got a green "Business verified." notice while the row
+ * never moved, and removeAdminMember() reported a member removed who is still
+ * on the team.
+ *
+ * The database is not the problem — RLS refuses exactly the right writes, and
+ * smoke:admin re-reads every refused row to prove it did not move. What was
+ * wrong is what the caller was told. So every privileged UPDATE/DELETE below
+ * asks for the rows it changed back and treats an empty result as the refusal
+ * it is. Enforcement stays server-side; this is the client reporting it
+ * honestly.
+ *
+ * The message says "either the row is gone, or you lack the role" rather than
+ * picking one: from here the two are genuinely indistinguishable — RLS filters
+ * a forbidden row and a missing row identically, on purpose, so a policy cannot
+ * be used to probe for rows the caller may not see.
+ *
+ * `instanceof` is unreliable across duplicated chunks in the static build, so
+ * callers that need to branch should check `name` — isAdminWriteRefusedError()
+ * does. (Same rationale as ReportAlreadyReviewedError in hp-api.ts.)
+ */
+export class AdminWriteRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AdminWriteRefusedError";
+  }
+}
+
+export function isAdminWriteRefusedError(error: unknown): error is AdminWriteRefusedError {
+  return (
+    error instanceof AdminWriteRefusedError ||
+    (typeof error === "object" &&
+      error !== null &&
+      (error as Error).name === "AdminWriteRefusedError")
+  );
+}
+
+/**
+ * Assert that a privileged write actually touched a row. `rows` is whatever the
+ * `.select()` chained onto the write returned; an empty array means every
+ * candidate row was filtered away by a policy.
+ */
+function assertWrote(rows: unknown[] | null, message: string) {
+  if (!rows || rows.length === 0) throw new AdminWriteRefusedError(message);
+}
+
 export async function getAdminRole(): Promise<AdminRole | null> {
   const result = await supabase.rpc("current_admin_role");
   if (result.error) throw result.error;
@@ -227,8 +277,12 @@ export async function deleteAdminPlace(id: string) {
     );
   }
 
-  const result = await supabase.from("places").delete().eq("id", id);
+  const result = await supabase.from("places").delete().eq("id", id).select("id");
   if (result.error) throw result.error;
+  assertWrote(
+    result.data,
+    "Nothing was deleted — either that place is already gone, or deleting a place is Owner/Editor only.",
+  );
 }
 
 export async function saveAdminStory(story: Database["public"]["Tables"]["stories"]["Insert"]) {
@@ -260,8 +314,13 @@ export async function setOrganizerVerification(
   const result = await supabase
     .from("organizers")
     .update({ verification_status: status })
-    .eq("id", organizerId);
+    .eq("id", organizerId)
+    .select("id");
   if (result.error) throw result.error;
+  assertWrote(
+    result.data,
+    "Nothing changed — either that organizer is gone, or only an Owner or Editor can change verification.",
+  );
 }
 
 export async function createAdminOrganizer(userId: string, displayName: string) {
@@ -284,8 +343,13 @@ export async function setBusinessVerification(
   const result = await supabase
     .from("businesses")
     .update({ verification_status: status })
-    .eq("id", businessId);
+    .eq("id", businessId)
+    .select("id");
   if (result.error) throw result.error;
+  assertWrote(
+    result.data,
+    "Nothing changed — either that business is gone, or only an Owner or Editor can change verification.",
+  );
 }
 
 export async function createAdminBusiness(userId: string, displayName: string) {
@@ -316,8 +380,13 @@ export async function clearPlaceDeal(claimId: string) {
   const result = await supabase
     .from("place_business_profiles")
     .update({ deal_text: null, deal_active: false })
-    .eq("id", claimId);
+    .eq("id", claimId)
+    .select("id");
   if (result.error) throw result.error;
+  assertWrote(
+    result.data,
+    "The deal was not cleared — either the claim is gone, or clearing a deal is Owner/Editor only.",
+  );
 }
 
 // Redeemed-coupon count per claim (stage B3), for the "Place claims" list. RLS
@@ -345,6 +414,10 @@ export async function replaceAdminRouteStops(
   routeId: string,
   stops: Database["public"]["Tables"]["route_stops"]["Insert"][],
 ) {
+  // Deliberately not checked for a zero-row result the way the privileged
+  // writes above are: a route that currently has no stops is a normal state,
+  // so "deleted nothing" here is not evidence of a refusal. The insert that
+  // follows is the loud half — it raises 42501 for a caller without the role.
   const removed = await supabase.from("route_stops").delete().eq("route_id", routeId);
   if (removed.error) throw removed.error;
   if (stops.length === 0) return;
@@ -353,13 +426,21 @@ export async function replaceAdminRouteStops(
 }
 
 export async function editAdminPost(id: string, text: string) {
-  const result = await supabase.from("posts").update({ text }).eq("id", id);
+  const result = await supabase.from("posts").update({ text }).eq("id", id).select("id");
   if (result.error) throw result.error;
+  assertWrote(
+    result.data,
+    "The post was not saved — either it is gone, or editing content is Owner/Editor only.",
+  );
 }
 
 export async function editAdminComment(id: string, text: string) {
-  const result = await supabase.from("comments").update({ text }).eq("id", id);
+  const result = await supabase.from("comments").update({ text }).eq("id", id).select("id");
   if (result.error) throw result.error;
+  assertWrote(
+    result.data,
+    "The comment was not saved — either it is gone, or editing content is Owner/Editor only.",
+  );
 }
 
 export async function moderateContent(
@@ -375,12 +456,28 @@ export async function moderateContent(
   if (result.error) throw result.error;
 }
 
+// Adding somebody is the loud half of RLS: a fresh row fails the INSERT policy's
+// WITH CHECK and raises 42501. Changing an existing member's role is the quiet
+// half — the upsert becomes an UPDATE, and a non-Owner's UPDATE just matches
+// nothing. Both paths are covered by asking for the row back.
 export async function setAdminMember(userId: string, role: AdminRole) {
-  const result = await supabase.from("admin_members").upsert({ user_id: userId, role });
+  const result = await supabase
+    .from("admin_members")
+    .upsert({ user_id: userId, role })
+    .select("user_id");
   if (result.error) throw result.error;
+  assertWrote(result.data, "The team role was not saved — only an Owner can manage admin roles.");
 }
 
 export async function removeAdminMember(userId: string) {
-  const result = await supabase.from("admin_members").delete().eq("user_id", userId);
+  const result = await supabase
+    .from("admin_members")
+    .delete()
+    .eq("user_id", userId)
+    .select("user_id");
   if (result.error) throw result.error;
+  assertWrote(
+    result.data,
+    "Nothing was removed — either that member is already gone, or only an Owner can manage admin roles.",
+  );
 }

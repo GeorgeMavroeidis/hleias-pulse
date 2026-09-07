@@ -67,6 +67,14 @@
     {
       "name": "write_admin_audit_log",
       "searchPath": "search_path=public"
+    },
+    {
+      "name": "write_admin_member_audit_log",
+      "searchPath": "search_path=public"
+    },
+    {
+      "name": "write_verification_audit_log",
+      "searchPath": "search_path=public"
     }
   ],
   "grants": {

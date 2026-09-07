@@ -62,28 +62,64 @@
 
 ### From the 2026-09-07 backend test-coverage pass
 
-- **The two highest-privilege actions in the app write no audit row.**
-  `admin_audit_logs` is well covered for content: `moderate_content()` and
-  `review_place_claim()` each insert their own row, and the
-  `write_admin_audit_log()` trigger sits on `places`, `posts`, `comments`,
-  `stories`, `meet_events`, `routes`, `cultural_events` and
-  `place_business_profiles`. Three tables have **neither** — no trigger, and no
-  explicit insert in the function or the API that writes them:
-  - `businesses` and `organizers` — so **verifying a business leaves no trace**,
-    and a verified business is what unlocks place claims and deals
-    (`20260905170000`), i.e. the revenue path. `setBusinessVerification()` /
-    `setOrganizerVerification()` in `admin-api.ts` are plain `.update()` calls.
-  - `admin_members` — so **granting somebody `owner` leaves no trace either**.
-    That is the single most powerful action in the system, and afterwards
-    nothing records who did it, when, or to whom. `setAdminMember()` /
-    `removeAdminMember()` are a plain upsert and delete.
+- ~~**The two highest-privilege actions in the app write no audit row.**~~
+  **Closed 2026-09-07**, `20260907120000_audit_privileged_admin_writes.sql`.
+  `businesses`, `organizers` and `admin_members` had no audit coverage at all —
+  no trigger, and no explicit insert in the function or the API that writes
+  them — so verifying a business (the gate on place claims and deals,
+  `20260905170000`, i.e. the revenue path) and granting somebody `owner` each
+  left no trace of who did it, when, or to whom.
 
-  Verified 2026-09-07 while writing `smoke:admin`, which asserts the audited
-  paths and deliberately does *not* pin this gap, so fixing it will not fail the
-  test. Fix is one migration: either extend `write_admin_audit_log()` to those
-  three tables, or insert explicitly. Worth deciding whether an audit row should
-  also survive its actor — `admin_audit_logs.actor_id` is `ON DELETE SET NULL`,
-  so deleting a user anonymises their history rather than keeping it.
+  Two new triggers rather than hanging the existing `write_admin_audit_log()`
+  on all three, because the two cases want opposite defaults:
+  - `write_admin_member_audit_log()` on `admin_members` is deliberately
+    **role-blind**. `write_admin_audit_log()` returns early unless the actor is
+    owner/editor, which is right for the tables it already covers — without it
+    every ordinary user's post and comment would write an audit row — but on
+    `admin_members` that gate would skip exactly the writes that matter most: a
+    promotion made over `psql` or with the `service_role` key has no
+    `auth.uid()` at all, so `has_admin_role()` is false and the row would
+    vanish. It records `current_user` alongside, and `smoke:admin` pins the
+    property by asserting that the fixture's own JWT-less insert is audited.
+  - `write_verification_audit_log()` on `businesses` / `organizers` fires **only
+    on a verification transition** — including a row *inserted* already
+    verified, which is the one route the `BEFORE UPDATE`
+    `prevent_*_self_verification()` guards cannot see. A self-service
+    application (a row that starts `pending`) is not an admin act and writes
+    nothing, so the table cannot fill with noise; `smoke:admin` pins that too.
+
+  Adds no policy, table or column: `audit:rls --check` reported the two new
+  SECURITY DEFINER functions and nothing else, which is the evidence it hands
+  nobody a new capability. Applied to the live database the same day.
+
+- ~~**A refused admin write reported success.**~~ **Closed 2026-09-07**, same
+  pass, in `src/lib/admin-api.ts`. Postgres refuses a privileged write in two
+  very different ways and only one is loud: an INSERT that fails a policy's
+  `WITH CHECK` raises 42501, but an UPDATE or DELETE that fails a `USING`
+  clause simply matches no rows — nothing changes and PostgREST reports
+  success. So a moderator clicking "Verify" on a business got a green "Business
+  verified." notice while the row never moved, and `removeAdminMember()`
+  reported a member removed who was still on the team. Every privileged
+  update/delete now chains `.select()` and raises `AdminWriteRefusedError` on an
+  empty result. **Enforcement did not move** — RLS was always refusing these
+  correctly, and `smoke:admin` still re-reads each row over `pg` to prove the
+  policy, not the client, is what stopped the write. Only the reporting was
+  wrong. Same fix applied to `deleteAdminPlace`, `clearPlaceDeal`,
+  `editAdminPost` and `editAdminComment`, which had the identical defect;
+  `replaceAdminRouteStops` deliberately excluded, since a route with no stops
+  makes "deleted nothing" a legitimate outcome there.
+
+- **Still open, and it is a product call rather than a technical one: should an
+  audit row survive its actor?** `admin_audit_logs.actor_id` is
+  `ON DELETE SET NULL`, so deleting a user anonymises their history — the trail
+  keeps "this business was verified" but loses who verified it. Keeping the name
+  means retaining a personal identifier after an erasure request, which needs a
+  lawful basis under GDPR; a security audit trail is a defensible one, but that
+  is Mavroeidis's decision and it comes with a retention period to set. The
+  2026-09-07 triggers deliberately follow the existing behaviour instead of
+  pre-empting it, and go slightly further in one place: a deleted
+  business/organizer row is logged without the applicant's `user_id`, so the
+  line survives without naming somebody who asked to be forgotten.
 
 ## Architecture / Tech Debt
 
