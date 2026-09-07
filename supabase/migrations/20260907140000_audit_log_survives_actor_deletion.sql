@@ -1,0 +1,42 @@
+-- An audit row must outlive the account that wrote it.
+--
+-- admin_audit_logs.actor_id was created as
+--   actor_id uuid references auth.users(id) on delete set null
+-- (20260824090000). That foreign key means deleting an account rewrites its
+-- whole admin history to "somebody did this" -- precisely when a person has a
+-- reason to disappear. 20260907120000 then made this worse by design: it added
+-- audit rows for the two most powerful actions in the system, verifying a
+-- business and granting an admin role, so the history now worth keeping is
+-- exactly the history that vanishes.
+--
+-- Dropping the constraint is the standard shape for an audit table: it records
+-- an id, it does not participate in the lifecycle of the thing it names. The
+-- column keeps its type and stays nullable, so a write with no auth.uid()
+-- (a seed, or anything over a direct psql connection) still records null.
+--
+-- Privacy: this retains an opaque uuid and nothing else. No name, no email --
+-- the details payloads written by write_admin_member_audit_log() and
+-- write_verification_audit_log() carry roles and status transitions, not
+-- personal fields. Keep it that way; these rows are now permanent.
+--
+-- Two consequences worth knowing before touching this again:
+--
+--   1. The `if actor is not distinct from subject_id then actor := null` guards
+--      in 20260907120000 exist only to stop an end-of-statement foreign key
+--      check failing during the auth.users cascade and taking the account
+--      deletion down with it. With the constraint gone there is no check left
+--      to fail. They are inert rather than wrong; do not re-add the constraint
+--      to make them meaningful again.
+--   2. Nothing cascades these rows away any more. A fixture that touches
+--      admin_members, businesses or organizers must clean up by entity_id --
+--      sweeping by actor_id misses them twice over, because the trigger fires
+--      during the cascade (after such a sweep has run) and records a null
+--      actor anyway. See the cleanup in smoke-routes / smoke-verification-guards
+--      / smoke-deal-race (d383700).
+--
+-- Adds no policy and no capability. admin_audit_logs still has SELECT-only
+-- grants and no INSERT policy, so rows continue to arrive solely through the
+-- security definer triggers and cannot be forged from a browser.
+
+alter table public.admin_audit_logs
+  drop constraint if exists admin_audit_logs_actor_id_fkey;
