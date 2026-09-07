@@ -60,7 +60,7 @@ free-tier services. The paid/Apple track starts in February.
    now carry audit triggers (`20260907120000`, applied live), and the admin API
    no longer reports a refused write as a success. The decision it left you is
    now made: an audit row **keeps** naming its actor after that person deletes
-   their account — `20260907140000` drops the foreign key that was nulling it.
+   their account — `20260907170000` drops the foreign key that was nulling it.
    That migration is **written but not yet applied to the live database**, so
    production still anonymises on deletion until someone pushes it. The
    retention *period* is still unset; see `IDEAS.md` → Security for both. The

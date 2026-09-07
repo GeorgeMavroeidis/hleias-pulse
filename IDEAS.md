@@ -110,7 +110,7 @@
   makes "deleted nothing" a legitimate outcome there.
 
 - ~~**Should an audit row survive its actor?**~~ **Decided 2026-09-07 — yes,
-  keep the actor.** `20260907140000_audit_log_survives_actor_deletion.sql` drops
+  keep the actor.** `20260907170000_audit_log_survives_actor_deletion.sql` drops
   `admin_audit_logs_actor_id_fkey`, so the column keeps the id instead of being
   nulled when the account goes. The reasoning: an audit table records an id, it
   does not participate in the lifecycle of the thing it names. Under
@@ -168,7 +168,7 @@
   sufficient reasons: the trigger fires *during* the cascade, i.e. after that
   sweep has already run, and it records `actor_id` as null anyway, because the
   `postgres` role has no `auth.uid()`. Fixed in `d383700` with a second pass
-  keyed on `entity_id`. `20260907140000` sharpens the rule rather than softening
+  keyed on `entity_id`. `20260907170000` sharpens the rule rather than softening
   it — with the foreign key gone, nothing cascades those rows away at all, so an
   `entity_id` sweep is the only cleanup that works.
 
