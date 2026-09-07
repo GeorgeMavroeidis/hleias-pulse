@@ -155,7 +155,9 @@ function checkPushCredential() {
       "push",
       denied
         ? `origin rejected the push: the active account is '${denied[1]}' and it has no write ` +
-            "access. Switch accounts (gh auth switch) before doing any more work."
+            "access. Run `gh auth status` — if the account with write access is already " +
+            "logged in, `gh auth switch` to it; if it is not listed at all, `gh auth login`. " +
+            "Do this before any more work: commits made now cannot be pushed."
         : `origin rejected a dry-run push: ${message.split("\n").find((l) => l.includes("fatal")) ?? message}`,
     );
   }
