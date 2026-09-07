@@ -60,6 +60,31 @@
   audit. `meet_events` INSERT is a single policy and `content_reports` UPDATE is
   two (own + admin) — both PR #47 gaps are closed.
 
+### From the 2026-09-07 backend test-coverage pass
+
+- **The two highest-privilege actions in the app write no audit row.**
+  `admin_audit_logs` is well covered for content: `moderate_content()` and
+  `review_place_claim()` each insert their own row, and the
+  `write_admin_audit_log()` trigger sits on `places`, `posts`, `comments`,
+  `stories`, `meet_events`, `routes`, `cultural_events` and
+  `place_business_profiles`. Three tables have **neither** — no trigger, and no
+  explicit insert in the function or the API that writes them:
+  - `businesses` and `organizers` — so **verifying a business leaves no trace**,
+    and a verified business is what unlocks place claims and deals
+    (`20260905170000`), i.e. the revenue path. `setBusinessVerification()` /
+    `setOrganizerVerification()` in `admin-api.ts` are plain `.update()` calls.
+  - `admin_members` — so **granting somebody `owner` leaves no trace either**.
+    That is the single most powerful action in the system, and afterwards
+    nothing records who did it, when, or to whom. `setAdminMember()` /
+    `removeAdminMember()` are a plain upsert and delete.
+
+  Verified 2026-09-07 while writing `smoke:admin`, which asserts the audited
+  paths and deliberately does *not* pin this gap, so fixing it will not fail the
+  test. Fix is one migration: either extend `write_admin_audit_log()` to those
+  three tables, or insert explicitly. Worth deciding whether an audit row should
+  also survive its actor — `admin_audit_logs.actor_id` is `ON DELETE SET NULL`,
+  so deleting a user anonymises their history rather than keeping it.
+
 ## Architecture / Tech Debt
 
 <!-- Things that work today but should be revisited —
@@ -89,17 +114,16 @@
 
 ### From the 2026-09-06 backend audit
 
-- **Whole modules have zero test coverage.** Covered today: users
-  (`smoke:auth-profile`), post/story writes (`smoke:post-write`), map
-  (`test:intelligence`, `test:map-visuals`), discovery (`test:discovery`), deal
-  redemption (`smoke:deal-race`), live surfaces (`smoke:live-surfaces`), and block
-  enforcement at the DB layer (`smoke:block-enforcement`). **Uncovered entirely:**
-  `admin` (`admin-api.ts` — the whole owner/editor/moderator privilege model,
-  `write_admin_audit_log`, `review_place_claim`), the `cultural_events` /
-  `organizers` track including `prevent_organizer_self_verification`, `businesses`
-  including `prevent_business_self_verification`, `routes` / `route_stops`, and
-  `saved_items`. The admin gap is the sharpest of these: it is the one surface
-  with its own privilege-escalation path and nothing exercises it.
+- ~~**Whole modules have zero test coverage.**~~ **Three of the gaps closed
+  2026-09-07.** `smoke:admin` covers the whole owner/editor/moderator privilege
+  model (`has_admin_role`, `moderate_content`, `review_place_claim`,
+  `write_admin_audit_log`, and admin_members visibility);
+  `smoke:verification-guards` covers `prevent_organizer_self_verification` /
+  `prevent_business_self_verification` plus the insert-as-verified route the
+  triggers do not see; `smoke:routes` covers routes / route_stops read/write RLS,
+  ordering and cascade. **Still uncovered:** `cultural_events` beyond organizer
+  verification (publishing, comments, reactions), `place_business_profiles`
+  claims beyond the deal-race fixture, and `saved_items`.
 
 - **`smoke:block-enforcement` tests the database, not the app.** It connects with
   `pg` and asserts the policy bites, which is the right test for the policy — and

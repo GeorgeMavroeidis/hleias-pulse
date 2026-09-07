@@ -50,10 +50,13 @@ free-tier services. The paid/Apple track starts in February.
    policy) and nothing ever deletes them. Add the cutoff to the policy **and**
    decide a deletion schedule — user photos tied to a location, so EU privacy law
    applies. One migration + a cleanup job. See `IDEAS.md` → Security.
-2. **Test coverage for the untested modules**, starting with `admin` — the whole
-   owner/editor/moderator permission model has zero tests and it's the one
-   surface with its own privilege-escalation path. Then cultural events /
-   organizers, business verification, routes. Pure code, no migration, no cost.
+2. **Test coverage for the untested modules** — *mostly done (2026-09-07).*
+   `smoke:admin` now covers the whole owner/editor/moderator permission model,
+   including the privilege-escalation path; `smoke:verification-guards` covers
+   organizer and business self-verification; `smoke:routes` covers routes /
+   route stops. Left: cultural-event publishing, place claims, `saved_items`.
+   Pure code, no migration, no cost. That pass also turned up an audit-trail
+   gap — see `IDEAS.md` → Security, 2026-09-07.
 3. **Confirm the web deploy works end to end.** `npm run deploy:worker` uploads
    to Cloudflare (free tier) — nobody has verified the deployed site actually
    runs, only that the script exists. May need a free Cloudflare account first.
