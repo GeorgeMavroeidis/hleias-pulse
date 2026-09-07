@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
+
+import { readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
 import {
   createPulseMeetEvent,
   createPulseStory,
@@ -12,41 +12,6 @@ import {
   setPulseMeetRsvp,
 } from "../src/lib/hp-api";
 import { supabase } from "../src/lib/supabase/client";
-
-const projectRef = "kfxfnqryfmuxiwlswyyn";
-
-function readSupabaseClientConfig() {
-  const source = readFileSync("src/lib/supabase/client.ts", "utf8");
-  const url = source.match(/const supabaseUrl = "([^"]+)"/)?.[1];
-  const publishableKey = source.match(/const supabasePublishableKey\s*=\s*"([^"]+)"/)?.[1];
-
-  if (!url || !publishableKey) {
-    throw new Error("Could not read Supabase client config.");
-  }
-
-  return { publishableKey, url };
-}
-
-function readServiceRoleKey() {
-  const output = execFileSync(
-    "npx",
-    ["supabase", "projects", "api-keys", "--project-ref", projectRef, "--output", "json"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const parsed = JSON.parse(output);
-  const keys = Array.isArray(parsed) ? parsed : (parsed.api_keys ?? parsed.keys ?? []);
-  const serviceRole = keys.find((key: Record<string, unknown>) => {
-    const name = String(key.name ?? key.api_key_type ?? key.type ?? key.key_type ?? "");
-    return name === "service_role";
-  });
-  const value = serviceRole?.api_key ?? serviceRole?.key ?? serviceRole?.value;
-
-  if (typeof value !== "string" || value.length < 100) {
-    throw new Error("Could not read Supabase service_role key from the local CLI session.");
-  }
-
-  return value;
-}
 
 function requireOk(label: string, error: { message?: string } | null | undefined) {
   if (error) throw new Error(`${label}: ${error.message ?? "Unknown Supabase error"}`);
