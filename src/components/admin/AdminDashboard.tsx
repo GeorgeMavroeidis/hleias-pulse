@@ -480,7 +480,7 @@ function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeratio
   // Two rows legitimately have no name to show: actor_id is null when the write
   // had no auth.uid() (a seed, or anything over a direct psql connection --
   // 20260907120000 audits those on purpose), and a profile can be missing for an
-  // id that is still recorded, because 20260907140000 drops the foreign key so
+  // id that is still recorded, because 20260907170000 drops the foreign key so
   // audit rows outlive the account. Fall back to a short id rather than hiding
   // the row: "who" is the whole point of the panel.
   const actorNames = useMemo(
