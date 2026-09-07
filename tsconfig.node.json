@@ -1,0 +1,22 @@
+{
+  // The NODE project: code that runs on a maintainer's machine or in CI, never
+  // in a browser. Same `strict` settings as the shipped app — these scripts
+  // create and delete real rows in the live database, so they earn the same
+  // rigour as the app does.
+  //
+  // Differences from tsconfig.json, and why:
+  //   types: ["node"]        — Node globals (process, Buffer, node:* modules).
+  //   lib without DOM        — there is no `document` here. Reaching for one
+  //                            should be a compile error, not a 3am crash.
+  //   lib ES2023             — these run on Node 22, not in an old browser.
+  //
+  // Scripts that import from `src/` (smoke tests, check-map-visuals) pull those
+  // src files into THIS program too, under Node's types. That is deliberate: if
+  // a browser-only API ever leaks into hp-api.ts, this is where it surfaces.
+  "extends": "./tsconfig.json",
+  "include": ["scripts/**/*.ts", "vite.config.ts", "vite.static.config.ts", "capacitor.config.ts"],
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"]
+  }
+}

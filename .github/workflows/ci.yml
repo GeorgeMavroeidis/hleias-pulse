@@ -37,8 +37,13 @@ jobs:
       - name: Secret scan
         run: npm run check:secrets
 
+      # Two projects, not one: tsconfig.json is the browser app (src/ plus the
+      # cloudflare-static-src entry that production actually boots from) and
+      # tsconfig.node.json is scripts/ plus the build configs. A bare
+      # `npx tsc --noEmit` only checks the first, which is how nine type errors
+      # sat undetected in scripts/ — the files were in no project at all.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       # All three suites are offline: pure functions plus node:assert.
       # They need no Supabase credentials and make no network calls.
