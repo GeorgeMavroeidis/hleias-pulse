@@ -67,6 +67,7 @@ import {
 import { getCurrentPulseAccount, type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { CULTURAL_EVENT_TYPES, CULTURAL_EVENT_TYPE_META, tr } from "@/lib/hp/cultural-events-types";
+import { initialsAvatarDataUri } from "@/lib/hp/avatar";
 
 type AdminTab =
   | "overview"
@@ -1488,7 +1489,8 @@ function StoryEditor({
         kind,
         author_name: authorName.trim() || "ΗΛΕΙΑ PULSE",
         author_type: "EDITOR",
-        author_avatar_url: story?.author_avatar_url ?? "https://i.pravatar.cc/120?img=47",
+        author_avatar_url:
+          story?.author_avatar_url ?? initialsAvatarDataUri(authorName.trim() || "ΗΛΕΙΑ PULSE"),
         media_url: mediaUrl.trim(),
         caption: caption.trim() || "Live update",
         expires_after_hours: Number(hours),
@@ -1707,7 +1709,8 @@ function MeetEditor({
         place_id: placeId,
         title: title.trim(),
         host_name: event?.host_name ?? "ΗΛΕΙΑ PULSE",
-        host_avatar_url: event?.host_avatar_url ?? "https://i.pravatar.cc/120?img=47",
+        host_avatar_url:
+          event?.host_avatar_url ?? initialsAvatarDataUri(event?.host_name ?? "ΗΛΕΙΑ PULSE"),
         host_type: event?.host_type ?? "GUIDE",
         starts_at: new Date(startsAt).toISOString(),
         duration_min: event?.duration_min ?? 120,
