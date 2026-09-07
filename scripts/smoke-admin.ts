@@ -158,12 +158,47 @@ async function expectRejection(label: string, call: () => Promise<unknown>) {
   return message;
 }
 
+/**
+ * Wait until PostgREST will actually accept the token we were just given.
+ *
+ * Supabase mints the JWT on its auth tier and validates it on its REST tier,
+ * and those two clocks drift against each other by a fraction of a second. The
+ * `iat` check has no leeway, so a freshly minted token can be born momentarily
+ * unusable and the next call dies with PGRST303 "JWT issued at future". Measured
+ * on 2026-09-07: the two tiers' Date headers disagree by up to a second, and it
+ * cost two of the first three runs of this script — always on the first call
+ * after sign-in, never later.
+ *
+ * It is not our bug and there is nothing here worth asserting on, so it is
+ * absorbed at the point it happens rather than left to fail whichever assertion
+ * happens to come next, for a reason that has nothing to do with what that
+ * assertion tests. Bounded deliberately: a token still refused after ~5s is a
+ * real problem and is allowed to surface.
+ *
+ * current_admin_role() is the probe because it is the cheapest authenticated
+ * round-trip in the app and it is valid for any signed-in user — a non-admin
+ * gets null, not an error.
+ */
+async function waitForTokenToBeAccepted(email: string) {
+  for (let attempt = 0; ; attempt += 1) {
+    const probe = await supabase.rpc("current_admin_role");
+    if (!probe.error || probe.error.code !== "PGRST303") return;
+    if (attempt >= 10) {
+      throw new Error(
+        `PostgREST kept refusing ${email}'s freshly issued token: ${probe.error.message}`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
 async function signInAs(email: string, password: string) {
   await supabase.auth.signOut();
   const result = await supabase.auth.signInWithPassword({ email, password });
   if (result.error) throw new Error(`Sign-in failed for ${email}: ${result.error.message}`);
   const userId = result.data.user?.id;
   assert(userId, "Sign-in returned no user id.");
+  await waitForTokenToBeAccepted(email);
   return userId;
 }
 
