@@ -109,17 +109,47 @@
   `replaceAdminRouteStops` deliberately excluded, since a route with no stops
   makes "deleted nothing" a legitimate outcome there.
 
-- **Still open, and it is a product call rather than a technical one: should an
-  audit row survive its actor?** `admin_audit_logs.actor_id` is
-  `ON DELETE SET NULL`, so deleting a user anonymises their history — the trail
-  keeps "this business was verified" but loses who verified it. Keeping the name
-  means retaining a personal identifier after an erasure request, which needs a
-  lawful basis under GDPR; a security audit trail is a defensible one, but that
-  is Mavroeidis's decision and it comes with a retention period to set. The
-  2026-09-07 triggers deliberately follow the existing behaviour instead of
-  pre-empting it, and go slightly further in one place: a deleted
-  business/organizer row is logged without the applicant's `user_id`, so the
-  line survives without naming somebody who asked to be forgotten.
+- ~~**Should an audit row survive its actor?**~~ **Decided 2026-09-07 — yes,
+  keep the actor.** `20260907140000_audit_log_survives_actor_deletion.sql` drops
+  `admin_audit_logs_actor_id_fkey`, so the column keeps the id instead of being
+  nulled when the account goes. The reasoning: an audit table records an id, it
+  does not participate in the lifecycle of the thing it names. Under
+  `ON DELETE SET NULL` the whole history collapsed to "somebody did this"
+  precisely when a person has a motive to disappear — and the 2026-09-07
+  triggers made that worse by design, because the history now worth keeping
+  (who verified a business, who granted `owner`) was exactly the history that
+  vanished.
+
+  What it retains is an opaque uuid and nothing else — no name, no email. The
+  `details` payloads carry roles and status transitions, not personal fields,
+  and the earlier choice to log a deleted business/organizer *without* the
+  applicant's `user_id` still stands. **Keep it that way:** these rows are now
+  permanent, so nothing personal should ever be written into them.
+
+  Free of side effects, checked before writing it: the constraint points at
+  `auth.users`, outside the exposed `public` schema, so
+  `admin_audit_logs.Relationships` in `database.types.ts` is already `[]` and
+  regenerating types is a no-op. Dropping a constraint is catalogue-only —
+  instant, no table rewrite.
+
+  **Still open, and smaller:** the retention *period*. Keeping the trail
+  indefinitely is a decision nobody has actually made, and GDPR wants a stated
+  period rather than "forever by default". Not urgent while there are no
+  outside users, but it should not be forgotten either.
+
+- **A new `AFTER DELETE` trigger silently changes what every existing test
+  fixture leaves behind.** Worth writing down, because it generalises well past
+  the three scripts it happened to hit. `20260907120000` put audit triggers on
+  `businesses`, `organizers` and `admin_members`, and `admin_audit_logs` has no
+  foreign key back to any of them — so a fixture touching those tables now
+  leaves audit rows the `auth.users` cascade never reaches. The existing "sweep
+  `admin_audit_logs` by `actor_id`" cleanup missed them for two independently
+  sufficient reasons: the trigger fires *during* the cascade, i.e. after that
+  sweep has already run, and it records `actor_id` as null anyway, because the
+  `postgres` role has no `auth.uid()`. Fixed in `d383700` with a second pass
+  keyed on `entity_id`. `20260907140000` sharpens the rule rather than softening
+  it — with the foreign key gone, nothing cascades those rows away at all, so an
+  `entity_id` sweep is the only cleanup that works.
 
 ## Architecture / Tech Debt
 
