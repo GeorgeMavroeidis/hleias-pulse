@@ -66,6 +66,15 @@ alter table public.admin_audit_logs
 -- Dropping the constraint without dropping the guards would cement the one
 -- erasure the constraint was never responsible for.
 --
+-- This is therefore a fix for a defect that is LIVE right now, not only a change
+-- of retention policy: 20260907120000 is already applied, so an owner who
+-- removes their own admin row today is already recorded as nobody.
+--
+-- DO NOT re-add admin_audit_logs_actor_id_fkey without restoring a guard of
+-- this shape. The end-of-statement cascade hazard comes back with the
+-- constraint, and it fails on the one path nobody tests by hand: a user
+-- deleting their own account.
+--
 -- The functions below are otherwise byte-for-byte 20260907120000. Only the
 -- `actor := null` blocks are removed.
 
