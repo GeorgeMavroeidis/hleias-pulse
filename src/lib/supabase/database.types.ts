@@ -1464,6 +1464,7 @@ export type Database = {
       current_business_id: { Args: never; Returns: string | null };
       current_organizer_id: { Args: never; Returns: string | null };
       get_pulse_bootstrap: { Args: never; Returns: Json };
+      refresh_generic_stories: { Args: never; Returns: undefined };
       issue_deal_code: { Args: { target_place_id: string }; Returns: Json };
       redeem_deal_code: { Args: { code: string }; Returns: Json };
       moderate_content: {
