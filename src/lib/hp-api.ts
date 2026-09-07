@@ -9,6 +9,7 @@ import {
 } from "./hp-model";
 import type { CreateMeetInput, MeetEvent, RsvpStatus } from "./hp/meet-types";
 import type { StreakState } from "./hp/meet-store";
+import { initialsAvatarDataUri } from "./hp/avatar";
 import type {
   CreateCulturalEventInput,
   CulturalEvent,
@@ -1186,7 +1187,9 @@ export async function createPulsePlace(input: CreatePulsePlaceInput): Promise<Pl
   const avatar = {
     place_id: result.data.id,
     position: 0,
-    avatar_url: input.authorAvatarUrl || "https://i.pravatar.cc/120?img=22",
+    // No author identity flows into this call today, so this is an honest
+    // "unknown contributor" mark rather than an invented name.
+    avatar_url: input.authorAvatarUrl || initialsAvatarDataUri("", input.name),
   };
   const avatarResult = await client.from("place_avatars").insert(avatar);
   const avatarsByPlace = avatarResult.error ? {} : { [result.data.id]: [avatar] };

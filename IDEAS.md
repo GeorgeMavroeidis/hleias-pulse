@@ -11,6 +11,39 @@
 ## New Feature Ideas
 
 - Myths — not a current feature, may revisit in brainstorming later
+- "Ask a local" — a question-and-answer surface in Pulse (tourists post a
+  question tied to a place, locals answer) rather than only one-way posts.
+  Flagged 2026-09-07 as the highest-leverage way to give locals a reason to
+  come back and post without being asked — see the "50-100 locals posting
+  unprompted" done-when in `ROADMAP.md` → Stage 3.
+- Village/area identity next to a user's name (e.g. "Local · Πύργος") instead
+  of just the generic LOCAL/GUIDE/BUSINESS badge — cheap, free, and a real
+  trust signal for tourists. Flagged 2026-09-07.
+
+## UI / Authenticity polish
+
+<!-- Flagged 2026-09-07 during a UI-realism discussion. The two highest-impact
+     items from that pass (frozen "just now" timestamps, pravatar stock-photo
+     fallbacks) are fixed — see below. These are the ones intentionally left. -->
+
+- **`LiveTicker`'s activity feed assigns a random stock avatar to real post
+  authors**, unrelated to who they actually are
+  (`src/lib/hp/activity-data.ts:35`, `` avatar: `https://i.pravatar.cc/60?img=${(i % 60) + 1}` ``).
+  Different bug from the avatar-fallback fix in `hp-model.ts`/`hp-api.ts`
+  (2026-09-07) — this one fabricates a face for someone who *is* identifiable,
+  it doesn't just cover for a missing photo. Needs `buildActivityTicks()` to
+  receive an author lookup (it currently only gets posts/places/events) so it
+  can use the real author's avatar — same initials-avatar fallback
+  (`src/lib/hp/avatar.ts`) when that's also missing.
+- No loading skeletons anywhere in `components/hp/` — the whole app's loading
+  state is one line of text (`PulseApp.tsx` → `"Loading pulse data…"`). Cheap,
+  no backend change, meaningful difference between "feels like a website" and
+  "feels like an app."
+- No haptics (`@capacitor/haptics`) anywhere — free, iOS-only effect, small
+  but real on things like the like/save buttons.
+- Empty states (e.g. "No posts match this filter yet.") are dead ends, not
+  prompts. Worth turning into a call to action once there's a composer flow
+  to point at.
 
 ## Security to Review
 

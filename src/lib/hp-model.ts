@@ -1,3 +1,5 @@
+import { initialsAvatarDataUri } from "./hp/avatar";
+
 export type PlaceType =
   | "beach"
   | "culture"
@@ -159,5 +161,5 @@ export const fallbackAuthor: Author = {
   id: "unknown",
   name: "Local",
   type: "LOCAL",
-  avatarUrl: "https://i.pravatar.cc/120?img=22",
+  avatarUrl: initialsAvatarDataUri("Local"),
 };
