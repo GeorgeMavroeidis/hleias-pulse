@@ -473,6 +473,20 @@ function AdminDenied() {
 
 function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeration: () => void }) {
   const { language, t } = useI18n();
+
+  // admin_audit_logs stores actor_id and nothing else about the person, so the
+  // name has to be resolved here. profiles.id IS the auth user id, and
+  // loadAdminData() already fetches every profile, so this costs one pass.
+  // Two rows legitimately have no name to show: actor_id is null when the write
+  // had no auth.uid() (a seed, or anything over a direct psql connection --
+  // 20260907120000 audits those on purpose), and a profile can be missing for an
+  // id that is still recorded, because 20260907140000 drops the foreign key so
+  // audit rows outlive the account. Fall back to a short id rather than hiding
+  // the row: "who" is the whole point of the panel.
+  const actorNames = useMemo(
+    () => new Map(data.profiles.map((profile) => [profile.id, profile.display_name])),
+    [data.profiles],
+  );
   const pending = [
     data.places,
     data.posts,
@@ -539,6 +553,13 @@ function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeratio
                     <span className="ml-1 text-slate-500">
                       {log.entity_type}
                       {log.entity_id ? ` · ${log.entity_id}` : ""}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-400">
+                      {log.actor_id
+                        ? t("by {name}", {
+                            name: actorNames.get(log.actor_id) ?? `${log.actor_id.slice(0, 8)}…`,
+                          })
+                        : t("by the system")}
                     </span>
                   </span>
                   <time className="shrink-0 text-xs text-slate-400">
