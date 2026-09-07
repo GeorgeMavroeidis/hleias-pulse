@@ -297,6 +297,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      cultural_event_likes: {
+        Row: {
+          created_at: string;
+          cultural_event_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          cultural_event_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          cultural_event_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cultural_event_likes_cultural_event_id_fkey";
+            columns: ["cultural_event_id"];
+            isOneToOne: false;
+            referencedRelation: "cultural_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       cultural_events: {
         Row: {
           area: string;
@@ -386,32 +412,6 @@ export type Database = {
             columns: ["place_id"];
             isOneToOne: false;
             referencedRelation: "places";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      cultural_event_likes: {
-        Row: {
-          created_at: string;
-          cultural_event_id: string;
-          user_id: string;
-        };
-        Insert: {
-          created_at?: string;
-          cultural_event_id: string;
-          user_id: string;
-        };
-        Update: {
-          created_at?: string;
-          cultural_event_id?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "cultural_event_likes_cultural_event_id_fkey";
-            columns: ["cultural_event_id"];
-            isOneToOne: false;
-            referencedRelation: "cultural_events";
             referencedColumns: ["id"];
           },
         ];
@@ -738,110 +738,6 @@ export type Database = {
           },
         ];
       };
-      places: {
-        Row: {
-          area: string;
-          best_time: string;
-          budget: string;
-          comment_count: number;
-          created_at: string;
-          created_by_identity: string;
-          crowd: string;
-          greek_name: string;
-          hotness: number;
-          id: string;
-          image_url: string;
-          lat: number;
-          lng: number;
-          moderation_status: string;
-          photos: string[];
-          mood: string;
-          name: string;
-          profile_id: string | null;
-          pulse: number;
-          recent_post_count: number;
-          short: string;
-          sort_order: number;
-          status: string;
-          tags: string[];
-          type: string;
-          updated_at: string;
-          user_id: string | null;
-          x: number;
-          y: number;
-        };
-        Insert: {
-          area: string;
-          best_time: string;
-          budget: string;
-          comment_count?: number;
-          created_at?: string;
-          created_by_identity?: string;
-          crowd: string;
-          greek_name: string;
-          hotness: number;
-          id: string;
-          image_url: string;
-          lat: number;
-          lng: number;
-          moderation_status?: string;
-          photos?: string[];
-          mood: string;
-          name: string;
-          profile_id?: string | null;
-          pulse: number;
-          recent_post_count?: number;
-          short: string;
-          sort_order?: number;
-          status: string;
-          tags?: string[];
-          type: string;
-          updated_at?: string;
-          user_id?: string | null;
-          x: number;
-          y: number;
-        };
-        Update: {
-          area?: string;
-          best_time?: string;
-          budget?: string;
-          comment_count?: number;
-          created_at?: string;
-          created_by_identity?: string;
-          crowd?: string;
-          greek_name?: string;
-          hotness?: number;
-          id?: string;
-          image_url?: string;
-          lat?: number;
-          lng?: number;
-          moderation_status?: string;
-          photos?: string[];
-          mood?: string;
-          name?: string;
-          profile_id?: string | null;
-          pulse?: number;
-          recent_post_count?: number;
-          short?: string;
-          sort_order?: number;
-          status?: string;
-          tags?: string[];
-          type?: string;
-          updated_at?: string;
-          user_id?: string | null;
-          x?: number;
-          y?: number;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "places_profile_id_fkey";
-            columns: ["profile_id"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       place_business_profiles: {
         Row: {
           business_id: string;
@@ -901,6 +797,110 @@ export type Database = {
             columns: ["place_id"];
             isOneToOne: false;
             referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      places: {
+        Row: {
+          area: string;
+          best_time: string;
+          budget: string;
+          comment_count: number;
+          created_at: string;
+          created_by_identity: string;
+          crowd: string;
+          greek_name: string;
+          hotness: number;
+          id: string;
+          image_url: string;
+          lat: number;
+          lng: number;
+          moderation_status: string;
+          mood: string;
+          name: string;
+          photos: string[];
+          profile_id: string | null;
+          pulse: number;
+          recent_post_count: number;
+          short: string;
+          sort_order: number;
+          status: string;
+          tags: string[];
+          type: string;
+          updated_at: string;
+          user_id: string | null;
+          x: number;
+          y: number;
+        };
+        Insert: {
+          area: string;
+          best_time: string;
+          budget: string;
+          comment_count?: number;
+          created_at?: string;
+          created_by_identity?: string;
+          crowd: string;
+          greek_name: string;
+          hotness: number;
+          id: string;
+          image_url: string;
+          lat: number;
+          lng: number;
+          moderation_status?: string;
+          mood: string;
+          name: string;
+          photos?: string[];
+          profile_id?: string | null;
+          pulse: number;
+          recent_post_count?: number;
+          short: string;
+          sort_order?: number;
+          status: string;
+          tags?: string[];
+          type: string;
+          updated_at?: string;
+          user_id?: string | null;
+          x: number;
+          y: number;
+        };
+        Update: {
+          area?: string;
+          best_time?: string;
+          budget?: string;
+          comment_count?: number;
+          created_at?: string;
+          created_by_identity?: string;
+          crowd?: string;
+          greek_name?: string;
+          hotness?: number;
+          id?: string;
+          image_url?: string;
+          lat?: number;
+          lng?: number;
+          moderation_status?: string;
+          mood?: string;
+          name?: string;
+          photos?: string[];
+          profile_id?: string | null;
+          pulse?: number;
+          recent_post_count?: number;
+          short?: string;
+          sort_order?: number;
+          status?: string;
+          tags?: string[];
+          type?: string;
+          updated_at?: string;
+          user_id?: string | null;
+          x?: number;
+          y?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "places_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1460,15 +1460,21 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      blocked_user_ids: { Args: never; Returns: string[] };
       current_admin_role: { Args: never; Returns: string | null };
       current_business_id: { Args: never; Returns: string | null };
       current_organizer_id: { Args: never; Returns: string | null };
       get_pulse_bootstrap: { Args: never; Returns: Json };
-      refresh_generic_stories: { Args: never; Returns: undefined };
+      has_admin_role: { Args: { required_roles: string[] }; Returns: boolean };
       issue_deal_code: { Args: { target_place_id: string }; Returns: Json };
-      redeem_deal_code: { Args: { code: string }; Returns: Json };
       moderate_content: {
         Args: { next_status: string; target_id: string; target_type: string };
+        Returns: undefined;
+      };
+      redeem_deal_code: { Args: { code: string }; Returns: Json };
+      refresh_generic_stories: { Args: never; Returns: undefined };
+      refresh_meet_event_rsvp_counts: {
+        Args: { target_event_id: string };
         Returns: undefined;
       };
       review_place_claim: {
@@ -1477,10 +1483,6 @@ export type Database = {
       };
       set_place_deal: {
         Args: { claim_id: string; deal_active: boolean; deal_text: string | null };
-        Returns: undefined;
-      };
-      refresh_meet_event_rsvp_counts: {
-        Args: { target_event_id: string };
         Returns: undefined;
       };
     };
