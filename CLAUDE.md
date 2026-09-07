@@ -4,6 +4,7 @@
 > Commit this to git so every contributor's session starts from the same context.
 
 ## Project Overview
+
 **Hleias Pulse** — a hyperlocal social app for the Ilia region of Greece, blending
 elements of Twitter (short posts), Google Maps (location), and Instagram (photo/video
 stories). Locals post real-time recommendations and happenings tied to a location;
@@ -11,6 +12,7 @@ tourists browse those posts to find authentic, local-approved things to do and s
 
 Core sections — the four bottom-nav tabs (`TAB_ITEMS` in
 `src/components/hp/pulse-shared.ts`):
+
 - **Map** — Leaflet map of the region, clustered markers, "what's hot" scoring
 - **Pulse** — the main feed: short posts tied to a place (`Post` in `hp-model.ts`)
 - **Routes** — curated multi-stop itineraries with a step-by-step active guide
@@ -18,6 +20,7 @@ Core sections — the four bottom-nav tabs (`TAB_ITEMS` in
   (published by verified organizers)
 
 Reachable, but not bottom-nav tabs:
+
 - **Deals** — local businesses offer discounts, redeemed in-app by code; planned
   revenue source (commission or paid placement)
 - **Saved** — the user's bookmarks
@@ -34,7 +37,7 @@ Goal: unite locals, help tourists, monetize via Deals.
 
 The person you're working with is in the **first year of a Computer Science &
 Engineering degree** and is new to most of the tooling and vocabulary. Treat that
-as *lack of exposure so far*, not lack of ability — it will change. For now,
+as _lack of exposure so far_, not lack of ability — it will change. For now,
 over-explain.
 
 Run it like a **CEO and a CTO**:
@@ -43,8 +46,8 @@ Run it like a **CEO and a CTO**:
   only act on **plain-language** explanations — so the first time a term comes up
   in a conversation (RLS, pooler, migration, merge conflict, CI, …), define it in
   the same breath. No unexplained acronyms, no assumed background.
-- **You are the CTO** — a professional software engineer. Keep the *engineering*
-  at a professional standard; simplify the *explanation*, never the work or the
+- **You are the CTO** — a professional software engineer. Keep the _engineering_
+  at a professional standard; simplify the _explanation_, never the work or the
   rigour. Concretely:
   - **Decide trivial, reversible things yourself.** Names, file layout, which of
     two libraries already in the project, an obvious adjacent cleanup — just do
@@ -54,12 +57,13 @@ Run it like a **CEO and a CTO**:
     better, say so and why, then let them choose.
   - **Challenge before you act.** Doubt the request first: is the assumption
     behind it right? does it contradict something they said earlier? is there a
-    simpler path? Say *"before I do that — …"* rather than complying silently. A
+    simpler path? Say _"before I do that — …"_ rather than complying silently. A
     wrong instruction caught early is worth far more than a fast one.
 - **What ships is still the CEO's call.** Push back hard; overriding their
   decision is not your job.
 
 ## Tech Stack (corrected — read directly from actual project files)
+
 - **Framework:** React 19 + Vite 7. TanStack Start / Router / Query are installed
   and wired into the `vite dev` entry, but read the next bullet before you rely on
   any of them — **the shipped app uses none of them.** There is no separate backend
@@ -113,10 +117,14 @@ Run it like a **CEO and a CTO**:
   managed by that package; there's a comment in `vite.config.ts` warning not to
   hand-duplicate what it already provides.
 - **Tooling:** TypeScript (`strict: true`), ESLint 9 (flat config), Prettier — all
-  already configured. Two caveats: `noUnusedLocals` and `noUnusedParameters` are
-  both **off**, and `tsconfig.json`'s `include` covers only `src/**` plus two config
-  files — so `npx tsc --noEmit` does **not** typecheck `scripts/**` or
-  `cloudflare-static-src/**`, and the latter is the production entry point.
+  already configured. Caveat: `noUnusedLocals` and `noUnusedParameters` are both
+  **off**. **Typechecking is two projects, not one** (since 2026-09-07):
+  `tsconfig.json` is the browser app — `src/**` _and_ `cloudflare-static-src/**`,
+  the entry production actually boots from — and `tsconfig.node.json` is
+  `scripts/**` plus the build configs, under Node's types with no DOM lib. They
+  are separate on purpose: one project would mean giving React components a
+  `process` global that does not exist in a browser. **Run `npm run typecheck`,
+  not `npx tsc --noEmit`** — the bare command still only checks the app half.
 - **Tests:** no test framework — `node:test` via `tsx --test`, plus hand-rolled
   assertion scripts. Two suites (`test:intelligence`, `test:discovery`) are real
   unit tests over pure functions; the rest are scripts.
@@ -126,22 +134,22 @@ Run it like a **CEO and a CTO**:
 **Is frontend separated from backend? Yes — but not the way this file used to
 imply, and not by folder-per-service.** There is no server tier to separate: the
 shipped app is a client-side React SPA that talks straight to Supabase. So the
-real boundary is *client code vs. database*, and it falls on a clean seam:
+real boundary is _client code vs. database_, and it falls on a clean seam:
 
-| Layer | Where | Notes |
-|---|---|---|
-| UI | `src/components/hp/**` (product), `src/components/admin/**`, `src/components/ui/**` (shadcn) | 40+ files; no Supabase imports of its own |
-| Data access | `src/lib/hp-api.ts` (2042 lines), `src/lib/admin-api.ts` (339), `src/lib/hp-auth.ts` | these three are the **only** files that import the Supabase client — verified, zero component does |
-| Domain types / logic | `src/lib/hp-model.ts`, `src/lib/hp/**` | pure, testable — this is what the unit tests cover |
-| Backend | `supabase/migrations/**` (30 migrations, 30 tables, 115 RLS policies) | tables, RLS policies, Postgres functions, triggers. `supabase/policy-snapshot.json` is the committed baseline for `audit:rls --check` |
-| Generated contract | `src/lib/supabase/database.types.ts` | `supabase gen types typescript` output — the thing that makes a schema change a compile error (see Team Notes) |
+| Layer                | Where                                                                                        | Notes                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| UI                   | `src/components/hp/**` (product), `src/components/admin/**`, `src/components/ui/**` (shadcn) | 40+ files; no Supabase imports of its own                                                                                             |
+| Data access          | `src/lib/hp-api.ts` (2042 lines), `src/lib/admin-api.ts` (339), `src/lib/hp-auth.ts`         | these three are the **only** files that import the Supabase client — verified, zero component does                                    |
+| Domain types / logic | `src/lib/hp-model.ts`, `src/lib/hp/**`                                                       | pure, testable — this is what the unit tests cover                                                                                    |
+| Backend              | `supabase/migrations/**` (30 migrations, 30 tables, 115 RLS policies)                        | tables, RLS policies, Postgres functions, triggers. `supabase/policy-snapshot.json` is the committed baseline for `audit:rls --check` |
+| Generated contract   | `src/lib/supabase/database.types.ts`                                                         | `supabase gen types typescript` output — the thing that makes a schema change a compile error (see Team Notes)                        |
 
 **Route files are not where the split happens** — there are only three of them
 (`src/routes/__root.tsx`, `index.tsx`, `admin.tsx`), each a thin shell that renders
 one component, and none of them run in production anyway (see Tech Stack). Nothing
 is interleaved in a route file because the routes are essentially empty.
 
-The seam that *is* under strain is component size, not layering:
+The seam that _is_ under strain is component size, not layering:
 `AdminDashboard.tsx` is 3241 lines, `PulseApp.tsx` 2631, `SocialMap.tsx` 2335.
 `PulseApp.tsx` holds the app shell and most product flows and is being split.
 
@@ -166,7 +174,7 @@ Modules, with status verified against the code (not against prior claims):
   `unmuteUser` / `getMyBlocks` over `content_reports` and `user_blocks`, and blocks
   are enforced server-side by RLS, not by client filtering. Two smoke tests cover
   it, and the difference between them is the lesson: `smoke:block-enforcement`
-  asserts the *policy* over `pg`, and stayed green the whole time the feature did
+  asserts the _policy_ over `pg`, and stayed green the whole time the feature did
   nothing at all, because the UI imported an in-memory stub and never reached those
   tables. `smoke:moderation` asserts the path **the user actually takes** — it
   imports the real `hp-api` functions and the real singleton client, then verifies
@@ -221,13 +229,14 @@ Modules, with status verified against the code (not against prior claims):
   a Meet event → change its RSVP → record an activity day and confirm the streak
   increments, then delete every fixture it made. Nothing in `src/` is called
   "live-surfaces"; don't look for a folder.
-- `payments` *(future)* — commission/monetization logic, kept isolated so it's easy
+- `payments` _(future)_ — commission/monetization logic, kept isolated so it's easy
   to lock down and audit separately. **Confirmed genuinely absent:** the only trace
   of it in the repo is a commented-out `stripeSecretKey` line in the unused
   `config.server.ts`. No payment provider, no money-handling code, nothing to audit
   yet. Deals currently move no money — they issue and burn codes.
 
 ## Conventions & Patterns
+
 - TypeScript in strict mode. (There are **no** Supabase Edge Functions in this repo
   — no `supabase/functions/` directory — so this rule is about app and script code.)
 - Every table gets an RLS policy before it ships — no exceptions (see Guardrails).
@@ -236,13 +245,17 @@ Modules, with status verified against the code (not against prior claims):
 - Tests required for anything touching money (Deals/payments) or auth.
 
 ## Commands
-*(real scripts, from package.json)*
+
+_(real scripts, from package.json)_
+
 - Install: `npm install`
 - Dev server: `npm run dev`
 - Build (production, static): `npm run build`
 - Preview build: `npm run preview`
 - Lint: `npm run lint` / Format: `npm run format`
-- Typecheck: `npx tsc --noEmit` (no npm script for it, but CI runs it)
+- Typecheck: `npm run typecheck` — runs both projects (app + node). CI runs
+  this. `npx tsc --noEmit` alone checks only the app project, so it will
+  happily pass with `scripts/**` broken.
 - Audit RLS policies: `npm run audit:rls`
 - Check for leaked secrets: `npm run check:secrets`
 - Deploy to Cloudflare: `npm run deploy:worker` (static assets — see Tech Stack)
@@ -259,7 +272,7 @@ Modules, with status verified against the code (not against prior claims):
 - Rebuild coastline geometry: `npm run build:ionian-land`
 - Build the TanStack Start (dev-path) bundle instead: `npm run build:tanstack`
 
-**Which of these run offline.** `lint`, `check:secrets`, `tsc --noEmit`,
+**Which of these run offline.** `lint`, `check:secrets`, `typecheck`,
 `test:intelligence`, `test:discovery`, `test:map-visuals` and `build` need nothing
 — that is exactly the set CI runs. **Every `smoke:*` script hits the live
 Supabase project**, creates real rows and real users, and cleans up in a `finally`.
@@ -311,6 +324,7 @@ None are auto-loaded; open them explicitly.
   `ROADMAP.md` before diving in.
 
 ## Guardrails — do NOT do these without explicit human approval
+
 - Ship a table without a Row Level Security (RLS) policy — an RLS-less table on
   Supabase is readable/writable by anyone with your public API key, which is
   effectively everyone. This is the #1 way Supabase apps leak all their data.
@@ -324,12 +338,15 @@ None are auto-loaded; open them explicitly.
   deploy — both scripts already exist, so this costs nothing but discipline
 
 ## Git Automation
+
 **Fully automatic, no need to ask:**
+
 - Stage and commit changes, with clear descriptive commit messages
 - Push to feature branches
 - Open pull requests (with a summary of what changed and why)
 
 **Still needs a human:**
+
 - Merging a PR into `main` — **Mavroeidis's call, and his alone.** `main` no
   longer requires a second maintainer's approval; it requires CI green (the
   `lint · typecheck · test · build` check) and resolved conversations. So the
@@ -338,8 +355,8 @@ None are auto-loaded; open them explicitly.
 - Force-pushing, rewriting history, or deleting branches
 - Pushing directly to `main`, bypassing PRs entirely
 
-*(deploying to production and touching payment/auth code already require a
-human — see Guardrails above; a PR merge into `main` feeds directly into that)*
+_(deploying to production and touching payment/auth code already require a
+human — see Guardrails above; a PR merge into `main` feeds directly into that)_
 
 **To make this a hard rule, not just advice Claude can drift from over a long
 session:** ask Claude Code to set up `.claude/settings.json` with a `permissions`
@@ -350,6 +367,7 @@ against its current docs when it sets this up — that format is version-specifi
 enough that it's not worth hand-copying from anywhere, including here.
 
 ## Team Notes
+
 Two maintainers, both **full-stack with full access to the whole repo**. No
 ownership lanes, no per-area gatekeeping — either of you may touch any file.
 `.github/CODEOWNERS` is one shared line that only auto-requests both of you as
@@ -363,10 +381,10 @@ git knows who you are:
 git config user.email
 ```
 
-| Email | Who | GitHub |
-|---|---|---|
+| Email                                                 | Who            | GitHub              |
+| ----------------------------------------------------- | -------------- | ------------------- |
 | `128294142+GeorgeMavroeidis@users.noreply.github.com` | **Mavroeidis** | `@GeorgeMavroeidis` |
-| `giorgosmargaris1234@gmail.com` | **Margaris** | `@GeorgeMargaris` |
+| `giorgosmargaris1234@gmail.com`                       | **Margaris**   | `@GeorgeMargaris`   |
 
 If it returns nothing, **stop and ask which maintainer this is** before
 committing — an unset identity produces commits attributed to a machine-local
@@ -388,6 +406,7 @@ Mavroeidis's call** — he merges to `main` when he judges it ready, without
 waiting on a second sign-off.
 
 **Workflow:**
+
 - Branch per task, small commits, PR into `main`
 - Pull `main` before starting any new session
 - Keep `ROADMAP.md` current as work lands — it's the async handoff for "where are

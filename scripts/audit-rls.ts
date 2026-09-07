@@ -38,43 +38,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import pg from "pg";
 
-const projectRef = "kfxfnqryfmuxiwlswyyn";
+import { createPgSession } from "./lib/pg";
+
 const SNAPSHOT_PATH = "supabase/policy-snapshot.json";
-
-function readEnvValue(name: string) {
-  try {
-    const env = readFileSync(".env", "utf8");
-    const value = env
-      .split(/\n/)
-      .map((line) => line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/))
-      .find((match) => match?.[1] === name)?.[2]
-      ?.trim()
-      .replace(/^['"]|['"]$/g, "");
-    return value || process.env[name];
-  } catch {
-    return process.env[name];
-  }
-}
-
-function createPgClient() {
-  const password = readEnvValue("SUPABASE_DB_PASSWORD");
-  if (!password) {
-    throw new Error(
-      "SUPABASE_DB_PASSWORD is missing. Put it in .env, like the smoke scripts expect.",
-    );
-  }
-
-  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
-  // not resolve. Session mode (port 5432), user postgres.<ref>.
-  return new pg.Client({
-    host: "aws-0-eu-central-1.pooler.supabase.com",
-    port: 5432,
-    database: "postgres",
-    user: `postgres.${projectRef}`,
-    password,
-    ssl: { rejectUnauthorized: false },
-  });
-}
 
 type Snapshot = {
   definerFunctions: { name: string; searchPath: string | null }[];
@@ -159,14 +125,17 @@ function render(snapshot: Snapshot) {
 
 async function main() {
   const check = process.argv.includes("--check");
-  const client = createPgClient();
-  await client.connect();
+  // Session mode: read-only introspection, but this script has always used
+  // 5432 and there is no reason to move it. The session's value here is the
+  // guarded connection — a drop used to kill the process with a raw stack
+  // trace instead of a readable failure.
+  const db = createPgSession("session", "audit-rls");
 
   let snapshot: Snapshot;
   try {
-    snapshot = await collect(client);
+    snapshot = await db.withPg(collect);
   } finally {
-    await client.end();
+    await db.close();
   }
 
   const rendered = render(snapshot);

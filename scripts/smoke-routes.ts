@@ -518,6 +518,19 @@ async function main() {
             [ids],
           );
           await client.query("delete from auth.users where id = any($1::uuid[])", [ids]);
+          // The sweep above is not enough on its own, for two reasons that only
+          // showed up once 20260907120000 put an audit trigger on
+          // admin_members. That trigger fires AFTER DELETE, so the row it writes
+          // for this fixture's owner is created *during* the cascade on the line
+          // above — after the actor_id sweep has already run. And it records
+          // actor_id as null here, because the postgres role has no auth.uid(),
+          // so an actor_id sweep would never have matched it anyway. Hence a
+          // second pass, keyed on entity_id, after the cascade.
+          await client.query(
+            `delete from public.admin_audit_logs
+             where entity_type = 'admin_members' and entity_id = any($1::text[])`,
+            [ids],
+          );
         }
         await client.query("delete from auth.users where email = any($1::text[])", [
           ROLES.map((role) => state.emails[role]),

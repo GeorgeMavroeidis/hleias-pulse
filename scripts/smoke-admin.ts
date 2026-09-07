@@ -17,9 +17,13 @@
  * Two things about Postgres row-level security shape every assertion here:
  *
  *   1. A refused INSERT raises 42501. A refused UPDATE or DELETE does not: its
- *      USING clause simply matches no rows, and the call returns success having
- *      changed nothing. So "did it throw?" is only half a test — every negative
- *      case below re-reads the row over `pg` to prove it did not move.
+ *      USING clause simply matches no rows, and the database returns success
+ *      having changed nothing. `admin-api.ts` now asks for the changed rows
+ *      back and raises AdminWriteRefusedError on an empty result, so the app is
+ *      loud about it — but that is a client-side check, and a client-side check
+ *      is exactly what a stub could fake. So "did it throw?" is still only half
+ *      a test: every negative case below also re-reads the row over `pg` to
+ *      prove the *policy* refused it.
  *   2. `write_admin_audit_log()` returns early unless the actor is owner/editor.
  *      A moderator's actions are logged only because `moderate_content()`
  *      inserts its own line. Both halves are asserted.
@@ -44,7 +48,8 @@
  *                          alone, and does not error
  *     moderateContent()    raises 'Not authorized to moderate content'
  *     setBusinessVerification() / setOrganizerVerification()
- *                          do NOT raise, and change nothing (case 1 above)
+ *                          raise "Nothing changed", and change nothing — the
+ *                          two halves of case 1 above
  *     reviewPlaceClaim()   raises 'Not authorized to review place claims'
  *     setAdminMember()     raises — a stranger cannot promote themselves. This
  *                          is the privilege-escalation attempt.
@@ -54,21 +59,28 @@
  *                          ('moderation_status_changed'), with no trigger row
  *                          beside it (case 2 above)
  *     setAdminMember()     raises — a moderator cannot promote
- *     removeAdminMember()  does NOT raise, and the owner's row survives
+ *     removeAdminMember()  raises "Nothing was removed", and the owner's row
+ *                          survives
  *     reviewPlaceClaim()   raises — claim review is owner/editor only
  *
  *   as the owner
- *     setBusinessVerification() / setOrganizerVerification()  land
+ *     setBusinessVerification() / setOrganizerVerification()  land, and each
+ *                          writes a 'verification_status_changed' audit row
  *     reviewPlaceClaim()   approves the claim and writes 'place_claim_reviewed'
  *     moderateContent()    hides the post and now writes a trigger row too,
  *                          because the actor is an owner
- *     setAdminMember() / removeAdminMember()  add and remove a real member
+ *     setAdminMember() / removeAdminMember()  add and remove a real member,
+ *                          writing 'admin_role_granted' and 'admin_role_revoked'
  *
- * NOT audited today, and deliberately not asserted either way: `businesses`,
- * `organizers` and `admin_members` carry no `write_admin_audit_log` trigger, so
- * verifying a business and granting somebody `owner` leave no trace. Recorded in
- * IDEAS.md -> Security to Review rather than pinned here, so fixing it does not
- * fail this test.
+ * Those last audit assertions are the 2026-09-07 finding, now closed:
+ * `businesses`, `organizers` and `admin_members` had no audit coverage at all,
+ * so verifying a business and granting somebody `owner` left no trace.
+ * 20260907120000 gives them their own triggers, and this script pins all three
+ * — including the property that separates them from `write_admin_audit_log()`:
+ * the `admin_members` trigger is role-blind, so the fixture rows this script
+ * inserts over `pg`, with no JWT and therefore no `auth.uid()`, are audited too.
+ * What is deliberately NOT audited is asserted as well: a self-service business
+ * application (a row that starts `pending`) writes no line.
  *
  * Needs the local Supabase CLI session (service_role key, to create the four
  * disposable users) and SUPABASE_DB_PASSWORD, like the other smokes. Everything
@@ -301,6 +313,28 @@ async function auditRows(actorId: string) {
   ).rows;
 }
 
+/**
+ * Audit rows about one entity, whoever wrote them. auditRows() above scopes by
+ * actor, which cannot see the rows that matter most here: a change made with no
+ * JWT has no actor at all, and recording it anyway is the point of the
+ * admin_members trigger.
+ */
+async function auditRowsFor(entityType: string, entityId: string) {
+  return (
+    await withPg((client) =>
+      client.query<{
+        action: string;
+        actor_id: string | null;
+        details: Record<string, unknown>;
+      }>(
+        `select action, actor_id, details from public.admin_audit_logs
+         where entity_type = $1 and entity_id = $2 order by created_at, action`,
+        [entityType, entityId],
+      ),
+    )
+  ).rows;
+}
+
 async function setupFixtures(admin: pg.Client, state: SmokeState) {
   // Cleanup deletes the disposable owner's auth user, which cascades into
   // admin_members and fires prevent_last_owner_removal(). If this disposable
@@ -408,6 +442,24 @@ async function main() {
     await withPg((client) => setupFixtures(client, state));
     console.log("[fixture] post, business, organizer, place claim and admin rows created");
 
+    // Those admin_members rows went in over `pg`: the postgres role, no JWT, so
+    // auth.uid() is null and has_admin_role() is false. write_admin_audit_log()
+    // would have returned early and recorded nothing. The dedicated trigger
+    // (20260907120000) is deliberately role-blind, which is what makes a
+    // promotion done outside the app auditable at all.
+    const fixtureGrant = await auditRowsFor("admin_members", state.users.moderator!);
+    assert(
+      fixtureGrant.some(
+        (row) =>
+          row.action === "admin_role_granted" &&
+          row.actor_id === null &&
+          row.details.after_role === "moderator",
+      ),
+      "Granting an admin_members row over `pg` wrote no audit line. The role-blind " +
+        "trigger from 20260907120000 is missing or is gated on has_admin_role().",
+    );
+    console.log("[fixture] the JWT-less admin_members grant was still audited");
+
     const businessId = state.businessId!;
     const claimId = state.claimId!;
     const organizerId = state.organizerId!;
@@ -496,20 +548,49 @@ async function main() {
     );
     console.log("[outsider] moderateContent refused, post untouched");
 
-    // Neither of these raises: the UPDATE's USING clause matches no row, so
-    // PostgREST reports success having changed nothing. The row read is the
-    // whole assertion.
-    await setBusinessVerification(businessId, "verified");
+    // The quiet half of RLS. The database still refuses these by filtering —
+    // the UPDATE's USING clause matches no row and Postgres reports success —
+    // so the rejection below comes from admin-api.ts noticing that nothing came
+    // back. Assert both: that the app is now loud, and, over `pg`, that the
+    // policy is what actually stopped the write.
+    const outsiderBusiness = await expectRejection("outsider setBusinessVerification", () =>
+      setBusinessVerification(businessId, "verified"),
+    );
+    assert(
+      outsiderBusiness.includes("Nothing changed"),
+      `Expected setBusinessVerification() to report a refused write, got: ${outsiderBusiness}`,
+    );
     assert(
       (await businessStatus()) === "pending",
       "A non-admin verified a business. setBusinessVerification is not gated.",
     );
-    await setOrganizerVerification(organizerId, "verified");
+    const outsiderOrganizer = await expectRejection("outsider setOrganizerVerification", () =>
+      setOrganizerVerification(organizerId, "verified"),
+    );
+    assert(
+      outsiderOrganizer.includes("Nothing changed"),
+      `Expected setOrganizerVerification() to report a refused write, got: ${outsiderOrganizer}`,
+    );
     assert(
       (await organizerStatus()) === "pending",
       "A non-admin verified an organizer. setOrganizerVerification is not gated.",
     );
-    console.log("[outsider] business/organizer verification silently changed nothing");
+    console.log("[outsider] business/organizer verification refused, nothing changed");
+
+    // A refused write must not leave an audit line claiming otherwise — and the
+    // applicant's own pending row must not either. The verification trigger
+    // fires on status transitions only, so a self-service application is not
+    // somebody's admin action and is not recorded as one.
+    assert(
+      (await auditRowsFor("businesses", businessId)).length === 0,
+      "A business audit row exists before anyone verified anything. The trigger is " +
+        "logging self-service writes, or a refused write.",
+    );
+    assert(
+      (await auditRowsFor("organizers", organizerId)).length === 0,
+      "An organizer audit row exists before anyone verified anything.",
+    );
+    console.log("[outsider] no audit rows written for the refused writes or the pending rows");
 
     const outsiderClaim = await expectRejection("outsider reviewPlaceClaim", () =>
       reviewPlaceClaim(claimId, "approved"),
@@ -563,10 +644,18 @@ async function main() {
     );
     console.log("[moderator] cannot add a team member");
 
-    // DELETE is the quiet half of RLS: no error, no effect. Asserting only on
-    // the absence of a throw here would pass against a policy that let a
-    // moderator delete the owner.
-    await removeAdminMember(ownerId);
+    // DELETE is the quiet half of RLS: the policy filters, nothing is deleted,
+    // and Postgres reports success. admin-api.ts turns that into a rejection —
+    // but a client-side check is not evidence about the policy, so the owner's
+    // row is re-read. Asserting only on the throw would pass against a policy
+    // that happily let a moderator delete the owner.
+    const moderatorRemove = await expectRejection("moderator removeAdminMember", () =>
+      removeAdminMember(ownerId),
+    );
+    assert(
+      moderatorRemove.includes("Nothing was removed"),
+      `Expected removeAdminMember() to report a refused write, got: ${moderatorRemove}`,
+    );
     assert(
       (await memberRole(ownerId)) === "owner",
       "A moderator removed an owner from the admin team.",
@@ -591,6 +680,27 @@ async function main() {
     await setOrganizerVerification(organizerId, "verified");
     assert((await organizerStatus()) === "verified", "An owner could not verify an organizer.");
     console.log("[owner] verified the business and the organizer");
+
+    // The 2026-09-07 gap. A verified business is what unlocks place claims and
+    // deals, so "who verified this, and when" has to be answerable.
+    for (const [table, id] of [
+      ["businesses", businessId],
+      ["organizers", organizerId],
+    ] as const) {
+      const rows = await auditRowsFor(table, id);
+      assert(
+        rows.some(
+          (row) =>
+            row.action === "verification_status_changed" &&
+            row.actor_id === ownerId &&
+            row.details.before_status === "pending" &&
+            row.details.after_status === "verified",
+        ),
+        `Verifying a ${table.slice(0, -1)} wrote no audit row naming the owner who did it ` +
+          `(got ${rows.length} row(s): ${rows.map((row) => row.action).join(", ") || "none"}).`,
+      );
+    }
+    console.log("[owner] both verifications wrote a 'verification_status_changed' audit row");
 
     await reviewPlaceClaim(claimId, "approved");
     assert((await claimStatus()) === "approved", "An owner could not approve a place claim.");
@@ -627,6 +737,29 @@ async function main() {
     assert((await memberRole(outsiderId)) === null, "An owner could not remove a team member.");
     console.log("[owner] added and removed a team member");
 
+    // Handing out and taking back admin access is the most powerful pair of
+    // actions in the system. Until 20260907120000 neither left a trace.
+    const memberAudit = await auditRowsFor("admin_members", outsiderId);
+    assert(
+      memberAudit.some(
+        (row) =>
+          row.action === "admin_role_granted" &&
+          row.actor_id === ownerId &&
+          row.details.after_role === "moderator",
+      ),
+      "Granting an admin role wrote no audit row naming the owner who granted it.",
+    );
+    assert(
+      memberAudit.some(
+        (row) =>
+          row.action === "admin_role_revoked" &&
+          row.actor_id === ownerId &&
+          row.details.before_role === "moderator",
+      ),
+      "Revoking an admin role wrote no audit row naming the owner who revoked it.",
+    );
+    console.log("[owner] the grant and the revoke were both audited");
+
     // The dashboard's own load, as an owner: the rows the outsider could not see.
     const ownerView = await loadAdminData();
     assert(
@@ -655,6 +788,19 @@ async function main() {
           // admin_members, businesses (and place_business_profiles through it)
           // and organizers all cascade from auth.users.
           await client.query("delete from auth.users where id = any($1::uuid[])", [ids]);
+          // That cascade is itself audited now (20260907120000): dropping an
+          // admin_members row or a verified business writes a fresh line, after
+          // the sweep above and with actor_id null, so no actor query can find
+          // it. Sweep again by entity — which is also how the fixture's own
+          // JWT-less grants are cleared.
+          await client.query(
+            "delete from public.admin_audit_logs where entity_id = any($1::text[])",
+            [
+              [...ids, state.businessId, state.organizerId, state.claimId, POST_ID].filter(
+                Boolean,
+              ) as string[],
+            ],
+          );
         }
         await client.query("delete from auth.users where email = any($1::text[])", [
           ROLES.map((role) => state.emails[role]),

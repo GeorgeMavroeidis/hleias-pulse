@@ -27,43 +27,11 @@
  *
  *   npm run smoke:deal-race
  */
-import { readFileSync } from "node:fs";
 import pg from "pg";
 
-const projectRef = "kfxfnqryfmuxiwlswyyn";
+import { connectGuarded, createPgSession, endQuietly } from "./lib/pg";
+
 const CODE = `RACE${Math.floor(Math.random() * 90 + 10)}`;
-
-function readEnvValue(name: string) {
-  try {
-    const env = readFileSync(".env", "utf8");
-    const value = env
-      .split(/\n/)
-      .map((line) => line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/))
-      .find((match) => match?.[1] === name)?.[2]
-      ?.trim()
-      .replace(/^['"]|['"]$/g, "");
-    return value || process.env[name];
-  } catch {
-    return process.env[name];
-  }
-}
-
-function createPgClient() {
-  const password = readEnvValue("SUPABASE_DB_PASSWORD");
-  if (!password) throw new Error("SUPABASE_DB_PASSWORD is missing.");
-
-  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
-  // not resolve. Session mode (port 5432) so `set local role` in actAs behaves
-  // exactly as a direct connection would. User is postgres.<ref>.
-  return new pg.Client({
-    host: "aws-0-eu-central-1.pooler.supabase.com",
-    port: 5432,
-    database: "postgres",
-    user: `postgres.${projectRef}`,
-    password,
-    ssl: { rejectUnauthorized: false },
-  });
-}
 
 /** Run the rest of this transaction as `authenticated` with auth.uid() = userId. */
 async function actAs(client: pg.Client, userId: string) {
@@ -132,18 +100,41 @@ async function teardown(admin: pg.Client, fixture: Fixture | null) {
   if (!fixture) return;
   // deal_redemptions and place_business_profiles both cascade from businesses.
   await admin.query("delete from public.businesses where id = $1", [fixture.businessId]);
+
+  // 20260907120000 put an audit trigger on businesses, and this fixture trips
+  // it twice: once on insert, because it is created already 'verified' rather
+  // than 'pending', and once on delete, because losing a verified row is the
+  // privileged event the trigger records. admin_audit_logs has no foreign key
+  // to businesses, so neither row cascades away with the business above —
+  // they have to be swept by hand, and *after* the delete, or the second one
+  // has not been written yet.
+  await admin.query(
+    "delete from public.admin_audit_logs where entity_type = 'businesses' and entity_id = $1",
+    [fixture.businessId],
+  );
 }
 
 async function main() {
-  const admin = createPgClient();
-  const a = createPgClient();
-  const b = createPgClient();
+  // `admin` runs plain fixture statements, so it can be a reconnecting session
+  // — that is what keeps `teardown` reachable after a failure instead of
+  // leaking a business, its place claim and the redemption row.
+  //
+  // `a` and `b` are the two racing sessions and must each be one pinned
+  // connection: they hold an open transaction, take a row lock, and run as an
+  // impersonated role via `set local role`. Reconnecting either of them would
+  // release the very lock this script exists to observe, so they get a guarded
+  // client with no retry — the guard keeps a dropped socket from killing the
+  // process, and nothing more.
+  const admin = createPgSession("session", "admin");
+  const [a, b] = await Promise.all([
+    connectGuarded("session", "a"),
+    connectGuarded("session", "b"),
+  ]);
   let fixture: Fixture | null = null;
 
-  await Promise.all([admin.connect(), a.connect(), b.connect()]);
-
   try {
-    fixture = await setup(admin);
+    // `once`, not `withPg`: setup inserts rows and is not safe to replay.
+    fixture = await admin.once(setup);
 
     // --- A redeems and holds the lock ------------------------------------
     await a.query("begin");
@@ -193,9 +184,11 @@ async function main() {
       throw new Error(`B failed, but not with the expected message. Got: ${secondError}`);
     }
 
-    const row = await admin.query<{ redeemed_at: string | null; status: string }>(
-      "select status, redeemed_at from public.deal_redemptions where code = $1",
-      [CODE],
+    const row = await admin.withPg((client) =>
+      client.query<{ redeemed_at: string | null; status: string }>(
+        "select status, redeemed_at from public.deal_redemptions where code = $1",
+        [CODE],
+      ),
     );
     if (row.rows[0]?.status !== "redeemed") {
       throw new Error(
@@ -219,12 +212,17 @@ async function main() {
       ),
     );
   } finally {
+    // Release the row locks first, so teardown's delete is not blocked by them.
     await a.query("rollback").catch(() => {});
     await b.query("rollback").catch(() => {});
-    await teardown(admin, fixture).catch((error) => {
-      console.error("Fixture cleanup failed — remove it by hand:", fixture, error);
-    });
-    await Promise.all([admin.end(), a.end(), b.end()]);
+    // A delete, so replaying it on a fresh connection is safe.
+    await admin
+      .withPg((client) => teardown(client, fixture))
+      .catch((error) => {
+        console.error("Fixture cleanup failed — remove it by hand:", fixture, error);
+      });
+    await admin.close();
+    await endQuietly(a, b);
   }
 }
 
