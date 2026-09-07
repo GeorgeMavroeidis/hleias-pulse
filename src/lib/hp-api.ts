@@ -898,6 +898,16 @@ function mapPointFromLatLng(lat: number, lng: number) {
 
 async function fetchPulseData(): Promise<PulseData> {
   const client = assertSupabase();
+
+  // Keep the small pool of evergreen editorial stories cycling (see
+  // 20260907130000_loop_generic_stories.sql) before reading the bootstrap, so
+  // an expired one is already refreshed by the time it's fetched below.
+  // Best-effort: a failure here shouldn't block the rest of the app loading.
+  const refreshResult = await client.rpc("refresh_generic_stories");
+  if (refreshResult.error) {
+    console.warn("Could not refresh generic stories.", refreshResult.error);
+  }
+
   const result = await client.rpc("get_pulse_bootstrap");
   if (result.error) throw result.error;
 

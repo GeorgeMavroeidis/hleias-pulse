@@ -131,12 +131,8 @@ function AuthorChip({ story }: { story: PlaceStory }) {
           </span>
         </div>
         <div className="text-[10px] font-semibold text-white/70">
-          {language === "GR"
-            ? story.minutesAgo <= 1
-              ? "τώρα"
-              : `πριν από ${story.minutesAgo}′`
-            : formatStoryTime(story.minutesAgo)}{" "}
-          · {t(STORY_KIND_LABEL[story.kind])}
+          {formatStoryTime(story.minutesAgo, story.createdAt, language)} ·{" "}
+          {t(STORY_KIND_LABEL[story.kind])}
         </div>
       </div>
     </div>
