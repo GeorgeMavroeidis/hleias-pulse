@@ -296,7 +296,7 @@ code → redeem → `deal_redemptions`), the `/admin` workspace, and report / bl
 mute (wired + server-enforced + `smoke:moderation`). Treat all of it as
 "functionally works", not "safe for strangers".
 
-### The three planning docs
+### The four planning docs
 
 - **`ROADMAP.md`** — the ordered plan: the three stages (REPAIR → BUILD →
   DEPLOY), what each stage is done-when, and a short "Next up" list. **Read it at
@@ -304,7 +304,12 @@ mute (wired + server-enforced + `smoke:moderation`). Treat all of it as
   constraint at the top: **no spending until February 2027** — free tiers only,
   and don't propose next steps that need a paid account before then.
 - **`IDEAS.md`** — the unordered backlog and the open product/technical
-  questions. Feeds into the roadmap.
+  questions (security notes, tech debt, workflow ideas). Feeds into the roadmap.
+- **`FEATURES.md`** — dedicated feature brainstorming/tracking, added
+  2026-09-07 so it doesn't get lost in `IDEAS.md`'s security/tech-debt notes.
+  Status-tagged (🔨 building / 📋 planned / 💡 idea / ⏸ parked). A feature
+  idea starts here (or in `IDEAS.md` → New Feature Ideas — don't duplicate
+  across both); once scheduled it moves into `ROADMAP.md` → "Next up".
 - **`SECURITY.md`** — the security checklist and the reasoning behind the
   Guardrails.
 

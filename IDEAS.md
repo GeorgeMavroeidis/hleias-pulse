@@ -10,15 +10,12 @@
 
 ## New Feature Ideas
 
-- Myths — not a current feature, may revisit in brainstorming later
-- "Ask a local" — a question-and-answer surface in Pulse (tourists post a
-  question tied to a place, locals answer) rather than only one-way posts.
-  Flagged 2026-09-07 as the highest-leverage way to give locals a reason to
-  come back and post without being asked — see the "50-100 locals posting
-  unprompted" done-when in `ROADMAP.md` → Stage 3.
-- Village/area identity next to a user's name (e.g. "Local · Πύργος") instead
-  of just the generic LOCAL/GUIDE/BUSINESS badge — cheap, free, and a real
-  trust signal for tourists. Flagged 2026-09-07.
+**Moved to `FEATURES.md` (2026-09-07)** — a dedicated file for feature
+brainstorming/tracking, kept separate from this file's security and tech-debt
+notes. "Ask a local", the village/area identity badge, and Myths now live
+there. Add new feature ideas to `FEATURES.md` going forward; this section
+stays for anything that isn't really a "feature" (workflow ideas, open
+product questions that don't fit elsewhere, etc.).
 
 ## UI / Authenticity polish
 
