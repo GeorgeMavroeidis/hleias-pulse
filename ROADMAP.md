@@ -56,7 +56,10 @@ free-tier services. The paid/Apple track starts in February.
    organizer and business self-verification; `smoke:routes` covers routes /
    route stops. Left: cultural-event publishing, place claims, `saved_items`.
    Pure code, no migration, no cost. That pass also turned up an audit-trail
-   gap — see `IDEAS.md` → Security, 2026-09-07.
+   gap — see `IDEAS.md` → Security, 2026-09-07 — and a CI blind spot, now
+   closed: `tsconfig.json` only ever covered `src/**`, so neither `scripts/**`
+   nor `cloudflare-static-src/**` (the production entry) was typechecked.
+   There are now two projects and a `npm run typecheck` that runs both.
 3. **Confirm the web deploy works end to end.** `npm run deploy:worker` uploads
    to Cloudflare (free tier) — nobody has verified the deployed site actually
    runs, only that the script exists. May need a free Cloudflare account first.
