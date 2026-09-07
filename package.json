@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "preflight": "tsx scripts/preflight.ts",
     "audit:rls": "tsx scripts/audit-rls.ts",
     "check:secrets": "tsx scripts/check-secrets.ts",
     "build:static": "vite build --config vite.static.config.ts",

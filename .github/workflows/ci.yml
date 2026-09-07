@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
 
+# cancel-in-progress is right for this workflow and wrong for the smoke suite:
+# everything below is a pure build, so a superseded run is wasted work. The
+# smoke scripts write real rows to the live database and clean up in a
+# `finally`, and a cancelled job is killed without unwinding — so they live in
+# .github/workflows/smoke.yml with their own non-cancelling, serialising group.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

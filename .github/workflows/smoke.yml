@@ -1,0 +1,111 @@
+# The smoke suite, against the live Supabase project.
+#
+# Deliberately a SEPARATE workflow from ci.yml, for one reason that is easy to
+# get wrong: ci.yml sets `cancel-in-progress: true` at workflow level, which is
+# correct for a build — a superseded run is wasted work. It would be actively
+# harmful here. A cancelled job is killed without unwinding, so the `finally`
+# block that deletes every fixture never runs, and the run leaks real rows and
+# real auth users into production. That is the same failure shape as the
+# unhandled `error` event that leaked four test accounts on 2026-09-07: the
+# process dies without the stack unwinding, so no cleanup executes.
+#
+# Hence `cancel-in-progress: false`, and a group name with no `${{ github.ref }}`
+# in it: these scripts claim shared rows from one production database — for
+# example smoke-deal-race takes "an auth user who does not already own a
+# business" and "a place with no live claim" — so two runs on different branches
+# would fight over the same rows. One at a time, repo-wide.
+name: Smoke
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: smoke-live
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: smoke · live database
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # A fork PR never receives repository secrets, so this job would fail with a
+    # confusing "missing credentials" error rather than an honest skip. Say so.
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    # The service_role key bypasses every RLS policy, so it lives in an
+    # Environment rather than repo-wide secrets: access is reviewable, and can be
+    # gated on a required reviewer if that is ever wanted.
+    environment: live-database
+
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Fail with a sentence someone can act on, rather than nine scripts each
+      # dying on their own obscure error.
+      - name: Check credentials are present
+        run: |
+          missing=""
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || missing="$missing SUPABASE_SERVICE_ROLE_KEY"
+          [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing SUPABASE_DB_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "Missing secret(s):$missing"
+            echo "Add them to the 'live-database' environment in repo settings."
+            exit 1
+          fi
+          echo "Both credentials present."
+
+      # Sequential on purpose. These share one production database and several
+      # of them claim the first matching row they find, so running them in
+      # parallel makes them fight each other rather than test anything.
+      #
+      # Every script cleans up in a `finally`. If a step below fails, read its
+      # output for a "cleanup failed — remove it by hand" line before re-running.
+      - name: smoke · auth + profile
+        run: npm run smoke:auth-profile
+
+      - name: smoke · post write
+        run: npm run smoke:post-write
+
+      - name: smoke · live surfaces
+        run: npm run smoke:live-surfaces
+
+      - name: smoke · moderation
+        run: npm run smoke:moderation
+
+      - name: smoke · block enforcement
+        run: npm run smoke:block-enforcement
+
+      - name: smoke · deal redemption race
+        run: npm run smoke:deal-race
+
+      - name: smoke · admin privilege model
+        run: npm run smoke:admin
+
+      - name: smoke · verification guards
+        run: npm run smoke:verification-guards
+
+      - name: smoke · routes
+        run: npm run smoke:routes
+
+      # The policy snapshot is the committed baseline for RLS. Drift here means
+      # somebody changed a policy without updating supabase/policy-snapshot.json.
+      - name: RLS snapshot check
+        run: npm run audit:rls -- --check

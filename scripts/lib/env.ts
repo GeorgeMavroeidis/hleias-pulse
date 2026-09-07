@@ -53,12 +53,30 @@ export function readSupabaseClientConfig() {
 }
 
 /**
- * Borrow the service_role key from the local Supabase CLI session.
+ * The service_role key, from the environment first and the local Supabase CLI
+ * session second.
  *
- * It is fetched per run and never written to disk — a service_role key
- * bypasses every RLS policy, so committing one would hand over the database.
+ * It is never written to disk — a service_role key bypasses every RLS policy,
+ * so committing one would hand over the database.
+ *
+ * The environment branch exists because CI has no logged-in Supabase CLI
+ * session, so the `npx supabase projects api-keys` path below cannot work
+ * there. Without this, adding the key to GitHub Actions secrets would not be
+ * enough to make the smoke suite runnable in CI — every script would still
+ * fail trying to shell out. Locally the CLI path stays the default, so nobody
+ * has to keep a copy of the key in their `.env`.
  */
 export function readServiceRoleKey() {
+  const fromEnv = readEnvValue("SUPABASE_SERVICE_ROLE_KEY");
+  if (fromEnv) {
+    if (fromEnv.length < 100) {
+      throw new Error(
+        "SUPABASE_SERVICE_ROLE_KEY is set but looks too short to be a service_role key.",
+      );
+    }
+    return fromEnv;
+  }
+
   const output = execFileSync(
     "npx",
     ["supabase", "projects", "api-keys", "--project-ref", projectRef, "--output", "json"],
@@ -73,7 +91,10 @@ export function readServiceRoleKey() {
   const value = serviceRole?.api_key ?? serviceRole?.key ?? serviceRole?.value;
 
   if (typeof value !== "string" || value.length < 100) {
-    throw new Error("Could not read Supabase service_role key from the local CLI session.");
+    throw new Error(
+      "Could not read Supabase service_role key. Either sign in to the Supabase CLI " +
+        "(`npx supabase login`) or set SUPABASE_SERVICE_ROLE_KEY in the environment.",
+    );
   }
 
   return value;

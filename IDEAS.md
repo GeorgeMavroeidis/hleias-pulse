@@ -30,7 +30,7 @@
   authors**, unrelated to who they actually are
   (`src/lib/hp/activity-data.ts:35`, `` avatar: `https://i.pravatar.cc/60?img=${(i % 60) + 1}` ``).
   Different bug from the avatar-fallback fix in `hp-model.ts`/`hp-api.ts`
-  (2026-09-07) — this one fabricates a face for someone who *is* identifiable,
+  (2026-09-07) — this one fabricates a face for someone who _is_ identifiable,
   it doesn't just cover for a missing photo. Needs `buildActivityTicks()` to
   receive an author lookup (it currently only gets posts/places/events) so it
   can use the real author's avatar — same initials-avatar fallback
@@ -115,7 +115,7 @@
     vanish. It records `current_user` alongside, and `smoke:admin` pins the
     property by asserting that the fixture's own JWT-less insert is audited.
   - `write_verification_audit_log()` on `businesses` / `organizers` fires **only
-    on a verification transition** — including a row *inserted* already
+    on a verification transition** — including a row _inserted_ already
     verified, which is the one route the `BEFORE UPDATE`
     `prevent_*_self_verification()` guards cannot see. A self-service
     application (a row that starts `pending`) is not an admin act and writes
@@ -172,6 +172,7 @@
   blocks force-push/delete, and enforces for admins. **Required approvals: 0** —
   Mavroeidis merges solo, no second sign-off. Bump it back to 1 only if you
   decide you want a hard "someone else looked at it" gate.
+
 - Rate limiting — add before public launch, prevents abuse/cost spikes; not
   needed while it's just the two of you testing
 - Caching / CDN for the Map and Stories feeds — static assets already get
@@ -200,6 +201,58 @@
   because the UI never reached those tables. A green smoke test sitting next to a
   broken feature is the pattern to watch for: assert at the layer the user
   actually goes through, not only the one underneath it.
+
+### From the 2026-09-07 shared-checkout day
+
+Four sessions worked in one checkout for a day. The engineering was fine; the
+coordination failed four times, and three of the four are now caught by
+`npm run preflight` (`scripts/preflight.ts`, run first by `/ship`).
+
+- **`main` carries two commits that fail their own CI gate.** `48a9190` and
+  `452d564` are each individually broken — `48a9190` shipped missing a file, so
+  it fails the two-project typecheck it introduced — and only `3893303` repairs
+  them. PR #59 was merged as a merge commit six minutes after opening, before the
+  squash-merge warning in its description could be read, so all six commits are
+  permanent history.
+  **Not fixable:** removing them needs a force-push to `main`, which CLAUDE.md
+  forbids to automation, and `main` has taken PRs #60–#62 since.
+  **Consequence:** a `git bisect` that lands on either commit fails to build for
+  reasons unrelated to whatever is being hunted. `main`'s tip is green; this is a
+  historical trap, not a present breakage. If you bisect and hit a typecheck or
+  build failure in that range, skip the commit rather than chasing it.
+  _Prevention, now in place:_ `/ship` runs the gate before pushing, and tells you
+  to put merge constraints in the PR body rather than only in chat.
+
+- **The index is shared mutable state.** Two sessions staged the same path; one
+  ran `git restore --staged` on "its own" files and silently dropped the other's
+  staged blob — that is how `48a9190` lost a file. A per-path index command
+  cannot tell whose content it is dropping.
+  _Prevention:_ `/ship` commits with `git commit -- <pathspec>`, which never
+  consults ambient index state, and verifies the commit's tree with
+  `git show --stat` rather than inspecting the index beforehand.
+
+- **HEAD is shared too.** One session checked out a different branch and every
+  later commit landed there silently; six commits missed the PR meant to carry
+  them. Both refs pointed at the same commit at the moment of the switch, so
+  nothing looked wrong.
+  _Prevention:_ `preflight` refuses on `main`/detached HEAD and accepts
+  `--expect <branch>`. `/ship start` warns that `git switch` moves HEAD for every
+  session sharing the checkout, and offers `git worktree add` instead.
+  _Still open:_ nothing enforces one worktree per session. That remains the only
+  real fix for this class.
+
+- **A schema change silently altered what every test fixture leaves behind.**
+  `20260907120000` added `AFTER DELETE` audit triggers to three tables, and
+  `admin_audit_logs` has no foreign key back to them — so nothing cascades those
+  rows away, and the existing "sweep by `actor_id`" cleanup in three scripts
+  missed them twice over: the trigger fires _during_ the `auth.users` cascade
+  (after that sweep has run) and records `actor_id` null anyway, because the
+  `postgres` role has no `auth.uid()`. Fixed in `d383700` with a second sweep
+  keyed on `entity_id`.
+  **The general rule:** a new `AFTER DELETE` trigger writing to a table with no
+  FK back to its subject changes the cleanup contract of every existing fixture.
+  _Prevention:_ `.github/workflows/smoke.yml` now runs the smoke suite on every
+  PR, so this class is caught automatically rather than by a reader.
 
 ## Open Questions
 
