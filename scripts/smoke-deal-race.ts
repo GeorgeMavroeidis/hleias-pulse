@@ -100,6 +100,18 @@ async function teardown(admin: pg.Client, fixture: Fixture | null) {
   if (!fixture) return;
   // deal_redemptions and place_business_profiles both cascade from businesses.
   await admin.query("delete from public.businesses where id = $1", [fixture.businessId]);
+
+  // 20260907120000 put an audit trigger on businesses, and this fixture trips
+  // it twice: once on insert, because it is created already 'verified' rather
+  // than 'pending', and once on delete, because losing a verified row is the
+  // privileged event the trigger records. admin_audit_logs has no foreign key
+  // to businesses, so neither row cascades away with the business above —
+  // they have to be swept by hand, and *after* the delete, or the second one
+  // has not been written yet.
+  await admin.query(
+    "delete from public.admin_audit_logs where entity_type = 'businesses' and entity_id = $1",
+    [fixture.businessId],
+  );
 }
 
 async function main() {

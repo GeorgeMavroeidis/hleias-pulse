@@ -483,12 +483,39 @@ async function main() {
       await withPg(async (client) => {
         const ids = ROLES.map((role) => state.users[role]).filter(Boolean) as string[];
         if (ids.length) {
+          // Collected before the cascade, because the audit rows are keyed on
+          // these ids and the rows that carry them are about to disappear.
+          const auditedEntities = (
+            await client.query<{ id: string }>(
+              `select id::text as id from public.businesses where user_id = any($1::uuid[])
+               union all
+               select id::text as id from public.organizers where user_id = any($1::uuid[])`,
+              [ids],
+            )
+          ).rows.map((row) => row.id);
+
           await client.query(
             "delete from public.admin_audit_logs where actor_id = any($1::uuid[])",
             [ids],
           );
           // businesses, organizers and admin_members all cascade from auth.users.
           await client.query("delete from auth.users where id = any($1::uuid[])", [ids]);
+
+          // 20260907120000 put AFTER DELETE audit triggers on all three of those
+          // tables, which changes what the cascade leaves behind. Those triggers
+          // fire *during* the delete above — after the actor_id sweep has
+          // already run — and they deliberately record actor_id as null when the
+          // actor is the user being deleted, as the postgres role is here. So
+          // the first sweep can never match them. This second pass is keyed on
+          // entity_id instead: the subject's user id for admin_members, the row
+          // id for businesses and organizers.
+          await client.query(
+            `delete from public.admin_audit_logs
+             where (entity_type = 'admin_members' and entity_id = any($1::text[]))
+                or (entity_type in ('businesses', 'organizers')
+                    and entity_id = any($2::text[]))`,
+            [ids, auditedEntities],
+          );
         }
         await client.query("delete from auth.users where email = any($1::text[])", [
           ROLES.map((role) => state.emails[role]),
