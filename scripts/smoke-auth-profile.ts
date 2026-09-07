@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import pg from "pg";
+
+import { readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
+import { createPgSession } from "./lib/pg";
 
 type SmokeState = {
   avatarPath?: string;
@@ -13,79 +13,20 @@ type SmokeState = {
   userId?: string;
 };
 
-const projectRef = "kfxfnqryfmuxiwlswyyn";
-
-function readEnvValue(name: string) {
-  try {
-    const env = readFileSync(".env", "utf8");
-    const value = env
-      .split(/\n/)
-      .map((line) => line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/))
-      .find((match) => match?.[1] === name)?.[2]
-      ?.trim()
-      .replace(/^['"]|['"]$/g, "");
-    return value || process.env[name];
-  } catch {
-    return process.env[name];
-  }
-}
-
-function readSupabaseClientConfig() {
-  const source = readFileSync("src/lib/supabase/client.ts", "utf8");
-  const url = source.match(/const supabaseUrl = "([^"]+)"/)?.[1];
-  const publishableKey = source.match(/const supabasePublishableKey\s*=\s*"([^"]+)"/)?.[1];
-
-  if (!url || !publishableKey) {
-    throw new Error("Could not read Supabase URL/publishable key from src/lib/supabase/client.ts.");
-  }
-
-  return { publishableKey, url };
-}
-
-function readServiceRoleKey() {
-  const output = execFileSync(
-    "npx",
-    ["supabase", "projects", "api-keys", "--project-ref", projectRef, "--output", "json"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const parsed = JSON.parse(output);
-  const keys = Array.isArray(parsed) ? parsed : (parsed.api_keys ?? parsed.keys ?? []);
-  const serviceRole = keys.find((key: Record<string, unknown>) => {
-    const name = String(key.name ?? key.api_key_type ?? key.type ?? key.key_type ?? "");
-    return name === "service_role";
-  });
-  const value = serviceRole?.api_key ?? serviceRole?.key ?? serviceRole?.value;
-
-  if (typeof value !== "string" || value.length < 100) {
-    throw new Error("Could not read Supabase service_role key from the local CLI session.");
-  }
-
-  return value;
-}
-
-function createPgClient() {
-  const password = readEnvValue("SUPABASE_DB_PASSWORD");
-  if (!password) {
-    throw new Error("SUPABASE_DB_PASSWORD is missing.");
-  }
-
-  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
-  // not resolve. Session mode (port 5432), user postgres.<ref>. This script runs
-  // plain statements (no `set role`), so mode is not load-bearing here.
-  return new pg.Client({
-    host: "aws-0-eu-central-1.pooler.supabase.com",
-    port: 5432,
-    database: "postgres",
-    user: `postgres.${projectRef}`,
-    password,
-    ssl: { rejectUnauthorized: false },
-  });
-}
+/**
+ * Direct database access, used for the two things the public API cannot do:
+ * confirm a brand-new user so it can sign in, and delete that user afterwards.
+ *
+ * Session mode purely to match what this script has always used — it runs
+ * plain statements and never `set local role`, so the mode is not load-bearing
+ * here. What *is* load-bearing is that this is a guarded, reconnecting session:
+ * `cleanupSmokeUser` below runs inside a `finally`, and it is the only thing
+ * standing between a failed run and a permanently leaked auth account.
+ */
+const db = createPgSession("session", "pg");
 
 async function confirmSmokeUserForLogin(userId: string, email: string) {
-  const client = createPgClient();
-  await client.connect();
-  try {
+  await db.withPg(async (client) => {
     const result = await client.query(
       `
         update auth.users
@@ -104,15 +45,11 @@ async function confirmSmokeUserForLogin(userId: string, email: string) {
     if (result.rowCount !== 1) {
       throw new Error("Could not confirm smoke user through direct Postgres cleanup/test access.");
     }
-  } finally {
-    await client.end();
-  }
+  });
 }
 
 async function cleanupSmokeUser(state: SmokeState) {
-  const client = createPgClient();
-  await client.connect();
-  try {
+  await db.withPg(async (client) => {
     if (state.userId) {
       await client.query("delete from public.comments where user_id = $1", [state.userId]);
       await client.query("delete from public.posts where user_id = $1", [state.userId]);
@@ -127,14 +64,29 @@ async function cleanupSmokeUser(state: SmokeState) {
     }
 
     await client.query("delete from auth.users where email = $1", [state.email]);
-  } finally {
-    await client.end();
-  }
+  });
 }
 
-function requireNoError<T>(label: string, data: T, error: { message?: string } | null) {
+/**
+ * Unwrap a Supabase `{ data, error }` result, or fail the smoke run loudly.
+ *
+ * The `NonNullable<T>` return is the point. PostgREST types `data` as `T | null`
+ * even on `.single()`, so returning it bare made every caller's `row.field` a
+ * "possibly null" — which nothing caught, because `scripts/` was outside the
+ * typechecked project. Asserting it here means a Supabase call that succeeds but
+ * returns nothing fails on this line with a label, instead of somewhere further
+ * down as "Cannot read properties of null".
+ */
+function requireNoError<T>(
+  label: string,
+  data: T,
+  error: { message?: string } | null,
+): NonNullable<T> {
   if (error) {
     throw new Error(`${label}: ${error.message ?? "Unknown Supabase error"}`);
+  }
+  if (data == null) {
+    throw new Error(`${label}: Supabase reported no error but returned no data.`);
   }
   return data;
 }
@@ -230,7 +182,7 @@ async function main() {
       profileResult.data,
       profileResult.error,
     );
-    if (!profile?.id) throw new Error("Profile trigger did not create a profile row.");
+    if (!profile.id) throw new Error("Profile trigger did not create a profile row.");
     console.log("[profile] trigger-created profile row ok");
 
     const handle = `smoke_${suffix.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}`.slice(0, 30);
@@ -366,6 +318,7 @@ async function main() {
         }`,
       );
     }
+    await db.close();
   }
 }
 

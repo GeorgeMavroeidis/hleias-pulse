@@ -20,45 +20,13 @@
  *
  *   npm run smoke:block-enforcement
  */
-import { readFileSync } from "node:fs";
 import pg from "pg";
 
-const projectRef = "kfxfnqryfmuxiwlswyyn";
+import { connectGuarded, createPgSession, endQuietly } from "./lib/pg";
+
 const stamp = Date.now();
 const POST_A = `block-smoke-a-${stamp}`;
 const POST_B = `block-smoke-b-${stamp}`;
-
-function readEnvValue(name: string) {
-  try {
-    const env = readFileSync(".env", "utf8");
-    const value = env
-      .split(/\n/)
-      .map((line) => line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/))
-      .find((match) => match?.[1] === name)?.[2]
-      ?.trim()
-      .replace(/^['"]|['"]$/g, "");
-    return value || process.env[name];
-  } catch {
-    return process.env[name];
-  }
-}
-
-function createPgClient() {
-  const password = readEnvValue("SUPABASE_DB_PASSWORD");
-  if (!password) throw new Error("SUPABASE_DB_PASSWORD is missing.");
-
-  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
-  // not resolve. Session mode (port 5432) so `set local role` in actAs/visibleAs
-  // behaves exactly as a direct connection would. User is postgres.<ref>.
-  return new pg.Client({
-    host: "aws-0-eu-central-1.pooler.supabase.com",
-    port: 5432,
-    database: "postgres",
-    user: `postgres.${projectRef}`,
-    password,
-    ssl: { rejectUnauthorized: false },
-  });
-}
 
 /** Which of the two fixture posts this reader can see, as the given user. */
 async function visiblePostsAs(client: pg.Client, userId: string | null) {
@@ -143,14 +111,24 @@ function assertSame(label: string, actual: string[], expected: string[]) {
 }
 
 async function main() {
-  const admin = createPgClient();
-  const reader = createPgClient();
+  // Two connections, deliberately different shapes.
+  //
+  // `admin` is a session: plain fixture statements, so it may transparently
+  // reopen if the pooler drops it — which is what keeps `teardown` reachable
+  // after a failure instead of leaking the fixture posts.
+  //
+  // `reader` must be a single pinned connection, because `visiblePostsAs`
+  // impersonates a role with `set local role` inside a transaction. Silently
+  // reconnecting mid-transaction would discard that role and quietly turn a
+  // real RLS assertion into a superuser read that always passes. Session mode
+  // (port 5432) for the same reason.
+  const admin = createPgSession("session", "admin");
+  const reader = await connectGuarded("session", "reader");
   let fixture: Fixture | null = null;
 
-  await Promise.all([admin.connect(), reader.connect()]);
-
   try {
-    fixture = await setup(admin);
+    // `once`, not `withPg`: setup inserts rows and is not safe to replay.
+    fixture = await admin.once(setup);
 
     const asB = await visiblePostsAs(reader, fixture.userB);
     const asA = await visiblePostsAs(reader, fixture.userA);
@@ -171,10 +149,14 @@ async function main() {
       ),
     );
   } finally {
-    await teardown(admin, fixture).catch((error) => {
-      console.error("Fixture cleanup failed — remove it by hand:", { POST_A, POST_B }, error);
-    });
-    await Promise.all([admin.end(), reader.end()]);
+    // Deletes only, so replaying them on a fresh connection is safe.
+    await admin
+      .withPg((client) => teardown(client, fixture))
+      .catch((error) => {
+        console.error("Fixture cleanup failed — remove it by hand:", { POST_A, POST_B }, error);
+      });
+    await admin.close();
+    await endQuietly(reader);
   }
 }
 

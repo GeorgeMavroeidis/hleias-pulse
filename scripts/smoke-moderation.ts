@@ -39,11 +39,10 @@
  *   npm run smoke:moderation
  */
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
-import pg from "pg";
 
+import { readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
+import { createPgSession } from "./lib/pg";
 import { supabase } from "../src/lib/supabase/client";
 import {
   blockUser,
@@ -55,8 +54,6 @@ import {
   unmuteUser,
 } from "../src/lib/hp-api";
 
-const projectRef = "kfxfnqryfmuxiwlswyyn";
-
 type SmokeState = {
   emailA: string;
   emailB: string;
@@ -65,89 +62,18 @@ type SmokeState = {
   userB?: string;
 };
 
-function readEnvValue(name: string) {
-  try {
-    const env = readFileSync(".env", "utf8");
-    const value = env
-      .split(/\n/)
-      .map((line) => line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/))
-      .find((match) => match?.[1] === name)?.[2]
-      ?.trim()
-      .replace(/^['"]|['"]$/g, "");
-    return value || process.env[name];
-  } catch {
-    return process.env[name];
-  }
-}
-
-function readSupabaseClientConfig() {
-  const source = readFileSync("src/lib/supabase/client.ts", "utf8");
-  const url = source.match(/const supabaseUrl = "([^"]+)"/)?.[1];
-  const publishableKey = source.match(/const supabasePublishableKey\s*=\s*"([^"]+)"/)?.[1];
-
-  if (!url || !publishableKey) {
-    throw new Error("Could not read Supabase URL/publishable key from src/lib/supabase/client.ts.");
-  }
-
-  return { publishableKey, url };
-}
-
-function readServiceRoleKey() {
-  const output = execFileSync(
-    "npx",
-    ["supabase", "projects", "api-keys", "--project-ref", projectRef, "--output", "json"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const parsed = JSON.parse(output);
-  const keys = Array.isArray(parsed) ? parsed : (parsed.api_keys ?? parsed.keys ?? []);
-  const serviceRole = keys.find((key: Record<string, unknown>) => {
-    const name = String(key.name ?? key.api_key_type ?? key.type ?? key.key_type ?? "");
-    return name === "service_role";
-  });
-  const value = serviceRole?.api_key ?? serviceRole?.key ?? serviceRole?.value;
-
-  if (typeof value !== "string" || value.length < 100) {
-    throw new Error("Could not read Supabase service_role key from the local CLI session.");
-  }
-
-  return value;
-}
-
-function createPgClient() {
-  const password = readEnvValue("SUPABASE_DB_PASSWORD");
-  if (!password) {
-    throw new Error("SUPABASE_DB_PASSWORD is missing. Put it in .env, like the other smokes.");
-  }
-
-  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
-  // not resolve. withPg() opens a fresh connection per assertion and this script
-  // runs only plain queries (no `set role`), so transaction mode (port 6543) is
-  // the right fit — session mode stalls on the rapid connect/end churn.
-  // User is postgres.<ref>.
-  return new pg.Client({
-    host: "aws-0-eu-central-1.pooler.supabase.com",
-    port: 6543,
-    database: "postgres",
-    user: `postgres.${projectRef}`,
-    password,
-    ssl: { rejectUnauthorized: false },
-  });
-}
-
 /**
  * Read committed state with the postgres superuser, bypassing RLS and the
  * client that did the write. "The row is really there" is the claim the stub
  * could fake; this is the check it could not have passed.
+ *
+ * Transaction mode: this script runs only plain queries, never `set local
+ * role`, so it does not need a pinned backend. The session keeps one guarded
+ * connection and reopens it if the pooler drops it — which matters most in the
+ * cleanup block below, where a dead connection would leak two auth users.
  */
-async function withPg<T>(run: (client: pg.Client) => Promise<T>): Promise<T> {
-  const client = createPgClient();
-  await client.connect();
-  try {
-    return await run(client);
-  } finally {
-    await client.end();
-  }
-}
+const db = createPgSession("transaction", "pg");
+const withPg = db.withPg;
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -355,6 +281,7 @@ async function main() {
         }`,
       );
     }
+    await db.close();
   }
 }
 
