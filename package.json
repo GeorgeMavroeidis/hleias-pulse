@@ -31,6 +31,7 @@
     "smoke:verification-guards": "tsx scripts/smoke-verification-guards.ts",
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
+    "test:secrets": "tsx --test scripts/check-secrets.test.ts",
     "test:map-visuals": "tsx scripts/check-map-visuals.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",
     "build:ionian-land": "tsx scripts/build-ionian-land.ts"

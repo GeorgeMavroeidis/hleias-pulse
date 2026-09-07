@@ -17,11 +17,12 @@
  *   npm run check:secrets
  */
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { readFileSync, statSync } from "node:fs";
 
 type Rule = { hint: string; name: string; pattern: RegExp };
 
-const RULES: Rule[] = [
+export const RULES: Rule[] = [
   {
     hint: "Supabase secret (service-role) key. It bypasses RLS entirely — read it from the CLI session or .env at runtime, as the smoke scripts do.",
     name: "supabase-secret-key",
@@ -41,13 +42,18 @@ const RULES: Rule[] = [
   {
     hint: "Postgres connection string with credentials in it.",
     name: "postgres-url-with-password",
-    // The password segment excludes $ { } so that a URL assembled from
-    // variables — `postgres://user:${SUPABASE_DB_PASSWORD}@host` in a CI step,
-    // for instance — is not reported as a hardcoded credential. It is not one:
-    // the secret lives in the secret store and only its name appears here. The
-    // SUPABASE_DB_PASSWORD rule above already draws the line in the same place
-    // and for the same reason. A literal password still matches.
-    pattern: /\bpostgres(?:ql)?:\/\/[^\s:@/]+:[^\s:@/${}]+@/,
+    // Only the FIRST character of the password segment excludes $ { }, so a URL
+    // assembled from variables — `postgres://user:${SUPABASE_DB_PASSWORD}@host`
+    // in a CI step — is not reported as a hardcoded credential, while a real
+    // password that merely CONTAINS one of those characters still is. That
+    // distinction is the whole rule: an earlier version excluded them across the
+    // whole segment and silently stopped flagging `p$ssw0rd`, `Ab{3}xyz` and
+    // `realSecret$`. Supabase-generated passwords routinely contain `$`.
+    //
+    // This is the same line the SUPABASE_DB_PASSWORD rule above draws — "the
+    // value STARTS with a variable reference" — and it is deliberately the same
+    // idiom. See scripts/check-secrets.test.ts before changing it.
+    pattern: /\bpostgres(?:ql)?:\/\/[^\s:@/]+:[^\s:@/${}][^\s:@/]*@/,
   },
   {
     hint: "Private key block.",
@@ -135,4 +141,8 @@ function main() {
   console.log("Secret scan clean.");
 }
 
-main();
+// Run only when executed directly. scripts/check-secrets.test.ts imports RULES
+// from this module, and importing it must not launch a repo-wide scan.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

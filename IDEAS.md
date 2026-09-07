@@ -274,6 +274,14 @@ coordination failed four times, and three of the four are now caught by
   session, which pointed out that "run the smokes in CI" and "give CI a
   production service_role key" are two separate decisions.
 
+- **`check:secrets` only sees tracked files.** It scans `git ls-files`, so a
+  secret sitting in an untracked file is invisible to it. `npm run preflight`
+  partly covers the other side — it fails on credential-looking _paths_ in the
+  working tree, tracked or not — but neither tool reads the _contents_ of an
+  untracked file. Lower priority than it sounds, since an untracked file cannot
+  be committed by accident the way a tracked one can, but it is a real gap.
+  Raised by the "TypeScript coverage" session.
+
 ## Open Questions
 
 <!-- Unresolved product or technical questions, yours or your buddy's -->
