@@ -132,6 +132,27 @@
   regenerating types is a no-op. Dropping a constraint is catalogue-only —
   instant, no table rewrite.
 
+  The same migration also removes the two `actor := null` guards from
+  `20260907120000`, because dropping the constraint without them would cement a
+  bug rather than fix one. Those guards were there to stop an audit row pointing
+  at a user the same statement was deleting from failing the foreign key check —
+  but the condition is only `tg_op = 'DELETE' and actor = subject`, with nothing
+  scoping it to a cascade. `"Owners can remove team members"` has no
+  self-exclusion and `removeAdminMember()` is a plain delete by `user_id`, so an
+  owner may remove their **own** admin row from the dashboard — and the guard
+  then nulls the actor on a live person whose account still exists, something
+  `ON DELETE SET NULL` would never have done. Without the fix, "who resigned
+  their own ownership" would read as nobody, permanently. Found in review by a
+  parallel session and verified against the policy and the API before acting.
+
+  Two things checked rather than asserted, both recorded in the migration
+  header: the constraint name really is `admin_audit_logs_actor_id_fkey` (a
+  `drop ... if exists` on a wrong name is a silent no-op), and the retained uuid
+  really is opaque — every identity column in the schema references `auth.users`
+  or `profiles`, `profiles.id` cascades from `auth.users`, and no identity uuid
+  column exists without a foreign key, so `actor_id` becomes the only place the
+  id survives. Re-check that if a table ever stores a user id loosely.
+
   **Still open, and smaller:** the retention *period*. Keeping the trail
   indefinitely is a decision nobody has actually made, and GDPR wants a stated
   period rather than "forever by default". Not urgent while there are no
