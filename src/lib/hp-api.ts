@@ -1903,10 +1903,11 @@ export async function setCulturalEventLike(eventId: string, liked: boolean) {
 // ---------------------------------------------------------------------------
 // Moderation — report, block, mute
 //
-// These six functions and the three types above them are the real
-// implementation of the contract stubbed in
-// `src/components/hp/moderation-api-stub.ts`. Signatures match that file
-// exactly, so the swap is one import line in `moderation-store.ts`.
+// These six functions and the three types above them are what
+// `moderation-store.ts` and `ReportSheet.tsx` import. They replaced an
+// in-memory stub (`moderation-api-stub.ts`, deleted) whose state lived in two
+// module-level Sets, so until the swap a report reached nobody and a block died
+// on reload. Covered end to end by `npm run smoke:moderation`.
 //
 // Storage: `content_reports` and `user_blocks`
 // (supabase/migrations/20260905130000_add_user_moderation.sql).
@@ -1939,10 +1940,41 @@ export interface ReportContentInput {
 
 const REPORT_NOTE_MAX = 1000;
 
+// Thrown by reportContent() when the reporter re-files a report a moderator has
+// already moved off 'open'. The row is theirs no longer (content_reports_update_
+// own, 20260905160000) — there is nothing for them to retry, so the UI shows a
+// plain "already handled" message rather than routing this to the generic
+// "could not send, try again" error path. Same name-check rationale as
+// isAuthRequiredError: `instanceof` is unreliable across duplicated bundle
+// chunks in the static build.
+export class ReportAlreadyReviewedError extends Error {
+  constructor(message = "This report has already been reviewed by a moderator.") {
+    super(message);
+    this.name = "ReportAlreadyReviewedError";
+  }
+}
+
+export function isReportAlreadyReviewedError(error: unknown): error is ReportAlreadyReviewedError {
+  return (
+    error instanceof ReportAlreadyReviewedError ||
+    (typeof error === "object" &&
+      error !== null &&
+      (error as Error).name === "ReportAlreadyReviewedError")
+  );
+}
+
 /**
- * File a report. Reporting the same target twice updates the existing report
- * rather than adding a duplicate, which matches the unique constraint and keeps
- * "how many distinct people reported this" an honest number.
+ * File a report. Reporting the same target twice updates the existing open
+ * report in place (the unique key is reporter + target, not reason), rather than
+ * adding a duplicate — keeping "how many distinct people reported this" honest.
+ *
+ * Once a moderator moves the report off `status = 'open'`, the reporter can no
+ * longer touch the row — `content_reports_update_own` is
+ * `using (reporter_id = auth.uid() and status = 'open')`
+ * (20260905160000_close_rls_audit_gaps.sql), which deliberately stops a reporter
+ * reopening or rewriting an actioned report. Re-filing the same pair then trips
+ * that policy; this raises `ReportAlreadyReviewedError` so the caller can say
+ * "already handled" instead of routing a dead-end 42501 to a retry prompt.
  */
 export async function reportContent(input: ReportContentInput): Promise<void> {
   const client = assertSupabase();
@@ -1960,7 +1992,17 @@ export async function reportContent(input: ReportContentInput): Promise<void> {
     { onConflict: "reporter_id,target_type,target_id" },
   );
 
-  if (result.error) throw result.error;
+  if (result.error) {
+    // 42501 here means the conflict-update path hit content_reports_update_own's
+    // USING clause: the reporter already filed this exact pair and a moderator
+    // has since moved it off 'open'. Nothing more for the reporter to do, so
+    // raise the typed error the store turns into a plain message rather than a
+    // retryable failure.
+    if (result.error.code === "42501") {
+      throw new ReportAlreadyReviewedError();
+    }
+    throw result.error;
+  }
 }
 
 async function setBlockKind(userId: string, kind: "block" | "mute"): Promise<void> {

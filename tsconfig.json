@@ -1,5 +1,24 @@
 {
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "eslint.config.js"],
+  // The BROWSER project: everything that gets bundled and shipped to a user.
+  //
+  // `include` is not a filter, it is the whole world TypeScript knows about —
+  // a file that is neither listed here nor imported by a listed file is never
+  // typechecked. `cloudflare-static-src` is the production entry point
+  // (vite.static.config.ts roots the real build there), so it belongs in the
+  // shipped project, not outside it.
+  //
+  // Node-side code — scripts/, the vite configs, capacitor.config.ts — lives in
+  // tsconfig.node.json instead, because it needs Node's globals and this project
+  // deliberately withholds them: `types: ["vite/client"]` is what stops someone
+  // writing `process.cwd()` in a React component, where it does not exist.
+  //
+  // `npx tsc --noEmit` checks THIS project only. `npm run typecheck` checks both.
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "cloudflare-static-src/**/*.ts",
+    "cloudflare-static-src/**/*.tsx"
+  ],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

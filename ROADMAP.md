@@ -1,143 +1,181 @@
-# ΗΛΕΙΑ PULSE — Roadmap
+# Hleias Pulse — Roadmap
 
-Last updated: 2026-09-04 · Target: **season-ready by March 2027**
+> The ordered plan: what we're building, in what order, and how we know each
+> stage is finished. **Not** auto-loaded — read it at the start of a session to
+> know where things stand, and keep it current as work lands. The messy,
+> unordered backlog and the open product/technical questions live in `IDEAS.md`;
+> the security checklist lives in `SECURITY.md`.
+>
+> `v1 — 2026-09-06`, budget constraint added `2026-09-07`. Drafted by the coding
+> agent from the codebase and history. **The timeline, the billing model, and
+> the order of "Next up" are product calls — Mavroeidis sets those, not the
+> agent.** Everything marked ⚠️ is a placeholder waiting on that.
 
-## Vision
+**Target:** ready for the 2027 tourist season in Ilia — the season runs roughly
+April–October, so the app needs real content and a public build **by spring
+2027**. ⚠️ *Set the exact date you're working back from.*
 
-Google Maps × Instagram × Twitter, for a region. Locals and tourists on the same live map.
-Locals get a reason to meet in under-visited places; tourists get recommendations from real
-people instead of review sites. Partner shops and cafés run deals users redeem in-app — that
-is the revenue. Start in Ilia, prove it, expand region by region.
+## Budget constraint — no spending until February 2027
 
-## Business model
+**Nothing that costs money happens before February 2027.** That includes:
+- the **Apple Developer Program** (~€99/year — unavoidable to put the app on
+  iPhones, TestFlight included),
+- any **paid tier** of a hosting, database, monitoring, or push service,
+- paid fonts, assets, domains.
 
-Shop/café owners partner with us. They fund the discount as their marketing spend; we are the
-channel that brings the customer. Users take a coupon code in-app, the shop redeems it, and
-`deal_redemptions` is the receipt. Billing is either a flat monthly partnership or
-per-redemption — **decision still open**, and it determines what gets built in Stage 2.
+Until February we use **free tiers only** and do work that costs nothing. The
+paid items below are marked ⏸ and parked behind this gate — they are not
+cancelled, just deferred.
 
-> The coupon pipeline is already built and verified working end-to-end.
-
----
-
-# The three stages
-
-Each is worthless without the one before it.
-
-## STAGE 1 — REPAIR · September
-> The app does not work. Nothing else matters until it does.
-
-**Objective:** a person can sign up, post, comment, and see it — and two people can build in
-parallel without destroying each other.
-
-**Exit:** core loop verified end-to-end · CI green on every PR · `PulseApp.tsx` split ·
-report/block shipped · **TestFlight build with real testers**.
-
-## STAGE 2 — BUILD · October – January
-> Make it worth opening twice.
-
-**Objective:** complete the social loop and the money loop. Notifications, real profiles,
-story expiry, moderation people can actually use, business onboarding, deal analytics.
-App Store compliant and accepted.
-
-**Exit:** a stranger in Pyrgos understands it in 30 seconds · Apple accepts the build ·
-a real café owner has run a real redemption.
-
-## STAGE 3 — DEPLOY · February – March
-> An empty map is worth nothing. Fill it before the season.
-
-**Objective:** 50–100 active locals posting weekly · 10–20 partner businesses with live deals ·
-App Store launch · ready for summer 2027.
-
-**Exit:** the map has organic content nobody on the team created.
-
-> ⚠️ **The trap:** Stage 3 is the one you will leave until last. Don't. Start recruiting
-> locals and businesses in **November**, in parallel. Code has a deadline; people have a
-> lead time. Launching to an empty map is the single biggest risk to this project.
+**Timeline risk to be aware of (Mavroeidis's call, not the agent's):** the Apple
+side — Developer account approval, first signed build, a TestFlight round, then
+App Store review — realistically needs **6–10 weeks** from a standing start. If
+paid work begins in February and the season target is spring 2027, that path is
+tight. Options: accept a later-in-season launch, find the ~€99 sooner, or ship
+the web build first and the iOS app during the season.
 
 ---
 
-# September — two tracks
+## Right now
 
-**Target by Sept 30: TestFlight build in real testers' hands.**
+**Stage 1 (REPAIR) is done. We're in Stage 2 (BUILD).**
 
-## Week 1 · Sept 4–10 — Make it work. Make it parallel.
+Current focus (Oct 2026 – Jan 2027): **the free work** — code, tests, and
+free-tier services. The paid/Apple track starts in February.
 
-**Status as of 5 Sept — Mavroeidis track is ~70% done, Margaris track not started.**
+## Next up (ordered) — free work first
 
-### Done
+1. **Story expiry.** Expired stories are still readable straight off the table
+   (the 6h/24h cutoff lives only in `get_pulse_bootstrap()`, not the row-security
+   policy) and nothing ever deletes them. Add the cutoff to the policy **and**
+   decide a deletion schedule — user photos tied to a location, so EU privacy law
+   applies. One migration + a cleanup job. See `IDEAS.md` → Security.
+2. **Test coverage for the untested modules** — *mostly done (2026-09-07).*
+   `smoke:admin` now covers the whole owner/editor/moderator permission model,
+   including the privilege-escalation path; `smoke:verification-guards` covers
+   organizer and business self-verification; `smoke:routes` covers routes /
+   route stops. Left: cultural-event publishing, place claims, `saved_items`.
+   Pure code, no migration, no cost. That pass also turned up an audit-trail
+   gap — **closed 2026-09-07**: `businesses`, `organizers` and `admin_members`
+   now carry audit triggers (`20260907120000`, applied live), and the admin API
+   no longer reports a refused write as a success. One decision left for you,
+   in `IDEAS.md` → Security: whether an audit row should keep naming its actor
+   after that person deletes their account. Also from that pass, a CI blind
+   spot, now
+   closed: `tsconfig.json` only ever covered `src/**`, so neither `scripts/**`
+   nor `cloudflare-static-src/**` (the production entry) was typechecked.
+   There are now two projects and a `npm run typecheck` that runs both.
+   And it turned up the fault behind the four leaked test accounts: a dropped
+   pooled connection is an unhandled `error` event, which kills the process
+   *outside* `try/finally`, so cleanup never runs. Fixed in three scripts by
+   hand, which left it live in the other five — every `pg` script now shares
+   one guarded connection helper (`scripts/lib/pg.ts`) instead of eight
+   hand-copied ones. Left over: `smoke:admin`, `smoke:routes` and
+   `smoke:verification-guards` still carry their own copy of that block.
+3. **Confirm the web deploy works end to end.** `npm run deploy:worker` uploads
+   to Cloudflare (free tier) — nobody has verified the deployed site actually
+   runs, only that the script exists. May need a free Cloudflare account first.
+4. **Error tracking + rate limiting.** Error tracking on a free tier (e.g. Sentry
+   ~5k errors/month free) so a crash in the wild is visible; rate limiting at the
+   app or database layer (no paid service needed) so one account can't run up
+   abuse or cost.
+5. **Web push notifications.** A reason to come back. Web push is free; Apple push
+   (APNs) needs the Developer account, so that half is ⏸ until February.
+6. ⏸ **First TestFlight build** — *blocked until February* (needs the paid Apple
+   Developer account). Everything else that can be done without it should be done
+   by then: build config, app icons, privacy-policy text, App Store copy.
+7. ⏸ **Decide the billing model** — flat monthly fee vs. per-redemption cut.
+   Doesn't block the free work; needed before the business dashboard. ⚠️ *Your
+   call, any time.*
 
-| | What | Where |
-|---|---|---|
-| ✅ | **The core loop works.** Posting, commenting, places, stories and meet events all failed with `42501`. Root cause was not the write but the `.insert().select()` read-back: no SELECT policy let an author see their own `pending` row. | PR #27 |
-| ✅ | **Map renders again.** CARTO began serving "API KEY REQUIRED" watermark tiles with HTTP 200. Now keyless OSM, overridable via `VITE_MAP_TILE_URL`. | PR #29 |
-| ✅ | **CI on every PR** — lint, typecheck, three suites, production build. There was none before. | PR #26 |
-| ✅ | **Migration history repaired.** All 20 migrations had been hand-pasted and were untracked, which is why #24090000 landed half-applied and broke posting for weeks. Duplicate version number also fixed. | PR #28 |
-| ✅ | **Image URLs made CORS-safe.** `Special:FilePath` sends no ACAO header, so the thumbnail cache never worked and full 1200–2000px originals were downloaded for 48px markers. | PR #30 |
-| ✅ | `ROADMAP.md` + `CLAUDE.md`, ownership lanes, CODEOWNERS | PR #24, #31 |
-| ✅ | All three branches synced; `main` is the single source of truth | — |
-| ✅ | **`PulseApp.tsx` split** into per-screen files — 7,011 lines down to ~2,400. | PR #34 |
-| ✅ | **Accounts-required flow.** `ensurePulseUserId()` no longer falls back to `signInAnonymously()`; it throws a typed `AuthRequiredError`. Every gated handler opens the sign-in sheet with Greek-first, per-action copy instead of a raw `AuthApiError`. Background writes no-op when signed out. | this PR |
-
-### Not done
-
-| | What | Owner |
-|---|---|---|
-| ⬜ | **Report / block / mute.** Apple Guideline 1.2 — guaranteed rejection without it. All new files. | **Margaris** |
-| ⬜ | **Split `styles.css`** (3,967 lines). `PulseApp.tsx` is done; the stylesheet is the remaining single-file bottleneck. | Mavroeidis |
-| ⬜ | **Apply the image migration.** `20260904210000` is merged but not run against the database. | Mavroeidis |
-| ⬜ | **Branch protection** on `main` + require Code Owner review. Without it CI and CODEOWNERS are advisory. | Mavroeidis |
-| ⬜ | `/ship` git automation · delete ~15 audit accounts · fix the "roday" typo | Mavroeidis |
-
-> **Gate still stands:** Week 2 does not start until `PulseApp.tsx` is split and CI is enforced.
-
-## Week 2 · Sept 11–17 — Complete the social loop
-
-| George | Margaris |
-|---|---|
-| Push notifications infra — Capacitor + Supabase triggers | Notification UI + preferences |
-| Business onboarding backend, `review_place_claim` wiring | Place-claim flow UI for shop owners |
-| Deal analytics (`deal_redemptions` → owner dashboard) | Profile completeness, avatar, identity switcher |
-| Bundle split — `PulseApp` chunk is 491 kB | Stories: expiry, viewer, seen-state |
-| RLS audit across **all** tables, not just posts | Composer + post-to-place flow |
-
-## Week 3 · Sept 18–24 — Money + mobile
-
-| George | Margaris |
-|---|---|
-| Apple Developer account + Capacitor release pipeline | Business-facing deal creation UX |
-| **First TestFlight build** | Moderation UX a human can actually use |
-| Shop-owner redemption dashboard (scan / enter code) | Onboarding rewrite — the first 30 seconds |
-| Error monitoring | i18n completeness pass — Greek-first, no gaps |
-| Security pass: keys, RLS, storage policies | Map area / discovery UX refinements |
-
-## Week 4 · Sept 25–30 — Harden and ship
-
-| George | Margaris |
-|---|---|
-| Performance: markers, list virtualization, cold start | Bug bash on a real iPhone, every screen |
-| App Store metadata, privacy policy, contact info | Copy pass — Greek reviewed by a native ear |
-| Content-seeding tooling for Stage 3 | Empty-state and error-state design |
-| **Ship TestFlight to 5–10 real testers in Ilia** | Collect and triage tester feedback |
+Keep this list to ~6–7. When something lands, tick it in the stage below and pull
+the next item up from `IDEAS.md`.
 
 ---
 
-## The three rules that make parallel work possible
+## The three stages
 
-1. **Small PRs, merged daily.** A branch alive >48h is rebuilding the last disaster.
-2. **Never both in the same file.** After the split: George owns `lib/`, `supabase/`,
-   `SocialMap`; Margaris owns screens, sheets, composer, i18n. Cross-boundary = ask first.
-3. **CI green or it does not merge.** No exceptions, especially when moving fast.
+### Stage 1 — REPAIR · ✅ done
 
-## What speed cannot fix
+**Objective:** the app actually works, end to end, for someone who isn't on the
+team.
 
-- **Apple review** takes days to weeks. Get the developer account in Week 1, not Week 3.
-- **Real users and partner businesses** have their own lead time. Start those conversations
-  in October regardless of code state.
-- **Supabase migrations** need George's explicit approval every time.
+**Done when — all true now:**
+- Core loop verified against the live database (sign up → post → see it → redeem
+  a deal → block someone).
+- CI runs on every PR and `main` is protected (checks must pass to merge).
+- `PulseApp.tsx` split from ~7k lines into a shell plus per-screen files.
+- Report / block / mute is wired to Supabase, enforced by row-security on the
+  server (not just hidden in the UI), and covered by `smoke:moderation` so it
+  can't silently regress.
+- Every write path requires a real account; there is no anonymous fallback.
+- An RLS policy-snapshot regression gate + a committed-secret scan run in CI.
+
+### Stage 2 — BUILD · ⬜ now
+
+**Objective:** make it worth opening a second time.
+
+Split by the budget gate:
+
+- **Oct 2026 – Jan 2027 (free):** story expiry + retention · test-coverage gaps ·
+  confirm the web deploy (free tier) · error tracking + rate limiting on free
+  tiers · web push notifications · App Store groundwork that costs nothing
+  (privacy-policy text, icons, store copy) · start recruiting locals (Stage 3
+  work, but the lead time is long).
+- **Feb 2027 onward (paid unlocked):** Apple Developer account · first TestFlight
+  build + real testers · Apple push notifications · the business-onboarding flow
+  and owner's dashboard (also needs the billing decision).
+
+**Done when:**
+- A first-time user in Pyrgos understands what the app is for within 30 seconds.
+- Apple accepts a TestFlight build and real testers are using it. *(Feb+)*
+- A real café or shop owner has run a real deal redemption, start to finish.
+- Story expiry and moderation are trustworthy — expired content is gone, a
+  reported item reaches a moderator, a block actually holds.
+- A crash in the wild shows up somewhere we look.
+
+### Stage 3 — DEPLOY · ⬜ before the season
+
+**Objective:** an empty map is worth nothing — fill it before tourists arrive.
+
+Work: recruit locals to post real content · sign up partner businesses with real
+deals · App Store submission and launch · monitoring and alerts so an outage
+is noticed.
+
+**Done when:**
+- 50–100 locals are posting without being asked to.
+- 10–20 partner businesses have live deals.
+- The app is on the App Store.
+- The map shows content nobody on the team created.
+
+**Start recruiting locals and businesses during Stage 2, not after it.** Outreach
+is slow and can't be compressed near the deadline.
+
+---
+
+## What a deadline can't compress
+
+- **The February budget gate** — no Apple Developer account, no paid services
+  before then. Everything on the paid track starts in February at the earliest.
+- **Apple review** — days to weeks per submission, and a rejection restarts the
+  clock. Once the account exists, submit the first TestFlight build immediately.
+- **Real locals and real businesses** — weeks of conversations. No amount of
+  engineering speed substitutes for this. This is why recruiting starts now, not
+  after the app is done.
+- **Database migrations** — each one needs explicit approval and goes in one at a
+  time (see `CLAUDE.md` → Guardrails). Don't batch a stack of schema changes for
+  the week before launch.
 
 ## Open decisions
 
-- [ ] Billing model — flat monthly partnership vs. per-redemption
-- [x] Anonymous browsing: browsing stays open; **writing requires an account** (2026-09-05)
-- [ ] Web build: keep at parity with iOS, or let it lag during Stage 2
+- [ ] **Billing model** — flat monthly partnership fee vs. per-redemption cut.
+      Blocks the business-facing Stage 2 work.
+- [ ] **Web build** — the budget gate makes it the near-term focus by default
+      (it can ship on free hosting now; the iOS app can't). Confirm that's the
+      intent, and decide whether it stays at full feature parity once the iOS
+      track opens in February.
+- [ ] **iOS identity** — the bundle id and display name are still
+      `com.theodoros.iliapulse` / "Ilia Pulse". Rebrand to "Hleias Pulse", or
+      keep the internal id and only change the visible name?
+- [ ] **Community roles** — who owns business partnerships, content moderation,
+      and community-building? Unassigned. Needs deciding before Stage 3.
