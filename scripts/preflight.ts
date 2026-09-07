@@ -241,10 +241,22 @@ function checkMigrationOrder() {
 
   const collisions: string[] = [];
   const earlier: string[] = [];
-  const refs = git("for-each-ref", "--format=%(refname)", "refs/remotes/origin") ?? "";
+  // Local heads as well as remote ones. A branch committed here but never
+  // pushed is invisible under refs/remotes, and that is not hypothetical:
+  // chore/admin-audit-trail carried two unpushed migrations for a day while a
+  // bad credential blocked every push.
+  const refs =
+    git("for-each-ref", "--format=%(refname)", "refs/remotes/origin", "refs/heads") ?? "";
+  const ownHead = `refs/heads/${branch}`;
 
   for (const ref of refs.split("\n").filter(Boolean)) {
-    if (ref === "refs/remotes/origin/main" || ref === ownUpstream || ref.endsWith("/HEAD")) {
+    if (
+      ref === "refs/remotes/origin/main" ||
+      ref === "refs/heads/main" ||
+      ref === ownUpstream ||
+      ref === ownHead ||
+      ref.endsWith("/HEAD")
+    ) {
       continue;
     }
     const short = ref.replace("refs/remotes/", "");
@@ -369,12 +381,34 @@ async function checkAppliedMigrations() {
     });
 
   if (collisions.length) {
-    // The next free number has to clear everything that exists anywhere — the
-    // applied list AND the migrations already sitting in this repo. Suggesting
-    // "highest applied + 1" would have proposed a version our own pending
-    // route_stops migration already holds.
+    // The next free number has to clear every source that can claim one:
+    //
+    //   the applied list      what the database has already run
+    //   this working tree     migrations sitting in supabase/migrations here
+    //   every git ref         local branches included, not just remote ones —
+    //                         a branch committed but never pushed still owns
+    //                         its numbers
+    //
+    // Suggesting "highest applied + 1" proposed 20260907160000, which this
+    // repo's own pending route_stops migration already held.
+    //
+    // ONE SOURCE REMAINS UNCHECKABLE: a migration file written in another
+    // worktree and not committed to any branch is in none of the three above,
+    // so this suggestion is safe against everything recorded, not against
+    // everything that exists. That case surfaces as an add/add conflict at
+    // merge — annoying but loud, unlike the silent skip this check exists for.
+    // There are two worktrees on this machine as of 2026-09-08, so it is worth
+    // knowing rather than assuming.
+    const fromRefs = (
+      git("for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes") ?? ""
+    )
+      .split("\n")
+      .filter(Boolean)
+      .flatMap((ref) => migrationsOn(ref).map((m) => m.version));
+
     const highest =
-      [...applied.keys(), ...local.map((f) => f.slice(0, 14))].sort().at(-1) ?? "00000000000000";
+      [...applied.keys(), ...local.map((f) => f.slice(0, 14)), ...fromRefs].sort().at(-1) ??
+      "00000000000000";
     const next = String(BigInt(highest) + 10000n);
     return record(
       "fail",
