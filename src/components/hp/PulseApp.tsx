@@ -67,6 +67,7 @@ import {
   claimPlace,
   createPulsePlace,
   createPulsePost,
+  askQuestion,
   createPulseMeetEvent,
   createPulseCulturalEvent,
   createPulseStory,
@@ -1433,6 +1434,35 @@ export function PulseApp() {
     markContribution();
     showToast(t("Post saved"));
   };
+  const addLocalQuestion = async ({
+    text,
+    placeId,
+    identity,
+  }: {
+    text: string;
+    placeId: string;
+    identity: PostingIdentity;
+  }) => {
+    if (account.status !== "ready") {
+      requireProfile("post");
+      throw new Error("Profile required.");
+    }
+    const place = findPlace(placeId);
+    if (!place) throw new Error("Place not found.");
+    const savedPost = await askQuestion({
+      text,
+      place,
+      identity,
+      profileId: account.profile.id,
+      authorName: profileDisplayName(account.profile),
+    });
+    setUserPosts((posts) => [savedPost, ...posts]);
+    setCreateOpen(false);
+    setComposerPin(null);
+    setTab("pulse");
+    markContribution();
+    showToast(t("Question posted"));
+  };
   const addLocalPlace = async (input: CreatePulsePlaceInput) => {
     if (account.status !== "ready") {
       requireProfile("place");
@@ -2440,6 +2470,7 @@ export function PulseApp() {
                 requireProfile("post");
               }}
               onPost={addLocalPost}
+              onQuestion={addLocalQuestion}
               onPlace={addLocalPlace}
               onStory={addLocalStory}
               onEvent={addMeetEvent}
