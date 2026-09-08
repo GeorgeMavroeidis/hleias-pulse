@@ -157,7 +157,7 @@ export function PostDetailModal({
                   </div>
                   <div className="mt-4 border-t border-hp-ink/10 pt-3">
                     <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Comments")}
+                      {post.kind === "question" ? t("Answers") : t("Comments")}
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
@@ -168,9 +168,13 @@ export function PostDetailModal({
                       ))}
                       {comments.length === 0 && (
                         <div className="text-[12px] text-hp-muted">
-                          {language === "GR"
-                            ? "Γίνε ο πρώτος που σχολιάζει."
-                            : "Be the first to comment."}
+                          {post.kind === "question"
+                            ? language === "GR"
+                              ? "Κανείς δεν έχει απαντήσει ακόμα — γίνε ο πρώτος."
+                              : "No one has answered yet — be the first."
+                            : language === "GR"
+                              ? "Γίνε ο πρώτος που σχολιάζει."
+                              : "Be the first to comment."}
                         </div>
                       )}
                     </div>
@@ -182,9 +186,15 @@ export function PostDetailModal({
                       value={text}
                       onChange={(e) => setText(e.target.value)}
                       name={`post-comment-${post.id}`}
-                      aria-label={t("Quick comment on post")}
+                      aria-label={
+                        post.kind === "question"
+                          ? t("Write your answer")
+                          : t("Quick comment on post")
+                      }
                       autoComplete="off"
-                      placeholder={t("Quick comment…")}
+                      placeholder={
+                        post.kind === "question" ? t("Write your answer…") : t("Quick comment…")
+                      }
                       className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && text.trim()) {

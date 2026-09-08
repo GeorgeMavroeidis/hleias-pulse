@@ -62,7 +62,7 @@ export interface Post {
   id: string;
   authorId: string;
   placeId: string;
-  kind: "spot" | "tip" | "event" | "photo";
+  kind: "spot" | "tip" | "event" | "photo" | "question";
   time: string;
   createdAt?: string | null;
   text: string;

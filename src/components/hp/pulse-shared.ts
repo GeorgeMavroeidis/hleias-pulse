@@ -6,6 +6,7 @@ import {
   MessageCircle,
   MapPin,
   Camera,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 import { type Author, type Place, type Post } from "@/lib/hp-model";
@@ -18,7 +19,7 @@ import { type DiscoveryLens } from "@/lib/hp/discovery";
 export type Tab = "map" | "pulse" | "routes" | "meet" | "saved" | "deals";
 export type NavTab = Exclude<Tab, "saved" | "deals">;
 export type MeetSubTab = "community" | "events";
-export type ComposerMode = "post" | "place" | "story" | "event";
+export type ComposerMode = "post" | "place" | "story" | "event" | "question";
 export type MarkerAnimationTheme = "calm" | "pulse" | "signal";
 export type CreateStoryInput = {
   placeId: string;
@@ -56,6 +57,7 @@ export const COMPOSER_MODE_ICONS: Record<ComposerMode, LucideIcon> = {
   place: MapPin,
   story: Camera,
   event: CalendarHeart,
+  question: HelpCircle,
 };
 export const ROUTE_FILTERS = ["All", "Beach", "Nature", "Culture", "No car", "Free"] as const;
 export type RouteFilter = (typeof ROUTE_FILTERS)[number];
