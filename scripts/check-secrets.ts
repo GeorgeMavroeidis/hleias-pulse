@@ -17,11 +17,12 @@
  *   npm run check:secrets
  */
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { readFileSync, statSync } from "node:fs";
 
 type Rule = { hint: string; name: string; pattern: RegExp };
 
-const RULES: Rule[] = [
+export const RULES: Rule[] = [
   {
     hint: "Supabase secret (service-role) key. It bypasses RLS entirely — read it from the CLI session or .env at runtime, as the smoke scripts do.",
     name: "supabase-secret-key",
@@ -41,7 +42,18 @@ const RULES: Rule[] = [
   {
     hint: "Postgres connection string with credentials in it.",
     name: "postgres-url-with-password",
-    pattern: /\bpostgres(?:ql)?:\/\/[^\s:@/]+:[^\s:@/]+@/,
+    // Only the FIRST character of the password segment excludes $ { }, so a URL
+    // assembled from variables — `postgres://user:${SUPABASE_DB_PASSWORD}@host`
+    // in a CI step — is not reported as a hardcoded credential, while a real
+    // password that merely CONTAINS one of those characters still is. That
+    // distinction is the whole rule: an earlier version excluded them across the
+    // whole segment and silently stopped flagging `p$ssw0rd`, `Ab{3}xyz` and
+    // `realSecret$`. Supabase-generated passwords routinely contain `$`.
+    //
+    // This is the same line the SUPABASE_DB_PASSWORD rule above draws — "the
+    // value STARTS with a variable reference" — and it is deliberately the same
+    // idiom. See scripts/check-secrets.test.ts before changing it.
+    pattern: /\bpostgres(?:ql)?:\/\/[^\s:@/]+:[^\s:@/${}][^\s:@/]*@/,
   },
   {
     hint: "Private key block.",
@@ -64,9 +76,12 @@ const RULES: Rule[] = [
  * `sb_publishable_` is the browser key and belongs in source — it is in
  * src/lib/supabase/client.ts by design and is safe there precisely because RLS
  * is the boundary. This file itself carries every pattern above as source code,
- * so it has to exempt itself or it would always fail.
+ * so it has to exempt itself or it would always fail. Its test carries the same
+ * patterns plus the fixtures they are asserted against -- a connection string
+ * with a literal password in it is the thing the rule must catch, so the test
+ * has to contain one -- and is exempt for exactly the same reason.
  */
-const ALLOWED_PATH = /^scripts\/check-secrets\.ts$/;
+const ALLOWED_PATH = /^scripts\/check-secrets(?:\.test)?\.ts$/;
 const ALLOWED_VALUE = /\bsb_publishable_[A-Za-z0-9_-]+/g;
 
 /** Never allow these to be tracked at all, whatever is inside them. */
@@ -129,4 +144,8 @@ function main() {
   console.log("Secret scan clean.");
 }
 
-main();
+// Run only when executed directly. scripts/check-secrets.test.ts imports RULES
+// from this module, and importing it must not launch a repo-wide scan.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}
