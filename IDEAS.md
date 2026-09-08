@@ -142,22 +142,108 @@
   `replaceAdminRouteStops` deliberately excluded, since a route with no stops
   makes "deleted nothing" a legitimate outcome there.
 
-- **Still open, and it is a product call rather than a technical one: should an
-  audit row survive its actor?** `admin_audit_logs.actor_id` is
-  `ON DELETE SET NULL`, so deleting a user anonymises their history — the trail
-  keeps "this business was verified" but loses who verified it. Keeping the name
-  means retaining a personal identifier after an erasure request, which needs a
-  lawful basis under GDPR; a security audit trail is a defensible one, but that
-  is Mavroeidis's decision and it comes with a retention period to set. The
-  2026-09-07 triggers deliberately follow the existing behaviour instead of
-  pre-empting it, and go slightly further in one place: a deleted
-  business/organizer row is logged without the applicant's `user_id`, so the
-  line survives without naming somebody who asked to be forgotten.
+- ~~**Should an audit row survive its actor?**~~ **Decided 2026-09-07 — yes,
+  keep the actor.** `20260907170000_audit_log_survives_actor_deletion.sql` drops
+  `admin_audit_logs_actor_id_fkey`, so the column keeps the id instead of being
+  nulled when the account goes. The reasoning: an audit table records an id, it
+  does not participate in the lifecycle of the thing it names. Under
+  `ON DELETE SET NULL` the whole history collapsed to "somebody did this"
+  precisely when a person has a motive to disappear — and the 2026-09-07
+  triggers made that worse by design, because the history now worth keeping
+  (who verified a business, who granted `owner`) was exactly the history that
+  vanished.
+
+  What it retains is an opaque uuid and nothing else — no name, no email. The
+  `details` payloads carry roles and status transitions, not personal fields,
+  and the earlier choice to log a deleted business/organizer *without* the
+  applicant's `user_id` still stands. **Keep it that way:** these rows are now
+  permanent, so nothing personal should ever be written into them.
+
+  Free of side effects, checked before writing it: the constraint points at
+  `auth.users`, outside the exposed `public` schema, so
+  `admin_audit_logs.Relationships` in `database.types.ts` is already `[]` and
+  regenerating types is a no-op. Dropping a constraint is catalogue-only —
+  instant, no table rewrite.
+
+  The same migration also removes the two `actor := null` guards from
+  `20260907120000`, because dropping the constraint without them would cement a
+  bug rather than fix one. Those guards were there to stop an audit row pointing
+  at a user the same statement was deleting from failing the foreign key check —
+  but the condition is only `tg_op = 'DELETE' and actor = subject`, with nothing
+  scoping it to a cascade. `"Owners can remove team members"` has no
+  self-exclusion and `removeAdminMember()` is a plain delete by `user_id`, so an
+  owner may remove their **own** admin row from the dashboard — and the guard
+  then nulls the actor on a live person whose account still exists, something
+  `ON DELETE SET NULL` would never have done. Without the fix, "who resigned
+  their own ownership" would read as nobody, permanently. Found in review by a
+  parallel session and verified against the policy and the API before acting.
+
+  Two things checked rather than asserted, both recorded in the migration
+  header: the constraint name really is `admin_audit_logs_actor_id_fkey` (a
+  `drop ... if exists` on a wrong name is a silent no-op), and the retained uuid
+  really is opaque — every identity column in the schema references `auth.users`
+  or `profiles`, `profiles.id` cascades from `auth.users`, and no identity uuid
+  column exists without a foreign key, so `actor_id` becomes the only place the
+  id survives. Re-check that if a table ever stores a user id loosely.
+
+  **Still open, and smaller:** the retention *period*. Keeping the trail
+  indefinitely is a decision nobody has actually made, and GDPR wants a stated
+  period rather than "forever by default". Not urgent while there are no
+  outside users, but it should not be forgotten either.
+
+- **A new `AFTER DELETE` trigger silently changes what every existing test
+  fixture leaves behind.** Worth writing down, because it generalises well past
+  the three scripts it happened to hit. `20260907120000` put audit triggers on
+  `businesses`, `organizers` and `admin_members`, and `admin_audit_logs` has no
+  foreign key back to any of them — so a fixture touching those tables now
+  leaves audit rows the `auth.users` cascade never reaches. The existing "sweep
+  `admin_audit_logs` by `actor_id`" cleanup missed them for two independently
+  sufficient reasons: the trigger fires *during* the cascade, i.e. after that
+  sweep has already run, and it records `actor_id` as null anyway, because the
+  `postgres` role has no `auth.uid()`. Fixed in `d383700` with a second pass
+  keyed on `entity_id`. `20260907170000` sharpens the rule rather than softening
+  it — with the foreign key gone, nothing cascades those rows away at all, so an
+  `entity_id` sweep is the only cleanup that works.
 
 ## Architecture / Tech Debt
 
 <!-- Things that work today but should be revisited —
      e.g. "myths module needs real scope before Stage 2 (see ROADMAP.md)" -->
+
+### Migration drift — production is ahead of `main`, and in one case ahead of git
+
+Found 2026-09-07 while renumbering the audit FK migration off a version that was
+already taken. Two separate problems, one worse than the other.
+
+- **`20260907150000` (`add_question_post_kind`) is applied to the live database
+  and has no migration file anywhere in this repository.** Searched every commit
+  reachable from every local and remote-tracking ref — no file at that version
+  exists. So a clean checkout plus `supabase db push` does **not** reproduce
+  production. Whatever that migration did, nothing in version control can
+  recreate it, review it, or roll it back. This is the one to fix first: either
+  find the file and commit it, or dump the applied definition out of the
+  database and write the migration retroactively.
+
+- **`20260907140000` (`enforce_story_expiry_rls`) is applied to the live
+  database but its file sits on an unmerged branch**,
+  `origin/fix/enforce-story-expiry-rls` (`c38fe8f`). Less severe — the file
+  exists and is reviewable — but `main` still does not contain a migration that
+  production has been running since 2026-09-07. Anyone reading `main` to
+  understand the schema is reading a version that has not existed for a while.
+
+  *(Verified directly: the file's location, its absence from `main`, and the
+  complete absence of any `20260907150000_*` file. The claim that both versions
+  are marked applied in `supabase_migrations.schema_migrations` comes from the
+  session that queried production; this session has opened no database
+  connection.)*
+
+  **The general rule this earns:** applying a migration to production before its
+  branch merges makes the version number unavailable to everyone else while
+  leaving no trace they can see. It is what silently stole `20260907140000` from
+  the audit fix — Supabase keys applied migrations on **version**, not filename,
+  so `supabase db push` would have matched the two, skipped ours, and reported
+  success. A refused UPDATE reports success; so does a migration that never ran.
+  Push the branch before applying it, or reserve the version some other way.
 
 - Error tracking (e.g. Sentry) — set up before public launch, cheap insurance,
   worth doing a bit earlier than the rest of this list
