@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   BadgeCheck,
   ArrowLeft,
+  Bell,
+  BellOff,
   Camera,
   FileText,
   LockKeyhole,
@@ -38,6 +40,13 @@ import {
   type PulseAccountProfile,
   type PulseAccountState,
 } from "@/lib/hp-auth";
+import {
+  disablePushNotifications,
+  enablePushNotifications,
+  getExistingPushSubscription,
+  getPushPermission,
+  isPushSupported,
+} from "@/lib/hp/push";
 
 type AuthMode = "signIn" | "signUp" | "forgotPassword";
 
@@ -868,6 +877,40 @@ export function AccountSheet({
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    getExistingPushSubscription()
+      .then((sub) => setPushOn(Boolean(sub)))
+      .catch(() => setPushOn(false));
+  }, [open]);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    setPushError(null);
+    try {
+      if (pushOn) {
+        await disablePushNotifications();
+        setPushOn(false);
+      } else {
+        await enablePushNotifications();
+        setPushOn(true);
+      }
+    } catch (err) {
+      setPushError(
+        getPushPermission() === "denied"
+          ? t("You've blocked notifications for this site in your browser.")
+          : t("Could not enable notifications."),
+      );
+      console.warn("Push toggle failed.", err);
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
     setDisplayName(profile?.displayName ?? "");
@@ -1209,6 +1252,47 @@ export function AccountSheet({
                     </button>
                   </div>
                 </section>
+
+                {isPushSupported() && (
+                  <section>
+                    <SectionHeader icon={Bell} label={t("Notifications")} tone="sea" />
+                    <button
+                      type="button"
+                      onClick={togglePush}
+                      disabled={pushBusy}
+                      className="hp-card-lift flex w-full items-center gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-left transition active:scale-[0.99] disabled:opacity-60"
+                    >
+                      <span
+                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${pushOn ? "bg-hp-sunset/15 text-hp-sunset" : "bg-hp-ink/5 text-hp-ink"}`}
+                      >
+                        {pushOn ? <Bell size={16} /> : <BellOff size={16} />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-black text-hp-ink">
+                          {t("Question answers")}
+                        </span>
+                        <span className="block text-[11px] text-hp-muted">
+                          {pushBusy
+                            ? t("Working...")
+                            : pushOn
+                              ? t("You'll be notified when someone answers your question")
+                              : t("Turn on to know when someone answers your question")}
+                        </span>
+                      </span>
+                      <span
+                        className={`h-6 w-11 shrink-0 rounded-full p-0.5 transition ${pushOn ? "bg-hp-sunset" : "bg-hp-ink/15"}`}
+                        aria-hidden="true"
+                      >
+                        <span
+                          className={`block h-5 w-5 rounded-full bg-white transition ${pushOn ? "translate-x-5" : "translate-x-0"}`}
+                        />
+                      </span>
+                    </button>
+                    {pushError && (
+                      <p className="mt-2 text-[11px] font-semibold text-hp-sunset">{pushError}</p>
+                    )}
+                  </section>
+                )}
 
                 {/* Safety, blocked accounts, and published contact details.
                     App Store Guideline 1.2 requires all three inside the app. */}

@@ -147,6 +147,15 @@ const EL: Record<string, string> = {
     "Ο σύνδεσμος επαναφοράς δεν είναι έγκυρος ή έχει λήξει. Ζήτησε έναν νέο.",
   "Saving...": "Αποθήκευση…",
   "Working...": "Γίνεται επεξεργασία…",
+  Notifications: "Ειδοποιήσεις",
+  "Question answers": "Απαντήσεις σε ερωτήσεις",
+  "You'll be notified when someone answers your question":
+    "Θα ειδοποιείσαι όταν κάποιος απαντήσει στην ερώτησή σου",
+  "Turn on to know when someone answers your question":
+    "Ενεργοποίησε για να μαθαίνεις όταν σου απαντούν",
+  "You've blocked notifications for this site in your browser.":
+    "Έχεις μπλοκάρει τις ειδοποιήσεις για αυτή τη σελίδα στον browser σου.",
+  "Could not enable notifications.": "Δεν ήταν δυνατή η ενεργοποίηση ειδοποιήσεων.",
   Local: "Ντόπιος",
   Tourist: "Επισκέπτης",
   Guide: "Οδηγός",
