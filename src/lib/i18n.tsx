@@ -265,6 +265,8 @@ const EL: Record<string, string> = {
   "Map places": "Σημεία χάρτη",
   "Admin members": "Μέλη διαχείρισης",
   "Recent admin activity": "Πρόσφατη δραστηριότητα διαχείρισης",
+  "by {name}": "από {name}",
+  "by the system": "από το σύστημα",
   "Safe publishing workflow": "Ασφαλής ροή δημοσίευσης",
   "Search places, areas, types…": "Αναζήτηση σημείων, περιοχών ή τύπων…",
   "Edit place": "Επεξεργασία σημείου",

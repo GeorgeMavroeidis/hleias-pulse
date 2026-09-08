@@ -13,11 +13,12 @@
 
 **Target:** ready for the 2027 tourist season in Ilia — the season runs roughly
 April–October, so the app needs real content and a public build **by spring
-2027**. ⚠️ *Set the exact date you're working back from.*
+2027**. ⚠️ _Set the exact date you're working back from._
 
 ## Budget constraint — no spending until February 2027
 
 **Nothing that costs money happens before February 2027.** That includes:
+
 - the **Apple Developer Program** (~€99/year — unavoidable to put the app on
   iPhones, TestFlight included),
 - any **paid tier** of a hosting, database, monitoring, or push service,
@@ -45,17 +46,18 @@ free-tier services. The paid/Apple track starts in February.
 
 ## Next up (ordered) — free work first
 
-1. **Story expiry** — *read-side closed (2026-09-07).* The 6h/24h cutoff used
+1. **Story expiry** — _read-side closed (2026-09-07)._ The 6h/24h cutoff used
    to live only in `get_pulse_bootstrap()`, not the row-security policy —
    anyone with the public API key could read a story straight off the table
    after it "expired" in the UI. `20260907140000_enforce_story_expiry_rls.sql`
    moved the same check into the policy itself; applied to the live database.
    **Still open, and it's a product call, not an engineering one:** nothing
    deletes expired rows (or their media in the `content-media` Storage
-   bucket) — this stops them being *read*, not stores them forever. Needs a
+   bucket) — this stops them being _read_, not stores them forever. Needs a
    retention-period decision before a deletion job is worth building. See
-   `IDEAS.md` → Security.
-2. **Test coverage for the untested modules** — *mostly done (2026-09-07).*
+   `IDEAS.md` → Security, and → Architecture / Tech Debt for the migration
+   drift this uncovered.
+2. **Test coverage for the untested modules** — _mostly done (2026-09-07)._
    `smoke:admin` now covers the whole owner/editor/moderator permission model,
    including the privilege-escalation path; `smoke:verification-guards` covers
    organizer and business self-verification; `smoke:routes` covers routes /
@@ -63,16 +65,19 @@ free-tier services. The paid/Apple track starts in February.
    Pure code, no migration, no cost. That pass also turned up an audit-trail
    gap — **closed 2026-09-07**: `businesses`, `organizers` and `admin_members`
    now carry audit triggers (`20260907120000`, applied live), and the admin API
-   no longer reports a refused write as a success. One decision left for you,
-   in `IDEAS.md` → Security: whether an audit row should keep naming its actor
-   after that person deletes their account. Also from that pass, a CI blind
-   spot, now
-   closed: `tsconfig.json` only ever covered `src/**`, so neither `scripts/**`
+   no longer reports a refused write as a success. The decision it left you is
+   now made: an audit row **keeps** naming its actor after that person deletes
+   their account — `20260907170000` drops the foreign key that was nulling it.
+   That migration is **written but not yet applied to the live database**, so
+   production still anonymises on deletion until someone pushes it. The
+   retention _period_ is still unset; see `IDEAS.md` → Security for both. The
+   `/admin` activity panel now shows who performed each action, not just what
+   changed. Also from that pass, a CI blind spot, now closed: `tsconfig.json` only ever covered `src/**`, so neither `scripts/**`
    nor `cloudflare-static-src/**` (the production entry) was typechecked.
    There are now two projects and a `npm run typecheck` that runs both.
    And it turned up the fault behind the four leaked test accounts: a dropped
    pooled connection is an unhandled `error` event, which kills the process
-   *outside* `try/finally`, so cleanup never runs. Fixed in three scripts by
+   _outside_ `try/finally`, so cleanup never runs. Fixed in three scripts by
    hand, which left it live in the other five — every `pg` script now shares
    one guarded connection helper (`scripts/lib/pg.ts`) instead of eight
    hand-copied ones. Left over: `smoke:admin`, `smoke:routes` and
@@ -98,12 +103,12 @@ free-tier services. The paid/Apple track starts in February.
    abuse or cost.
 5. **Web push notifications.** A reason to come back. Web push is free; Apple push
    (APNs) needs the Developer account, so that half is ⏸ until February.
-6. ⏸ **First TestFlight build** — *blocked until February* (needs the paid Apple
+6. ⏸ **First TestFlight build** — _blocked until February_ (needs the paid Apple
    Developer account). Everything else that can be done without it should be done
    by then: build config, app icons, privacy-policy text, App Store copy.
 7. ⏸ **Decide the billing model** — flat monthly fee vs. per-redemption cut.
-   Doesn't block the free work; needed before the business dashboard. ⚠️ *Your
-   call, any time.*
+   Doesn't block the free work; needed before the business dashboard. ⚠️ _Your
+   call, any time._
 
 Keep this list to ~6–7. When something lands, tick it in the stage below and pull
 the next item up from `IDEAS.md`.
@@ -118,6 +123,7 @@ the next item up from `IDEAS.md`.
 team.
 
 **Done when — all true now:**
+
 - Core loop verified against the live database (sign up → post → see it → redeem
   a deal → block someone).
 - CI runs on every PR and `main` is protected (checks must pass to merge).
@@ -144,8 +150,9 @@ Split by the budget gate:
   and owner's dashboard (also needs the billing decision).
 
 **Done when:**
+
 - A first-time user in Pyrgos understands what the app is for within 30 seconds.
-- Apple accepts a TestFlight build and real testers are using it. *(Feb+)*
+- Apple accepts a TestFlight build and real testers are using it. _(Feb+)_
 - A real café or shop owner has run a real deal redemption, start to finish.
 - Story expiry and moderation are trustworthy — expired content is gone, a
   reported item reaches a moderator, a block actually holds.
@@ -160,6 +167,7 @@ deals · App Store submission and launch · monitoring and alerts so an outage
 is noticed.
 
 **Done when:**
+
 - 50–100 locals are posting without being asked to.
 - 10–20 partner businesses have live deals.
 - The app is on the App Store.
