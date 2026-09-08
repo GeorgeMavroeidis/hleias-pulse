@@ -20,6 +20,7 @@ import { TrendingHero } from "./TrendingHero";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { ContentMenu } from "./ContentMenu";
 import { useModeration } from "./use-moderation";
+import { displayPostTime, isRecentlyPosted } from "@/lib/hp/post-time";
 
 export function PulseFeed({
   posts,
@@ -75,7 +76,7 @@ export function PulseFeed({
         place.status === "busy" ||
         place.status === "popular" ||
         post.kind === "event" ||
-        post.time.toLowerCase().includes("now") ||
+        isRecentlyPosted(post) ||
         post.tags.some((tag) => ["live", "now", "packed", "busy"].includes(tag))
       );
     }
@@ -169,7 +170,7 @@ export function PulseFeed({
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-hp-muted">
-                    <MapPin size={9} /> {p.name} · {post.time}
+                    <MapPin size={9} /> {p.name} · {displayPostTime(post)}
                   </div>
                 </div>
                 <button

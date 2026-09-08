@@ -1,3 +1,5 @@
+import { formatDistanceToNowStrict } from "date-fns";
+import { el, enUS } from "date-fns/locale";
 import type { Place, StoryItem } from "../hp-model";
 
 /**
@@ -140,12 +142,39 @@ export function toneStyle(tone: StoryTone): ToneStyle {
   return tone === "muted" ? MUTED_TONE : TONE_STYLES[tone];
 }
 
-export function formatStoryTime(minutesAgo: number): string {
-  if (minutesAgo < 1) return "just now";
-  if (minutesAgo < 60) return `${Math.round(minutesAgo)} min ago`;
-  const hours = minutesAgo / 60;
-  if (hours < 24) return `${Math.round(hours)}h ago`;
-  return "today";
+/**
+ * A real relative-time label ("3 hours ago", "2 days ago") in either
+ * language. Previously this only handled minutes/hours and fell back to the
+ * literal word "today" past 24h — wrong for anything actually a day or more
+ * old, which every one of the evergreen editorial stories eventually is
+ * between refreshes. The Greek call site had its own, worse version that
+ * never converted units at all: any story older than a minute showed the
+ * raw minute count forever (e.g. "πριν από 20411′"). date-fns already ships
+ * a Greek locale, so this uses it instead of hand-rolled formatting.
+ *
+ * `createdAt` is preferred when available; `minutesAgo` (and the language's
+ * own minute-counting fallback) only covers the rare case where a story
+ * somehow has no real timestamp.
+ */
+export function formatStoryTime(
+  minutesAgo: number,
+  createdAt: string | undefined,
+  language: "GR" | "EN",
+): string {
+  if (minutesAgo < 1) return language === "GR" ? "τώρα" : "just now";
+  const time = createdAt ? new Date(createdAt).getTime() : NaN;
+  if (Number.isFinite(time)) {
+    return formatDistanceToNowStrict(time, {
+      addSuffix: true,
+      locale: language === "GR" ? el : enUS,
+    });
+  }
+  if (minutesAgo < 60) {
+    const n = Math.round(minutesAgo);
+    return language === "GR" ? `πριν από ${n}′` : `${n} min ago`;
+  }
+  const hours = Math.round(minutesAgo / 60);
+  return language === "GR" ? `πριν από ${hours} ώ.` : `${hours}h ago`;
 }
 
 function minutesSince(iso: string): number {

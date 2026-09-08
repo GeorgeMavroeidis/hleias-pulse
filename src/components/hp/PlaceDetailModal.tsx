@@ -37,6 +37,7 @@ import { useModeration } from "./use-moderation";
 import { type PlaceStoryGroup } from "@/lib/hp/place-stories";
 import type { PlaceBusinessProfile } from "@/lib/hp/business-types";
 import { openStreetMapUrl } from "./pulse-shared";
+import { displayPostTime } from "@/lib/hp/post-time";
 
 export function PlaceDetailModal({
   place,
@@ -375,7 +376,9 @@ export function PlaceDetailModal({
                           >
                             {a.type}
                           </span>
-                          <span className="ml-auto text-[10px] text-hp-muted">{p.time}</span>
+                          <span className="ml-auto text-[10px] text-hp-muted">
+                            {displayPostTime(p)}
+                          </span>
                           <ContentMenu
                             className="-my-1"
                             target={{

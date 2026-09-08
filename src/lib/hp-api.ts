@@ -9,6 +9,7 @@ import {
 } from "./hp-model";
 import type { CreateMeetInput, MeetEvent, RsvpStatus } from "./hp/meet-types";
 import type { StreakState } from "./hp/meet-store";
+import { initialsAvatarDataUri } from "./hp/avatar";
 import type {
   CreateCulturalEventInput,
   CulturalEvent,
@@ -897,6 +898,16 @@ function mapPointFromLatLng(lat: number, lng: number) {
 
 async function fetchPulseData(): Promise<PulseData> {
   const client = assertSupabase();
+
+  // Keep the small pool of evergreen editorial stories cycling (see
+  // 20260907130000_loop_generic_stories.sql) before reading the bootstrap, so
+  // an expired one is already refreshed by the time it's fetched below.
+  // Best-effort: a failure here shouldn't block the rest of the app loading.
+  const refreshResult = await client.rpc("refresh_generic_stories");
+  if (refreshResult.error) {
+    console.warn("Could not refresh generic stories.", refreshResult.error);
+  }
+
   const result = await client.rpc("get_pulse_bootstrap");
   if (result.error) throw result.error;
 
@@ -1186,7 +1197,9 @@ export async function createPulsePlace(input: CreatePulsePlaceInput): Promise<Pl
   const avatar = {
     place_id: result.data.id,
     position: 0,
-    avatar_url: input.authorAvatarUrl || "https://i.pravatar.cc/120?img=22",
+    // No author identity flows into this call today, so this is an honest
+    // "unknown contributor" mark rather than an invented name.
+    avatar_url: input.authorAvatarUrl || initialsAvatarDataUri("", input.name),
   };
   const avatarResult = await client.from("place_avatars").insert(avatar);
   const avatarsByPlace = avatarResult.error ? {} : { [result.data.id]: [avatar] };

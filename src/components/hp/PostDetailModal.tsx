@@ -16,6 +16,7 @@ import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
 import { openStreetMapUrl } from "./pulse-shared";
 import { ContentMenu } from "./ContentMenu";
+import { displayPostTime } from "@/lib/hp/post-time";
 
 export function PostDetailModal({
   post,
@@ -119,7 +120,7 @@ export function PostDetailModal({
                       </div>
                       <div className="text-[10px] text-hp-muted">
                         <MapPin size={9} className="mr-0.5 inline" />
-                        {p.name} · {post.time}
+                        {p.name} · {displayPostTime(post)}
                       </div>
                     </div>
                     <ContentMenu

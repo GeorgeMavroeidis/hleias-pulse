@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { StreakState } from "@/lib/hp/meet-store";
+import { initialsAvatarDataUri } from "@/lib/hp/avatar";
 
 interface Badge {
   id: string;
@@ -110,7 +111,7 @@ export function ProfileSheet({
             {/* Identity */}
             <div className="flex items-center gap-3 rounded-3xl border border-hp-ink/10 bg-hp-paper p-3.5">
               <img
-                src="https://i.pravatar.cc/120?img=22"
+                src={initialsAvatarDataUri(handle)}
                 alt={handle}
                 className="h-14 w-14 rounded-full border border-hp-ink/10 object-cover"
               />
