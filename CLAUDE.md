@@ -337,6 +337,52 @@ None are auto-loaded; open them explicitly.
 - **Process rule:** run `npm run audit:rls` and `npm run check:secrets` before every
   deploy — both scripts already exist, so this costs nothing but discipline
 
+## Worktrees — one checkout per task
+
+**Work in a worktree, not in the main checkout.** Create one per task:
+
+```sh
+npm run worktree:new -- fix/story-expiry
+```
+
+That makes `../worktrees/story-expiry/`, on a new branch off `origin/main`, with
+`node_modules` and `.env` linked so it can run immediately. Pass an existing
+branch name instead and it checks that out rather than creating one. When the
+work has merged: `git worktree remove ../worktrees/<name>`.
+
+**What a worktree is.** A second working directory that shares this repo's
+history but has its **own `HEAD`** (the branch it is on) and its **own index**
+(git's staging area — what `git add` writes to and `git commit` reads).
+
+**Why it is a rule and not a preference.** A clone has exactly one of each, so
+two sessions in one clone share both. On 2026-09-07 four sessions worked in this
+repo at once and it went wrong twice in one morning:
+
+- One session ran `git restore --staged` on its own six paths. One of those
+  paths was also staged by another session. The index stores content per path
+  with **no notion of who staged it**, so "unstage only my files" silently
+  unstaged the other session's file too. That commit went out missing the file
+  and failed the CI gate it had just added — and nobody caught it, because the
+  index had been _verified green a minute earlier_. Shared mutable state.
+- Another session then checked out a new branch in the shared tree. Every other
+  session's next commit would have landed on a branch it never chose. It went
+  unnoticed for hours, because nothing announces a `HEAD` change.
+
+Separate indexes and separate `HEAD`s make both impossible, instead of things
+four agents have to negotiate by message.
+
+**Two habits worth keeping anyway**, because they cost nothing:
+
+- Commit with an explicit pathspec — `git commit -- path/a path/b` — so a commit
+  never depends on ambient index state.
+- Verify the **commit**, not the index: `git show --stat <sha>`. A tree is
+  immutable; an index is not.
+
+**Where they live.** A sibling `worktrees/` directory, deliberately _outside_
+the repo: `eslint .` would lint a worktree nested inside it, and `npm run
+format` would rewrite files in it. Outside, there is nothing to ignore and
+nothing to commit by accident.
+
 ## Git Automation
 
 **Fully automatic, no need to ask:**
@@ -407,6 +453,7 @@ waiting on a second sign-off.
 
 **Workflow:**
 
+- **One worktree per task** — see below. Never two sessions in one checkout.
 - Branch per task, small commits, PR into `main`
 - Pull `main` before starting any new session
 - Keep `ROADMAP.md` current as work lands — it's the async handoff for "where are
