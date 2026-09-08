@@ -76,9 +76,12 @@ export const RULES: Rule[] = [
  * `sb_publishable_` is the browser key and belongs in source — it is in
  * src/lib/supabase/client.ts by design and is safe there precisely because RLS
  * is the boundary. This file itself carries every pattern above as source code,
- * so it has to exempt itself or it would always fail.
+ * so it has to exempt itself or it would always fail. Its test carries the same
+ * patterns plus the fixtures they are asserted against -- a connection string
+ * with a literal password in it is the thing the rule must catch, so the test
+ * has to contain one -- and is exempt for exactly the same reason.
  */
-const ALLOWED_PATH = /^scripts\/check-secrets\.ts$/;
+const ALLOWED_PATH = /^scripts\/check-secrets(?:\.test)?\.ts$/;
 const ALLOWED_VALUE = /\bsb_publishable_[A-Za-z0-9_-]+/g;
 
 /** Never allow these to be tracked at all, whatever is inside them. */
