@@ -55,10 +55,11 @@
  *   npm run smoke:verification-guards
  */
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
+
+import { readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
+import { createPgSession } from "./lib/pg";
 
 import { supabase } from "../src/lib/supabase/client";
 import { setBusinessVerification, setOrganizerVerification } from "../src/lib/admin-api";
@@ -70,7 +71,6 @@ import {
   updateOrganizerProfile,
 } from "../src/lib/hp-api";
 
-const projectRef = "kfxfnqryfmuxiwlswyyn";
 const stamp = Date.now();
 
 type Role = "applicant" | "impostor" | "owner";
@@ -85,131 +85,19 @@ type SmokeState = {
   users: Partial<Record<Role, string>>;
 };
 
-function readEnvValue(name: string) {
-  try {
-    const env = readFileSync(".env", "utf8");
-    const value = env
-      .split(/\n/)
-      .map((line) => line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/))
-      .find((match) => match?.[1] === name)?.[2]
-      ?.trim()
-      .replace(/^['"]|['"]$/g, "");
-    return value || process.env[name];
-  } catch {
-    return process.env[name];
-  }
-}
-
-function readSupabaseClientConfig() {
-  const source = readFileSync("src/lib/supabase/client.ts", "utf8");
-  const url = source.match(/const supabaseUrl = "([^"]+)"/)?.[1];
-  const publishableKey = source.match(/const supabasePublishableKey\s*=\s*"([^"]+)"/)?.[1];
-
-  if (!url || !publishableKey) {
-    throw new Error("Could not read Supabase URL/publishable key from src/lib/supabase/client.ts.");
-  }
-
-  return { publishableKey, url };
-}
-
-function readServiceRoleKey() {
-  const output = execFileSync(
-    "npx",
-    ["supabase", "projects", "api-keys", "--project-ref", projectRef, "--output", "json"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const parsed = JSON.parse(output);
-  const keys = Array.isArray(parsed) ? parsed : (parsed.api_keys ?? parsed.keys ?? []);
-  const serviceRole = keys.find((key: Record<string, unknown>) => {
-    const name = String(key.name ?? key.api_key_type ?? key.type ?? key.key_type ?? "");
-    return name === "service_role";
-  });
-  const value = serviceRole?.api_key ?? serviceRole?.key ?? serviceRole?.value;
-
-  if (typeof value !== "string" || value.length < 100) {
-    throw new Error("Could not read Supabase service_role key from the local CLI session.");
-  }
-
-  return value;
-}
-
-function createPgClient() {
-  const password = readEnvValue("SUPABASE_DB_PASSWORD");
-  if (!password) {
-    throw new Error("SUPABASE_DB_PASSWORD is missing. Put it in .env, like the other smokes.");
-  }
-
-  // This project (created 2026-08) is pooler-only — db.<ref>.supabase.co does
-  // not resolve. Only plain queries here (no `set role`), so transaction mode
-  // (port 6543) is the right fit. User is postgres.<ref>.
-  return new pg.Client({
-    host: "aws-0-eu-central-1.pooler.supabase.com",
-    port: 6543,
-    database: "postgres",
-    user: `postgres.${projectRef}`,
-    password,
-    ssl: { rejectUnauthorized: false },
-  });
-}
-
-/**
- * One shared connection with a listener on it, as in smoke-admin.ts. A dropped
- * pooled connection emits an `error` event, and an EventEmitter with no `error`
- * listener rethrows as an uncaught exception — which would kill the process
- * outside main()'s try/finally and leak the disposable users.
- */
-let shared: pg.Client | null = null;
-
-function isConnectionError(error: unknown) {
-  const code = (error as { code?: unknown } | null)?.code;
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    code === "ETIMEDOUT" ||
-    code === "ECONNRESET" ||
-    code === "EPIPE" ||
-    code === "57P01" || // admin_shutdown — the pooler recycled the backend
-    /connection terminated|connection error|socket hang up|server closed the connection/i.test(
-      message,
-    )
-  );
-}
-
-async function connectPg() {
-  if (shared) return shared;
-  const client = createPgClient();
-  client.on("error", (error: Error) => {
-    console.warn(`[pg] pooled connection dropped: ${error.message}`);
-    if (shared === client) shared = null;
-  });
-  await client.connect();
-  shared = client;
-  return client;
-}
-
 /**
  * Read committed state with the postgres superuser, bypassing RLS and the
- * client that attempted the write. Retries once, and only when the connection
- * itself failed — a SQL error is the answer an assertion wants.
+ * client that did the write. A silent zero-row UPDATE looks identical to a
+ * successful one from the caller's side; this is what tells them apart.
+ *
+ * Transaction mode (port 6543): this script runs only plain queries, never
+ * `set local role`, so it needs no pinned backend. The session holds one
+ * guarded connection and reopens it if the pooler drops it — see
+ * scripts/lib/pg.ts for why the listener on it is the whole point.
  */
-async function withPg<T>(run: (client: pg.Client) => Promise<T>): Promise<T> {
-  for (let attempt = 0; ; attempt += 1) {
-    const client = await connectPg();
-    try {
-      return await run(client);
-    } catch (error) {
-      if (attempt >= 1 || !isConnectionError(error)) throw error;
-      if (shared === client) shared = null;
-      await client.end().catch(() => {});
-      console.warn("[pg] retrying on a fresh connection");
-    }
-  }
-}
-
-async function closePg() {
-  const client = shared;
-  shared = null;
-  if (client) await client.end().catch(() => {});
-}
+const db = createPgSession("transaction", "verification");
+const withPg = db.withPg;
+const closePg = db.close;
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -274,7 +162,10 @@ async function main() {
     }
     console.log(`[auth] disposable users created: ${ROLES.join(", ")}`);
 
-    await withPg(async (client) => {
+    // `once`, not `withPg`: this inserts fixture rows and a replayed
+    // callback would fail on the duplicate key rather than the original
+    // connection error, hiding what actually went wrong.
+    await db.once(async (client) => {
       // Deleting the disposable owner in cleanup cascades into admin_members and
       // fires prevent_last_owner_removal(). If ours were the only owner that
       // trigger would refuse, and the fixture would be stuck. Refuse to start.
