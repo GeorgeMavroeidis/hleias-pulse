@@ -194,6 +194,7 @@ export function CreateComposerModal({
   onPlace,
   onStory,
   onEvent,
+  onQuestion,
 }: {
   open: boolean;
   initialMode?: ComposerMode;
@@ -212,6 +213,11 @@ export function CreateComposerModal({
   onPlace: (payload: CreatePulsePlaceInput) => Promise<void>;
   onStory: (payload: CreateStoryInput) => Promise<void>;
   onEvent: (payload: CreateMeetInput) => Promise<void>;
+  onQuestion: (payload: {
+    text: string;
+    placeId: string;
+    identity: PostingIdentity;
+  }) => Promise<void>;
 }) {
   const { language, t } = useI18n();
   const [mode, setMode] = useState<ComposerMode>("post");
@@ -314,6 +320,28 @@ export function CreateComposerModal({
         language === "GR"
           ? "Δεν ήταν δυνατή η αποθήκευση. Δοκίμασε ξανά."
           : "Could not save post. Try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleQuestionSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!requireComposerAccount()) return;
+    if (!text.trim() || !place) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onQuestion({ text: text.trim(), placeId: place, identity });
+      setText("");
+      setPlaceQuery("");
+    } catch (submitError) {
+      console.warn("Could not ask question.", submitError);
+      setError(
+        language === "GR"
+          ? "Δεν ήταν δυνατή η αποθήκευση. Δοκίμασε ξανά."
+          : "Could not save question. Try again.",
       );
     } finally {
       setSaving(false);
@@ -527,8 +555,8 @@ export function CreateComposerModal({
               </button>
             </div>
 
-            <div className="mb-4 grid grid-cols-4 gap-1 rounded-full border border-hp-ink/10 bg-white/50 p-1">
-              {(["post", "place", "story", "event"] as ComposerMode[]).map((option) => {
+            <div className="mb-4 grid grid-cols-5 gap-1 rounded-full border border-hp-ink/10 bg-white/50 p-1">
+              {(["post", "question", "place", "story", "event"] as ComposerMode[]).map((option) => {
                 const ModeIcon = COMPOSER_MODE_ICONS[option];
                 return (
                   <button
@@ -696,6 +724,73 @@ export function CreateComposerModal({
                   className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {saving ? t("Saving…") : t("Post")}
+                </button>
+              </form>
+            ) : mode === "question" ? (
+              <form
+                data-testid="composer-question-form"
+                onSubmit={handleQuestionSubmit}
+                className="hp-stagger space-y-3"
+              >
+                <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+                  <ImageBox
+                    src={selectedPlace.imageUrl}
+                    alt={selectedPlace.name}
+                    className="h-full w-full"
+                    rounded="rounded-2xl"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
+                  <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
+                    <ImagePlus size={12} />
+                    {t("Using {place} image", { place: selectedPlace.name })}
+                  </span>
+                </div>
+                <label htmlFor="create-question-text" className="sr-only">
+                  Question text
+                </label>
+                <textarea
+                  id="create-question-text"
+                  name="create-question-text"
+                  data-testid="composer-question-text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  autoComplete="off"
+                  placeholder={t("Ask something about this place…")}
+                  className={`${fieldClass()} resize-none`}
+                  rows={3}
+                />
+                {/* No "posting as" picker here on purpose — a question always
+                    goes out under the account's own identity. The other
+                    modes let you override it per-post; whether that should
+                    change too is a separate discussion. */}
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+                    {t("Location")}
+                  </div>
+                  <input
+                    type="hidden"
+                    id="create-question-place"
+                    name="create-question-place"
+                    data-testid="composer-question-place"
+                    value={place}
+                    readOnly
+                  />
+                  <SearchablePlacePicker
+                    places={places}
+                    value={place}
+                    onChange={setPlace}
+                    query={placeQuery}
+                    setQuery={setPlaceQuery}
+                  />
+                </div>
+                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                <button
+                  type="submit"
+                  data-testid="composer-question-submit"
+                  disabled={!text.trim() || saving}
+                  className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
+                >
+                  {saving ? t("Saving…") : t("Ask")}
                 </button>
               </form>
             ) : mode === "place" ? (

@@ -1151,6 +1151,82 @@ export async function createPulsePost(input: CreatePulsePostInput): Promise<Post
   return mapPost(result.data, {});
 }
 
+// "Ask a local" (FEATURES.md): a question is a Post of kind 'question' —
+// same table, same RLS, same moderation/report path as every other post.
+// Answers are ordinary comments against this post's id, added through the
+// existing addComment flow; nothing new needed there.
+export interface CreatePulseQuestionInput {
+  text: string;
+  place: Place;
+  identity?: Author["type"];
+  profileId?: string | null;
+  authorName?: string;
+}
+
+export async function askQuestion(input: CreatePulseQuestionInput): Promise<Post> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+  const identity = authorType(input.identity);
+  const identityTag = identity.toLowerCase();
+  const id = `user-question-${Date.now()}-${randomIdSuffix()}`;
+
+  const result = await client
+    .from("posts")
+    .insert({
+      id,
+      author_id: "you",
+      place_id: input.place.id,
+      kind: "question",
+      display_time: "just now",
+      text: input.text,
+      tags: [identityTag, "question"],
+      likes_count: 0,
+      image_url: input.place.imageUrl,
+      user_id: userId,
+      profile_id: input.profileId ?? null,
+      posting_identity: identity,
+      author_kind: "user",
+      moderation_status: "pending",
+      sort_order: -Math.floor(Date.now() / 1000),
+    })
+    .select(POST_RETURN_COLUMNS)
+    .single();
+
+  if (result.error) throw result.error;
+  return mapPost(result.data, {});
+}
+
+// Web push (FEATURES.md → Ask a local: "someone answered your question").
+// The actual sending happens server-side (supabase/functions/send-push),
+// triggered by a database trigger on new comments — these three just manage
+// this browser's subscription row so that trigger has somewhere to look.
+export interface PushSubscriptionKeys {
+  endpoint: string;
+  p256dh: string;
+  authKey: string;
+}
+
+export async function savePushSubscription(sub: PushSubscriptionKeys): Promise<void> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+  const result = await client.from("push_subscriptions").upsert(
+    {
+      user_id: userId,
+      endpoint: sub.endpoint,
+      p256dh: sub.p256dh,
+      auth_key: sub.authKey,
+    },
+    { onConflict: "endpoint" },
+  );
+  if (result.error) throw result.error;
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  const client = assertSupabase();
+  const result = await client.from("push_subscriptions").delete().eq("endpoint", endpoint);
+  if (result.error) throw result.error;
+}
+
 export async function createPulsePlace(input: CreatePulsePlaceInput): Promise<Place> {
   const client = assertSupabase();
   const userId = await ensurePulseUserId();
