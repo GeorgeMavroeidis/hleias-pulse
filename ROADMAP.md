@@ -82,9 +82,21 @@ free-tier services. The paid/Apple track starts in February.
    one guarded connection helper (`scripts/lib/pg.ts`) instead of eight
    hand-copied ones. Left over: `smoke:admin`, `smoke:routes` and
    `smoke:verification-guards` still carry their own copy of that block.
-3. **Confirm the web deploy works end to end.** `npm run deploy:worker` uploads
-   to Cloudflare (free tier) — nobody has verified the deployed site actually
-   runs, only that the script exists. May need a free Cloudflare account first.
+3. **Confirm the web deploy works end to end** — *build artifact verified
+   (2026-09-07), actual live Cloudflare deploy still unverified.* Built
+   `cloudflare-static-dist` fresh off `main` and served it through
+   `wrangler dev` (the same static-assets + SPA-fallback runtime Cloudflare
+   uses, no account needed to run it locally): onboarding, map, Pulse feed,
+   story viewer and the `/admin` gate all loaded correctly, and — worth
+   calling out — `/admin` returned 200 (not a 404) confirming the SPA
+   fallback the `window.location.pathname` check depends on actually works
+   under Cloudflare-style routing, not just `vite dev`. Only console noise:
+   expected, already-handled CORS failures from `image-cache.ts`'s optional
+   thumbnail cache hitting external hosts with no CORS headers (pravatar,
+   municipal tourism sites) — it degrades to the plain image URL by design,
+   confirmed still rendering fine. **What's left:** nobody has run
+   `npm run deploy:worker` against the real Cloudflare account or checked the
+   live `*.workers.dev` URL — needs whoever holds that account.
 4. **Error tracking + rate limiting.** Error tracking on a free tier (e.g. Sentry
    ~5k errors/month free) so a crash in the wild is visible; rate limiting at the
    app or database layer (no paid service needed) so one account can't run up
