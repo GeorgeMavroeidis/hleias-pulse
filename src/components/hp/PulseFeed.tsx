@@ -1,7 +1,15 @@
 import { DISCOVERY_PLACE_IDS, DISCOVERY_MILESTONE } from "./pulse-shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Map as MapIcon, Bookmark, Heart, MessageCircle, Share2, MapPin } from "lucide-react";
+import {
+  Map as MapIcon,
+  Bookmark,
+  Heart,
+  MessageCircle,
+  Share2,
+  MapPin,
+  HelpCircle,
+} from "lucide-react";
 import {
   typeColor,
   authorTypeColor,
@@ -168,6 +176,11 @@ export function PulseFeed({
                     >
                       {a.type}
                     </span>
+                    {post.kind === "question" && (
+                      <span className="inline-flex items-center gap-0.5 rounded-sm bg-hp-sea px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-ink">
+                        <HelpCircle size={9} /> {t("Question")}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-hp-muted">
                     <MapPin size={9} /> {p.name} · {displayPostTime(post)}
@@ -238,7 +251,14 @@ export function PulseFeed({
                     className="inline-flex items-center gap-1"
                     aria-label={t("Open comments")}
                   >
-                    <MessageCircle size={15} /> {commentCount}
+                    <MessageCircle size={15} />{" "}
+                    {post.kind === "question"
+                      ? commentCount === 0
+                        ? t("No answers yet")
+                        : t(commentCount === 1 ? "{n} answer" : "{n} answers", {
+                            n: commentCount,
+                          })
+                      : commentCount}
                   </button>
                   <button
                     type="button"

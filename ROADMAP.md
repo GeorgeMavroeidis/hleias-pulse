@@ -45,11 +45,16 @@ free-tier services. The paid/Apple track starts in February.
 
 ## Next up (ordered) — free work first
 
-1. **Story expiry.** Expired stories are still readable straight off the table
-   (the 6h/24h cutoff lives only in `get_pulse_bootstrap()`, not the row-security
-   policy) and nothing ever deletes them. Add the cutoff to the policy **and**
-   decide a deletion schedule — user photos tied to a location, so EU privacy law
-   applies. One migration + a cleanup job. See `IDEAS.md` → Security.
+1. **Story expiry** — *read-side closed (2026-09-07).* The 6h/24h cutoff used
+   to live only in `get_pulse_bootstrap()`, not the row-security policy —
+   anyone with the public API key could read a story straight off the table
+   after it "expired" in the UI. `20260907140000_enforce_story_expiry_rls.sql`
+   moved the same check into the policy itself; applied to the live database.
+   **Still open, and it's a product call, not an engineering one:** nothing
+   deletes expired rows (or their media in the `content-media` Storage
+   bucket) — this stops them being *read*, not stores them forever. Needs a
+   retention-period decision before a deletion job is worth building. See
+   `IDEAS.md` → Security.
 2. **Test coverage for the untested modules** — *mostly done (2026-09-07).*
    `smoke:admin` now covers the whole owner/editor/moderator permission model,
    including the privilege-escalation path; `smoke:verification-guards` covers
@@ -72,9 +77,21 @@ free-tier services. The paid/Apple track starts in February.
    one guarded connection helper (`scripts/lib/pg.ts`) instead of eight
    hand-copied ones. Left over: `smoke:admin`, `smoke:routes` and
    `smoke:verification-guards` still carry their own copy of that block.
-3. **Confirm the web deploy works end to end.** `npm run deploy:worker` uploads
-   to Cloudflare (free tier) — nobody has verified the deployed site actually
-   runs, only that the script exists. May need a free Cloudflare account first.
+3. **Confirm the web deploy works end to end** — *build artifact verified
+   (2026-09-07), actual live Cloudflare deploy still unverified.* Built
+   `cloudflare-static-dist` fresh off `main` and served it through
+   `wrangler dev` (the same static-assets + SPA-fallback runtime Cloudflare
+   uses, no account needed to run it locally): onboarding, map, Pulse feed,
+   story viewer and the `/admin` gate all loaded correctly, and — worth
+   calling out — `/admin` returned 200 (not a 404) confirming the SPA
+   fallback the `window.location.pathname` check depends on actually works
+   under Cloudflare-style routing, not just `vite dev`. Only console noise:
+   expected, already-handled CORS failures from `image-cache.ts`'s optional
+   thumbnail cache hitting external hosts with no CORS headers (pravatar,
+   municipal tourism sites) — it degrades to the plain image URL by design,
+   confirmed still rendering fine. **What's left:** nobody has run
+   `npm run deploy:worker` against the real Cloudflare account or checked the
+   live `*.workers.dev` URL — needs whoever holds that account.
 4. **Error tracking + rate limiting.** Error tracking on a free tier (e.g. Sentry
    ~5k errors/month free) so a crash in the wild is visible; rate limiting at the
    app or database layer (no paid service needed) so one account can't run up
