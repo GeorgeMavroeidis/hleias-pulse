@@ -1196,6 +1196,37 @@ export async function askQuestion(input: CreatePulseQuestionInput): Promise<Post
   return mapPost(result.data, {});
 }
 
+// Web push (FEATURES.md → Ask a local: "someone answered your question").
+// The actual sending happens server-side (supabase/functions/send-push),
+// triggered by a database trigger on new comments — these three just manage
+// this browser's subscription row so that trigger has somewhere to look.
+export interface PushSubscriptionKeys {
+  endpoint: string;
+  p256dh: string;
+  authKey: string;
+}
+
+export async function savePushSubscription(sub: PushSubscriptionKeys): Promise<void> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+  const result = await client.from("push_subscriptions").upsert(
+    {
+      user_id: userId,
+      endpoint: sub.endpoint,
+      p256dh: sub.p256dh,
+      auth_key: sub.authKey,
+    },
+    { onConflict: "endpoint" },
+  );
+  if (result.error) throw result.error;
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  const client = assertSupabase();
+  const result = await client.from("push_subscriptions").delete().eq("endpoint", endpoint);
+  if (result.error) throw result.error;
+}
+
 export async function createPulsePlace(input: CreatePulsePlaceInput): Promise<Place> {
   const client = assertSupabase();
   const userId = await ensurePulseUserId();

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
@@ -10,10 +11,19 @@ import {
   Sun,
   Music2,
   Route,
+  Bell,
+  BellOff,
   type LucideIcon,
 } from "lucide-react";
 import type { StreakState } from "@/lib/hp/meet-store";
 import { initialsAvatarDataUri } from "@/lib/hp/avatar";
+import {
+  disablePushNotifications,
+  enablePushNotifications,
+  getExistingPushSubscription,
+  getPushPermission,
+  isPushSupported,
+} from "@/lib/hp/push";
 
 interface Badge {
   id: string;
@@ -69,6 +79,40 @@ export function ProfileSheet({
 }: Props) {
   const earned = badges.filter((b) => b.earned).length;
   const rank = leaderboard.findIndex((r) => r.you) + 1;
+
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    getExistingPushSubscription()
+      .then((sub) => setPushOn(Boolean(sub)))
+      .catch(() => setPushOn(false));
+  }, [open]);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    setPushError(null);
+    try {
+      if (pushOn) {
+        await disablePushNotifications();
+        setPushOn(false);
+      } else {
+        await enablePushNotifications();
+        setPushOn(true);
+      }
+    } catch (err) {
+      setPushError(
+        getPushPermission() === "denied"
+          ? "Έχεις μπλοκάρει τις ειδοποιήσεις για αυτή τη σελίδα στον browser σου."
+          : "Δεν ήταν δυνατή η ενεργοποίηση ειδοποιήσεων.",
+      );
+      console.warn("Push toggle failed.", err);
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -242,6 +286,44 @@ export function ProfileSheet({
               </div>
               <ChevronRight size={16} className="text-hp-muted" />
             </button>
+
+            {isPushSupported() && (
+              <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3">
+                <button
+                  type="button"
+                  onClick={togglePush}
+                  disabled={pushBusy}
+                  className="flex w-full items-center gap-3 text-left disabled:opacity-60"
+                >
+                  <span
+                    className={`grid h-10 w-10 place-items-center rounded-full ${pushOn ? "bg-hp-sunset/15 text-hp-sunset" : "bg-hp-ink/5 text-hp-ink"}`}
+                  >
+                    {pushOn ? <Bell size={16} /> : <BellOff size={16} />}
+                  </span>
+                  <div className="flex-1">
+                    <div className="text-[13px] font-black text-hp-ink">Ειδοποιήσεις</div>
+                    <div className="text-[11px] text-hp-muted">
+                      {pushBusy
+                        ? "..."
+                        : pushOn
+                          ? "Θα σε ειδοποιούμε όταν κάποιος απαντήσει σε ερώτησή σου"
+                          : "Ενεργοποίησε για να μαθαίνεις όταν σου απαντούν"}
+                    </div>
+                  </div>
+                  <span
+                    className={`h-6 w-11 shrink-0 rounded-full p-0.5 transition ${pushOn ? "bg-hp-sunset" : "bg-hp-ink/15"}`}
+                    aria-hidden="true"
+                  >
+                    <span
+                      className={`block h-5 w-5 rounded-full bg-white transition ${pushOn ? "translate-x-5" : "translate-x-0"}`}
+                    />
+                  </span>
+                </button>
+                {pushError && (
+                  <p className="mt-2 text-[11px] font-semibold text-hp-sunset">{pushError}</p>
+                )}
+              </div>
+            )}
 
             <p className="mt-4 text-center text-[10px] text-hp-muted">
               ΗΛΕΙΑ PULSE · ο λογαριασμός σου συγχρονίζεται με ασφάλεια

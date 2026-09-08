@@ -7,7 +7,17 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["cloudflare-static-dist", "dist", ".output", ".tanstack", ".vinxi", "supabase/.temp"],
+    ignores: [
+      "cloudflare-static-dist",
+      "dist",
+      ".output",
+      ".tanstack",
+      ".vinxi",
+      "supabase/.temp",
+      // Deno runtime (edge functions) — a different global scope (Deno, npm:
+      // specifiers) than the browser/Node projects this config covers.
+      "supabase/functions",
+    ],
   },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
