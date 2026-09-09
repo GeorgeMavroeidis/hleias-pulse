@@ -50,10 +50,11 @@ export const projectRef = readEnvValue("SUPABASE_PROJECT_REF") ?? PRODUCTION_PRO
  * Refuse to touch production from CI.
  *
  * The smoke scripts create and delete real rows and real auth users. Running
- * them on every pull request is fine against a disposable CI project and is not
- * fine against the database serving users — and the difference between those
- * two is a handful of environment variables that somebody will eventually get
- * wrong. This makes that mistake loud instead of destructive.
+ * them on every pull request is fine against the throwaway stack CI builds with
+ * `supabase start`, and is not fine against the database serving users — and the
+ * difference between those two is a handful of environment variables that
+ * somebody will eventually get wrong. This makes that mistake loud instead of
+ * destructive.
  *
  * Called from the two chokepoints every script passes through: the service_role
  * key (which grants write access over PostgREST) and the Postgres client config
@@ -64,9 +65,11 @@ export function assertTargetIsSafeForCI() {
   if (projectRef === PRODUCTION_PROJECT_REF) {
     throw new Error(
       "Refusing to run against the production Supabase project from CI. These scripts " +
-        "create and delete real rows and real auth users. Point CI at its own project by " +
-        "setting SUPABASE_PROJECT_REF, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY and " +
-        "SUPABASE_DB_HOST to the CI project's values.",
+        "create and delete real rows and real auth users. CI is meant to run against the " +
+        "local stack (`supabase start`) — see .github/workflows/smoke.yml, which sets " +
+        "SUPABASE_PROJECT_REF, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_DB_HOST " +
+        "and SUPABASE_DB_PASSWORD from `supabase status`. Reaching this error means one " +
+        "of those did not get set, so the scripts fell back to the production default.",
     );
   }
 }
@@ -84,8 +87,11 @@ export function readSupabaseClientConfig() {
   if (envUrl && envKey) return { publishableKey: envKey, url: envUrl };
 
   const source = readFileSync("src/lib/supabase/client.ts", "utf8");
-  const url = source.match(/const supabaseUrl = "([^"]+)"/)?.[1];
-  const publishableKey = source.match(/const supabasePublishableKey\s*=\s*"([^"]+)"/)?.[1];
+  // Matches the production constants, not the resolved values: since the client
+  // module gained a Node-only override, `supabaseUrl` there is an expression
+  // rather than a literal. These two are still the project the app ships with.
+  const url = source.match(/const productionUrl = "([^"]+)"/)?.[1];
+  const publishableKey = source.match(/const productionPublishableKey\s*=\s*"([^"]+)"/)?.[1];
 
   if (!url || !publishableKey) {
     throw new Error("Could not read Supabase URL/publishable key from src/lib/supabase/client.ts.");

@@ -39,6 +39,19 @@
  *
  * Pick "session" if the script ever says `set local role`. Otherwise
  * "transaction".
+ *
+ * ## What CI does NOT check, stated plainly
+ *
+ * CI runs these scripts against the LOCAL stack (`supabase start`), which has
+ * no pooler: both modes reach the same Postgres directly, with session
+ * semantics. Session semantics are the more permissive of the two, so a script
+ * that wrongly assumes state survives between statements passes in CI and could
+ * still fail against the hosted pooler in "transaction" mode.
+ *
+ * So CI proves the SQL and the policies are right. It does not prove the pooler
+ * mode chosen for each script is right. That distinction is only exercised by
+ * running the suite against the hosted project from a maintainer's machine,
+ * which is still worth doing before anything ships.
  */
 import pg from "pg";
 
@@ -48,11 +61,27 @@ export type PoolerMode = "session" | "transaction";
 
 /**
  * The pooler host is REGION-specific — `aws-0-<region>.pooler.supabase.com` —
- * so a second project in another region needs a different one. Overridable for
- * exactly that reason; the default is this project's own region.
+ * so a project in another region needs a different one. Overridable for exactly
+ * that reason; the default is this project's own region.
  */
-const POOLER_HOST = readEnvValue("SUPABASE_DB_HOST") ?? "aws-0-eu-central-1.pooler.supabase.com";
+const DB_HOST = readEnvValue("SUPABASE_DB_HOST") ?? "aws-0-eu-central-1.pooler.supabase.com";
 const POOLER_PORT: Record<PoolerMode, number> = { session: 5432, transaction: 6543 };
+
+/** `[db] port` in supabase/config.toml — the local stack's Postgres. */
+const LOCAL_DB_PORT = 54322;
+
+/**
+ * Is the target the local Supabase stack (`supabase start`) rather than a
+ * hosted project?
+ *
+ * This is one decision, not four knobs, because the three settings below only
+ * make sense together — a half-configured target fails in a confusing way. CI
+ * runs against the local stack (see .github/workflows/smoke.yml); a maintainer's
+ * machine runs against the hosted project.
+ */
+function isLocalStack(host: string) {
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
 
 function clientConfig(mode: PoolerMode): pg.ClientConfig {
   // The other chokepoint, alongside readServiceRoleKey(). Direct Postgres access
@@ -66,13 +95,21 @@ function clientConfig(mode: PoolerMode): pg.ClientConfig {
     );
   }
 
+  const local = isLocalStack(DB_HOST);
+
   return {
-    host: POOLER_HOST,
-    port: POOLER_PORT[mode],
+    host: DB_HOST,
+    // The local stack has no pooler, so both modes reach the same Postgres. See
+    // the fidelity note in the module docstring above.
+    port: Number(readEnvValue("SUPABASE_DB_PORT")) || (local ? LOCAL_DB_PORT : POOLER_PORT[mode]),
     database: "postgres",
-    user: `postgres.${projectRef}`,
+    // The pooler wants `postgres.<ref>` to route to a project. Plain Postgres
+    // wants the role name.
+    user: readEnvValue("SUPABASE_DB_USER") ?? (local ? "postgres" : `postgres.${projectRef}`),
     password,
-    ssl: { rejectUnauthorized: false },
+    // A container on loopback serves no certificate; asking for TLS there fails
+    // the connection outright rather than degrading.
+    ssl: local ? false : { rejectUnauthorized: false },
   };
 }
 

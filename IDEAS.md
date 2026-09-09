@@ -155,7 +155,7 @@
 
   What it retains is an opaque uuid and nothing else — no name, no email. The
   `details` payloads carry roles and status transitions, not personal fields,
-  and the earlier choice to log a deleted business/organizer *without* the
+  and the earlier choice to log a deleted business/organizer _without_ the
   applicant's `user_id` still stands. **Keep it that way:** these rows are now
   permanent, so nothing personal should ever be written into them.
 
@@ -186,7 +186,7 @@
   column exists without a foreign key, so `actor_id` becomes the only place the
   id survives. Re-check that if a table ever stores a user id loosely.
 
-  **Still open, and smaller:** the retention *period*. Keeping the trail
+  **Still open, and smaller:** the retention _period_. Keeping the trail
   indefinitely is a decision nobody has actually made, and GDPR wants a stated
   period rather than "forever by default". Not urgent while there are no
   outside users, but it should not be forgotten either.
@@ -198,7 +198,7 @@
   foreign key back to any of them — so a fixture touching those tables now
   leaves audit rows the `auth.users` cascade never reaches. The existing "sweep
   `admin_audit_logs` by `actor_id`" cleanup missed them for two independently
-  sufficient reasons: the trigger fires *during* the cascade, i.e. after that
+  sufficient reasons: the trigger fires _during_ the cascade, i.e. after that
   sweep has already run, and it records `actor_id` as null anyway, because the
   `postgres` role has no `auth.uid()`. Fixed in `d383700` with a second pass
   keyed on `entity_id`. `20260907170000` sharpens the rule rather than softening
@@ -231,11 +231,11 @@ already taken. Two separate problems, one worse than the other.
   production has been running since 2026-09-07. Anyone reading `main` to
   understand the schema is reading a version that has not existed for a while.
 
-  *(Verified directly: the file's location, its absence from `main`, and the
-  complete absence of any `20260907150000_*` file. The claim that both versions
-  are marked applied in `supabase_migrations.schema_migrations` comes from the
+  \_(Verified directly: the file's location, its absence from `main`, and the
+  complete absence of any `20260907150000\__`file. The claim that both versions
+  are marked applied in`supabase_migrations.schema_migrations` comes from the
   session that queried production; this session has opened no database
-  connection.)*
+  connection.)\*
 
   **The general rule this earns:** applying a migration to production before its
   branch merges makes the version number unavailable to everyone else while
@@ -338,27 +338,43 @@ coordination failed four times, and three of the four are now caught by
   **The general rule:** a new `AFTER DELETE` trigger writing to a table with no
   FK back to its subject changes the cleanup contract of every existing fixture.
   _Prevention:_ `.github/workflows/smoke.yml` runs the smoke suite on every PR,
-  against a **CI-only Supabase project**, with the schema rebuilt from
-  `supabase/migrations` first — so a migration that changes an invariant other
-  tests depend on now fails a check instead of waiting to be noticed by a reader.
+  against a **Supabase stack built inside the runner** (`supabase start`), whose
+  schema is rebuilt from `supabase/migrations` from empty every run — so a
+  migration that changes an invariant other tests depend on now fails a check
+  instead of waiting to be noticed by a reader.
 
-- **Setup still owed before that workflow can pass.** Create a second (free)
-  Supabase project used only by CI, then add six values to a `ci-database`
-  GitHub Environment: `SUPABASE_PROJECT_REF`, `SUPABASE_URL`,
-  `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_HOST` (the pooler host is
-  region-specific, so a project in another region needs a different one),
-  `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_PASSWORD`. **All six must describe
-  the CI project, never production.**
-  Why a second project rather than pointing CI at the real one: a service_role
-  key bypasses every RLS policy, and a GitHub Environment does not stop somebody
-  who can land a workflow-file edit from reading the secret, nor a third-party
-  action in that job from exfiltrating it. Against a disposable project a leak
-  costs a rebuild; against production it is a breach. `assertTargetIsSafeForCI()`
-  in `scripts/lib/env.ts` refuses to run when `CI` is set and the target is still
-  the production ref, so a misconfigured secret fails loudly rather than quietly
-  writing to the database serving users. Raised by the "TypeScript coverage"
-  session, which pointed out that "run the smokes in CI" and "give CI a
-  production service_role key" are two separate decisions.
+- **Why CI builds its own database instead of using a hosted one.** The smoke
+  scripts need a `service_role` key, which bypasses every RLS policy: total
+  read/write on whatever it points at. Pointing that at production is a breach
+  waiting to happen — a GitHub Environment does not stop somebody who can land a
+  workflow-file edit from reading the secret, nor a third-party action in that
+  job from exfiltrating it — and the scripts also create and delete real users
+  and rows, which is a poor thing to do to the database serving users on every
+  pull request.
+  The obvious answer, a second hosted project, **is not available**: Supabase's
+  free plan allows one project per organisation, and a second would need Pro,
+  against this repo's no-spending-until-February-2027 constraint (`ROADMAP.md`).
+  So CI runs `supabase start` instead, building Postgres, Auth and PostgREST in
+  Docker on the runner and destroying them with it. This is better than the
+  second project would have been, not merely cheaper:
+  - **There is no real credential to protect.** The local stack's `anon` and
+    `service_role` keys are fixed values published in Supabase's own docs,
+    identical on every machine. The secret that needed guarding does not exist.
+  - **A fresh database every run**, so no leftover fixtures accumulate and runs
+    cannot contend over the same rows — which is why the workflow's concurrency
+    group is per-ref and may cancel, unlike the repo-wide serialisation a shared
+    project forced.
+  - **The schema comes from the migration list from empty**, so it cannot drift
+    the way a long-lived project does — including the way production did.
+    `assertTargetIsSafeForCI()` in `scripts/lib/env.ts` still refuses to run when
+    `CI` is set and the target is the production ref, and the workflow asserts that
+    guard actually fires before running anything that writes.
+    **What this does not cover:** the local stack has no connection pooler, so
+    every script gets session semantics whichever mode it asked for. A script that
+    wrongly assumes state survives between statements passes in CI and could still
+    fail against the hosted pooler in transaction mode. Running the suite against
+    the hosted project from a maintainer's machine is still worth doing before
+    anything ships — see the fidelity note in `scripts/lib/pg.ts`.
 
 - **`check:secrets` only sees tracked files.** It scans `git ls-files`, so a
   secret sitting in an untracked file is invisible to it. `npm run preflight`
@@ -367,6 +383,78 @@ coordination failed four times, and three of the four are now caught by
   untracked file. Lower priority than it sounds, since an untracked file cannot
   be committed by accident the way a tracked one can, but it is a real gap.
   Raised by the "TypeScript coverage" session.
+
+### Rebuilding the database from migrations (2026-09-09)
+
+**One root cause, seven symptoms.** The first CI run to build the schema from
+empty found that `supabase/migrations` could not reproduce the database. Every
+failure is the same shape: a migration that fixes up _the rows that already
+exist_ and then changes the rule for newcomers — correct against production,
+quietly wrong against nothing. They accumulated because nothing had ever built
+from scratch.
+
+`CLAUDE.md` says schema changes go through migrations so the database can always
+be reproduced. Until this pass, it could not be: a recovery, a new environment,
+or a second maintainer's local stack would all have failed.
+
+**Fixed (in the CI-smokes work):**
+
+1. `20260617161000` inserted demo stories referencing ten `places`. No migration
+   creates places — they exist only in `supabase/seed.sql`, which runs _after_
+   every migration. Now guarded on those places existing.
+2. `supabase/seed.sql` omitted `stories.media_url`, which `20260617161000` made
+   `NOT NULL` after backfilling the rows that existed at the time. The generator
+   now emits it, mirroring the migration's own backfill.
+3. Seeded `places`, `posts`, `comments` and `stories` landed as
+   `moderation_status = 'pending'`, because `20260824090000` published the rows
+   that existed and then set the default to `pending`. Every public read policy
+   requires `published`, so **a rebuilt database showed the app an empty map**
+   with all the data present but invisible. The seed now sets it explicitly.
+4. `src/lib/supabase/client.ts` hardcoded production and read nothing from the
+   environment, so the six scripts that import the app singleton reached the live
+   database from CI — and did, for one read. `assertTargetIsSafeForCI()` did not
+   catch it: it guards the Postgres connection and the service_role key, and this
+   was a third path through neither. The client now takes a Node-only override
+   and refuses to be production when `CI` is set.
+5. `businesses` had a policy `"Public can read verified businesses" ... to anon`
+   but no matching `grant ... to anon`; Postgres checks privileges _before_ RLS,
+   so that policy had been dead since the table was created. **Anonymous readers
+   — tourists, half the audience — got `permission denied` instead of a feed.**
+   Fixed in `20260909100000`. The live database already had the grant, so this
+   changes nothing there; it makes the migration list reproduce what exists.
+6. `smoke:post-write` never signed in, and `createPulsePost` has required a
+   session since `ensurePulseUserId()` was added. It could not have passed on any
+   machine. Nothing noticed because nothing ran it — while this file and
+   `CLAUDE.md` both listed posts as covered by it.
+
+**Still open:**
+
+- **Seeded Meet events.** `20260617161000` defines six demo Meet events
+  (`meet-kourouta-sunset-swim`, `meet-amaliada-panigyri`, `meet-foloi-cleanup`,
+  `meet-katakolo-coffee`, `meet-pyrgos-night`, `meet-zacharo-sunset`) but inserts
+  them with `join public.places`, which matches nothing at migration time. So a
+  rebuilt database has **no Meet events at all** and the Meet tab is empty.
+  `smoke:live-surfaces` fails on this. The test cannot simply make its own:
+  `createPulseMeetEvent` writes `moderation_status: 'pending'` and the public
+  read policy requires `'published'`, so a new Meet is invisible by design.
+  _Recommended fix:_ transplant those six into the seed, where places exist by
+  the time it runs — the same data, somewhere it can execute. **It is a product
+  call whether a fresh install should ship with demo Meets, which is why this was
+  left rather than decided.**
+- **Six smoke scripts never reached**, so their state against a from-scratch
+  database is unknown: `moderation`, `block-enforcement`, `deal-race`, `admin`,
+  `verification-guards`, `routes`. Expect more of the same class.
+- **`audit:rls --check` unverified** against a rebuilt schema. It would prove the
+  migrations alone reproduce the policy set, which is exactly the property in
+  doubt — worth running first when this is picked up.
+- **`.github/workflows/smoke.yml` runs only the two scripts that pass.** Add them
+  back one at a time as each is fixed. A permanently red check trains people to
+  ignore red, which costs more than the coverage is worth.
+
+**The general rule worth remembering:** a migration that backfills existing rows
+and then changes the default is invisible to anything created afterwards — and
+the seed always runs afterwards. When writing one, ask what it does to a database
+with no rows in it.
 
 ## Open Questions
 
