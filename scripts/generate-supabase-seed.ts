@@ -34,6 +34,25 @@ function uuidFromSeed(seed: string): string {
   ].join("-");
 }
 
+/**
+ * `stories.media_url` is NOT NULL.
+ *
+ * 20260617161000 added the column nullable, backfilled it from the story's own
+ * place, and only then applied the constraint — so the backfill covered every
+ * row that existed at the time and the seed was never updated to match. On a
+ * database built from empty the migration backfills nothing (stories is still
+ * empty), and this seed then inserted a NULL into a NOT NULL column.
+ *
+ * Mirroring the migration's backfill rather than inventing a value keeps the two
+ * agreeing: the place's image, with the same fallback the migration used.
+ */
+function storyMediaUrl(placeId: string) {
+  return (
+    PLACES.find((place) => place.id === placeId)?.imageUrl ??
+    "/story-feature/kourouta-online-story.jpg"
+  );
+}
+
 function insertRows(
   table: string,
   columns: string[],
@@ -264,12 +283,13 @@ const sections = [
   ),
   insertRows(
     "stories",
-    ["id", "label", "place_id", "position"],
+    ["id", "label", "place_id", "position", "media_url"],
     STORIES.map((story, index) => [
       `story-${slug(story.label)}`,
       story.label,
       story.placeId,
       index,
+      storyMediaUrl(story.placeId),
     ]),
     "id",
   ),

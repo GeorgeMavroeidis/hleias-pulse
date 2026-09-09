@@ -333,19 +333,20 @@ on conflict (route_id, position) do update set
     title = excluded.title,
     body = excluded.body;
 
-insert into public.stories (id, label, place_id, position)
+insert into public.stories (id, label, place_id, position, media_url)
 values
-  ('story-kourouta', 'Kourouta', 'kourouta-beach', 0),
-  ('story-zacharo', 'Zacharo', 'zacharo-beach', 1),
-  ('story-olympia', 'Olympia', 'ancient-olympia', 2),
-  ('story-foloi', 'Foloi', 'foloi-forest', 3),
-  ('story-katakolo', 'Katakolo', 'katakolo-port', 4),
-  ('story-andritsaina', 'Andritsaina', 'andritsaina', 5),
-  ('story-kyllini', 'Kyllini', 'kyllini-beach', 6)
+  ('story-kourouta', 'Kourouta', 'kourouta-beach', 0, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg/1280px-%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg'),
+  ('story-zacharo', 'Zacharo', 'zacharo-beach', 1, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/500px_photo_%28255278229%29.jpeg/1280px-500px_photo_%28255278229%29.jpeg'),
+  ('story-olympia', 'Olympia', 'ancient-olympia', 2, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg'),
+  ('story-foloi', 'Foloi', 'foloi-forest', 3, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg'),
+  ('story-katakolo', 'Katakolo', 'katakolo-port', 4, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg'),
+  ('story-andritsaina', 'Andritsaina', 'andritsaina', 5, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Andritsaina_overview.jpg/1280px-Andritsaina_overview.jpg'),
+  ('story-kyllini', 'Kyllini', 'kyllini-beach', 6, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg/1280px-Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg')
 on conflict (id) do update set
     label = excluded.label,
     place_id = excluded.place_id,
-    position = excluded.position;
+    position = excluded.position,
+    media_url = excluded.media_url;
 
 insert into public.vibe_chips (id, label, position)
 values
