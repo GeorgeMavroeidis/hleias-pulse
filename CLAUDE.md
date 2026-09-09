@@ -282,9 +282,20 @@ your local CLI session, and `smoke:admin` / `smoke:block-enforcement` /
 `smoke:verification-guards` / `audit:rls` additionally need
 `SUPABASE_DB_PASSWORD` in `.env` for a direct `pg` connection — via the pooler
 (`aws-0-eu-central-1.pooler.supabase.com`, user `postgres.<ref>`), because this
-project has no `db.<ref>.supabase.co` direct host. None of them can run in CI,
-and none should be run
-casually against production.
+project has no `db.<ref>.supabase.co` direct host.
+
+**Run locally, they hit production — so don't run them casually.** In CI they do
+not: `.github/workflows/smoke.yml` runs the whole suite against a throwaway
+Supabase stack built inside the runner with `supabase start`, whose schema is
+rebuilt from `supabase/migrations` from empty every run. Nothing about that
+touches the live project, and no real credential is involved — the local stack's
+keys are fixed public development values. `assertTargetIsSafeForCI()` in
+`scripts/lib/env.ts` throws if `CI` is set and the target is still the production
+ref, so a misconfigured run fails loudly instead of writing to the live database.
+What CI cannot check is pooler behaviour: the local stack has no pooler, so every
+script gets session semantics whichever mode it asked for (see the fidelity note
+in `scripts/lib/pg.ts`). Running the suite against the hosted project by hand is
+still worth doing before anything ships.
 
 ## Where things stand
 
