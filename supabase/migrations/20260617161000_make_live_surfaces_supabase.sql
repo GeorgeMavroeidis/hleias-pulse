@@ -340,94 +340,143 @@ create policy "Users can create own activity days"
 on public.user_activity_days for insert to authenticated
 with check (user_id = (select auth.uid()));
 
-insert into public.stories (
-  id, label, place_id, position, kind, author_name, author_type, author_avatar_url,
-  media_url, caption, expires_after_hours, crowd, parking, condition, created_at, moderation_status
-)
-values
-  (
-    'story-kourouta', 'Kourouta', 'kourouta-beach', 0, 'report', 'Nikos', 'LOCAL',
-    'https://i.pravatar.cc/120?img=12', '/story-feature/kourouta-online-story.jpg',
-    'Filling up fast. Wind dropped, water is glassy. Parking already tight near the bars.',
-    null, 'high', 'tight', array['clean', 'calm']::text[], now() - interval '14 minutes', 'published'
-  ),
-  (
-    'story-kourouta-sunbeds', 'Kourouta', 'kourouta-beach', 1, 'beach_status', 'Maria', 'TOURIST',
-    'https://i.pravatar.cc/120?img=32', '/story-feature/kourouta-online-story.jpg',
-    'Sunbeds gone by 16:00. Free patch of sand left of the lifeguard tower.',
-    null, 'high', 'full', array[]::text[], now() - interval '52 minutes', 'published'
-  ),
-  (
-    'story-katakolo', 'Katakolo', 'katakolo-sunset', 2, 'photo', 'Eleni', 'EDITOR',
-    'https://i.pravatar.cc/120?img=47', '/story-feature/katakolo-sunset-online-story.jpg',
-    'Golden hour hitting the port lights. Walk the mole, not the promenade.',
-    null, null, null, array[]::text[], now() - interval '22 minutes', 'published'
-  ),
-  (
-    'story-olympia', 'Olympia', 'ancient-olympia', 3, 'editor_note', 'Eleni', 'EDITOR',
-    'https://i.pravatar.cc/120?img=47', '/story-feature/ancient-olympia-online-story.jpg',
-    'Go late afternoon. The light on the columns is the whole point. Skip midday.',
-    null, null, null, array[]::text[], now() - interval '35 minutes', 'published'
-  ),
-  (
-    'story-foloi', 'Foloi', 'foloi-forest', 4, 'editor_note', 'Nikos', 'LOCAL',
-    'https://i.pravatar.cc/120?img=12', '/story-feature/foloi-oak-forest-online-story.jpg',
-    'Bring water. No bins up here. Shade is unreal right now.',
-    null, null, null, array[]::text[], now() - interval '40 minutes', 'published'
-  ),
-  (
-    'story-kyllini', 'Kyllini', 'kyllini-beach', 5, 'beach_status', 'Andreas', 'BUSINESS',
-    'https://i.pravatar.cc/120?img=58', '/story-feature/kyllini-beach-online-story.jpg',
-    'Long open stretch, never feels packed. North end is the quieter bit.',
-    null, 'medium', 'easy', array['clean']::text[], now() - interval '70 minutes', 'published'
-  ),
-  (
-    'story-zacharo', 'Zacharo', 'zacharo-beach', 6, 'report', 'Nikos', 'LOCAL',
-    'https://i.pravatar.cc/120?img=12', '/story-feature/zacharo-sunset-online-story.jpg',
-    'Big sky, almost empty. Sand is hot, bring shoes. Sunset is the move.',
-    null, 'low', 'easy', array['quiet', 'clean']::text[], now() - interval '18 minutes', 'published'
-  ),
-  (
-    'story-andritsaina', 'Andritsaina', 'andritsaina', 7, 'editor_note', 'Eleni', 'EDITOR',
-    'https://i.pravatar.cc/120?img=47', '/story-feature/andritsaina-online-story.jpg',
-    'Cooler up here by evening. Stone lanes, slow food, cold beer.',
-    null, null, null, array[]::text[], now() - interval '95 minutes', 'published'
-  ),
-  (
-    'story-kakovatos', 'Kakovatos', 'kakovatos-beach', 8, 'report', 'Maria', 'TOURIST',
-    'https://i.pravatar.cc/120?img=32', '/story-feature/kakovatos-beach-online-story.jpg',
-    'Endless sand, barely anyone. The not-obvious-scene beach.',
-    null, 'low', 'easy', array['quiet']::text[], now() - interval '28 minutes', 'published'
-  ),
-  (
-    'story-kaiafas', 'Kaiafas', 'kaiafas-lake', 9, 'editor_note', 'Eleni', 'EDITOR',
-    'https://i.pravatar.cc/120?img=47', '/story-feature/kaiafas-lake-sunset-online-story.jpg',
-    'Pine, lake, and weird calm. Do the loop, then sunset ten minutes south.',
-    null, null, null, array[]::text[], now() - interval '110 minutes', 'published'
-  ),
-  (
-    'story-chlemoutsi', 'Chlemoutsi', 'chlemoutsi', 10, 'photo', 'Maria', 'TOURIST',
-    'https://i.pravatar.cc/120?img=32', '/story-feature/chlemoutsi-castle-online-story.jpg',
-    'Castle on the hill, Ionian on the horizon. Best at golden hour.',
-    null, null, null, array[]::text[], now() - interval '160 minutes', 'published'
-  )
-on conflict (id) do update set
-  label = excluded.label,
-  place_id = excluded.place_id,
-  position = excluded.position,
-  kind = excluded.kind,
-  author_name = excluded.author_name,
-  author_type = excluded.author_type,
-  author_avatar_url = excluded.author_avatar_url,
-  media_url = excluded.media_url,
-  caption = excluded.caption,
-  expires_after_hours = excluded.expires_after_hours,
-  crowd = excluded.crowd,
-  parking = excluded.parking,
-  condition = excluded.condition,
-  created_at = excluded.created_at,
-  moderation_status = excluded.moderation_status,
-  updated_at = now();
+-- Demo rows for the surfaces this migration creates.
+--
+-- WHY THIS IS GUARDED. These reference public.places, and NO migration creates
+-- places -- they live only in supabase/seed.sql, which Supabase applies AFTER
+-- every migration. So on a database built from the migration list alone there
+-- is nothing for these to point at, and the insert dies on
+-- stories_place_id_fkey. That went unnoticed for as long as this migration only
+-- ever ran against a database that had already been seeded, which is to say
+-- production. It surfaced the first time CI built the schema from empty.
+--
+-- The guard is what makes a from-scratch rebuild possible -- `supabase start`,
+-- `supabase db reset`, a new environment, a second maintainer's local stack.
+-- On a fresh database the places are absent, this block is skipped, and
+-- seed.sql supplies places and stories together afterwards. On a database that
+-- already has them it behaves exactly as it always has, so production is
+-- unaffected and no already-applied migration changes its effect there.
+--
+-- It requires ALL the referenced places, not merely some: a partial set would
+-- insert some rows and still fail the foreign key on the rest, which is the
+-- confusing half-state this exists to avoid.
+--
+-- The meet_events insert further down this same file already solves this, with
+-- `join public.places on places.id = seed_events.place_id` -- an inner join
+-- matches nothing on an empty places table, so it inserts nothing and survives.
+-- This one could not borrow that shape without restructuring a bare VALUES list
+-- into a derived table, which means spelling out a column type for every NULL
+-- and risking a cast bug in SQL that cannot be run locally. A guard around the
+-- original statement reaches the same outcome and leaves the statement itself
+-- byte-for-byte unchanged.
+do $guarded$
+begin
+  if (
+    select count(*) from public.places where id in (
+      'ancient-olympia',
+      'andritsaina',
+      'chlemoutsi',
+      'foloi-forest',
+      'kaiafas-lake',
+      'kakovatos-beach',
+      'katakolo-sunset',
+      'kourouta-beach',
+      'kyllini-beach',
+      'zacharo-beach'
+    )
+  ) = 10 then
+
+    insert into public.stories (
+      id, label, place_id, position, kind, author_name, author_type, author_avatar_url,
+      media_url, caption, expires_after_hours, crowd, parking, condition, created_at, moderation_status
+    )
+    values
+      (
+        'story-kourouta', 'Kourouta', 'kourouta-beach', 0, 'report', 'Nikos', 'LOCAL',
+        'https://i.pravatar.cc/120?img=12', '/story-feature/kourouta-online-story.jpg',
+        'Filling up fast. Wind dropped, water is glassy. Parking already tight near the bars.',
+        null, 'high', 'tight', array['clean', 'calm']::text[], now() - interval '14 minutes', 'published'
+      ),
+      (
+        'story-kourouta-sunbeds', 'Kourouta', 'kourouta-beach', 1, 'beach_status', 'Maria', 'TOURIST',
+        'https://i.pravatar.cc/120?img=32', '/story-feature/kourouta-online-story.jpg',
+        'Sunbeds gone by 16:00. Free patch of sand left of the lifeguard tower.',
+        null, 'high', 'full', array[]::text[], now() - interval '52 minutes', 'published'
+      ),
+      (
+        'story-katakolo', 'Katakolo', 'katakolo-sunset', 2, 'photo', 'Eleni', 'EDITOR',
+        'https://i.pravatar.cc/120?img=47', '/story-feature/katakolo-sunset-online-story.jpg',
+        'Golden hour hitting the port lights. Walk the mole, not the promenade.',
+        null, null, null, array[]::text[], now() - interval '22 minutes', 'published'
+      ),
+      (
+        'story-olympia', 'Olympia', 'ancient-olympia', 3, 'editor_note', 'Eleni', 'EDITOR',
+        'https://i.pravatar.cc/120?img=47', '/story-feature/ancient-olympia-online-story.jpg',
+        'Go late afternoon. The light on the columns is the whole point. Skip midday.',
+        null, null, null, array[]::text[], now() - interval '35 minutes', 'published'
+      ),
+      (
+        'story-foloi', 'Foloi', 'foloi-forest', 4, 'editor_note', 'Nikos', 'LOCAL',
+        'https://i.pravatar.cc/120?img=12', '/story-feature/foloi-oak-forest-online-story.jpg',
+        'Bring water. No bins up here. Shade is unreal right now.',
+        null, null, null, array[]::text[], now() - interval '40 minutes', 'published'
+      ),
+      (
+        'story-kyllini', 'Kyllini', 'kyllini-beach', 5, 'beach_status', 'Andreas', 'BUSINESS',
+        'https://i.pravatar.cc/120?img=58', '/story-feature/kyllini-beach-online-story.jpg',
+        'Long open stretch, never feels packed. North end is the quieter bit.',
+        null, 'medium', 'easy', array['clean']::text[], now() - interval '70 minutes', 'published'
+      ),
+      (
+        'story-zacharo', 'Zacharo', 'zacharo-beach', 6, 'report', 'Nikos', 'LOCAL',
+        'https://i.pravatar.cc/120?img=12', '/story-feature/zacharo-sunset-online-story.jpg',
+        'Big sky, almost empty. Sand is hot, bring shoes. Sunset is the move.',
+        null, 'low', 'easy', array['quiet', 'clean']::text[], now() - interval '18 minutes', 'published'
+      ),
+      (
+        'story-andritsaina', 'Andritsaina', 'andritsaina', 7, 'editor_note', 'Eleni', 'EDITOR',
+        'https://i.pravatar.cc/120?img=47', '/story-feature/andritsaina-online-story.jpg',
+        'Cooler up here by evening. Stone lanes, slow food, cold beer.',
+        null, null, null, array[]::text[], now() - interval '95 minutes', 'published'
+      ),
+      (
+        'story-kakovatos', 'Kakovatos', 'kakovatos-beach', 8, 'report', 'Maria', 'TOURIST',
+        'https://i.pravatar.cc/120?img=32', '/story-feature/kakovatos-beach-online-story.jpg',
+        'Endless sand, barely anyone. The not-obvious-scene beach.',
+        null, 'low', 'easy', array['quiet']::text[], now() - interval '28 minutes', 'published'
+      ),
+      (
+        'story-kaiafas', 'Kaiafas', 'kaiafas-lake', 9, 'editor_note', 'Eleni', 'EDITOR',
+        'https://i.pravatar.cc/120?img=47', '/story-feature/kaiafas-lake-sunset-online-story.jpg',
+        'Pine, lake, and weird calm. Do the loop, then sunset ten minutes south.',
+        null, null, null, array[]::text[], now() - interval '110 minutes', 'published'
+      ),
+      (
+        'story-chlemoutsi', 'Chlemoutsi', 'chlemoutsi', 10, 'photo', 'Maria', 'TOURIST',
+        'https://i.pravatar.cc/120?img=32', '/story-feature/chlemoutsi-castle-online-story.jpg',
+        'Castle on the hill, Ionian on the horizon. Best at golden hour.',
+        null, null, null, array[]::text[], now() - interval '160 minutes', 'published'
+      )
+    on conflict (id) do update set
+      label = excluded.label,
+      place_id = excluded.place_id,
+      position = excluded.position,
+      kind = excluded.kind,
+      author_name = excluded.author_name,
+      author_type = excluded.author_type,
+      author_avatar_url = excluded.author_avatar_url,
+      media_url = excluded.media_url,
+      caption = excluded.caption,
+      expires_after_hours = excluded.expires_after_hours,
+      crowd = excluded.crowd,
+      parking = excluded.parking,
+      condition = excluded.condition,
+      created_at = excluded.created_at,
+      moderation_status = excluded.moderation_status,
+      updated_at = now();
+  end if;
+end
+$guarded$;
 
 with seed_events (
   id, place_id, title, host_name, host_avatar_url, host_type, starts_offset,
