@@ -46,6 +46,19 @@ function uuidFromSeed(seed: string): string {
  * Mirroring the migration's backfill rather than inventing a value keeps the two
  * agreeing: the place's image, with the same fallback the migration used.
  */
+/**
+ * Seeded content is published; user-created content is not.
+ *
+ * 20260824090000 made every public read policy require
+ * `moderation_status = 'published'`, backfilled the rows that existed at the
+ * time, and set the column default to 'pending' for everything after. The seed
+ * runs AFTER every migration, so it always lands on the wrong side of that
+ * backfill: without this, every seeded place, post, comment and story is
+ * invisible to anon and authenticated readers, and a freshly built database
+ * looks empty through the app.
+ */
+const PUBLISHED = "published";
+
 function storyMediaUrl(placeId: string) {
   return (
     PLACES.find((place) => place.id === placeId)?.imageUrl ??
@@ -141,6 +154,7 @@ const sections = [
       "recent_post_count",
       "status",
       "sort_order",
+      "moderation_status",
     ],
     PLACES.map((place, index) => [
       place.id,
@@ -165,6 +179,7 @@ const sections = [
       place.recentPostCount,
       place.status,
       index,
+      PUBLISHED,
     ]),
     "id",
   ),
@@ -190,6 +205,7 @@ const sections = [
       "likes_count",
       "image_url",
       "sort_order",
+      "moderation_status",
     ],
     POSTS.map((post, index) => [
       post.id,
@@ -202,13 +218,23 @@ const sections = [
       post.likes,
       post.imageUrl,
       index,
+      PUBLISHED,
     ]),
     "id",
   ),
   `delete from public.comments where id in (${seededPostComments.map((comment) => sql(comment.id)).join(", ")});`,
   insertRows(
     "comments",
-    ["id", "target_type", "post_id", "author_id", "author_name", "text", "sort_order"],
+    [
+      "id",
+      "target_type",
+      "post_id",
+      "author_id",
+      "author_name",
+      "text",
+      "sort_order",
+      "moderation_status",
+    ],
     seededPostComments.map((comment) => [
       comment.id,
       "post",
@@ -217,6 +243,7 @@ const sections = [
       comment.authorName,
       comment.text,
       comment.sortOrder,
+      PUBLISHED,
     ]),
     "id",
   ),
@@ -283,13 +310,14 @@ const sections = [
   ),
   insertRows(
     "stories",
-    ["id", "label", "place_id", "position", "media_url"],
+    ["id", "label", "place_id", "position", "media_url", "moderation_status"],
     STORIES.map((story, index) => [
       `story-${slug(story.label)}`,
       story.label,
       story.placeId,
       index,
       storyMediaUrl(story.placeId),
+      PUBLISHED,
     ]),
     "id",
   ),
