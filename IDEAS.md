@@ -231,9 +231,9 @@ already taken. Two separate problems, one worse than the other.
   production has been running since 2026-09-07. Anyone reading `main` to
   understand the schema is reading a version that has not existed for a while.
 
-  _(Verified directly: the file's location, its absence from `main`, and the
+  \_(Verified directly: the file's location, its absence from `main`, and the
   complete absence of any `20260907150000\__`file. The claim that both versions
-are marked applied in`supabase_migrations.schema_migrations` comes from the
+  are marked applied in`supabase_migrations.schema_migrations` comes from the
   session that queried production; this session has opened no database
   connection.)\*
 
@@ -383,6 +383,78 @@ coordination failed four times, and three of the four are now caught by
   untracked file. Lower priority than it sounds, since an untracked file cannot
   be committed by accident the way a tracked one can, but it is a real gap.
   Raised by the "TypeScript coverage" session.
+
+### Rebuilding the database from migrations (2026-09-09)
+
+**One root cause, seven symptoms.** The first CI run to build the schema from
+empty found that `supabase/migrations` could not reproduce the database. Every
+failure is the same shape: a migration that fixes up _the rows that already
+exist_ and then changes the rule for newcomers — correct against production,
+quietly wrong against nothing. They accumulated because nothing had ever built
+from scratch.
+
+`CLAUDE.md` says schema changes go through migrations so the database can always
+be reproduced. Until this pass, it could not be: a recovery, a new environment,
+or a second maintainer's local stack would all have failed.
+
+**Fixed (in the CI-smokes work):**
+
+1. `20260617161000` inserted demo stories referencing ten `places`. No migration
+   creates places — they exist only in `supabase/seed.sql`, which runs _after_
+   every migration. Now guarded on those places existing.
+2. `supabase/seed.sql` omitted `stories.media_url`, which `20260617161000` made
+   `NOT NULL` after backfilling the rows that existed at the time. The generator
+   now emits it, mirroring the migration's own backfill.
+3. Seeded `places`, `posts`, `comments` and `stories` landed as
+   `moderation_status = 'pending'`, because `20260824090000` published the rows
+   that existed and then set the default to `pending`. Every public read policy
+   requires `published`, so **a rebuilt database showed the app an empty map**
+   with all the data present but invisible. The seed now sets it explicitly.
+4. `src/lib/supabase/client.ts` hardcoded production and read nothing from the
+   environment, so the six scripts that import the app singleton reached the live
+   database from CI — and did, for one read. `assertTargetIsSafeForCI()` did not
+   catch it: it guards the Postgres connection and the service_role key, and this
+   was a third path through neither. The client now takes a Node-only override
+   and refuses to be production when `CI` is set.
+5. `businesses` had a policy `"Public can read verified businesses" ... to anon`
+   but no matching `grant ... to anon`; Postgres checks privileges _before_ RLS,
+   so that policy had been dead since the table was created. **Anonymous readers
+   — tourists, half the audience — got `permission denied` instead of a feed.**
+   Fixed in `20260909100000`. The live database already had the grant, so this
+   changes nothing there; it makes the migration list reproduce what exists.
+6. `smoke:post-write` never signed in, and `createPulsePost` has required a
+   session since `ensurePulseUserId()` was added. It could not have passed on any
+   machine. Nothing noticed because nothing ran it — while this file and
+   `CLAUDE.md` both listed posts as covered by it.
+
+**Still open:**
+
+- **Seeded Meet events.** `20260617161000` defines six demo Meet events
+  (`meet-kourouta-sunset-swim`, `meet-amaliada-panigyri`, `meet-foloi-cleanup`,
+  `meet-katakolo-coffee`, `meet-pyrgos-night`, `meet-zacharo-sunset`) but inserts
+  them with `join public.places`, which matches nothing at migration time. So a
+  rebuilt database has **no Meet events at all** and the Meet tab is empty.
+  `smoke:live-surfaces` fails on this. The test cannot simply make its own:
+  `createPulseMeetEvent` writes `moderation_status: 'pending'` and the public
+  read policy requires `'published'`, so a new Meet is invisible by design.
+  _Recommended fix:_ transplant those six into the seed, where places exist by
+  the time it runs — the same data, somewhere it can execute. **It is a product
+  call whether a fresh install should ship with demo Meets, which is why this was
+  left rather than decided.**
+- **Six smoke scripts never reached**, so their state against a from-scratch
+  database is unknown: `moderation`, `block-enforcement`, `deal-race`, `admin`,
+  `verification-guards`, `routes`. Expect more of the same class.
+- **`audit:rls --check` unverified** against a rebuilt schema. It would prove the
+  migrations alone reproduce the policy set, which is exactly the property in
+  doubt — worth running first when this is picked up.
+- **`.github/workflows/smoke.yml` runs only the two scripts that pass.** Add them
+  back one at a time as each is fixed. A permanently red check trains people to
+  ignore red, which costs more than the coverage is worth.
+
+**The general rule worth remembering:** a migration that backfills existing rows
+and then changes the default is invisible to anything created afterwards — and
+the seed always runs afterwards. When writing one, ask what it does to a database
+with no rows in it.
 
 ## Open Questions
 
