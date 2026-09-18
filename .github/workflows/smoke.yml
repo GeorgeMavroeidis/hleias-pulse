@@ -161,6 +161,15 @@ jobs:
       - name: smoke · post write
         run: npm run smoke:post-write
 
+      - name: lint · local database
+        run: npx supabase db lint --local
+
+      - name: smoke · push security
+        run: npm run smoke:push-security
+
+      - name: audit · RLS + grants
+        run: npm run audit:rls -- --check
+
       - name: Stop the local stack
         if: always()
         run: npx supabase stop --no-backup || true
