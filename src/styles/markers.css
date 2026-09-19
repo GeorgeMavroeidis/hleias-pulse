@@ -1,6 +1,6 @@
-/* Map markers, base layer: leaflet container, area/child markers, dot pins. */
+/* Map markers, base layer: MapLibre container, area/child markers, dot pins. */
 
-.hp-real-map .leaflet-container {
+.hp-real-map .maplibregl-map {
   z-index: 0;
   height: 100%;
   width: 100%;
@@ -8,23 +8,7 @@
   font-family: var(--hp-font-body);
 }
 
-.hp-real-map .leaflet-control-attribution {
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--hp-paper) 88%, transparent);
-  color: var(--hp-muted);
-  font-size: 9px;
-  line-height: 1.5;
-  margin: 0 0 calc(4.75rem + env(safe-area-inset-bottom)) 0.5rem;
-  padding: 0.125rem 0.45rem;
-}
-
-.hp-real-map .leaflet-control-attribution a {
-  color: var(--hp-deep);
-  font-weight: 700;
-}
-
-.hp-real-map .leaflet-tile-pane {
-  /* Warm CARTO Voyager toward the hp-paper identity */
+.hp-real-map .maplibregl-canvas {
   filter: saturate(0.82) brightness(1.03) sepia(0.06) hue-rotate(-6deg);
   opacity: 1;
 }
@@ -40,6 +24,8 @@
   pointer-events: auto !important;
   touch-action: manipulation;
   user-select: none;
+  width: 1px;
+  height: 1px;
 }
 
 .hp-area-marker:focus,

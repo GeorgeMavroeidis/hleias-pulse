@@ -292,13 +292,13 @@ on conflict (id) do update set
     tags = excluded.tags,
     sort_order = excluded.sort_order;
 
-insert into public.routes (id, title, author_id, lede, duration, budget, tags, image_url, comment_count, saves_count, sort_order)
+insert into public.routes (id, title, author_id, lede, duration, budget, tags, image_url, comment_count, saves_count, sort_order, routing_profile)
 values
-  ('route-1', 'Beach → Food → After', 'eleni', 'Do this if you want the obvious Kourouta night without wasting half the day.', '7h', '€€', array['party', 'beach', 'night']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg/1280px-Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg', 8, 30, 0),
-  ('route-2', 'No-car Katakolo Day', 'nikos', 'Cruise off, walk the port, swim, eat by the sea. No rental needed.', '5h', '€', array['no car', 'cruise', 'walk']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg', 11, 41, 1),
-  ('route-3', 'Quiet South Coast', 'maria', 'Skip the crowds. Big sky, free beaches, sunset that ruins you for everywhere else.', '1 day', 'free', array['quiet', 'beach', 'sunset']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg', 14, 52, 2),
-  ('route-4', 'Forest Escape', 'andreas', 'Trade the heat for shade. Oak trees, slow village, real mountain air.', 'half day', 'free', array['nature', 'shade', 'village']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg', 17, 63, 3),
-  ('route-5', 'Ancient Without Boring', 'eleni', 'Culture, but the kind you actually want to talk about after.', '1 day', '€€', array['culture', 'roadtrip', 'views']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg', 20, 74, 4)
+  ('route-1', 'Beach → Food → After', 'eleni', 'Do this if you want the obvious Kourouta night without wasting half the day.', '7h', '€€', array['party', 'beach', 'night']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg/1280px-Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg', 8, 30, 0, 'driving-car'),
+  ('route-2', 'No-car Katakolo Day', 'nikos', 'Cruise off, walk the port, swim, eat by the sea. No rental needed.', '5h', '€', array['no car', 'cruise', 'walk']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg', 11, 41, 1, 'foot-walking'),
+  ('route-3', 'Quiet South Coast', 'maria', 'Skip the crowds. Big sky, free beaches, sunset that ruins you for everywhere else.', '1 day', 'free', array['quiet', 'beach', 'sunset']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg', 14, 52, 2, 'driving-car'),
+  ('route-4', 'Forest Escape', 'andreas', 'Trade the heat for shade. Oak trees, slow village, real mountain air.', 'half day', 'free', array['nature', 'shade', 'village']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg', 17, 63, 3, 'driving-car'),
+  ('route-5', 'Ancient Without Boring', 'eleni', 'Culture, but the kind you actually want to talk about after.', '1 day', '€€', array['culture', 'roadtrip', 'views']::text[], 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg', 20, 74, 4, 'driving-car')
 on conflict (id) do update set
     title = excluded.title,
     author_id = excluded.author_id,
@@ -309,7 +309,8 @@ on conflict (id) do update set
     image_url = excluded.image_url,
     comment_count = excluded.comment_count,
     saves_count = excluded.saves_count,
-    sort_order = excluded.sort_order;
+    sort_order = excluded.sort_order,
+    routing_profile = excluded.routing_profile;
 
 delete from public.route_stops where route_id in ('route-1', 'route-2', 'route-3', 'route-4', 'route-5');
 

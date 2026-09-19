@@ -1134,6 +1134,12 @@ export type Database = {
           id: string;
           image_url: string;
           lede: string;
+          route_distance_m: number | null;
+          route_duration_s: number | null;
+          route_generated_at: string | null;
+          route_geometry: Json | null;
+          route_input_hash: string | null;
+          routing_profile: string;
           saves_count: number;
           sort_order: number;
           tags: string[];
@@ -1149,6 +1155,12 @@ export type Database = {
           id: string;
           image_url: string;
           lede: string;
+          route_distance_m?: number | null;
+          route_duration_s?: number | null;
+          route_generated_at?: string | null;
+          route_geometry?: Json | null;
+          route_input_hash?: string | null;
+          routing_profile?: string;
           saves_count?: number;
           sort_order?: number;
           tags?: string[];
@@ -1164,6 +1176,12 @@ export type Database = {
           id?: string;
           image_url?: string;
           lede?: string;
+          route_distance_m?: number | null;
+          route_duration_s?: number | null;
+          route_generated_at?: string | null;
+          route_geometry?: Json | null;
+          route_input_hash?: string | null;
+          routing_profile?: string;
           saves_count?: number;
           sort_order?: number;
           tags?: string[];

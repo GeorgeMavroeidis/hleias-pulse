@@ -410,6 +410,15 @@ export async function saveAdminRoute(route: Database["public"]["Tables"]["routes
   return result.data;
 }
 
+export async function buildAdminRoutePreview(body: {
+  profile: "driving-car" | "foot-walking";
+  coordinates: [number, number][];
+}) {
+  const result = await supabase.functions.invoke("build-route-preview", { body });
+  if (result.error) throw result.error;
+  return result.data as unknown;
+}
+
 export async function replaceAdminRouteStops(
   routeId: string,
   stops: Database["public"]["Tables"]["route_stops"]["Insert"][],

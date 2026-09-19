@@ -154,7 +154,7 @@
 .hp-real-map.hp-dropping-pin {
   cursor: crosshair;
 }
-.hp-real-map.hp-dropping-pin .leaflet-container {
+.hp-real-map.hp-dropping-pin .maplibregl-map {
   cursor: crosshair;
 }
 .hp-pin-target {
@@ -221,7 +221,7 @@
   --hp-ink: #f3ecdc;
   --hp-muted: #a79fc4;
 }
-.hp-app-shell.is-night .hp-real-map .leaflet-tile-pane {
+.hp-app-shell.is-night .hp-real-map .maplibregl-canvas {
   filter: invert(1) hue-rotate(180deg) brightness(0.92) saturate(0.7);
 }
 

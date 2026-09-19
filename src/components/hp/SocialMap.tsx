@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, Crosshair, MapPinned, Minus, Plus } from "lucide-react";
 import Supercluster from "supercluster";
-import "leaflet/dist/leaflet.css";
+import "maplibre-gl/dist/maplibre-gl.css";
+import type {
+  ErrorEvent as MapLibreErrorEvent,
+  Map as MapLibreMap,
+  Marker as MapLibreMarker,
+  StyleSpecification,
+} from "maplibre-gl";
 import { type EventItem, type Place } from "@/lib/hp-model";
+import { removeAdministrativeBoundaries } from "@/lib/hp/map-core";
 import { useImageUrls } from "@/lib/hp/image-cache";
 import { SEA_SHIMMER_LATLNGS, SEA_SHIMMER_MAX_ZOOM } from "@/lib/hp/sea-shimmer";
 import {
@@ -41,19 +48,17 @@ import {
   markerMapFillScale,
 } from "@/lib/hp/map-visuals";
 
-const OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const OSM_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
 
-const MAP_TILE_URL = import.meta.env.VITE_MAP_TILE_URL || OSM_TILE_URL;
-const MAP_TILE_ATTRIBUTION = import.meta.env.VITE_MAP_TILE_ATTRIBUTION || OSM_ATTRIBUTION;
-const MAP_TILE_SUBDOMAINS = import.meta.env.VITE_MAP_TILE_SUBDOMAINS || "";
-const MAP_TILE_MAX_ZOOM = Number(import.meta.env.VITE_MAP_TILE_MAX_ZOOM) || 19;
+async function loadBoundaryFreeBasemap(signal: AbortSignal): Promise<StyleSpecification> {
+  const response = await fetch(OPENFREEMAP_STYLE_URL, { signal });
+  if (!response.ok) {
+    throw new Error(`Basemap style request failed (${response.status}).`);
+  }
+  return removeAdministrativeBoundaries((await response.json()) as StyleSpecification);
+}
 
-type LeafletModule = typeof import("leaflet");
-type LeafletMap = import("leaflet").Map;
-type LeafletMarker = import("leaflet").Marker;
-type LatLngTuple = import("leaflet").LatLngTuple;
+type LatLngTuple = [number, number];
 type InteractiveMarkerElement = HTMLElement & {
   __hpClickHandler?: EventListener;
   __hpKeyHandler?: EventListener;
@@ -105,7 +110,6 @@ const ILIA_DETAIL_BBOX: [number, number, number, number] = [19.9, 36.35, 23.25, 
 const MAP_PAN_DURATION = 0.28;
 const MAP_OVERVIEW_DURATION = 0.34;
 const MAP_FOCUS_DURATION = 0.38;
-const MAP_EASE_LINEARITY = 0.25;
 const RICH_VISUAL_ZOOM = 13.25;
 const MIN_UTILITY_RAIL_HEIGHT = 248;
 const MIN_MAP_CHROME_HEIGHT = 188;
@@ -405,11 +409,7 @@ function resolveUrl(resolve: (url: string) => string, url: string) {
   return value || PLACEHOLDER_IMG;
 }
 
-function createAreaIcon(
-  L: LeafletModule,
-  cluster: MapAreaCluster,
-  resolve: (url: string) => string,
-) {
+function createAreaIcon(cluster: MapAreaCluster, resolve: (url: string) => string) {
   const size = clusterSize(cluster.status);
   const images = cluster.places.slice(0, 3);
   const collage = images
@@ -428,9 +428,9 @@ function createAreaIcon(
     .join("");
   const statusLabel = cluster.status === "quiet" ? "" : cluster.status;
 
-  return L.divIcon({
-    className: "hp-area-marker",
-    html: `
+  const element = document.createElement("div");
+  element.className = "hp-area-marker";
+  element.innerHTML = `
       <div
         class="hp-area-marker__shell is-pulse-${cluster.status} ${cluster.status === "live" ? "is-live" : ""} ${cluster.status === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, cluster.id)}"
@@ -449,16 +449,11 @@ function createAreaIcon(
           ${cluster.status !== "quiet" ? '<span class="hp-area-marker__dot"></span>' : ""}
         </span>
       </div>
-    `,
-    // A stable one-pixel Leaflet anchor lets CSS scale the visual around the
-    // real coordinate without rebuilding/re-anchoring the DivIcon while zooming.
-    iconSize: [1, 1],
-    iconAnchor: [0.5, 0.5],
-  });
+    `;
+  return element;
 }
 
 function createChildIcon(
-  L: LeafletModule,
   place: Place,
   eventCount: number,
   tier: PulseTier,
@@ -479,9 +474,9 @@ function createChildIcon(
     .join("");
   const statusLabel = tier === "live" ? "live" : tier === "hot" ? "hot" : "";
 
-  return L.divIcon({
-    className: "hp-child-marker",
-    html: `
+  const element = document.createElement("div");
+  element.className = "hp-child-marker";
+  element.innerHTML = `
       <div
         class="hp-child-marker__shell is-pulse-${tier} ${hasStories ? "has-stories" : ""} ${solo ? "is-solo" : ""} ${tier === "live" ? "is-live" : ""} ${tier === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, place.id)}"
@@ -505,14 +500,11 @@ function createChildIcon(
           ${avatars ? `<span class="hp-child-marker__avatars">${avatars}</span>` : ""}
         </span>
       </div>
-    `,
-    iconSize: [1, 1],
-    iconAnchor: [0.5, 0.5],
-  });
+    `;
+  return element;
 }
 
 function createActivityClusterIcon(
-  L: LeafletModule,
   node: ActivityClusterRenderNode,
   resolve: (url: string) => string,
 ) {
@@ -533,9 +525,9 @@ function createActivityClusterIcon(
       ? `${node.eventCount} event${node.eventCount === 1 ? "" : "s"}`
       : `${node.postCount} posts`;
 
-  return L.divIcon({
-    className: "hp-activity-cluster",
-    html: `
+  const element = document.createElement("div");
+  element.className = "hp-activity-cluster";
+  element.innerHTML = `
       <div
         class="hp-area-marker__shell hp-area-marker__shell--activity is-pulse-${node.tier} ${node.tier === "live" ? "is-live" : ""} ${node.tier === "hot" ? "is-hot" : ""}"
         style="${markerStyle(size, node.id)}"
@@ -552,10 +544,8 @@ function createActivityClusterIcon(
           ${node.tier !== "quiet" ? '<span class="hp-area-marker__dot"></span>' : ""}
         </span>
       </div>
-    `,
-    iconSize: [1, 1],
-    iconAnchor: [0.5, 0.5],
-  });
+    `;
+  return element;
 }
 
 function shortPlaceName(name: string) {
@@ -824,8 +814,10 @@ interface Props {
   onBack?: () => void;
   bottomOverlayHeight: number;
   availableMapHeight: number;
-  /** Ordered lat/lng path to draw as a route polyline (e.g. an open route's stops). */
-  routePath?: { lat: number; lng: number; label: string }[] | null;
+  routePreview?: {
+    stops: { lat: number; lng: number; label: string }[];
+    geometry: [number, number][] | null;
+  } | null;
   /** Fired on map long-press so the shell can open the composer pre-filled. */
   onMapLongPress?: (lat: number, lng: number) => void;
 }
@@ -862,26 +854,23 @@ export function SocialMap({
   onBack,
   bottomOverlayHeight,
   availableMapHeight,
-  routePath = null,
+  routePreview = null,
   onMapLongPress,
 }: Props) {
   const { t } = useI18n();
   const mapNodeRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const leafletRef = useRef<LeafletModule | null>(null);
-  const markersRef = useRef<Map<string, LeafletMarker>>(new Map());
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const maplibreModuleRef = useRef<typeof import("maplibre-gl") | null>(null);
+  const markersRef = useRef<Map<string, MapLibreMarker>>(new Map());
   const markerSigRef = useRef<Map<string, string>>(new Map());
   const markerRuntimeRef = useRef<Map<string, MarkerRuntimeState>>(new Map());
-  const markerClickHandlerRef = useRef<Map<string, () => void>>(new Map());
   const renderNodesRef = useRef<Map<string, RenderNode>>(new Map());
   const scheduleMarkerViewportSyncRef = useRef<() => void>(() => {});
   const activitySnapshotRef = useRef(activitySnapshot);
   activitySnapshotRef.current = activitySnapshot;
   const activateMarkerByIdRef = useRef<(id: string) => void>(() => undefined);
-  const userMarkerRef = useRef<LeafletMarker | null>(null);
-  const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
-  const seaLayerRef = useRef<import("leaflet").Polygon | null>(null);
-  const seaVisibleRef = useRef(false);
+  const userMarkerRef = useRef<MapLibreMarker | null>(null);
+  const routeStopMarkersRef = useRef<MapLibreMarker[]>([]);
   const onMapLongPressRef = useRef(onMapLongPress);
   onMapLongPressRef.current = onMapLongPress;
   const onClearSelectionRef = useRef(onClearSelection);
@@ -905,7 +894,9 @@ export function SocialMap({
   const ignoreBackgroundClickUntilRef = useRef(0);
   const lastZoomRef = useRef(OVERVIEW_ZOOM);
   const [mapReady, setMapReady] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(OVERVIEW_ZOOM);
+  const [attributionExpanded, setAttributionExpanded] = useState(true);
   const selectionKey = `${selectedAreaId ?? ""}|${selectedPlaceId ?? ""}`;
   const selectionKeyRef = useRef(selectionKey);
   selectionKeyRef.current = selectionKey;
@@ -1241,10 +1232,9 @@ export function SocialMap({
   }, [activeLens, clusters, discoverySnapshot.areas, selectedAreaId]);
 
   const zoomIntoCluster = useCallback((cluster: MapAreaCluster) => {
-    const L = leafletRef.current;
     const map = mapRef.current;
     const container = mapNodeRef.current;
-    if (!L || !map || !container) return;
+    if (!map || !container) return;
 
     const places = cluster.childPlaces;
     const overlayHeight = bottomOverlayHeightRef.current;
@@ -1252,9 +1242,7 @@ export function SocialMap({
     const childrenAlreadySafe =
       map.getZoom() >= SPLIT_ZOOM &&
       places.length > 0 &&
-      places.every((place) =>
-        pointIsInSafeRect(map.latLngToContainerPoint([place.lat, place.lng]), viewport),
-      );
+      places.every((place) => pointIsInSafeRect(map.project([place.lng, place.lat]), viewport));
     if (childrenAlreadySafe) return;
 
     const visibleMapHeight = Math.max(80, container.clientHeight - overlayHeight);
@@ -1270,14 +1258,20 @@ export function SocialMap({
         ? [places[0].lat, places[0].lng]
         : [cluster.lat, cluster.lng];
       const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(SPLIT_ZOOM, map.getZoom() + 0.5));
-      const projected = map.project(focus, targetZoom);
-      const shifted = map.unproject([projected.x, projected.y + bottomPadding * 0.42], targetZoom);
       if (reduceMotion) {
-        map.setView([shifted.lat, shifted.lng], targetZoom, { animate: false });
+        map.easeTo({
+          center: [focus[1], focus[0]],
+          zoom: targetZoom,
+          offset: [0, -bottomPadding * 0.21],
+          duration: 0,
+        });
       } else {
-        map.flyTo([shifted.lat, shifted.lng], targetZoom, {
-          duration: MAP_FOCUS_DURATION,
-          easeLinearity: MAP_EASE_LINEARITY,
+        map.flyTo({
+          center: [focus[1], focus[0]],
+          zoom: targetZoom,
+          offset: [0, -bottomPadding * 0.21],
+          duration: MAP_FOCUS_DURATION * 1000,
+          essential: true,
         });
       }
       return;
@@ -1287,16 +1281,20 @@ export function SocialMap({
     // a tight cluster like Ancient Olympia (pins within ~800m) now flies in to
     // ~z15, where the pins clearly separate and the supercluster bubble
     // (which stops clustering above z13) can no longer swallow them.
-    const bounds = L.latLngBounds(places.map((place) => [place.lat, place.lng] as LatLngTuple)).pad(
-      0.25,
-    );
+    const bounds: [[number, number], [number, number]] = [
+      [
+        Math.min(...places.map((place) => place.lng)),
+        Math.min(...places.map((place) => place.lat)),
+      ],
+      [
+        Math.max(...places.map((place) => place.lng)),
+        Math.max(...places.map((place) => place.lat)),
+      ],
+    ];
     map.fitBounds(bounds, {
-      animate: !reduceMotion,
-      duration: MAP_FOCUS_DURATION,
-      easeLinearity: MAP_EASE_LINEARITY,
+      duration: reduceMotion ? 0 : MAP_FOCUS_DURATION * 1000,
       maxZoom: AREA_FOCUS_MAX_ZOOM,
-      paddingTopLeft: [48, topPadding],
-      paddingBottomRight: [48, bottomPadding],
+      padding: { left: 48, top: topPadding, right: 48, bottom: bottomPadding },
     });
   }, []);
 
@@ -1318,23 +1316,27 @@ export function SocialMap({
         x: (viewport.left + viewport.right) / 2,
         y: (viewport.top + viewport.bottom) / 2,
       };
-      const projected = map.project(node.latLng, targetZoom);
-      const targetCenter = map.unproject(
-        [
-          projected.x + container.clientWidth / 2 - desiredPoint.x,
-          projected.y + container.clientHeight / 2 - desiredPoint.y,
-        ],
-        targetZoom,
-      );
+      const offset: [number, number] = [
+        desiredPoint.x - container.clientWidth / 2,
+        desiredPoint.y - container.clientHeight / 2,
+      ];
       const reduceMotion = prefersReducedMapMotion();
       map.stop();
       selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
       if (reduceMotion) {
-        map.setView(targetCenter, targetZoom, { animate: false });
+        map.easeTo({
+          center: [node.latLng[1], node.latLng[0]],
+          zoom: targetZoom,
+          offset,
+          duration: 0,
+        });
       } else {
-        map.flyTo(targetCenter, targetZoom, {
-          duration: MAP_FOCUS_DURATION,
-          easeLinearity: MAP_EASE_LINEARITY,
+        map.flyTo({
+          center: [node.latLng[1], node.latLng[0]],
+          zoom: targetZoom,
+          offset,
+          duration: MAP_FOCUS_DURATION * 1000,
+          essential: true,
         });
       }
     },
@@ -1346,11 +1348,13 @@ export function SocialMap({
     if (!map) return;
     map.stop();
     if (prefersReducedMapMotion()) {
-      map.setView(ILIA_CENTER, OVERVIEW_ZOOM, { animate: false });
+      map.jumpTo({ center: [ILIA_CENTER[1], ILIA_CENTER[0]], zoom: OVERVIEW_ZOOM });
     } else {
-      map.flyTo(ILIA_CENTER, OVERVIEW_ZOOM, {
-        duration: MAP_OVERVIEW_DURATION,
-        easeLinearity: MAP_EASE_LINEARITY,
+      map.flyTo({
+        center: [ILIA_CENTER[1], ILIA_CENTER[0]],
+        zoom: OVERVIEW_ZOOM,
+        duration: MAP_OVERVIEW_DURATION * 1000,
+        essential: true,
       });
     }
   }, []);
@@ -1409,216 +1413,184 @@ export function SocialMap({
 
   useEffect(() => {
     let cancelled = false;
-    let map: LeafletMap | null = null;
+    let map: MapLibreMap | null = null;
     let zoomFrame: number | null = null;
     let effectsResumeFrame: number | null = null;
+    const basemapAbortController = new AbortController();
     const activeMapMotion = new Set<"move" | "zoom">();
     const cleanupFns: Array<() => void> = [];
     const markers = markersRef.current;
     const markerSigs = markerSigRef.current;
     const markerRuntimes = markerRuntimeRef.current;
-    const markerClickHandlers = markerClickHandlerRef.current;
 
-    import("leaflet").then((L) => {
-      if (cancelled || !mapNodeRef.current) return;
+    Promise.all([import("maplibre-gl"), loadBoundaryFreeBasemap(basemapAbortController.signal)])
+      .then(([maplibre, basemapStyle]) => {
+        if (cancelled || !mapNodeRef.current) return;
 
-      leafletRef.current = L;
-      map = L.map(mapNodeRef.current, {
-        attributionControl: true,
-        center: ILIA_CENTER,
-        doubleClickZoom: true,
-        maxBounds: MAP_PAN_BOUNDS,
-        maxBoundsViscosity: 0.3,
-        maxZoom: MAX_ZOOM,
-        minZoom: MIN_ZOOM,
-        scrollWheelZoom: "center",
-        tapHold: false,
-        tapTolerance: 18,
-        touchZoom: true,
-        wheelDebounceTime: 18,
-        wheelPxPerZoomLevel: 70,
-        zoom: OVERVIEW_ZOOM,
-        zoomDelta: 0.5,
-        zoomControl: false,
-        zoomSnap: 0.25,
-      });
-      const guidePane = map.createPane("hp-marker-guides");
-      guidePane.style.zIndex = "625";
-      guidePane.style.pointerEvents = "none";
-
-      const seaPane = map.createPane("hp-sea-shimmer");
-      seaPane.style.zIndex = "250";
-      seaPane.style.pointerEvents = "none";
-      seaPane.style.opacity = "0";
-      seaPane.style.transition = "opacity 360ms ease";
-
-      // Basemap. CARTO's basemaps.cartocdn.com now returns an "API KEY REQUIRED"
-      // watermark tile (HTTP 200, ~3KB) to unauthenticated callers, so the default
-      // is the keyless OpenStreetMap tile server. Point VITE_MAP_TILE_URL at a
-      // keyed provider (CARTO, MapTiler, Stadia, Mapbox) before public launch --
-      // the OSM community tile server is not intended for production app traffic.
-      L.tileLayer(MAP_TILE_URL, {
-        attribution: MAP_TILE_ATTRIBUTION,
-        maxZoom: MAP_TILE_MAX_ZOOM,
-        ...(MAP_TILE_SUBDOMAINS ? { subdomains: MAP_TILE_SUBDOMAINS } : {}),
-        opacity: 1,
-      }).addTo(map);
-
-      const onMapClick = (event: import("leaflet").LeafletMouseEvent) => {
-        if (Date.now() < ignoreBackgroundClickUntilRef.current) return;
-        const target = event.originalEvent?.target as Element | null;
-        if (target?.closest(".leaflet-marker-icon, .leaflet-control, button, a")) return;
-        if (selectionKeyRef.current === "|") return;
-
-        cameraHandledSelectionRef.current = "|";
-        onClearSelectionRef.current();
-      };
-      map.on("click", onMapClick);
-      cleanupFns.push(() => map?.off("click", onMapClick));
-
-      if (mapNodeRef.current) {
-        const mapContainer = mapNodeRef.current;
-        const resizeObserver = new ResizeObserver(() => {
-          map?.invalidateSize({ animate: false, pan: false });
+        maplibreModuleRef.current = maplibre;
+        map = new maplibre.Map({
+          container: mapNodeRef.current,
+          style: basemapStyle,
+          attributionControl: false,
+          center: [ILIA_CENTER[1], ILIA_CENTER[0]],
+          doubleClickZoom: true,
+          maxBounds: [
+            [MAP_PAN_BOUNDS[0][1], MAP_PAN_BOUNDS[0][0]],
+            [MAP_PAN_BOUNDS[1][1], MAP_PAN_BOUNDS[1][0]],
+          ],
+          maxZoom: MAX_ZOOM,
+          minZoom: MIN_ZOOM,
+          zoom: OVERVIEW_ZOOM,
+          maplibreLogo: false,
+          renderWorldCopies: false,
         });
-        resizeObserver.observe(mapContainer);
-        cleanupFns.push(() => resizeObserver.disconnect());
-      }
-
-      // Geolocation -> pulsing "you are here" dot
-      const onLocationFound = (e: import("leaflet").LocationEvent) => {
-        if (cancelled || !map) return;
-        const latlng = e.latlng;
-        if (userMarkerRef.current) {
-          userMarkerRef.current.setLatLng(latlng);
-        } else {
-          userMarkerRef.current = L.marker(latlng, {
-            interactive: false,
-            keyboard: false,
-            zIndexOffset: 2000,
-            icon: L.divIcon({
-              className: "hp-user-marker",
-              html: '<span class="hp-user-dot" style="display:block;width:15px;height:15px"></span>',
-              iconSize: [15, 15],
-              iconAnchor: [7.5, 7.5],
-            }),
-          }).addTo(map);
-        }
-      };
-      map.on("locationfound", onLocationFound);
-      cleanupFns.push(() => map?.off("locationfound", onLocationFound));
-
-      // Long-press -> drop-pin (open composer pre-filled)
-      const container = mapNodeRef.current;
-      if (container) {
-        let pressTimer: number | null = null;
-        let pressPoint: { x: number; y: number } | null = null;
-        const clearPress = () => {
-          if (pressTimer !== null) window.clearTimeout(pressTimer);
-          pressTimer = null;
-          pressPoint = null;
-        };
-        const onDown = (ev: PointerEvent) => {
-          if (ev.button !== 0) return;
-          const target = ev.target as HTMLElement | null;
-          if (target?.closest(".leaflet-marker-icon, .leaflet-control, button, a")) return;
-          pressPoint = { x: ev.clientX, y: ev.clientY };
-          pressTimer = window.setTimeout(() => {
-            if (!map || !pressPoint) return;
-            const rect = container.getBoundingClientRect();
-            const ll = map.containerPointToLatLng([
-              pressPoint.x - rect.left,
-              pressPoint.y - rect.top,
-            ]);
-            ignoreBackgroundClickUntilRef.current = Date.now() + 700;
-            onMapLongPressRef.current?.(ll.lat, ll.lng);
-            clearPress();
-          }, 480);
-        };
-        const onMove = (ev: PointerEvent) => {
-          if (!pressPoint) return;
-          if (
-            Math.abs(ev.clientX - pressPoint.x) > 10 ||
-            Math.abs(ev.clientY - pressPoint.y) > 10
-          ) {
-            clearPress();
-          }
-        };
-        container.addEventListener("pointerdown", onDown);
-        container.addEventListener("pointermove", onMove);
-        container.addEventListener("pointerup", clearPress);
-        container.addEventListener("pointercancel", clearPress);
-        container.addEventListener("pointerleave", clearPress);
-        cleanupFns.push(() => {
-          clearPress();
-          container.removeEventListener("pointerdown", onDown);
-          container.removeEventListener("pointermove", onMove);
-          container.removeEventListener("pointerup", clearPress);
-          container.removeEventListener("pointercancel", clearPress);
-          container.removeEventListener("pointerleave", clearPress);
-        });
-      }
-
-      const syncZoom = () => {
-        if (!map) return;
-        if (zoomFrame !== null) return;
-        zoomFrame = window.requestAnimationFrame(() => {
-          zoomFrame = null;
-          if (!map) return;
-          const nextZoom = map.getZoom();
-          lastZoomRef.current = nextZoom;
-          applyMarkerZoomProfile(mapNodeRef.current, nextZoom);
-          setZoom(nextZoom);
-        });
-      };
-      map.on("zoom zoomend", syncZoom);
-      const pauseMarkerEffects = (kind: "move" | "zoom") => {
-        activeMapMotion.add(kind);
-        if (effectsResumeFrame !== null) {
-          window.cancelAnimationFrame(effectsResumeFrame);
-          effectsResumeFrame = null;
-        }
-        mapNodeRef.current?.classList.add("hp-map-is-moving");
-      };
-      const resumeMarkerEffects = (kind: "move" | "zoom") => {
-        activeMapMotion.delete(kind);
-        if (activeMapMotion.size > 0) return;
-        effectsResumeFrame = window.requestAnimationFrame(() => {
-          effectsResumeFrame = null;
-          mapNodeRef.current?.classList.remove("hp-map-is-moving");
-          scheduleMarkerViewportSyncRef.current();
-        });
-      };
-      const onMoveStart = () => pauseMarkerEffects("move");
-      const onZoomStart = () => pauseMarkerEffects("zoom");
-      const onMoveEnd = () => {
-        resumeMarkerEffects("move");
-      };
-      const onZoomEnd = () => resumeMarkerEffects("zoom");
-      map.on("movestart", onMoveStart);
-      map.on("zoomstart", onZoomStart);
-      map.on("moveend", onMoveEnd);
-      map.on("zoomend", onZoomEnd);
-      cleanupFns.push(() => {
-        map?.off("movestart", onMoveStart);
-        map?.off("zoomstart", onZoomStart);
-        map?.off("moveend", onMoveEnd);
-        map?.off("zoomend", onZoomEnd);
-      });
-      map.whenReady(() => {
-        if (cancelled || !map) return;
         mapRef.current = map;
-        const readyZoom = map.getZoom();
-        lastZoomRef.current = readyZoom;
-        applyMarkerZoomProfile(mapNodeRef.current, readyZoom);
-        setZoom(readyZoom);
-        setMapReady(true);
-        window.setTimeout(() => map?.invalidateSize(), 0);
+        const onBasemapError = (event: MapLibreErrorEvent) => {
+          console.error("Basemap rendering error", event.error ?? event);
+          setMapLoadError(event.error?.message ?? "The basemap could not be loaded.");
+        };
+        map.on("error", onBasemapError);
+        cleanupFns.push(() => map?.off("error", onBasemapError));
+
+        const onMapClick = (event: { originalEvent: MouseEvent }) => {
+          if (Date.now() < ignoreBackgroundClickUntilRef.current) return;
+          const target = event.originalEvent?.target as Element | null;
+          if (target?.closest(".maplibregl-marker, .maplibregl-control-container, button, a"))
+            return;
+          if (selectionKeyRef.current === "|") return;
+
+          cameraHandledSelectionRef.current = "|";
+          onClearSelectionRef.current();
+        };
+        map.on("click", onMapClick);
+        cleanupFns.push(() => map?.off("click", onMapClick));
+
+        if (mapNodeRef.current) {
+          const mapContainer = mapNodeRef.current;
+          const resizeObserver = new ResizeObserver(() => {
+            map?.resize();
+          });
+          resizeObserver.observe(mapContainer);
+          cleanupFns.push(() => resizeObserver.disconnect());
+        }
+
+        // Long-press -> drop-pin (open composer pre-filled)
+        const container = mapNodeRef.current;
+        if (container) {
+          let pressTimer: number | null = null;
+          let pressPoint: { x: number; y: number } | null = null;
+          const clearPress = () => {
+            if (pressTimer !== null) window.clearTimeout(pressTimer);
+            pressTimer = null;
+            pressPoint = null;
+          };
+          const onDown = (ev: PointerEvent) => {
+            if (ev.button !== 0) return;
+            const target = ev.target as HTMLElement | null;
+            if (target?.closest(".maplibregl-marker, .maplibregl-control-container, button, a"))
+              return;
+            pressPoint = { x: ev.clientX, y: ev.clientY };
+            pressTimer = window.setTimeout(() => {
+              if (!map || !pressPoint) return;
+              const rect = container.getBoundingClientRect();
+              const ll = map.unproject([pressPoint.x - rect.left, pressPoint.y - rect.top]);
+              ignoreBackgroundClickUntilRef.current = Date.now() + 700;
+              onMapLongPressRef.current?.(ll.lat, ll.lng);
+              clearPress();
+            }, 480);
+          };
+          const onMove = (ev: PointerEvent) => {
+            if (!pressPoint) return;
+            if (
+              Math.abs(ev.clientX - pressPoint.x) > 10 ||
+              Math.abs(ev.clientY - pressPoint.y) > 10
+            ) {
+              clearPress();
+            }
+          };
+          container.addEventListener("pointerdown", onDown);
+          container.addEventListener("pointermove", onMove);
+          container.addEventListener("pointerup", clearPress);
+          container.addEventListener("pointercancel", clearPress);
+          container.addEventListener("pointerleave", clearPress);
+          cleanupFns.push(() => {
+            clearPress();
+            container.removeEventListener("pointerdown", onDown);
+            container.removeEventListener("pointermove", onMove);
+            container.removeEventListener("pointerup", clearPress);
+            container.removeEventListener("pointercancel", clearPress);
+            container.removeEventListener("pointerleave", clearPress);
+          });
+        }
+
+        const syncZoom = () => {
+          if (!map) return;
+          if (zoomFrame !== null) return;
+          zoomFrame = window.requestAnimationFrame(() => {
+            zoomFrame = null;
+            if (!map) return;
+            const nextZoom = map.getZoom();
+            lastZoomRef.current = nextZoom;
+            applyMarkerZoomProfile(mapNodeRef.current, nextZoom);
+            setZoom(nextZoom);
+          });
+        };
+        map.on("zoom", syncZoom);
+        map.on("zoomend", syncZoom);
+        const pauseMarkerEffects = (kind: "move" | "zoom") => {
+          activeMapMotion.add(kind);
+          if (effectsResumeFrame !== null) {
+            window.cancelAnimationFrame(effectsResumeFrame);
+            effectsResumeFrame = null;
+          }
+          mapNodeRef.current?.classList.add("hp-map-is-moving");
+        };
+        const resumeMarkerEffects = (kind: "move" | "zoom") => {
+          activeMapMotion.delete(kind);
+          if (activeMapMotion.size > 0) return;
+          effectsResumeFrame = window.requestAnimationFrame(() => {
+            effectsResumeFrame = null;
+            mapNodeRef.current?.classList.remove("hp-map-is-moving");
+            scheduleMarkerViewportSyncRef.current();
+          });
+        };
+        const onMoveStart = () => pauseMarkerEffects("move");
+        const onZoomStart = () => pauseMarkerEffects("zoom");
+        const onMoveEnd = () => {
+          resumeMarkerEffects("move");
+        };
+        const onZoomEnd = () => resumeMarkerEffects("zoom");
+        map.on("movestart", onMoveStart);
+        map.on("zoomstart", onZoomStart);
+        map.on("moveend", onMoveEnd);
+        map.on("zoomend", onZoomEnd);
+        cleanupFns.push(() => {
+          map?.off("movestart", onMoveStart);
+          map?.off("zoomstart", onZoomStart);
+          map?.off("moveend", onMoveEnd);
+          map?.off("zoomend", onZoomEnd);
+        });
+        map.once("load", () => {
+          if (cancelled || !map) return;
+          const readyZoom = map.getZoom();
+          lastZoomRef.current = readyZoom;
+          applyMarkerZoomProfile(mapNodeRef.current, readyZoom);
+          setZoom(readyZoom);
+          setMapReady(true);
+          setMapLoadError(null);
+          window.setTimeout(() => map?.resize(), 0);
+        });
+      })
+      .catch((error: unknown) => {
+        if (cancelled || (error instanceof DOMException && error.name === "AbortError")) return;
+        const message = error instanceof Error ? error.message : "The basemap could not be loaded.";
+        console.error(message);
+        setMapLoadError(message);
       });
-    });
 
     return () => {
       cancelled = true;
+      basemapAbortController.abort();
       if (zoomFrame !== null) {
         window.cancelAnimationFrame(zoomFrame);
       }
@@ -1627,18 +1599,17 @@ export function SocialMap({
       }
       cleanupFns.forEach((cleanup) => cleanup());
       setMapReady(false);
-      markerClickHandlers.forEach((handler, id) => markers.get(id)?.off("click", handler));
+      markers.forEach((marker) => marker.remove());
       markers.clear();
       markerSigs.clear();
       markerRuntimes.clear();
-      markerClickHandlers.clear();
+      routeStopMarkersRef.current.forEach((marker) => marker.remove());
+      routeStopMarkersRef.current = [];
+      userMarkerRef.current?.remove();
       map?.remove();
       mapRef.current = null;
-      leafletRef.current = null;
+      maplibreModuleRef.current = null;
       userMarkerRef.current = null;
-      routeLayerRef.current = null;
-      seaLayerRef.current = null;
-      seaVisibleRef.current = false;
     };
   }, []);
 
@@ -1652,13 +1623,13 @@ export function SocialMap({
         frame = null;
         // The settle event schedules a fresh pass; do not re-grid each zoom frame.
         if (mapNodeRef.current?.classList.contains("hp-map-is-moving")) return;
-        const size = map.getSize();
+        const size = { x: map.getCanvas().clientWidth, y: map.getCanvas().clientHeight };
         const height = Math.max(
           0,
           Math.min(size.y - bottomOverlayHeightRef.current, availableMapHeightRef.current),
         );
         const nodes = [...renderNodesRef.current.values()].map((node) => {
-          const point = map.latLngToContainerPoint(node.latLng);
+          const point = map.project([node.latLng[1], node.latLng[0]]);
           const score =
             node.kind === "child"
               ? scorePlace(node.place, activitySnapshotRef.current, node.eventCount)
@@ -1715,13 +1686,16 @@ export function SocialMap({
       schedule();
     };
     scheduleMarkerViewportSyncRef.current = schedule;
-    map.on("moveend zoomend resize", schedule);
+    map.on("moveend", schedule);
+    map.on("zoomend", schedule);
+    map.on("resize", schedule);
     document.addEventListener("visibilitychange", onVisibilityChange);
     schedule();
     return () => {
-      if (frame !== null) cancelAnimationFrame(frame);
       scheduleMarkerViewportSyncRef.current = () => {};
-      map.off("moveend zoomend resize", schedule);
+      map.off("moveend", schedule);
+      map.off("zoomend", schedule);
+      map.off("resize", schedule);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [mapReady]);
@@ -1731,20 +1705,17 @@ export function SocialMap({
   }, [bottomOverlayHeight, availableMapHeight, activitySnapshot]);
 
   useEffect(() => {
-    const L = leafletRef.current;
+    const maplibre = maplibreModuleRef.current;
     const map = mapRef.current;
-    if (!L || !map || !mapReady) return;
+    if (!maplibre || !map || !mapReady) return;
 
     const nodeIds = new Set(renderNodes.map((node) => node.id));
     markersRef.current.forEach((marker, id) => {
       if (nodeIds.has(id)) return;
-      const clickHandler = markerClickHandlerRef.current.get(id);
-      if (clickHandler) marker.off("click", clickHandler);
       marker.remove();
       markersRef.current.delete(id);
       markerSigRef.current.delete(id);
       markerRuntimeRef.current.delete(id);
-      markerClickHandlerRef.current.delete(id);
     });
 
     renderNodes.forEach((node) => {
@@ -1791,11 +1762,10 @@ export function SocialMap({
       const needsRebuild = markerSigRef.current.get(node.id) !== sig;
       const createIcon = () =>
         node.kind === "cluster"
-          ? createAreaIcon(L, node.cluster, resolveImg)
+          ? createAreaIcon(node.cluster, resolveImg)
           : node.kind === "activity-cluster"
-            ? createActivityClusterIcon(L, node, resolveImg)
+            ? createActivityClusterIcon(node, resolveImg)
             : createChildIcon(
-                L,
                 node.place,
                 node.eventCount,
                 node.tier,
@@ -1804,18 +1774,16 @@ export function SocialMap({
                 resolveImg,
               );
 
+      if (marker && needsRebuild) {
+        marker.remove();
+        markersRef.current.delete(node.id);
+        marker = undefined;
+      }
       if (!marker) {
-        marker = L.marker(node.latLng, {
-          icon: createIcon(),
-          riseOnHover: true,
-          zIndexOffset,
-        }).addTo(map);
+        marker = new maplibre.Marker({ element: createIcon(), anchor: "center" })
+          .setLngLat([node.latLng[1], node.latLng[0]])
+          .addTo(map);
         markersRef.current.set(node.id, marker);
-        const clickHandler = () => activateMarkerByIdRef.current(node.id);
-        marker.on("click", clickHandler);
-        markerClickHandlerRef.current.set(node.id, clickHandler);
-      } else if (needsRebuild) {
-        marker.setIcon(createIcon());
       }
 
       if (needsRebuild) markerSigRef.current.set(node.id, sig);
@@ -1843,17 +1811,13 @@ export function SocialMap({
         previousRuntime.lat !== node.latLng[0] ||
         previousRuntime.lng !== node.latLng[1]
       ) {
-        marker.setLatLng(node.latLng);
-      }
-      if (!previousRuntime || Math.abs(previousRuntime.opacity - node.opacity) > 0.0001) {
-        marker.setOpacity(node.opacity);
-      }
-      if (!previousRuntime || previousRuntime.zIndexOffset !== zIndexOffset) {
-        marker.setZIndexOffset(zIndexOffset);
+        marker.setLngLat([node.latLng[1], node.latLng[0]]);
       }
 
       const markerElement = marker.getElement() as InteractiveMarkerElement | null;
       if (markerElement) {
+        markerElement.style.opacity = node.opacity.toFixed(3);
+        markerElement.style.zIndex = String(zIndexOffset);
         const markerShell = markerElement.firstElementChild as HTMLElement | null;
         const shouldSyncProminence =
           needsRebuild ||
@@ -1891,7 +1855,6 @@ export function SocialMap({
         }
 
         if (needsRebuild) {
-          // Leaflet can reuse the outer icon element when replacing its content.
           if (markerElement.__hpClickHandler)
             markerElement.removeEventListener("click", markerElement.__hpClickHandler, true);
           if (markerElement.__hpKeyHandler)
@@ -1967,7 +1930,7 @@ export function SocialMap({
         ? markerCoreRadius(primarySelectedNode, map.getZoom())
         : SAFE_MARKER_RADIUS,
     );
-    const currentPoint = map.latLngToContainerPoint(latLng);
+    const currentPoint = map.project([latLng[1], latLng[0]]);
     const currentZoom = map.getZoom();
 
     if (currentZoom >= RICH_VISUAL_ZOOM && pointIsInSafeRect(currentPoint, viewport)) return;
@@ -1980,9 +1943,7 @@ export function SocialMap({
       if (delta.x === 0 && delta.y === 0) return;
       selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 320);
       map.panBy([delta.x, delta.y], {
-        animate: !reduceMotion,
-        duration: MAP_PAN_DURATION,
-        easeLinearity: MAP_EASE_LINEARITY,
+        duration: reduceMotion ? 0 : MAP_PAN_DURATION * 1000,
       });
       return;
     }
@@ -1990,19 +1951,20 @@ export function SocialMap({
     selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
     const bottomPadding = Math.min(460, Math.max(180, bottomOverlayHeight + 40));
     const focusOffset = Math.min(270, Math.max(128, bottomPadding * 0.44));
-    const targetPoint = map.project(latLng, PLACE_FOCUS_ZOOM);
-    const offsetCenter = map.unproject(
-      [targetPoint.x, targetPoint.y + focusOffset],
-      PLACE_FOCUS_ZOOM,
-    );
-    const targetCenter: LatLngTuple = [offsetCenter.lat, offsetCenter.lng];
-
     if (reduceMotion) {
-      map.setView(targetCenter, PLACE_FOCUS_ZOOM, { animate: false });
+      map.easeTo({
+        center: [latLng[1], latLng[0]],
+        zoom: PLACE_FOCUS_ZOOM,
+        offset: [0, -focusOffset],
+        duration: 0,
+      });
     } else {
-      map.flyTo(targetCenter, PLACE_FOCUS_ZOOM, {
-        duration: MAP_FOCUS_DURATION,
-        easeLinearity: MAP_EASE_LINEARITY,
+      map.flyTo({
+        center: [latLng[1], latLng[0]],
+        zoom: PLACE_FOCUS_ZOOM,
+        offset: [0, -focusOffset],
+        duration: MAP_FOCUS_DURATION * 1000,
+        essential: true,
       });
     }
   }, [
@@ -2033,7 +1995,7 @@ export function SocialMap({
         return;
       }
 
-      const point = map.latLngToContainerPoint(primarySelectedNode.latLng);
+      const point = map.project([primarySelectedNode.latLng[1], primarySelectedNode.latLng[0]]);
       const viewport = safeMapRect(
         container,
         bottomOverlayHeight,
@@ -2042,7 +2004,7 @@ export function SocialMap({
       );
       const delta = panDeltaIntoSafeRect(point, viewport);
       if (delta.x !== 0 || delta.y !== 0) {
-        map.panBy([delta.x, delta.y], { animate: false });
+        map.panBy([delta.x, delta.y], { duration: 0 });
         correctionCount += 1;
         if (correctionCount < 3) {
           frame = window.requestAnimationFrame(keepSelectionVisible);
@@ -2065,104 +2027,181 @@ export function SocialMap({
     if (didInitialFitRef.current) return;
     didInitialFitRef.current = true;
 
-    const bounds = clusters.map((cluster) => [cluster.lat, cluster.lng] as LatLngTuple);
+    const bounds: [[number, number], [number, number]] = [
+      [
+        Math.min(...clusters.map((cluster) => cluster.lng)),
+        Math.min(...clusters.map((cluster) => cluster.lat)),
+      ],
+      [
+        Math.max(...clusters.map((cluster) => cluster.lng)),
+        Math.max(...clusters.map((cluster) => cluster.lat)),
+      ],
+    ];
     map.fitBounds(bounds, {
-      animate: !prefersReducedMapMotion(),
-      duration: MAP_OVERVIEW_DURATION,
+      duration: prefersReducedMapMotion() ? 0 : MAP_OVERVIEW_DURATION * 1000,
       maxZoom: OVERVIEW_ZOOM,
-      paddingBottomRight: [52, 210],
-      paddingTopLeft: [52, 108],
+      padding: { left: 52, top: 108, right: 52, bottom: 210 },
     });
   }, [clusters, isSplitZoom, mapReady, selectedAreaId, selectedPlaceId]);
 
   useEffect(() => {
-    const L = leafletRef.current;
     const map = mapRef.current;
-    if (!L || !map || !mapReady) return;
-
-    const shouldShow = zoom <= SEA_SHIMMER_MAX_ZOOM && !selectedPlaceId;
-    if (shouldShow === seaVisibleRef.current) return;
-    seaVisibleRef.current = shouldShow;
-
-    const pane = map.getPane("hp-sea-shimmer");
-
-    if (shouldShow) {
-      if (!seaLayerRef.current) {
-        seaLayerRef.current = L.polygon(SEA_SHIMMER_LATLNGS as LatLngTuple[][][], {
-          pane: "hp-sea-shimmer",
-          className: "hp-sea-shimmer",
-          interactive: false,
-          stroke: false,
-          fillOpacity: 1,
-          fillRule: "evenodd",
-        });
-      }
-      seaLayerRef.current.addTo(map);
-      window.requestAnimationFrame(() => {
-        if (seaVisibleRef.current && pane) pane.style.opacity = "1";
+    if (!map || !mapReady) return;
+    const sourceId = "hp-sea-shimmer-source";
+    const layerId = "hp-sea-shimmer";
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "MultiPolygon",
+            coordinates: SEA_SHIMMER_LATLNGS.map((polygon) =>
+              polygon.map((ring) => ring.map(([lat, lng]) => [lng, lat])),
+            ),
+          },
+        },
       });
-      return;
     }
-
-    if (pane) pane.style.opacity = "0";
-    const layer = seaLayerRef.current;
-    if (layer) {
-      window.setTimeout(() => {
-        if (!seaVisibleRef.current) layer.remove();
-      }, 400);
+    if (!map.hasImage("hp-waves")) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 28;
+      canvas.height = 20;
+      const context = canvas.getContext("2d");
+      if (context) {
+        context.fillStyle = "rgba(119,190,213,.11)";
+        context.fillRect(0, 0, 28, 20);
+        context.strokeStyle = "rgba(72,147,175,.24)";
+        context.lineWidth = 1;
+        for (const y of [7, 14]) {
+          context.beginPath();
+          context.moveTo(-7, y);
+          context.quadraticCurveTo(0, y - 5, 7, y);
+          context.quadraticCurveTo(14, y + 5, 21, y);
+          context.quadraticCurveTo(28, y - 5, 35, y);
+          context.stroke();
+        }
+        map.addImage("hp-waves", context.getImageData(0, 0, 28, 20));
+      }
     }
+    if (!map.getLayer(layerId)) {
+      const beforeId = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
+      map.addLayer(
+        {
+          id: layerId,
+          type: "fill",
+          source: sourceId,
+          paint: {
+            "fill-pattern": "hp-waves",
+            "fill-opacity": 0.85,
+            "fill-opacity-transition": { duration: 360 },
+          },
+        },
+        beforeId,
+      );
+    }
+    map.setLayoutProperty(
+      layerId,
+      "visibility",
+      zoom <= SEA_SHIMMER_MAX_ZOOM && !selectedPlaceId ? "visible" : "none",
+    );
   }, [mapReady, zoom, selectedPlaceId]);
 
   useEffect(() => {
-    const L = leafletRef.current;
+    const maplibre = maplibreModuleRef.current;
     const map = mapRef.current;
-    routeLayerRef.current?.remove();
-    routeLayerRef.current = null;
-
-    if (!L || !map || !mapReady || !routePath || routePath.length < 2) return;
-
-    const group = L.layerGroup().addTo(map);
-    const latLngs = routePath.map((stop) => [stop.lat, stop.lng] as LatLngTuple);
-    const line = L.polyline(latLngs, {
-      className: "hp-route-line",
-      color: "var(--hp-sunset)",
-      dashArray: "2 12",
-      interactive: false,
-      opacity: 0.92,
-      weight: 4,
-    }).addTo(group);
-
-    routePath.forEach((stop, index) => {
-      L.marker([stop.lat, stop.lng], {
-        interactive: false,
-        keyboard: false,
-        zIndexOffset: 1800,
-        icon: L.divIcon({
-          className: "hp-route-stop-marker",
-          html: `<span class="hp-route-stop" title="${escapeHtml(stop.label)}">${index + 1}</span>`,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-        }),
-      }).addTo(group);
+    routeStopMarkersRef.current.forEach((marker) => marker.remove());
+    routeStopMarkersRef.current = [];
+    if (!maplibre || !map || !mapReady) return;
+    const sourceId = "hp-route-source";
+    const solidId = "hp-route-solid";
+    const fallbackId = "hp-route-fallback";
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: { type: "LineString", coordinates: [] },
+        },
+      });
+      const beforeId = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
+      map.addLayer(
+        {
+          id: solidId,
+          type: "line",
+          source: sourceId,
+          layout: { "line-cap": "round", "line-join": "round", visibility: "none" },
+          paint: { "line-color": "#e06a32", "line-width": 4, "line-opacity": 0.92 },
+        },
+        beforeId,
+      );
+      map.addLayer(
+        {
+          id: fallbackId,
+          type: "line",
+          source: sourceId,
+          layout: { "line-cap": "round", "line-join": "round", visibility: "none" },
+          paint: {
+            "line-color": "#e06a32",
+            "line-width": 4,
+            "line-opacity": 0.92,
+            "line-dasharray": [0.5, 3],
+          },
+        },
+        beforeId,
+      );
+    }
+    if (!routePreview || routePreview.stops.length < 2) {
+      map.setLayoutProperty(solidId, "visibility", "none");
+      map.setLayoutProperty(fallbackId, "visibility", "none");
+      return;
+    }
+    const coordinates = routePreview.geometry?.length
+      ? routePreview.geometry
+      : routePreview.stops.map((stop) => [stop.lng, stop.lat] as [number, number]);
+    (map.getSource(sourceId) as import("maplibre-gl").GeoJSONSource).setData({
+      type: "Feature",
+      properties: {},
+      geometry: { type: "LineString", coordinates },
     });
-
-    routeLayerRef.current = group;
+    map.setLayoutProperty(solidId, "visibility", routePreview.geometry ? "visible" : "none");
+    map.setLayoutProperty(fallbackId, "visibility", routePreview.geometry ? "none" : "visible");
+    routeStopMarkersRef.current = routePreview.stops.map((stop, index) => {
+      const element = document.createElement("div");
+      element.className = "hp-route-stop-marker";
+      element.innerHTML = `<span class="hp-route-stop" title="${escapeHtml(stop.label)}">${index + 1}</span>`;
+      return new maplibre.Marker({ element, anchor: "center" })
+        .setLngLat([stop.lng, stop.lat])
+        .addTo(map);
+    });
     const reduceMotion = prefersReducedMapMotion();
     const routeBottomPadding = Math.max(188, bottomOverlayHeightRef.current + 40);
     map.stop();
-    map.fitBounds(line.getBounds().pad(0.22), {
-      animate: !reduceMotion,
-      duration: MAP_FOCUS_DURATION,
-      maxZoom: PLACE_FOCUS_ZOOM,
-      paddingBottomRight: [48, routeBottomPadding],
-      paddingTopLeft: [48, 116],
-    });
+    map.fitBounds(
+      [
+        [
+          Math.min(...coordinates.map(([lng]) => lng)),
+          Math.min(...coordinates.map(([, lat]) => lat)),
+        ],
+        [
+          Math.max(...coordinates.map(([lng]) => lng)),
+          Math.max(...coordinates.map(([, lat]) => lat)),
+        ],
+      ],
+      {
+        duration: reduceMotion ? 0 : MAP_FOCUS_DURATION * 1000,
+        maxZoom: PLACE_FOCUS_ZOOM,
+        padding: { left: 48, top: 116, right: 48, bottom: routeBottomPadding },
+      },
+    );
 
     return () => {
-      group.remove();
-      if (routeLayerRef.current === group) routeLayerRef.current = null;
+      routeStopMarkersRef.current.forEach((marker) => marker.remove());
+      routeStopMarkersRef.current = [];
     };
-  }, [mapReady, routePath]);
+  }, [mapReady, routePreview]);
 
   const resetToOverview = () => {
     if (selectionKeyRef.current !== "|") cameraHandledSelectionRef.current = "|";
@@ -2185,9 +2224,47 @@ export function SocialMap({
 
   const locateUser = () => {
     const map = mapRef.current;
-    if (!map) return;
-    map.locate({ enableHighAccuracy: true, maxZoom: 15, setView: true });
+    const maplibre = maplibreModuleRef.current;
+    if (!map || !maplibre || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const lngLat: [number, number] = [coords.longitude, coords.latitude];
+        if (userMarkerRef.current) userMarkerRef.current.setLngLat(lngLat);
+        else {
+          const element = document.createElement("div");
+          element.className = "hp-user-marker";
+          element.innerHTML =
+            '<span class="hp-user-dot" style="display:block;width:15px;height:15px"></span>';
+          userMarkerRef.current = new maplibre.Marker({ element, anchor: "center" })
+            .setLngLat(lngLat)
+            .addTo(map);
+        }
+        map.flyTo({
+          center: lngLat,
+          zoom: Math.max(map.getZoom(), 15),
+          duration: 650,
+          essential: true,
+        });
+      },
+      (error) => console.warn("Could not locate the device.", error),
+      { enableHighAccuracy: true, maximumAge: 30000, timeout: 12000 },
+    );
   };
+
+  useEffect(() => {
+    if (!mapReady) return;
+    setAttributionExpanded(true);
+    const container = mapNodeRef.current;
+    const collapse = () => setAttributionExpanded(false);
+    const timer = window.setTimeout(collapse, 5000);
+    container?.addEventListener("pointerdown", collapse, { once: true });
+    container?.addEventListener("wheel", collapse, { once: true });
+    return () => {
+      window.clearTimeout(timer);
+      container?.removeEventListener("pointerdown", collapse);
+      container?.removeEventListener("wheel", collapse);
+    };
+  }, [mapReady]);
 
   const utilityRailHidden = availableMapHeight < MIN_UTILITY_RAIL_HEIGHT;
   const mapChromeHidden = availableMapHeight < MIN_MAP_CHROME_HEIGHT;
@@ -2203,35 +2280,57 @@ export function SocialMap({
     >
       <div ref={mapNodeRef} className="h-full w-full" aria-label={t("Interactive map of Ilia")} />
 
-      <svg
-        aria-hidden="true"
-        focusable="false"
-        width="0"
-        height="0"
-        className="pointer-events-none absolute"
-      >
-        <defs>
-          <pattern id="hp-waves" width="28" height="20" patternUnits="userSpaceOnUse">
-            <rect className="hp-sea-shimmer__tint" width="28" height="20" />
-            <g className="hp-sea-shimmer__waves" fill="none" strokeLinecap="round">
-              <path
-                className="hp-sea-shimmer__wave-a"
-                d="M-28 7 Q-21 2 -14 7 T0 7 T14 7 T28 7 T42 7 T56 7"
-              />
-              <path
-                className="hp-sea-shimmer__wave-b"
-                d="M-28 14 Q-21 10 -14 14 T0 14 T14 14 T28 14 T42 14 T56 14"
-              />
-            </g>
-          </pattern>
-        </defs>
-      </svg>
-
-      {!mapReady && (
+      {mapLoadError ? (
+        <div
+          role="alert"
+          className="absolute inset-0 z-40 grid place-items-center bg-hp-paper/94 p-6 text-center text-sm text-hp-ink/70"
+        >
+          <div>
+            <p>{mapLoadError}</p>
+            <button
+              type="button"
+              className="mt-3 rounded-full bg-hp-ink px-4 py-2 font-bold text-hp-paper"
+              onClick={() => window.location.reload()}
+            >
+              {t("Retry map")}
+            </button>
+          </div>
+        </div>
+      ) : !mapReady ? (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-hp-paper/70">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-hp-ink/15 border-t-hp-sunset">
             <span className="sr-only">{t("Loading map")}</span>
           </div>
+        </div>
+      ) : null}
+
+      {mapReady && (
+        <div className="hp-map-attribution" data-expanded={attributionExpanded ? "true" : "false"}>
+          {attributionExpanded && (
+            <div className="hp-map-attribution__credits" role="note">
+              ©{" "}
+              <a href="https://www.openmaptiles.org" target="_blank" rel="noreferrer">
+                OpenMapTiles
+              </a>
+              {" · "}©{" "}
+              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
+                OpenStreetMap
+              </a>
+              {" · "}
+              <a href="https://openrouteservice.org" target="_blank" rel="noreferrer">
+                openrouteservice / HeiGIT
+              </a>
+            </div>
+          )}
+          <button
+            type="button"
+            className="hp-map-attribution__info"
+            aria-label={t("Map licences")}
+            aria-expanded={attributionExpanded}
+            onClick={() => setAttributionExpanded((value) => !value)}
+          >
+            ⓘ
+          </button>
         </div>
       )}
 

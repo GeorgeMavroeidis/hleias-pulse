@@ -17,6 +17,7 @@ export default tseslint.config(
       // Deno runtime (edge functions) — a different global scope (Deno, npm:
       // specifiers) than the browser/Node projects this config covers.
       "supabase/functions",
+      "ios/App/App/public",
     ],
   },
   {

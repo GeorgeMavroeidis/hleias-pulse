@@ -34,10 +34,12 @@
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
     "test:map-visuals": "tsx scripts/check-map-visuals.ts",
+    "test:routing": "tsx --test scripts/check-route-preview.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",
     "build:ionian-land": "tsx scripts/build-ionian-land.ts"
   },
   "dependencies": {
+    "@capacitor/app-launcher": "^8.0.1",
     "@capacitor/core": "^8.4.0",
     "@capacitor/ios": "^8.4.0",
     "@capacitor/status-bar": "^8.0.2",
@@ -85,6 +87,7 @@
     "input-otp": "^1.4.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.575.0",
+    "maplibre-gl": "^6.10.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",

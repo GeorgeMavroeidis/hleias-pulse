@@ -276,6 +276,7 @@ const sections = [
       "comment_count",
       "saves_count",
       "sort_order",
+      "routing_profile",
     ],
     ROUTES.map((route, index) => [
       route.id,
@@ -289,6 +290,7 @@ const sections = [
       route.commentCount,
       route.saves,
       index,
+      route.id === "route-2" ? "foot-walking" : "driving-car",
     ]),
     "id",
   ),

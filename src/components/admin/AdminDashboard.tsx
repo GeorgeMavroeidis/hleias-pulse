@@ -1,4 +1,4 @@
-import { Children, useEffect, useMemo, useState } from "react";
+import { Children, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -42,6 +42,7 @@ import {
   type OrganizerVerificationStatus,
   type PlaceClaimStatus,
   clearPlaceDeal,
+  buildAdminRoutePreview,
   getClaimRedemptionCounts,
   createAdminBusiness,
   deleteAdminPlace,
@@ -64,6 +65,12 @@ import {
   setOrganizerVerification,
   uploadContentMedia,
 } from "@/lib/admin-api";
+import {
+  parseRoutePreviewResponse,
+  routeInputHash,
+  type RouteCoordinate,
+} from "@/lib/hp/route-preview";
+import type { RouteRoutingProfile } from "@/lib/hp-model";
 import { getCurrentPulseAccount, type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { CULTURAL_EVENT_TYPES, CULTURAL_EVENT_TYPE_META, tr } from "@/lib/hp/cultural-events-types";
@@ -2589,12 +2596,16 @@ function RouteEditor({
   const [budget, setBudget] = useState(route?.budget ?? "Free");
   const [imageUrl, setImageUrl] = useState(route?.image_url ?? "");
   const [tagText, setTagText] = useState(route?.tags.join(", ") ?? "");
+  const [routingProfile, setRoutingProfile] = useState<RouteRoutingProfile>(
+    route?.routing_profile === "foot-walking" ? "foot-walking" : "driving-car",
+  );
   const [stops, setStops] = useState(() =>
     route
       ? routeStops.filter((stop) => stop.route_id === route.id).map((stop) => ({ ...stop }))
       : [],
   );
   const [saving, setSaving] = useState(false);
+  const forcePreviewRebuildRef = useRef(false);
   const upload = async (file: File | null) => {
     if (!file) return;
     try {
@@ -2629,8 +2640,30 @@ function RouteEditor({
         message: t("Title, summary, duration, and image are required."),
       });
     const routeId = route?.id ?? `route-${slug(title)}-${Date.now()}`;
+    const coordinates = stops
+      .map((stop) => places.find((place) => place.id === stop.place_id))
+      .filter((place): place is AdminPlace => Boolean(place))
+      .map((place) => [place.lng, place.lat] as RouteCoordinate);
+    const inputHash = coordinates.length >= 2 ? routeInputHash(routingProfile, coordinates) : null;
+    let preview: ReturnType<typeof parseRoutePreviewResponse> | null = null;
+    let previewWarning: string | null = null;
     try {
       setSaving(true);
+      const previewChanged =
+        forcePreviewRebuildRef.current || !inputHash || route?.route_input_hash !== inputHash;
+      if (previewChanged && coordinates.length >= 2) {
+        try {
+          preview = parseRoutePreviewResponse(
+            await buildAdminRoutePreview({
+              profile: routingProfile,
+              coordinates: coordinates.map((item) => [...item]),
+            }),
+          );
+        } catch (error) {
+          previewWarning =
+            error instanceof Error ? error.message : t("Could not rebuild the route preview.");
+        }
+      }
       await saveAdminRoute({
         id: routeId,
         title: title.trim(),
@@ -2643,19 +2676,45 @@ function RouteEditor({
         comment_count: route?.comment_count ?? 0,
         saves_count: route?.saves_count ?? 0,
         sort_order: route?.sort_order ?? Date.now(),
+        routing_profile: routingProfile,
+        route_geometry:
+          (preview?.geometry as unknown as AdminRoute["route_geometry"]) ??
+          (!previewChanged ? route?.route_geometry : null) ??
+          null,
+        route_distance_m:
+          preview?.distanceMeters ?? (!previewChanged ? route?.route_distance_m : null) ?? null,
+        route_duration_s:
+          preview?.durationSeconds ?? (!previewChanged ? route?.route_duration_s : null) ?? null,
+        route_input_hash: preview
+          ? inputHash
+          : !previewChanged
+            ? (route?.route_input_hash ?? null)
+            : null,
+        route_generated_at: preview
+          ? new Date().toISOString()
+          : !previewChanged
+            ? (route?.route_generated_at ?? null)
+            : null,
       });
       await replaceAdminRouteStops(
         routeId,
         stops.map((stop, position) => ({ ...stop, route_id: routeId, position })),
       );
       await onSaved();
-      setNotice({ tone: "success", message: t("Route and stops saved.") });
+      forcePreviewRebuildRef.current = false;
+      setNotice({
+        tone: previewWarning ? "error" : "success",
+        message: previewWarning
+          ? `${t("Route and stops saved.")} ${t("The road preview was cleared:")} ${previewWarning}`
+          : t("Route and stops saved."),
+      });
     } catch (error) {
       setNotice({
         tone: "error",
         message: error instanceof Error ? error.message : t("Could not save route."),
       });
     } finally {
+      forcePreviewRebuildRef.current = false;
       setSaving(false);
     }
   };
@@ -2693,6 +2752,16 @@ function RouteEditor({
             />
           </Field>
         </div>
+        <Field label="Travel mode">
+          <select
+            className={inputClass}
+            value={routingProfile}
+            onChange={(event) => setRoutingProfile(event.target.value as RouteRoutingProfile)}
+          >
+            <option value="driving-car">Driving</option>
+            <option value="foot-walking">Walking</option>
+          </select>
+        </Field>
         <Field label="Tags">
           <input
             className={inputClass}
@@ -2801,9 +2870,22 @@ function RouteEditor({
             ))}
           </div>
         </div>
-        <ActionButton type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save route"}
-        </ActionButton>
+        <div className="flex gap-2">
+          <ActionButton type="submit" disabled={saving}>
+            {saving ? "Saving…" : "Save route"}
+          </ActionButton>
+          <ActionButton
+            type="button"
+            tone="muted"
+            disabled={saving || stops.length < 2}
+            onClick={(event) => {
+              forcePreviewRebuildRef.current = true;
+              event.currentTarget.form?.requestSubmit();
+            }}
+          >
+            Rebuild route preview
+          </ActionButton>
+        </div>
       </div>
     </form>
   );

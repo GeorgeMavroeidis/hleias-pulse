@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  coordinateBounds,
+  removeAdministrativeBoundaries,
+  toMapLibreCoordinate,
+} from "../src/lib/hp/map-core";
+import {
   childMarkerSize,
   markerPresenceScale,
   markerMotionPhase,
@@ -134,6 +139,49 @@ const mapSource = readFileSync(
   new URL("../src/components/hp/SocialMap.tsx", import.meta.url),
   "utf8",
 );
+assert.ok(mapSource.includes("https://tiles.openfreemap.org/styles/bright"));
+assert.ok(mapSource.includes('import("maplibre-gl")'));
+assert.ok(mapSource.includes("new maplibre.Map"));
+assert.ok(mapSource.includes("attributionControl: false"));
+assert.ok(mapSource.includes("hp-map-attribution__info"));
+assert.doesNotMatch(mapSource, /maplibre-gl-leaflet|import\("leaflet"\)|OPENFREEMAP_ATTRIBUTION/);
+assert.doesNotMatch(
+  mapSource,
+  /tile\.openstreetmap\.org/,
+  "The public map must not silently restore OSM Standard administrative boundaries",
+);
+assert.doesNotMatch(mapSource, /VITE_MAP_TILE_/);
+assert.doesNotMatch(mapSource, /ORS_API_KEY|VITE_[A-Z_]*ROUT/);
+const style = removeAdministrativeBoundaries({
+  version: 8,
+  sources: {},
+  layers: [
+    { id: "water", type: "background" },
+    { id: "boundary_2", type: "line", source: "openmaptiles", "source-layer": "boundary" },
+    { id: "admin-boundary-label", type: "symbol", source: "openmaptiles", "source-layer": "place" },
+    { id: "road", type: "line", source: "openmaptiles", "source-layer": "transportation" },
+  ],
+});
+assert.deepEqual(
+  style.layers.map((layer) => layer.id),
+  ["water", "road"],
+);
+assert.deepEqual(toMapLibreCoordinate(37.64, 21.31), [21.31, 37.64]);
+assert.deepEqual(
+  coordinateBounds([
+    [21, 37],
+    [22, 38],
+    [20, 37.5],
+  ]),
+  [
+    [20, 37],
+    [22, 38],
+  ],
+);
+console.log(
+  "Basemap contract: direct MapLibre, one compact credit control and boundary-free vector style passed.",
+);
+
 const markerKeyframes = [...css.matchAll(/@keyframes (hp-marker-[\w-]+)\s*\{([\s\S]*?)\n\}/g)];
 assert.ok(markerKeyframes.length >= 10);
 for (const [, name, body] of markerKeyframes) {

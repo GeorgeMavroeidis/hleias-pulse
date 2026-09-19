@@ -1,7 +1,8 @@
 import { MustSeeTodayDeck } from "./PulseFeed";
+import { Capacitor } from "@capacitor/core";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Bookmark, X, MessageCircle, Clock, Wallet } from "lucide-react";
+import { Search, Bookmark, X, MessageCircle, Clock, Wallet, Navigation } from "lucide-react";
 import {
   authorTypeColor,
   type Author,
@@ -10,6 +11,8 @@ import {
   type RouteItem,
 } from "@/lib/hp-model";
 import { useI18n } from "@/lib/i18n";
+import type { NavigationProvider } from "@/lib/hp/route-navigation";
+import { formatRouteDistance, formatRouteDuration } from "@/lib/hp/route-preview";
 import { ImageBox } from "./ImageBox";
 import { ROUTE_FILTERS, type RouteFilter } from "./pulse-shared";
 
@@ -306,6 +309,7 @@ export function ActiveRouteGuide({
   findPlace,
   onOpenStop,
   onNext,
+  onNavigate,
   onClose,
 }: {
   route: RouteItem;
@@ -313,12 +317,16 @@ export function ActiveRouteGuide({
   findPlace: (id: string) => Place | undefined;
   onOpenStop: (placeId: string, index: number) => void;
   onNext: () => void;
+  onNavigate: (placeId: string, provider: NavigationProvider) => void;
   onClose: () => void;
 }) {
   const { language, t } = useI18n();
   const stop = route.stops[stopIndex] ?? route.stops[0];
   const place = stop ? findPlace(stop.placeId) : null;
   const total = route.stops.length;
+  const distance = formatRouteDistance(route.routeDistanceMeters);
+  const duration = formatRouteDuration(route.routeDurationSeconds);
+  const isIos = Capacitor.getPlatform() === "ios";
 
   return (
     <motion.div
@@ -342,6 +350,13 @@ export function ActiveRouteGuide({
           <p className="line-clamp-2 text-[11.5px] leading-snug text-hp-muted">
             {stop?.body ?? route.lede}
           </p>
+          <p className="mt-0.5 text-[10.5px] font-semibold text-hp-muted">
+            {distance && duration
+              ? `${route.routingProfile === "foot-walking" ? "Walk" : "Drive"} · ${distance} · ${duration}`
+              : language === "GR"
+                ? "Πρόχειρη ευθεία διαδρομή · χωρίς ETA"
+                : "Stop-to-stop preview · no ETA"}
+          </p>
         </div>
         <button
           type="button"
@@ -352,6 +367,30 @@ export function ActiveRouteGuide({
           <X size={14} />
         </button>
       </div>
+      {stop && (
+        <div className="mt-2 flex items-center gap-2 border-t border-hp-ink/10 pt-2">
+          <span className="mr-auto flex items-center gap-1 text-[10.5px] font-bold text-hp-muted">
+            <Navigation size={12} />{" "}
+            {language === "GR" ? "Πλοήγηση στη στάση" : "Navigate to next stop"}
+          </span>
+          {isIos && (
+            <button
+              type="button"
+              onClick={() => onNavigate(stop.placeId, "apple")}
+              className="rounded-full border border-hp-ink/15 px-2.5 py-1.5 text-[10.5px] font-bold text-hp-ink"
+            >
+              Apple Maps
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onNavigate(stop.placeId, "google")}
+            className="rounded-full border border-hp-ink/15 px-2.5 py-1.5 text-[10.5px] font-bold text-hp-ink"
+          >
+            Google Maps
+          </button>
+        </div>
+      )}
       <div className="mt-2 flex gap-2">
         {stop && (
           <button
