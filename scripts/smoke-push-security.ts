@@ -114,17 +114,27 @@ async function main() {
         user_id: owner.id,
       }),
     );
+    const fcmEndpoint = `https://fcm.googleapis.com/fcm/send/${suffix}-one`;
+    const databaseAllowlist = await db.withPg((client) =>
+      client.query<{ allowed: boolean }>("select private.is_allowed_push_endpoint($1) as allowed", [
+        fcmEndpoint,
+      ]),
+    );
+    assert(databaseAllowlist.rows[0]?.allowed, "database rejected the valid FCM endpoint shape");
     const firstSubscription = await owner.client
       .from("push_subscriptions")
       .insert({
         auth_key: "auth-one",
-        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-one`,
+        endpoint: fcmEndpoint,
         p256dh: "key-one",
         user_id: owner.id,
       })
       .select("id")
       .single();
-    assert(!firstSubscription.error && firstSubscription.data, "valid FCM subscription rejected");
+    assert(
+      !firstSubscription.error && firstSubscription.data,
+      `valid FCM subscription rejected: ${firstSubscription.error?.code ?? "unknown_code"}`,
+    );
     const secondSubscription = await owner.client
       .from("push_subscriptions")
       .insert({
