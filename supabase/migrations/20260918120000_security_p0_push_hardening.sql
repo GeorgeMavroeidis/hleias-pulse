@@ -15,6 +15,11 @@ create extension if not exists pg_cron;
 drop trigger if exists comments_notify_question_answered on public.comments;
 drop function if exists public.notify_question_answered();
 
+-- Do not depend on legacy Supabase auto-grants: a from-scratch project keeps
+-- new public tables closed unless the migration declares the intended access.
+revoke all on table public.push_subscriptions from public, anon, authenticated;
+grant select, insert, update, delete on table public.push_subscriptions to authenticated;
+
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated;
 alter default privileges in schema private revoke all on tables from public, anon, authenticated;

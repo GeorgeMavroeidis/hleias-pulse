@@ -487,22 +487,10 @@
       ]
     },
     "push_subscriptions": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },

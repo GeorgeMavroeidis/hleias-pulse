@@ -288,6 +288,27 @@ async function main() {
 
     // Queue internals and service RPCs are unavailable to client roles.
     await db.withPg(async (client) => {
+      const subscriptionGrants = await client.query<{
+        grantee: string;
+        privilege_type: string;
+      }>(`
+        select grantee, privilege_type
+        from information_schema.role_table_grants
+        where table_schema = 'public'
+          and table_name = 'push_subscriptions'
+          and grantee in ('anon', 'authenticated')
+        order by grantee, privilege_type
+      `);
+      assert(
+        JSON.stringify(subscriptionGrants.rows) ===
+          JSON.stringify(
+            ["DELETE", "INSERT", "SELECT", "UPDATE"].map((privilege_type) => ({
+              grantee: "authenticated",
+              privilege_type,
+            })),
+          ),
+        "push subscription table grants exceed authenticated CRUD",
+      );
       const grants = await client.query<{ count: string }>(`
         select count(*)
         from information_schema.role_table_grants
