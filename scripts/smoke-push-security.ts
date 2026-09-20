@@ -133,7 +133,9 @@ async function main() {
       .single();
     assert(
       !firstSubscription.error && firstSubscription.data,
-      `valid FCM subscription rejected: ${firstSubscription.error?.code ?? "unknown_code"}`,
+      `valid FCM subscription rejected: ${firstSubscription.error?.code ?? "unknown_code"} ${
+        firstSubscription.error?.message ?? "unknown_message"
+      }`,
     );
     const secondSubscription = await owner.client
       .from("push_subscriptions")
