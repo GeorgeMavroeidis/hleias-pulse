@@ -31,10 +31,12 @@
  *
  *   npm run audit:rls            # write supabase/policy-snapshot.json
  *   npm run audit:rls -- --check # exit 1 if live state has drifted from it
+ *   npm run audit:rls -- --check --scope=push
+ *                                # compare only the P0 push trust boundary
  *
- * Needs SUPABASE_DB_PASSWORD (.env or environment), like the smoke scripts, so
- * it is a local/on-demand gate rather than a CI job — CI has no database
- * credentials and its suites are deliberately offline.
+ * Needs SUPABASE_DB_PASSWORD (.env or environment), like the smoke scripts.
+ * CI runs the push-scoped check against its disposable local stack; the full
+ * check remains the production preflight gate.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import pg from "pg";
@@ -50,6 +52,42 @@ type Snapshot = {
   rlsDisabled: string[];
   tables: string[];
 };
+
+const PUSH_DEFINER_FUNCTIONS = new Set([
+  "claim_push_delivery_batch",
+  "complete_push_delivery",
+  "prepare_push_delivery",
+  "private.enforce_push_subscription_endpoint",
+  "private.enqueue_published_question_answer",
+  "private.invoke_push_worker",
+  "private.refresh_push_outbox_status",
+]);
+
+function isPushTable(table: string) {
+  return table === "push_subscriptions" || table.startsWith("private.push_notification_");
+}
+
+/**
+ * Local bootstrap intentionally differs from the production-wide snapshot in
+ * legacy, unrelated objects. The P0 CI gate therefore compares only the trust
+ * boundary this change owns; the default audit remains a full production
+ * posture comparison for rollout preflight.
+ */
+function pushScope(snapshot: Snapshot): Snapshot {
+  return {
+    definerFunctions: snapshot.definerFunctions.filter(({ name }) =>
+      PUSH_DEFINER_FUNCTIONS.has(name),
+    ),
+    grants: Object.fromEntries(
+      Object.entries(snapshot.grants).filter(([table]) => isPushTable(table)),
+    ),
+    policies: Object.fromEntries(
+      Object.entries(snapshot.policies).filter(([table]) => isPushTable(table)),
+    ),
+    rlsDisabled: snapshot.rlsDisabled.filter(isPushTable),
+    tables: snapshot.tables.filter(isPushTable),
+  };
+}
 
 async function collect(client: pg.Client): Promise<Snapshot> {
   const tables = await client.query<{
@@ -152,6 +190,11 @@ function render(snapshot: Snapshot) {
 
 async function main() {
   const check = process.argv.includes("--check");
+  const scopeArgument = process.argv.find((argument) => argument.startsWith("--scope="));
+  if (scopeArgument && scopeArgument !== "--scope=push") {
+    throw new Error(`Unsupported audit scope: ${scopeArgument.slice("--scope=".length)}`);
+  }
+  const scopedToPush = scopeArgument === "--scope=push";
   // Session mode: read-only introspection, but this script has always used
   // 5432 and there is no reason to move it. The session's value here is the
   // guarded connection — a drop used to kill the process with a raw stack
@@ -211,14 +254,21 @@ async function main() {
     return;
   }
 
-  if (expected === rendered) {
-    console.log(`Live policy state matches ${SNAPSHOT_PATH}.`);
+  const expectedSnapshot = JSON.parse(expected) as Snapshot;
+  const expectedForComparison = render(
+    scopedToPush ? pushScope(expectedSnapshot) : expectedSnapshot,
+  );
+  const actualForComparison = render(scopedToPush ? pushScope(snapshot) : snapshot);
+  const scopeLabel = scopedToPush ? "push security scope in " : "";
+
+  if (expectedForComparison === actualForComparison) {
+    console.log(`Live policy state matches ${scopeLabel}${SNAPSHOT_PATH}.`);
     return;
   }
 
-  console.error(`Live policy state has DRIFTED from ${SNAPSHOT_PATH}.`);
-  const before = expected.split("\n");
-  const after = rendered.split("\n");
+  console.error(`Live policy state has DRIFTED from ${scopeLabel}${SNAPSHOT_PATH}.`);
+  const before = expectedForComparison.split("\n");
+  const after = actualForComparison.split("\n");
   const seen = new Set(before);
   const gone = new Set(after);
   for (const line of after) if (!seen.has(line)) console.error(`  + ${line.trim()}`);
