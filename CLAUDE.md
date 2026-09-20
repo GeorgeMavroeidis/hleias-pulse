@@ -237,8 +237,9 @@ Modules, with status verified against the code (not against prior claims):
 
 ## Conventions & Patterns
 
-- TypeScript in strict mode. (There are **no** Supabase Edge Functions in this repo
-  — no `supabase/functions/` directory — so this rule is about app and script code.)
+- TypeScript in strict mode. The `send-push` Supabase Edge Function is a thin
+  Deno entrypoint over shared handler/queue/endpoint/transport modules; its
+  offline coverage runs through `npm run test:push-security`.
 - Every table gets an RLS policy before it ships — no exceptions (see Guardrails).
 - Schema changes go through Supabase migrations — never hand-edit the database via
   the dashboard for anything permanent.
@@ -253,6 +254,8 @@ _(real scripts, from package.json)_
 - Build (production, static): `npm run build`
 - Preview build: `npm run preview`
 - Lint: `npm run lint` / Format: `npm run format`
+- Push security (offline): `npm run test:push-security`
+- Push queue/RLS acceptance (disposable Supabase only): `npm run smoke:push-security`
 - Typecheck: `npm run typecheck` — runs both projects (app + node). CI runs
   this. `npx tsc --noEmit` alone checks only the app project, so it will
   happily pass with `scripts/**` broken.

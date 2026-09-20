@@ -101,8 +101,12 @@ free-tier services. The paid/Apple track starts in February.
    ~5k errors/month free) so a crash in the wild is visible; rate limiting at the
    app or database layer (no paid service needed) so one account can't run up
    abuse or cost.
-5. **Web push notifications.** A reason to come back. Web push is free; Apple push
-   (APNs) needs the Developer account, so that half is ⏸ until February.
+5. **Web push notifications.** The browser subscription UI exists, and Phase 0
+   hardening adds moderation-gated durable delivery, push-time block checks, a
+   strict provider allowlist, bounded transport, and disposable-stack coverage. It
+   remains intentionally undeployed until the security PR is merged and the
+   production provisioning/deploy approval in `SECURITY.md` is given. Native
+   APNs/TestFlight work still waits for the paid Developer account.
 6. ⏸ **First TestFlight build** — _blocked until February_ (needs the paid Apple
    Developer account). Everything else that can be done without it should be done
    by then: build config, app icons, privacy-policy text, App Store copy.

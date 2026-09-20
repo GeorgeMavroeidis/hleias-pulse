@@ -5,6 +5,14 @@
       "searchPath": "search_path=public"
     },
     {
+      "name": "claim_push_delivery_batch",
+      "searchPath": "search_path=\"\""
+    },
+    {
+      "name": "complete_push_delivery",
+      "searchPath": "search_path=\"\""
+    },
+    {
       "name": "current_admin_role",
       "searchPath": "search_path=public"
     },
@@ -35,6 +43,10 @@
     {
       "name": "moderate_content",
       "searchPath": "search_path=public"
+    },
+    {
+      "name": "prepare_push_delivery",
+      "searchPath": "search_path=\"\""
     },
     {
       "name": "prevent_business_self_verification",
@@ -75,6 +87,22 @@
     {
       "name": "write_verification_audit_log",
       "searchPath": "search_path=public"
+    },
+    {
+      "name": "private.enforce_push_subscription_endpoint",
+      "searchPath": "search_path=\"\""
+    },
+    {
+      "name": "private.enqueue_published_question_answer",
+      "searchPath": "search_path=\"\""
+    },
+    {
+      "name": "private.invoke_push_worker",
+      "searchPath": "search_path=\"\""
+    },
+    {
+      "name": "private.refresh_push_outbox_status",
+      "searchPath": "search_path=\"\""
     }
   ],
   "grants": {
@@ -455,6 +483,14 @@
         "SELECT",
         "TRIGGER",
         "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "push_subscriptions": {
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
         "UPDATE"
       ]
     },
@@ -936,6 +972,11 @@
         "Users can update own profile [authenticated]"
       ]
     },
+    "push_subscriptions": {
+      "ALL": [
+        "Users manage their own push subscriptions [authenticated]"
+      ]
+    },
     "route_stops": {
       "ALL": [
         "Editors can manage route stops [authenticated]"
@@ -1063,6 +1104,7 @@
     "post_likes",
     "posts",
     "profiles",
+    "push_subscriptions",
     "route_stops",
     "routes",
     "saved_items",
@@ -1073,6 +1115,8 @@
     "user_place_visits",
     "user_preferences",
     "user_security_events",
-    "vibe_chips"
+    "vibe_chips",
+    "private.push_notification_deliveries",
+    "private.push_notification_outbox"
   ]
 }

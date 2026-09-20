@@ -1,5 +1,6 @@
 /**
- * Snapshot the live security posture of the `public` schema, and diff it.
+ * Snapshot the live security posture of the client-facing `public` schema and
+ * the locked `private` schema, and diff it.
  *
  * Why this exists: on 2026-09-05 an audit found that meet_events had carried
  * two INSERT policies since August. A migration had tried to retire the old one
@@ -30,10 +31,12 @@
  *
  *   npm run audit:rls            # write supabase/policy-snapshot.json
  *   npm run audit:rls -- --check # exit 1 if live state has drifted from it
+ *   npm run audit:rls -- --check --scope=push
+ *                                # compare only the P0 push trust boundary
  *
- * Needs SUPABASE_DB_PASSWORD (.env or environment), like the smoke scripts, so
- * it is a local/on-demand gate rather than a CI job — CI has no database
- * credentials and its suites are deliberately offline.
+ * Needs SUPABASE_DB_PASSWORD (.env or environment), like the smoke scripts.
+ * CI runs the push-scoped check against its disposable local stack; the full
+ * check remains the production preflight gate.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import pg from "pg";
@@ -50,13 +53,53 @@ type Snapshot = {
   tables: string[];
 };
 
+const PUSH_DEFINER_FUNCTIONS = new Set([
+  "claim_push_delivery_batch",
+  "complete_push_delivery",
+  "prepare_push_delivery",
+  "private.enforce_push_subscription_endpoint",
+  "private.enqueue_published_question_answer",
+  "private.invoke_push_worker",
+  "private.refresh_push_outbox_status",
+]);
+
+function isPushTable(table: string) {
+  return table === "push_subscriptions" || table.startsWith("private.push_notification_");
+}
+
+/**
+ * Local bootstrap intentionally differs from the production-wide snapshot in
+ * legacy, unrelated objects. The P0 CI gate therefore compares only the trust
+ * boundary this change owns; the default audit remains a full production
+ * posture comparison for rollout preflight.
+ */
+function pushScope(snapshot: Snapshot): Snapshot {
+  return {
+    definerFunctions: snapshot.definerFunctions.filter(({ name }) =>
+      PUSH_DEFINER_FUNCTIONS.has(name),
+    ),
+    grants: Object.fromEntries(
+      Object.entries(snapshot.grants).filter(([table]) => isPushTable(table)),
+    ),
+    policies: Object.fromEntries(
+      Object.entries(snapshot.policies).filter(([table]) => isPushTable(table)),
+    ),
+    rlsDisabled: snapshot.rlsDisabled.filter(isPushTable),
+    tables: snapshot.tables.filter(isPushTable),
+  };
+}
+
 async function collect(client: pg.Client): Promise<Snapshot> {
-  const tables = await client.query<{ relname: string; relrowsecurity: boolean }>(`
-    select c.relname, c.relrowsecurity
+  const tables = await client.query<{
+    relname: string;
+    relrowsecurity: boolean;
+    schema_name: string;
+  }>(`
+    select n.nspname as schema_name, c.relname, c.relrowsecurity
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public' and c.relkind = 'r'
-    order by c.relname
+    where n.nspname in ('public', 'private') and c.relkind in ('r', 'p')
+    order by case when n.nspname = 'public' then 0 else 1 end, c.relname
   `);
 
   const policies = await client.query<{
@@ -64,40 +107,51 @@ async function collect(client: pg.Client): Promise<Snapshot> {
     permissive: string;
     policyname: string;
     roles: string;
+    schemaname: string;
     tablename: string;
   }>(`
-    select tablename, policyname, cmd, permissive, array_to_string(roles, ',') as roles
+    select schemaname, tablename, policyname, cmd, permissive, array_to_string(roles, ',') as roles
     from pg_policies
-    where schemaname = 'public'
-    order by tablename, cmd, policyname
+    where schemaname in ('public', 'private')
+    order by case when schemaname = 'public' then 0 else 1 end, tablename, cmd, policyname
   `);
 
-  // Only anon and authenticated matter here: those are the two roles a request
-  // from the app or from the open internet actually arrives as.
+  // Client roles matter for the public schema. service_role is included as
+  // well because the private queue intentionally denies even direct table
+  // access to the worker; it must go through the narrow RPC surface.
   const grants = await client.query<{
     grantee: string;
     privilege_type: string;
+    table_schema: string;
     table_name: string;
   }>(`
-    select table_name, grantee, privilege_type
+    select table_schema, table_name, grantee, privilege_type
     from information_schema.role_table_grants
-    where table_schema = 'public' and grantee in ('anon', 'authenticated')
-    order by table_name, grantee, privilege_type
+    where (table_schema = 'public' and grantee in ('anon', 'authenticated'))
+       or (table_schema = 'private' and grantee in ('anon', 'authenticated', 'service_role'))
+    order by case when table_schema = 'public' then 0 else 1 end,
+             table_name, grantee, privilege_type
   `);
 
-  const definer = await client.query<{ name: string; search_path: string | null }>(`
-    select p.proname as name,
+  const definer = await client.query<{
+    name: string;
+    schema_name: string;
+    search_path: string | null;
+  }>(`
+    select n.nspname as schema_name, p.proname as name,
            (select cfg from unnest(coalesce(p.proconfig, '{}')) cfg
              where cfg like 'search_path=%' limit 1) as search_path
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.prosecdef
-    order by p.proname
+    where n.nspname in ('public', 'private') and p.prosecdef
+    order by case when n.nspname = 'public' then 0 else 1 end, p.proname
   `);
 
   const policyMap: Snapshot["policies"] = {};
   for (const row of policies.rows) {
-    const byCmd = (policyMap[row.tablename] ??= {});
+    const table =
+      row.schemaname === "public" ? row.tablename : `${row.schemaname}.${row.tablename}`;
+    const byCmd = (policyMap[table] ??= {});
     (byCmd[row.cmd] ??= []).push(
       `${row.policyname} [${row.roles}]${row.permissive === "PERMISSIVE" ? "" : " RESTRICTIVE"}`,
     );
@@ -105,16 +159,27 @@ async function collect(client: pg.Client): Promise<Snapshot> {
 
   const grantMap: Snapshot["grants"] = {};
   for (const row of grants.rows) {
-    const byGrantee = (grantMap[row.table_name] ??= {});
+    const table =
+      row.table_schema === "public" ? row.table_name : `${row.table_schema}.${row.table_name}`;
+    const byGrantee = (grantMap[table] ??= {});
     (byGrantee[row.grantee] ??= []).push(row.privilege_type);
   }
 
   return {
-    definerFunctions: definer.rows.map((row) => ({ name: row.name, searchPath: row.search_path })),
+    definerFunctions: definer.rows.map((row) => ({
+      name: row.schema_name === "public" ? row.name : `${row.schema_name}.${row.name}`,
+      searchPath: row.search_path,
+    })),
     grants: grantMap,
     policies: policyMap,
-    rlsDisabled: tables.rows.filter((row) => !row.relrowsecurity).map((row) => row.relname),
-    tables: tables.rows.map((row) => row.relname),
+    rlsDisabled: tables.rows
+      .filter((row) => !row.relrowsecurity)
+      .map((row) =>
+        row.schema_name === "public" ? row.relname : `${row.schema_name}.${row.relname}`,
+      ),
+    tables: tables.rows.map((row) =>
+      row.schema_name === "public" ? row.relname : `${row.schema_name}.${row.relname}`,
+    ),
   };
 }
 
@@ -125,6 +190,11 @@ function render(snapshot: Snapshot) {
 
 async function main() {
   const check = process.argv.includes("--check");
+  const scopeArgument = process.argv.find((argument) => argument.startsWith("--scope="));
+  if (scopeArgument && scopeArgument !== "--scope=push") {
+    throw new Error(`Unsupported audit scope: ${scopeArgument.slice("--scope=".length)}`);
+  }
+  const scopedToPush = scopeArgument === "--scope=push";
   // Session mode: read-only introspection, but this script has always used
   // 5432 and there is no reason to move it. The session's value here is the
   // guarded connection — a drop used to kill the process with a raw stack
@@ -142,14 +212,22 @@ async function main() {
 
   // A table with RLS off, or one with no policy at all, is a finding on its
   // own — loud, whether or not the snapshot matches.
-  const unprotected = snapshot.tables.filter((table) => !snapshot.policies[table]);
-  if (snapshot.rlsDisabled.length || unprotected.length) {
+  const unprotected = snapshot.tables.filter(
+    (table) => !table.startsWith("private.") && !snapshot.policies[table],
+  );
+  const privateGrants = Object.keys(snapshot.grants).filter((table) =>
+    table.startsWith("private."),
+  );
+  if (snapshot.rlsDisabled.length || unprotected.length || privateGrants.length) {
     console.error("RLS COVERAGE FAILURE");
     if (snapshot.rlsDisabled.length) {
       console.error(`  RLS disabled: ${snapshot.rlsDisabled.join(", ")}`);
     }
     if (unprotected.length) {
       console.error(`  No policy at all: ${unprotected.join(", ")}`);
+    }
+    if (privateGrants.length) {
+      console.error(`  Client/service grants on private tables: ${privateGrants.join(", ")}`);
     }
     process.exit(1);
   }
@@ -176,14 +254,21 @@ async function main() {
     return;
   }
 
-  if (expected === rendered) {
-    console.log(`Live policy state matches ${SNAPSHOT_PATH}.`);
+  const expectedSnapshot = JSON.parse(expected) as Snapshot;
+  const expectedForComparison = render(
+    scopedToPush ? pushScope(expectedSnapshot) : expectedSnapshot,
+  );
+  const actualForComparison = render(scopedToPush ? pushScope(snapshot) : snapshot);
+  const scopeLabel = scopedToPush ? "push security scope in " : "";
+
+  if (expectedForComparison === actualForComparison) {
+    console.log(`Live policy state matches ${scopeLabel}${SNAPSHOT_PATH}.`);
     return;
   }
 
-  console.error(`Live policy state has DRIFTED from ${SNAPSHOT_PATH}.`);
-  const before = expected.split("\n");
-  const after = rendered.split("\n");
+  console.error(`Live policy state has DRIFTED from ${scopeLabel}${SNAPSHOT_PATH}.`);
+  const before = expectedForComparison.split("\n");
+  const after = actualForComparison.split("\n");
   const seen = new Set(before);
   const gone = new Set(after);
   for (const line of after) if (!seen.has(line)) console.error(`  + ${line.trim()}`);

@@ -58,6 +58,9 @@ jobs:
       - name: Test — discovery
         run: npm run test:discovery
 
+      - name: Test — push security
+        run: npm run test:push-security
+
       - name: Test — map visuals
         run: npm run test:map-visuals
 

@@ -1488,6 +1488,24 @@ export type Database = {
     };
     Functions: {
       blocked_user_ids: { Args: never; Returns: string[] };
+      claim_push_delivery_batch: {
+        Args: never;
+        Returns: {
+          attempt_count: number;
+          claim_token: string;
+          delivery_id: string;
+          outbox_id: string;
+        }[];
+      };
+      complete_push_delivery: {
+        Args: {
+          error_code?: string;
+          outcome: string;
+          target_claim_token: string;
+          target_delivery_id: string;
+        };
+        Returns: boolean;
+      };
       current_admin_role: { Args: never; Returns: string | null };
       current_business_id: { Args: never; Returns: string | null };
       current_organizer_id: { Args: never; Returns: string | null };
@@ -1497,6 +1515,20 @@ export type Database = {
       moderate_content: {
         Args: { next_status: string; target_id: string; target_type: string };
         Returns: undefined;
+      };
+      prepare_push_delivery: {
+        Args: { target_claim_token: string; target_delivery_id: string };
+        Returns: {
+          attempt_count: number;
+          auth_key: string;
+          comment_text: string;
+          delivery_id: string;
+          endpoint: string;
+          outbox_id: string;
+          p256dh: string;
+          post_id: string;
+          subscription_id: string;
+        }[];
       };
       redeem_deal_code: { Args: { code: string }; Returns: Json };
       refresh_generic_stories: { Args: never; Returns: undefined };

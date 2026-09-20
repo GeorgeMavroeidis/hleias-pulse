@@ -149,8 +149,9 @@ jobs:
       #   smoke:admin                not reached
       #   smoke:verification-guards  not reached
       #   smoke:routes               not reached
-      #   audit:rls --check          not reached, so unverified against a
-      #                              from-scratch schema
+      #   audit:rls --check          the full production-wide baseline has
+      #                              unrelated local-bootstrap drift; the P0
+      #                              push scope runs below
       #
       # Add them back one at a time as each is made to pass. A red check nobody
       # can fix teaches people to ignore red, which costs more than the coverage
@@ -160,6 +161,15 @@ jobs:
 
       - name: smoke · post write
         run: npm run smoke:post-write
+
+      - name: lint · local database
+        run: npx supabase db lint --local
+
+      - name: smoke · push security
+        run: npm run smoke:push-security
+
+      - name: audit · RLS + grants
+        run: npm run audit:rls -- --check --scope=push
 
       - name: Stop the local stack
         if: always()
