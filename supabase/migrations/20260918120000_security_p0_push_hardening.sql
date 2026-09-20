@@ -55,7 +55,8 @@ create table private.push_notification_deliveries (
   last_error_code text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (outbox_id, subscription_id)
+  constraint push_notification_deliveries_outbox_subscription_key
+    unique (outbox_id, subscription_id)
 );
 
 create index push_notification_outbox_status_idx
@@ -268,7 +269,7 @@ begin
   from private.push_notification_outbox as o
   join public.push_subscriptions as s on s.user_id = o.recipient_id
   where o.status in ('queued', 'processing')
-  on conflict (outbox_id, subscription_id) do nothing;
+  on conflict on constraint push_notification_deliveries_outbox_subscription_key do nothing;
 
   update private.push_notification_outbox as o
   set status = 'skipped',
