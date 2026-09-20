@@ -120,151 +120,6 @@ for each row execute function private.enforce_push_subscription_endpoint();
 revoke all on function private.is_allowed_push_endpoint(text) from public, anon, authenticated;
 revoke all on function private.enforce_push_subscription_endpoint() from public, anon, authenticated;
 
--- Replaces blocked_user_ids(): callers get only a boolean authorization
--- decision, never the identifiers in somebody else's block relationships.
-create or replace function public.can_view_user_content(content_user_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select content_user_id is null
-    or auth.uid() is null
-    or not exists (
-      select 1
-      from public.user_blocks as ub
-      where ub.kind = 'block'
-        and (
-          (ub.blocker_id = auth.uid() and ub.blocked_id = content_user_id)
-          or (ub.blocker_id = content_user_id and ub.blocked_id = auth.uid())
-        )
-    );
-$$;
-
-revoke all on function public.can_view_user_content(uuid) from public, anon, authenticated;
-grant execute on function public.can_view_user_content(uuid) to anon, authenticated;
-
-drop policy if exists "Public can read published posts" on public.posts;
-create policy "Public can read published posts"
-on public.posts for select to anon, authenticated
-using (
-  moderation_status = 'published'
-  and public.can_view_user_content(user_id)
-);
-
-drop policy if exists "Public can read published comments" on public.comments;
-create policy "Public can read published comments"
-on public.comments for select to anon, authenticated
-using (
-  moderation_status = 'published'
-  and public.can_view_user_content(user_id)
-);
-
-drop policy if exists "Public can read published stories" on public.stories;
-create policy "Public can read published stories"
-on public.stories for select to anon, authenticated
-using (
-  moderation_status = 'published'
-  and public.can_view_user_content(user_id)
-  and (
-    expires_after_hours is null
-    or created_at > now() - make_interval(hours => expires_after_hours)
-  )
-);
-
-drop policy if exists "Public can read published meet events" on public.meet_events;
-create policy "Public can read published meet events"
-on public.meet_events for select to anon, authenticated
-using (
-  moderation_status = 'published'
-  and public.can_view_user_content(user_id)
-);
-
-drop function if exists public.blocked_user_ids();
-
--- Database-side interaction gate. It runs for direct PostgREST writes too, so
--- knowing a hidden parent id never bypasses moderation or a block.
-create or replace function private.enforce_comment_interaction()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  actor_id uuid := auth.uid();
-  parent_owner_id uuid;
-  parent_exists boolean := false;
-  parent_is_public boolean := false;
-  actor_is_editor boolean := false;
-begin
-  -- A missing auth.uid() is a trusted database/service workflow. Client roles
-  -- still need an authenticated UUID to pass the table's INSERT policy.
-  if actor_id is null then
-    return new;
-  end if;
-
-  actor_is_editor := public.has_admin_role(array['owner', 'editor']);
-
-  if not actor_is_editor and new.user_id is distinct from actor_id then
-    raise exception using errcode = '42501', message = 'Interaction is not allowed';
-  end if;
-
-  case new.target_type
-    when 'post' then
-      select true, p.moderation_status = 'published', p.user_id
-      into parent_exists, parent_is_public, parent_owner_id
-      from public.posts as p
-      where p.id = new.post_id;
-    when 'place' then
-      select true, p.moderation_status = 'published', p.profile_id
-      into parent_exists, parent_is_public, parent_owner_id
-      from public.places as p
-      where p.id = new.place_id;
-    when 'cultural_event' then
-      select true, e.moderation_status = 'published', e.user_id
-      into parent_exists, parent_is_public, parent_owner_id
-      from public.cultural_events as e
-      where e.id = new.cultural_event_id;
-    when 'route' then
-      select true, true, null::uuid
-      into parent_exists, parent_is_public, parent_owner_id
-      from public.routes as r
-      where r.id = new.route_id;
-    else
-      parent_exists := false;
-  end case;
-
-  if not coalesce(parent_exists, false)
-    or (not actor_is_editor and not coalesce(parent_is_public, false)) then
-    raise exception using errcode = '42501', message = 'Interaction is not allowed';
-  end if;
-
-  if parent_owner_id is not null
-    and parent_owner_id is distinct from actor_id
-    and exists (
-      select 1
-      from public.user_blocks as ub
-      where ub.kind = 'block'
-        and (
-          (ub.blocker_id = actor_id and ub.blocked_id = parent_owner_id)
-          or (ub.blocker_id = parent_owner_id and ub.blocked_id = actor_id)
-        )
-    ) then
-    raise exception using errcode = '42501', message = 'Interaction is not allowed';
-  end if;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists comments_enforce_interaction on public.comments;
-create trigger comments_enforce_interaction
-before insert on public.comments
-for each row execute function private.enforce_comment_interaction();
-
-revoke all on function private.enforce_comment_interaction() from public, anon, authenticated;
-
 create or replace function private.enqueue_published_question_answer()
 returns trigger
 language plpgsql
@@ -375,20 +230,33 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  recovered_outbox_id uuid;
 begin
   -- Recover only leases old enough that a normal Edge invocation cannot still
   -- be active. A crash after provider acceptance can still cause one retry;
   -- the stable Web Push Topic minimizes that unavoidable protocol boundary.
-  update private.push_notification_deliveries as d
-  set status = case when d.attempt_count >= 4 then 'failed' else 'queued' end,
-      next_attempt_at = case when d.attempt_count >= 4 then d.next_attempt_at else now() end,
-      claim_token = null,
-      processing_at = null,
-      completed_at = case when d.attempt_count >= 4 then now() else null end,
-      last_error_code = case when d.attempt_count >= 4 then 'lease_exhausted' else 'lease_recovered' end,
-      updated_at = now()
-  where d.status = 'processing'
-    and d.processing_at < now() - interval '5 minutes';
+  for recovered_outbox_id in
+    with recovered as (
+      update private.push_notification_deliveries as d
+      set status = case when d.attempt_count >= 4 then 'failed' else 'queued' end,
+          next_attempt_at = case when d.attempt_count >= 4 then d.next_attempt_at else now() end,
+          claim_token = null,
+          processing_at = null,
+          completed_at = case when d.attempt_count >= 4 then now() else null end,
+          last_error_code = case
+            when d.attempt_count >= 4 then 'lease_exhausted'
+            else 'lease_recovered'
+          end,
+          updated_at = now()
+      where d.status = 'processing'
+        and d.processing_at < now() - interval '5 minutes'
+      returning d.outbox_id
+    )
+    select distinct r.outbox_id from recovered as r
+  loop
+    perform private.refresh_push_outbox_status(recovered_outbox_id);
+  end loop;
 
   insert into private.push_notification_deliveries (outbox_id, subscription_id)
   select o.id, s.id
@@ -723,18 +591,5 @@ select cron.schedule(
   '* * * * *',
   $cron$select private.invoke_push_worker();$cron$
 );
-
--- The moderation RPC remains client-facing only to authenticated admins; its
--- internal role check is no longer paired with a default PUBLIC EXECUTE grant.
-alter function public.moderate_content(text, text, text) set search_path = '';
-revoke all on function public.moderate_content(text, text, text) from public, anon;
-grant execute on function public.moderate_content(text, text, text) to authenticated;
-
-alter function public.current_admin_role() set search_path = '';
-revoke all on function public.current_admin_role() from public, anon;
-grant execute on function public.current_admin_role() to authenticated;
-alter function public.has_admin_role(text[]) set search_path = '';
-revoke all on function public.has_admin_role(text[]) from public, anon;
-grant execute on function public.has_admin_role(text[]) to authenticated;
 
 commit;

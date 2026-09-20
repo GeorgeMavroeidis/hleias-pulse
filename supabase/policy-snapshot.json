@@ -1,8 +1,8 @@
 {
   "definerFunctions": [
     {
-      "name": "can_view_user_content",
-      "searchPath": "search_path=\"\""
+      "name": "blocked_user_ids",
+      "searchPath": "search_path=public"
     },
     {
       "name": "claim_push_delivery_batch",
@@ -14,7 +14,7 @@
     },
     {
       "name": "current_admin_role",
-      "searchPath": "search_path=\"\""
+      "searchPath": "search_path=public"
     },
     {
       "name": "current_business_id",
@@ -34,7 +34,7 @@
     },
     {
       "name": "has_admin_role",
-      "searchPath": "search_path=\"\""
+      "searchPath": "search_path=public"
     },
     {
       "name": "issue_deal_code",
@@ -42,7 +42,7 @@
     },
     {
       "name": "moderate_content",
-      "searchPath": "search_path=\"\""
+      "searchPath": "search_path=public"
     },
     {
       "name": "prepare_push_delivery",
@@ -87,10 +87,6 @@
     {
       "name": "write_verification_audit_log",
       "searchPath": "search_path=public"
-    },
-    {
-      "name": "private.enforce_comment_interaction",
-      "searchPath": "search_path=\"\""
     },
     {
       "name": "private.enforce_push_subscription_endpoint",

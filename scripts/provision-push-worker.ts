@@ -10,23 +10,35 @@ import { randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { PRODUCTION_PROJECT_REF, projectRef, readEnvValue } from "./lib/env";
 import { createPgSession } from "./lib/pg";
 
 const WORKER_URL = "https://kfxfnqryfmuxiwlswyyn.supabase.co/functions/v1/send-push";
 
-async function upsertVaultSecret(client: import("pg").default.Client, name: string, value: string) {
-  await client.query(
-    `with existing as (
-       select id from vault.secrets where name = $2
-     ), updated as (
-       select vault.update_secret(id, $1, $2, $3) from existing
-     )
-     select vault.create_secret($1, $2, $3)
-     where not exists (select 1 from existing)`,
-    [value, name, "Phase 0 scheduled push worker"],
+export async function upsertVaultSecret(
+  client: import("pg").default.Client,
+  name: string,
+  value: string,
+) {
+  const description = "Phase 0 scheduled push worker";
+  const existing = await client.query<{ id: string }>(
+    "select id::text from vault.secrets where name = $1",
+    [name],
   );
+  const existingId = existing.rows[0]?.id;
+  if (existingId) {
+    await client.query("select vault.update_secret($1::uuid, $2, $3, $4)", [
+      existingId,
+      value,
+      name,
+      description,
+    ]);
+    return;
+  }
+
+  await client.query("select vault.create_secret($1, $2, $3)", [value, name, description]);
 }
 
 async function main() {
@@ -85,7 +97,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : "Push provisioning failed.");
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : "Push provisioning failed.");
+    process.exit(1);
+  });
+}

@@ -1487,7 +1487,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      can_view_user_content: { Args: { content_user_id: string }; Returns: boolean };
+      blocked_user_ids: { Args: never; Returns: string[] };
       claim_push_delivery_batch: {
         Args: never;
         Returns: {

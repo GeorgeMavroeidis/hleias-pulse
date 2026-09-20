@@ -1,5 +1,5 @@
 /**
- * Disposable-stack acceptance test for the durable push queue and comment gate.
+ * Disposable-stack acceptance test for the durable push queue.
  *
  * This script is intentionally destructive and is guarded by scripts/lib/env.ts.
  * Run it only against `supabase start`; it never contacts a push provider and it
@@ -20,7 +20,6 @@ type UserFixture = {
 
 const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
 const questionId = `push-question-${suffix}`;
-const hiddenQuestionId = `push-hidden-${suffix}`;
 const unrelatedQuestionId = `push-unrelated-${suffix}`;
 const password = `Push-${randomUUID()}-Aa1!`;
 
@@ -66,7 +65,6 @@ async function setupContent(
 
   for (const [id, userId, moderationStatus] of [
     [questionId, ownerId, "published"],
-    [hiddenQuestionId, ownerId, "hidden"],
     [unrelatedQuestionId, unrelatedId, "published"],
   ] as const) {
     await client.query(
@@ -156,64 +154,39 @@ async function main() {
       "valid Mozilla subscription rejected",
     );
 
-    // Identity forgery and unpublished-parent probing fail before an INSERT.
-    await expectRejected("forged identity", async () =>
-      answerer.client.from("comments").insert({
-        author_name: "forged",
-        moderation_status: "pending",
-        post_id: questionId,
-        target_type: "post",
-        text: "forged",
-        user_id: owner.id,
-      }),
-    );
-    await expectRejected("hidden parent", async () =>
-      answerer.client.from("comments").insert({
-        author_name: "hidden",
-        moderation_status: "pending",
-        post_id: hiddenQuestionId,
-        target_type: "post",
-        text: "hidden",
-        user_id: answerer.id,
-      }),
-    );
-
-    // Both directions of a block reject the same direct PostgREST write.
+    // A block in either direction prevents the publication event from entering
+    // the push outbox. General comment-write enforcement is tested separately.
     await db.once((client) =>
       client.query(
         "insert into public.user_blocks (blocker_id, blocked_id, kind) values ($1, $2, 'block')",
         [owner.id, answerer.id],
       ),
     );
-    await expectRejected("owner blocks answerer", async () =>
-      answerer.client.from("comments").insert({
+    const blockedAnswer = await answerer.client
+      .from("comments")
+      .insert({
         author_name: "blocked",
         moderation_status: "pending",
         post_id: questionId,
         target_type: "post",
         text: "blocked",
         user_id: answerer.id,
-      }),
+      })
+      .select("id")
+      .single();
+    assert(!blockedAnswer.error && blockedAnswer.data, "blocked answer fixture rejected");
+    commentIds.push(blockedAnswer.data.id);
+    await db.once((client) =>
+      client.query("update public.comments set moderation_status = 'published' where id = $1", [
+        blockedAnswer.data.id,
+      ]),
     );
-    await db.once(async (client) => {
-      await client.query("delete from public.user_blocks where blocker_id = $1", [owner.id]);
-      await client.query(
-        "insert into public.user_blocks (blocker_id, blocked_id, kind) values ($1, $2, 'block')",
-        [answerer.id, owner.id],
-      );
-    });
-    await expectRejected("answerer blocks owner", async () =>
-      answerer.client.from("comments").insert({
-        author_name: "blocked",
-        moderation_status: "pending",
-        post_id: questionId,
-        target_type: "post",
-        text: "blocked",
-        user_id: answerer.id,
-      }),
+    assert(
+      (await db.withPg((client) => outboxCount(client, blockedAnswer.data.id))) === 0,
+      "blocked answer enqueued",
     );
     await db.once((client) =>
-      client.query("delete from public.user_blocks where blocker_id = $1", [answerer.id]),
+      client.query("delete from public.user_blocks where blocker_id = $1", [owner.id]),
     );
 
     const answer = await answerer.client
@@ -444,13 +417,123 @@ async function main() {
       "transient retry did not terminate after four attempts",
     );
 
+    // Eligibility is checked again after claiming and immediately before
+    // transport, so a newly-created block cancels already queued deliveries.
+    const revokedAnswer = await answerer.client
+      .from("comments")
+      .insert({
+        author_name: "answerer",
+        moderation_status: "pending",
+        post_id: questionId,
+        target_type: "post",
+        text: "revoked before delivery",
+        user_id: answerer.id,
+      })
+      .select("id")
+      .single();
+    assert(!revokedAnswer.error && revokedAnswer.data, "revoked answer fixture rejected");
+    commentIds.push(revokedAnswer.data.id);
+    await db.once((client) =>
+      client.query("update public.comments set moderation_status = 'published' where id = $1", [
+        revokedAnswer.data.id,
+      ]),
+    );
+    const revokedClaims = await db.withPg((client) =>
+      client.query<{ claim_token: string; delivery_id: string }>(
+        "select * from public.claim_push_delivery_batch()",
+      ),
+    );
+    assert(revokedClaims.rowCount === 2, "expected one revoked delivery per active subscription");
+    await db.once((client) =>
+      client.query(
+        "insert into public.user_blocks (blocker_id, blocked_id, kind) values ($1, $2, 'block')",
+        [answerer.id, owner.id],
+      ),
+    );
+    for (const claim of revokedClaims.rows) {
+      const preparedAfterBlock = await db.withPg((client) =>
+        client.query("select * from public.prepare_push_delivery($1, $2)", [
+          claim.delivery_id,
+          claim.claim_token,
+        ]),
+      );
+      assert(preparedAfterBlock.rowCount === 0, "blocked delivery reached transport preparation");
+    }
+    await db.once((client) =>
+      client.query("delete from public.user_blocks where blocker_id = $1", [answerer.id]),
+    );
+
+    // A worker crash on the fourth attempt must terminalize both the expired
+    // delivery and its parent outbox instead of leaving the event processing.
+    const leaseAnswer = await answerer.client
+      .from("comments")
+      .insert({
+        author_name: "answerer",
+        moderation_status: "pending",
+        post_id: questionId,
+        target_type: "post",
+        text: "fourth attempt lease",
+        user_id: answerer.id,
+      })
+      .select("id")
+      .single();
+    assert(!leaseAnswer.error && leaseAnswer.data, "lease answer fixture rejected");
+    commentIds.push(leaseAnswer.data.id);
+    await db.once((client) =>
+      client.query("update public.comments set moderation_status = 'published' where id = $1", [
+        leaseAnswer.data.id,
+      ]),
+    );
+    const leaseClaims = await db.withPg((client) =>
+      client.query<{ claim_token: string; delivery_id: string }>(
+        "select * from public.claim_push_delivery_batch()",
+      ),
+    );
+    assert(leaseClaims.rowCount === 2, "expected two lease-test deliveries");
+    const expiredLease = leaseClaims.rows[0];
+    const terminalPeer = leaseClaims.rows[1];
+    await db.once(async (client) => {
+      await client.query("select public.complete_push_delivery($1, $2, 'permanent', 'http_400')", [
+        terminalPeer.delivery_id,
+        terminalPeer.claim_token,
+      ]);
+      await client.query(
+        `update private.push_notification_deliveries
+         set attempt_count = 4,
+             processing_at = now() - interval '6 minutes'
+         where id = $1`,
+        [expiredLease.delivery_id],
+      );
+    });
+    const claimsAfterLeaseExpiry = await db.withPg((client) =>
+      client.query<{ delivery_id: string }>("select * from public.claim_push_delivery_batch()"),
+    );
+    assert(
+      !claimsAfterLeaseExpiry.rows.some((row) => row.delivery_id === expiredLease.delivery_id),
+      "fourth-attempt expired lease was reclaimed",
+    );
+    const terminalLeaseState = await db.withPg((client) =>
+      client.query<{ delivery_status: string; outbox_status: string }>(
+        `select d.status as delivery_status, o.status as outbox_status
+         from private.push_notification_deliveries as d
+         join private.push_notification_outbox as o on o.id = d.outbox_id
+         where d.id = $1`,
+        [expiredLease.delivery_id],
+      ),
+    );
+    assert(
+      terminalLeaseState.rows[0]?.delivery_status === "failed" &&
+        terminalLeaseState.rows[0]?.outbox_status === "failed",
+      "expired fourth attempt did not terminalize its outbox",
+    );
+
     console.log(JSON.stringify({ ok: true, claims: claims.length, outbox: "durable" }, null, 2));
   } finally {
     await db
       .withPg(async (client) => {
         await client.query("delete from public.comments where id = any($1::uuid[])", [commentIds]);
         await client.query("delete from public.posts where id = any($1::text[])", [
-          [questionId, hiddenQuestionId, unrelatedQuestionId],
+          [questionId, unrelatedQuestionId],
         ]);
         for (const user of users) {
           await client.query("delete from auth.users where id = $1", [user.id]);

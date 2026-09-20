@@ -6,14 +6,12 @@
 > fuller picture behind those rules.
 
 ## Row Level Security (RLS)
-
 Every table needs an RLS policy before it ships. A table without one is
 readable/writable by anyone holding your public API key — effectively everyone.
 `npm run audit:rls` already checks this. Run it before every deploy, not once
 and forget it.
 
 ## Secrets
-
 `npm run check:secrets` scans for leaked credentials. Run before every deploy.
 
 ## Push-notification trust boundary
@@ -125,20 +123,17 @@ enqueue only if approved afterward. Adding another push provider requires a
 reviewed allowlist migration and endpoint-policy tests.
 
 ## Privacy (location data)
-
 Location is personal data under EU/Greek privacy law (GDPR). Don't store more
 precision than a feature actually needs, and think about retention — do old
 location pings need to be kept at all, or just the current one?
 
 ## Pre-launch security checklist
-
 One pass, all in one place, before opening this to real outside users:
-
 - [ ] Full RLS audit across every table — not spot-checks
 - [ ] Secrets scan clean
 - [ ] Push worker secret, Vault names, JWT verification, and cron preflight pass
 - [ ] `npm run test:push-security` and `npm run smoke:push-security` pass
 - [ ] Deals redemption re-verified against reuse/replay (already smoke-tested —
       confirm again right before launch, not just once during development)
-- [ ] Rate limiting in place _(see IDEAS.md — not built yet)_
-- [ ] Error tracking set up _(see IDEAS.md — not built yet)_
+- [ ] Rate limiting in place *(see IDEAS.md — not built yet)*
+- [ ] Error tracking set up *(see IDEAS.md — not built yet)*

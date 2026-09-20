@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
+import { upsertVaultSecret } from "./provision-push-worker.ts";
 import { createHandler } from "../supabase/functions/send-push/handler.ts";
 import { validatePushEndpoint } from "../supabase/functions/send-push/endpoint-policy.ts";
 import {
@@ -17,6 +18,47 @@ import {
 } from "../supabase/functions/send-push/worker.ts";
 
 const INTERNAL_SECRET = "test-only-internal-secret-with-enough-entropy";
+
+describe("Vault provisioning", () => {
+  test("updates an existing named secret instead of leaving the old value active", async () => {
+    const calls: Array<{ sql: string; values?: unknown[] }> = [];
+    const client = {
+      async query(sql: string, values?: unknown[]) {
+        calls.push({ sql, values });
+        if (sql.startsWith("select id::text")) {
+          return { rows: [{ id: "00000000-0000-0000-0000-000000000001" }] };
+        }
+        return { rows: [] };
+      },
+    } as unknown as import("pg").default.Client;
+
+    await upsertVaultSecret(client, "push_worker_secret", "rotated-value");
+
+    assert.equal(calls.length, 2);
+    assert.match(calls[1].sql, /vault[.]update_secret/);
+    assert.deepEqual(calls[1].values, [
+      "00000000-0000-0000-0000-000000000001",
+      "rotated-value",
+      "push_worker_secret",
+      "Phase 0 scheduled push worker",
+    ]);
+  });
+
+  test("creates a named secret only when no existing row is present", async () => {
+    const calls: Array<{ sql: string; values?: unknown[] }> = [];
+    const client = {
+      async query(sql: string, values?: unknown[]) {
+        calls.push({ sql, values });
+        return { rows: [] };
+      },
+    } as unknown as import("pg").default.Client;
+
+    await upsertVaultSecret(client, "push_worker_secret", "initial-value");
+
+    assert.equal(calls.length, 2);
+    assert.match(calls[1].sql, /vault[.]create_secret/);
+  });
+});
 
 function request(body = "{}", headers: Record<string, string> = {}, method = "POST"): Request {
   return new Request("https://example.test/functions/v1/send-push", {
