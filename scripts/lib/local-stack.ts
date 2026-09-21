@@ -30,5 +30,6 @@ export function localStackEnv(): NodeJS.ProcessEnv {
     SUPABASE_DB_PORT: db.port,
     SUPABASE_DB_USER: decodeURIComponent(db.username),
     ["SUPABASE_DB_PASSWORD"]: decodeURIComponent(db.password),
+    SUPABASE_DB_URL: status.DB_URL,
   };
 }

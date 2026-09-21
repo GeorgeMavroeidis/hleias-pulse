@@ -58,8 +58,21 @@ for (const iteration of [1, 2]) {
 }
 
 const typesPath = "src/lib/supabase/database.types.ts";
+assert(env.SUPABASE_DB_URL, "Local database URL missing from Supabase status");
 const generated = await format(
-  supabase("gen", "types", "--lang", "typescript", "--local", "--schema", "public"),
+  // `--local` still asks for a Supabase access token on an unauthed Linux CLI
+  // in some 2.x builds. The status-derived URL is already loopback-validated,
+  // and keeps this recovery gate independent of any hosted account.
+  supabase(
+    "gen",
+    "types",
+    "--lang",
+    "typescript",
+    "--db-url",
+    env.SUPABASE_DB_URL,
+    "--schema",
+    "public",
+  ),
   {
     ...(await resolveConfig(typesPath)),
     filepath: typesPath,
