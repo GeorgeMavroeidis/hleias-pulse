@@ -927,7 +927,8 @@ const RAW_PLACES = [
     bestTime: "morning",
     tags: ["monastery", "culture", "coast", "quiet"],
     short: "A compact culture stop near Skafidia, close enough to combine with the coast.",
-    imageUrl: "https://visitkatakolon.gr/wp-content/uploads/2015/03/monastery2.jpg",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Monastery_of_Skafidia.JPG/1280px-Monastery_of_Skafidia.JPG",
   },
   {
     id: "korakochori",
@@ -962,7 +963,8 @@ const RAW_PLACES = [
     tags: ["wine", "estate", "katakolo", "food"],
     short:
       "Historic winery and estate near Korakochori, useful for a Katakolo/Olympia day that is not only ruins.",
-    imageUrl: "https://visitkatakolon.gr/wp-content/uploads/2015/03/Mercouri-Estate.jpeg",
+    imageUrl:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/%CE%9A%CF%84%CE%AE%CE%BC%CE%B1_%CE%9C%CE%B5%CF%81%CE%BA%CE%BF%CF%8D%CF%81%CE%B7_-_panoramio.jpg/1280px-%CE%9A%CF%84%CE%AE%CE%BC%CE%B1_%CE%9C%CE%B5%CF%81%CE%BA%CE%BF%CF%8D%CF%81%CE%B7_-_panoramio.jpg",
   },
   {
     id: "lechaina-zacharo-flower",

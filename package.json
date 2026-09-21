@@ -38,7 +38,12 @@
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
     "test:map-visuals": "tsx scripts/check-map-visuals.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",
-    "build:ionian-land": "tsx scripts/build-ionian-land.ts"
+    "build:ionian-land": "tsx scripts/build-ionian-land.ts",
+    "supabase:local": "tsx scripts/with-local-supabase.ts",
+    "db:verify": "tsx scripts/verify-database.ts",
+    "db:contract": "tsx scripts/check-db-contract.ts",
+    "test:db-safety": "tsx --test scripts/local-database-safety.test.ts",
+    "check:migration-versions": "tsx scripts/check-migration-versions.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.0",

@@ -1,36 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5";
-  };
-  graphql_public: {
-    Tables: {
-      [_ in never]: never;
-    };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json;
-          operationName?: string;
-          query?: string;
-          variables?: Json;
-        };
-        Returns: Json;
-      };
-    };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
   public: {
     Tables: {
       admin_audit_logs: {
@@ -1506,9 +1476,9 @@ export type Database = {
         };
         Returns: boolean;
       };
-      current_admin_role: { Args: never; Returns: string | null };
-      current_business_id: { Args: never; Returns: string | null };
-      current_organizer_id: { Args: never; Returns: string | null };
+      current_admin_role: { Args: never; Returns: string };
+      current_business_id: { Args: never; Returns: string };
+      current_organizer_id: { Args: never; Returns: string };
       get_pulse_bootstrap: { Args: never; Returns: Json };
       has_admin_role: { Args: { required_roles: string[] }; Returns: boolean };
       issue_deal_code: { Args: { target_place_id: string }; Returns: Json };
@@ -1541,7 +1511,7 @@ export type Database = {
         Returns: undefined;
       };
       set_place_deal: {
-        Args: { claim_id: string; deal_active: boolean; deal_text: string | null };
+        Args: { claim_id: string; deal_active: boolean; deal_text: string };
         Returns: undefined;
       };
     };
@@ -1670,9 +1640,6 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
