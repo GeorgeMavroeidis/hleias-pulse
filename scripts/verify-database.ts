@@ -9,12 +9,16 @@ import { localStackEnv } from "./lib/local-stack";
 
 // No arbitrary CLI arguments: this entrypoint can only reset the local stack.
 assert.equal(process.argv.length, 2, "db:verify accepts no target or reset flags");
-function supabase(...args: string[]) {
+function supabaseWithEnv(environment: NodeJS.ProcessEnv, ...args: string[]) {
   return execFileSync("npx", ["--no-install", "supabase", ...args], {
     encoding: "utf8",
+    env: environment,
     stdio: ["ignore", "pipe", "inherit"],
     maxBuffer: 16 * 1024 * 1024,
   });
+}
+function supabase(...args: string[]) {
+  return supabaseWithEnv(process.env, ...args);
 }
 function run(script: string, env: NodeJS.ProcessEnv, args: string[] = []) {
   console.log(`\n[verify] ${script} ${args.join(" ")}`);
@@ -60,10 +64,11 @@ for (const iteration of [1, 2]) {
 const typesPath = "src/lib/supabase/database.types.ts";
 assert(env.SUPABASE_DB_URL, "Local database URL missing from Supabase status");
 const generated = await format(
-  // `--local` still asks for a Supabase access token on an unauthed Linux CLI
-  // in some 2.x builds. The status-derived URL is already loopback-validated,
-  // and keeps this recovery gate independent of any hosted account.
-  supabase(
+  // CLI 2.106 checks only that this variable is present even for a direct DB URL.
+  // Override any real token with an inert value; the URL is status-derived and
+  // loopback-validated, so type generation cannot consult a hosted project.
+  supabaseWithEnv(
+    { ...process.env, SUPABASE_ACCESS_TOKEN: "local-only-placeholder" },
     "gen",
     "types",
     "--lang",
