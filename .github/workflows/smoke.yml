@@ -65,111 +65,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Boots Postgres + Auth + PostgREST and applies supabase/migrations and
-      # supabase/seed.sql from empty. Docker is preinstalled on ubuntu-latest.
-      - name: Start the local Supabase stack
-        run: npx supabase start
+      - name: Test local target safety
+        run: npm run test:db-safety
 
-      # `supabase status -o env` prints the stack's own addresses and keys. Read
-      # them rather than hardcoding: the ports come from supabase/config.toml and
-      # would drift silently if copied here.
-      #
-      # None of this is secret. These are the local stack's fixed development
-      # credentials, the same on every machine and published in Supabase's docs.
-      - name: Point the scripts at the local stack
-        run: |
-          set -euo pipefail
-          npx supabase status -o env > /tmp/supabase.env
-          set -a; . /tmp/supabase.env; set +a
-
-          # DB_URL has the shape <scheme>://<user>:<password>@<host>:<port>/<db>.
-          # Written with metavariables on purpose: a literal example here is
-          # indistinguishable from a committed credential, and check:secrets
-          # flags it — correctly.
-          db_password=$(printf '%s' "$DB_URL" | sed -E 's#^[^:]+://[^:]+:([^@]+)@.*#\1#')
-          db_port=$(printf '%s' "$DB_URL" | sed -E 's#.*@[^:]+:([0-9]+)/.*#\1#')
-
-          {
-            # Anything but the production ref, so assertTargetIsSafeForCI() is
-            # satisfied deliberately rather than by accident.
-            echo "SUPABASE_PROJECT_REF=local"
-            echo "SUPABASE_URL=$API_URL"
-            echo "SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
-            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
-            echo "SUPABASE_DB_HOST=127.0.0.1"
-            echo "SUPABASE_DB_PORT=$db_port"
-            echo "SUPABASE_DB_PASSWORD=$db_password"
-          } >> "$GITHUB_ENV"
-
-      # Belt and braces: prove the guard is armed before running anything that
-      # writes. If SUPABASE_PROJECT_REF failed to reach the environment, the
-      # scripts would fall back to the production ref -- this asserts they will
-      # refuse, so a broken step above fails here rather than somewhere that
-      # writes rows.
-      - name: Verify the production guard is armed
-        run: |
-          set -euo pipefail
-          echo "target ref: ${SUPABASE_PROJECT_REF:-<unset>}"
-          [ "${SUPABASE_PROJECT_REF:-}" = "local" ] || {
-            echo "SUPABASE_PROJECT_REF is not 'local' — refusing to continue."
-            exit 1
-          }
-          CI=1 SUPABASE_PROJECT_REF=kfxfnqryfmuxiwlswyyn npx tsx -e '
-            import { assertTargetIsSafeForCI } from "./scripts/lib/env.ts";
-            try {
-              assertTargetIsSafeForCI();
-              console.error("GUARD DID NOT FIRE against the production ref.");
-              process.exit(1);
-            } catch {
-              console.log("guard fires against the production ref, as designed.");
-            }
-          '
-
-      # ONLY THE SCRIPTS THAT PASS ON A FROM-SCRATCH DATABASE RUN HERE.
-      #
-      # Sequential on purpose: they share one database and several claim the
-      # first matching row they find, so in parallel they fight each other
-      # rather than test anything.
-      #
-      # The other seven are NOT skipped because they are broken. They fail
-      # because the database this job builds from supabase/migrations is not the
-      # database they were written against -- production holds rows and grants
-      # that no migration creates, and every one of those gaps is a real defect
-      # rather than a CI quirk. Six were fixed getting this far; the rest are
-      # written up in IDEAS.md -> Architecture / Tech Debt, "Rebuilding the
-      # database from migrations".
-      #
-      # Not yet running, each with a known reason:
-      #   smoke:live-surfaces        needs seeded Meet events; the migration
-      #                              defines six but inserts them with a join to
-      #                              places, which is empty at migration time
-      #   smoke:moderation           not reached
-      #   smoke:block-enforcement    not reached
-      #   smoke:deal-race            not reached
-      #   smoke:admin                not reached
-      #   smoke:verification-guards  not reached
-      #   smoke:routes               not reached
-      #   audit:rls --check          the full production-wide baseline has
-      #                              unrelated local-bootstrap drift; the P0
-      #                              push scope runs below
-      #
-      # Add them back one at a time as each is made to pass. A red check nobody
-      # can fix teaches people to ignore red, which costs more than the coverage
-      # is worth.
-      - name: smoke · auth + profile
-        run: npm run smoke:auth-profile
-
-      - name: smoke · post write
-        run: npm run smoke:post-write
-
-      - name: lint · local database
-        run: npx supabase db lint --local
-
-      - name: smoke · push security
-        run: npm run smoke:push-security
-
-      - name: audit · RLS + grants
-        run: npm run audit:rls -- --check --scope=push
+      # Two resets, complete schema comparison, deterministic seed/types, every
+      # smoke, full RLS snapshot, and explicit post-suite fixture cleanup checks.
+      # The runner gets credentials ONLY from local status, ignores .env and
+      # refuses non-loopback targets. No hosted secret is needed by this job.
+      - name: Reconstruct and verify the complete backend
+        run: npm run db:verify
 
       - name: Stop the local stack
         if: always()

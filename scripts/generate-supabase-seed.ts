@@ -1,15 +1,7 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
-import {
-  AUTHORS,
-  EVENTS,
-  PLACES,
-  POSTS,
-  ROUTES,
-  STORIES,
-  VIBE_CHIPS,
-  type Comment,
-} from "./hp-seed-data";
+import { AUTHORS, EVENTS, PLACES, POSTS, ROUTES, VIBE_CHIPS, type Comment } from "./hp-seed-data";
 
 type SqlValue = string | number | null | string[];
 
@@ -35,18 +27,6 @@ function uuidFromSeed(seed: string): string {
 }
 
 /**
- * `stories.media_url` is NOT NULL.
- *
- * 20260617161000 added the column nullable, backfilled it from the story's own
- * place, and only then applied the constraint — so the backfill covered every
- * row that existed at the time and the seed was never updated to match. On a
- * database built from empty the migration backfills nothing (stories is still
- * empty), and this seed then inserted a NULL into a NOT NULL column.
- *
- * Mirroring the migration's backfill rather than inventing a value keeps the two
- * agreeing: the place's image, with the same fallback the migration used.
- */
-/**
  * Seeded content is published; user-created content is not.
  *
  * 20260824090000 made every public read policy require
@@ -58,13 +38,6 @@ function uuidFromSeed(seed: string): string {
  * looks empty through the app.
  */
 const PUBLISHED = "published";
-
-function storyMediaUrl(placeId: string) {
-  return (
-    PLACES.find((place) => place.id === placeId)?.imageUrl ??
-    "/story-feature/kourouta-online-story.jpg"
-  );
-}
 
 function insertRows(
   table: string,
@@ -155,6 +128,7 @@ const sections = [
       "status",
       "sort_order",
       "moderation_status",
+      "photos",
     ],
     PLACES.map((place, index) => [
       place.id,
@@ -180,6 +154,7 @@ const sections = [
       place.status,
       index,
       PUBLISHED,
+      [place.imageUrl],
     ]),
     "id",
   ),
@@ -308,19 +283,35 @@ const sections = [
     ),
     "route_id, position",
   ),
-  insertRows(
-    "stories",
-    ["id", "label", "place_id", "position", "media_url", "moderation_status"],
-    STORIES.map((story, index) => [
-      `story-${slug(story.label)}`,
-      story.label,
-      story.placeId,
-      index,
-      storyMediaUrl(story.placeId),
-      PUBLISHED,
-    ]),
-    "id",
-  ),
+  readFileSync(new URL("./seed-live-surfaces.sql", import.meta.url), "utf8"),
+  // These links could not be populated by 20260827140000: places did not exist yet.
+  `update public.cultural_events c
+set place_id = links.place_id
+from (values
+  ('municipal-2026-saske-kyllini', 'kyllini-harbor'),
+  ('municipal-2026-anthestiria-gastouni', 'gastouni'),
+  ('municipal-2026-ilida-revue', 'ancient-elis'),
+  ('municipal-2026-ilida-antigone', 'ancient-elis'),
+  ('municipal-2026-ilida-full-moon', 'ancient-elis')
+) as links(event_id, place_id)
+where c.id = links.event_id and c.place_id is null;`,
+  // Local-only identities have no password or provider identity and are banned.
+  // Two ordinary accounts support block/Deal fixtures; the inert owner preserves
+  // the last-owner invariant while disposable admin accounts are cleaned up.
+  `insert into auth.users (id, aud, role, email, encrypted_password, banned_until,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values
+  ('00000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated',
+   'seed-reader-a@hleias.invalid', '', 'infinity', '{}', '{"display_name":"Seed reader A"}', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('00000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated',
+   'seed-reader-b@hleias.invalid', '', 'infinity', '{}', '{"display_name":"Seed reader B"}', '2026-01-01T00:00:01Z', '2026-01-01T00:00:01Z'),
+  ('00000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated',
+   'seed-owner@hleias.invalid', '', 'infinity', '{}', '{"display_name":"Inert local owner"}', '2026-01-01T00:00:02Z', '2026-01-01T00:00:02Z')
+on conflict (id) do nothing;
+
+insert into public.admin_members (user_id, role)
+values ('00000000-0000-4000-8000-000000000003', 'owner')
+on conflict (user_id) do nothing;`,
   insertRows(
     "vibe_chips",
     ["id", "label", "position"],

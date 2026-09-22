@@ -230,10 +230,11 @@ export async function saveAdminPlace(place: Database["public"]["Tables"]["places
 // first: a business claim carries the partner's deal text, phone and photos.
 //
 // Not listed, because Postgres already refuses the delete while they exist:
-// posts, meet_events, events and route_stops (`on delete restrict`) and
-// deal_redemptions (no action). Also not listed: place_avatars, saved_items and
-// user_place_visits, which are decoration and per-user state — losing those with
-// the place is the intended behaviour, not a surprise.
+// posts, meet_events, events and route_stops (`on delete restrict`). A deal
+// redemption cascades, but its mandatory business claim is already checked
+// below. Also not listed: place_avatars, saved_items and user_place_visits,
+// which are decoration and per-user state — losing those with the place is the
+// intended behaviour, not a surprise.
 const PLACE_CASCADE_CHECKS = [
   { column: "place_id", label: "business claim", table: "place_business_profiles" },
   { column: "place_id", label: "story", table: "stories" },
@@ -243,12 +244,12 @@ const PLACE_CASCADE_CHECKS = [
 /**
  * Hard-deletes a place, refusing while content would be silently destroyed.
  *
- * Postgres only protects some of this. posts, meet_events, events, route_stops
- * and deal_redemptions block the delete themselves, so those need no help. But
- * comments, stories and place_business_profiles are `on delete cascade`: without
- * the pre-flight below, deleting a place with no posts but three stories and an
- * approved business claim succeeds and takes all four rows with it, behind a
- * dialog that says "this cannot be undone".
+ * Postgres only protects some of this. posts, meet_events, events and
+ * route_stops block the delete themselves, so those need no help. But comments,
+ * stories and place_business_profiles are `on delete cascade`: without the
+ * pre-flight below, deleting a place with no posts but three stories and an
+ * approved business claim succeeds and also removes any deal redemptions,
+ * behind a dialog that says "this cannot be undone".
  *
  * This is a guard, not a boundary. Authorisation is RLS ("Editors can manage
  * places", owner/editor only) and that is what actually stops a non-admin. A

@@ -141,7 +141,7 @@ real boundary is _client code vs. database_, and it falls on a clean seam:
 | UI                   | `src/components/hp/**` (product), `src/components/admin/**`, `src/components/ui/**` (shadcn) | 40+ files; no Supabase imports of its own                                                                                             |
 | Data access          | `src/lib/hp-api.ts` (2042 lines), `src/lib/admin-api.ts` (339), `src/lib/hp-auth.ts`         | these three are the **only** files that import the Supabase client — verified, zero component does                                    |
 | Domain types / logic | `src/lib/hp-model.ts`, `src/lib/hp/**`                                                       | pure, testable — this is what the unit tests cover                                                                                    |
-| Backend              | `supabase/migrations/**` (30 migrations, 30 tables, 115 RLS policies)                        | tables, RLS policies, Postgres functions, triggers. `supabase/policy-snapshot.json` is the committed baseline for `audit:rls --check` |
+| Backend              | `supabase/migrations/**`                                                                     | tables, RLS policies, Postgres functions, triggers. `supabase/policy-snapshot.json` is the committed baseline for `audit:rls --check` |
 | Generated contract   | `src/lib/supabase/database.types.ts`                                                         | `supabase gen types typescript` output — the thing that makes a schema change a compile error (see Team Notes)                        |
 
 **Route files are not where the split happens** — there are only three of them
@@ -272,13 +272,16 @@ _(real scripts, from package.json)_
 - Unit tests: `npm run test:intelligence`, `npm run test:discovery`
 - Map visuals check: `npm run test:map-visuals`
 - Generate Supabase seed data: `npm run supabase:generate-seed`
+- Full local database reconstruction: `npm run db:verify`
+- Run one database check safely on the local stack: `npm run supabase:local -- smoke:live-surfaces`
+- Check migration timestamps across refs/worktrees: `npm run check:migration-versions`
 - Rebuild coastline geometry: `npm run build:ionian-land`
 - Build the TanStack Start (dev-path) bundle instead: `npm run build:tanstack`
 
 **Which of these run offline.** `lint`, `check:secrets`, `typecheck`,
 `test:intelligence`, `test:discovery`, `test:map-visuals` and `build` need nothing
-— that is exactly the set CI runs. **Every `smoke:*` script hits the live
-Supabase project**, creates real rows and real users, and cleans up in a `finally`.
+— that is exactly the set CI runs. An unwrapped `smoke:*` command defaults to the
+live Supabase project, creates real rows/users, and cleans up in a `finally`.
 Several also shell out to `npx supabase … api-keys` for a `service_role` key from
 your local CLI session, and `smoke:admin` / `smoke:block-enforcement` /
 `smoke:deal-race` / `smoke:moderation` / `smoke:routes` /
@@ -287,14 +290,12 @@ your local CLI session, and `smoke:admin` / `smoke:block-enforcement` /
 (`aws-0-eu-central-1.pooler.supabase.com`, user `postgres.<ref>`), because this
 project has no `db.<ref>.supabase.co` direct host.
 
-**Run locally, they hit production — so don't run them casually.** In CI they do
-not: `.github/workflows/smoke.yml` runs the whole suite against a throwaway
-Supabase stack built inside the runner with `supabase start`, whose schema is
-rebuilt from `supabase/migrations` from empty every run. Nothing about that
-touches the live project, and no real credential is involved — the local stack's
-keys are fixed public development values. `assertTargetIsSafeForCI()` in
-`scripts/lib/env.ts` throws if `CI` is set and the target is still the production
-ref, so a misconfigured run fails loudly instead of writing to the live database.
+**Use `npm run supabase:local -- <script>` for a local stack.** It reads only
+loopback credentials from `supabase status` and refuses linked/remote targets.
+In CI, `.github/workflows/smoke.yml` runs `db:verify` against a throwaway stack,
+rebuilding twice from migrations and seed. Nothing about that touches the live
+project, and no real credential is involved. `assertTargetIsSafeForCI()` and the
+local-only wrapper both fail closed on a hosted target.
 What CI cannot check is pooler behaviour: the local stack has no pooler, so every
 script gets session semantics whichever mode it asked for (see the fidelity note
 in `scripts/lib/pg.ts`). Running the suite against the hosted project by hand is
@@ -454,7 +455,7 @@ the commit, not what you're allowed to edit.
 **The real collision point is the schema, not a lane.** You share one codebase
 and one database. What has to stay in sync is the Supabase schema and its
 generated types: after any migration, regenerate them (`supabase gen types
-typescript` → `src/lib/supabase/database.types.ts`) so the other person's code
+--lang typescript --local --schema public` → `src/lib/supabase/database.types.ts`) so the other person's code
 gets a compile error immediately if something it depends on changed shape,
 instead of a silent runtime bug later.
 

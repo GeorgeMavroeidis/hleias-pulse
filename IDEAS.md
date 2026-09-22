@@ -210,32 +210,19 @@
 <!-- Things that work today but should be revisited —
      e.g. "myths module needs real scope before Stage 2 (see ROADMAP.md)" -->
 
-### Migration drift — production is ahead of `main`, and in one case ahead of git
+### Migration drift — resolved and guarded (re-audited 2026-09-22)
 
 Found 2026-09-07 while renumbering the audit FK migration off a version that was
-already taken. Two separate problems, one worse than the other.
+already taken. The original warning below is retained as history; its factual
+state is now resolved.
 
-- **`20260907150000` (`add_question_post_kind`) is applied to the live database
-  and has no migration file anywhere in this repository.** Searched every commit
-  reachable from every local and remote-tracking ref — no file at that version
-  exists. So a clean checkout plus `supabase db push` does **not** reproduce
-  production. Whatever that migration did, nothing in version control can
-  recreate it, review it, or roll it back. This is the one to fix first: either
-  find the file and commit it, or dump the applied definition out of the
-  database and write the migration retroactively.
-
-- **`20260907140000` (`enforce_story_expiry_rls`) is applied to the live
-  database but its file sits on an unmerged branch**,
-  `origin/fix/enforce-story-expiry-rls` (`c38fe8f`). Less severe — the file
-  exists and is reviewable — but `main` still does not contain a migration that
-  production has been running since 2026-09-07. Anyone reading `main` to
-  understand the schema is reading a version that has not existed for a while.
-
-  \_(Verified directly: the file's location, its absence from `main`, and the
-  complete absence of any `20260907150000\__`file. The claim that both versions
-  are marked applied in`supabase_migrations.schema_migrations` comes from the
-  session that queried production; this session has opened no database
-  connection.)\*
+- A read-only production inventory now shows all 39 applied version/name pairs
+  in `main`, including `20260907140000` and `20260907150000`. No applied live
+  migration is missing from Git.
+- The documented preflight fetches refs and checks migration timestamps across
+  every local/remote ref and worktree. The recovery gate then rebuilds twice
+  from empty and compares the resulting catalog. The forward reconciliation and
+  exact findings live in `docs/SUPABASE_RECOVERY.md`.
 
   **The general rule this earns:** applying a migration to production before its
   branch merges makes the version number unavailable to everyone else while
@@ -427,7 +414,7 @@ or a second maintainer's local stack would all have failed.
    machine. Nothing noticed because nothing ran it — while this file and
    `CLAUDE.md` both listed posts as covered by it.
 
-**Still open:**
+**Closed by the reproducible-backend pass (2026-09-22):**
 
 - **Seeded Meet events.** `20260617161000` defines six demo Meet events
   (`meet-kourouta-sunset-swim`, `meet-amaliada-panigyri`, `meet-foloi-cleanup`,
@@ -437,19 +424,11 @@ or a second maintainer's local stack would all have failed.
   `smoke:live-surfaces` fails on this. The test cannot simply make its own:
   `createPulseMeetEvent` writes `moderation_status: 'pending'` and the public
   read policy requires `'published'`, so a new Meet is invisible by design.
-  _Recommended fix:_ transplant those six into the seed, where places exist by
-  the time it runs — the same data, somewhere it can execute. **It is a product
-  call whether a fresh install should ship with demo Meets, which is why this was
-  left rather than decided.**
-- **Six smoke scripts never reached**, so their state against a from-scratch
-  database is unknown: `moderation`, `block-enforcement`, `deal-race`, `admin`,
-  `verification-guards`, `routes`. Expect more of the same class.
-- **`audit:rls --check` unverified** against a rebuilt schema. It would prove the
-  migrations alone reproduce the policy set, which is exactly the property in
-  doubt — worth running first when this is picked up.
-- **`.github/workflows/smoke.yml` runs only the two scripts that pass.** Add them
-  back one at a time as each is fixed. A permanently red check trains people to
-  ignore red, which costs more than the coverage is worth.
+  They now live in the seed, after places exist, with stable IDs and
+  future-relative times. Re-seeding preserves real RSVP contributions.
+- All ten smoke scripts, `audit:rls --check`, database lint, generated types,
+  fixture cleanup and two deterministic clean resets now run under `db:verify`.
+- `.github/workflows/smoke.yml` runs that complete local-only gate.
 
 **The general rule worth remembering:** a migration that backfills existing rows
 and then changes the default is invisible to anything created afterwards — and

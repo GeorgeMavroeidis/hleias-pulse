@@ -14,59 +14,59 @@ on conflict (id) do update set
     type = excluded.type,
     avatar_url = excluded.avatar_url;
 
-insert into public.places (id, name, greek_name, type, area, x, y, lat, lng, pulse, mood, crowd, budget, best_time, tags, short, image_url, hotness, comment_count, recent_post_count, status, sort_order, moderation_status)
+insert into public.places (id, name, greek_name, type, area, x, y, lat, lng, pulse, mood, crowd, budget, best_time, tags, short, image_url, hotness, comment_count, recent_post_count, status, sort_order, moderation_status, photos)
 values
-  ('ancient-olympia', 'Ancient Olympia', 'Αρχαία Ολυμπία', 'culture', 'Olympia', 63, 48, 37.6441431, 21.6252773, 7, 'historic but still iconic', 'medium', '€€', 'late afternoon', array['culture', 'unesco', 'walk', 'history']::text[], 'Ancient ruins, golden light, and a surprisingly good late-afternoon wander.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg', 7, 6, 5, 'popular', 0, 'published'),
-  ('olympia-stadium', 'Olympia Stadium', 'Στάδιο Ολυμπίας', 'culture', 'Olympia', 65, 49, 37.6392693, 21.6342494, 5, 'quiet flex', 'low', '€€', 'morning', array['ancient', 'walk', 'photo', 'calm']::text[], 'The ancient stadium. Simple, huge, silent. Feels better than expected.', 'https://upload.wikimedia.org/wikipedia/commons/8/8e/Olympia_the_stadium.jpg', 5, 5, 3, 'active', 1, 'published'),
-  ('olympia-museum', 'Archaeological Museum of Olympia', 'Αρχαιολογικό Μουσείο Ολυμπίας', 'culture', 'Olympia', 67, 47, 37.6434963, 21.6295709, 4, 'rainy day save', 'medium', '€€', 'hot midday', array['museum', 'culture', 'indoor', 'rainy']::text[], 'Good indoor move when the sun is too aggressive.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/20190507_061_olympia_museum.jpg/1280px-20190507_061_olympia_museum.jpg', 4, 5, 2, 'active', 2, 'published'),
-  ('olympic-games-museum', 'Museum of Ancient Olympic Games', 'Μουσείο Αρχαίων Ολυμπιακών Αγώνων', 'culture', 'Olympia', 66, 45, 37.6410748, 21.6255075, 4, 'old-school olympic lore', 'low', '€', 'midday', array['museum', 'olympics', 'quick', 'culture']::text[], 'Small culture hit before going back to beach mode.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/Museum_of_the_History_of_the_Ancient_Olympic_Games%2C_Archaia_Olympia_Greece.jpg/1280px-Museum_of_the_History_of_the_Ancient_Olympic_Games%2C_Archaia_Olympia_Greece.jpg', 4, 3, 2, 'active', 3, 'published'),
-  ('katakolo-port', 'Katakolo Port', 'Λιμάνι Κατακόλου', 'local', 'Katakolo', 20, 42, 37.6455045, 21.3249507, 8, 'port walk energy', 'high when cruise ships arrive', 'free', 'sunset', array['port', 'walk', 'coffee', 'cruise']::text[], 'Port walk, coffee, sea air, cruise chaos, good people-watching.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg', 8, 8, 6, 'popular', 4, 'published'),
-  ('katakolo-sunset', 'Katakolo Sunset', 'Ηλιοβασίλεμα Κατακόλου', 'sunset', 'Katakolo', 18, 40, 37.6493, 21.3155, 7, 'easy sunset spot', 'medium', 'free', '20:00', array['sunset', 'walk', 'date', 'photo']::text[], 'Low-effort sunset spot with port lights and sea breeze.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2f/Katakolo-sunset.jpg/1280px-Katakolo-sunset.jpg', 7, 8, 5, 'popular', 5, 'published'),
-  ('katakolo-kiani-akti', 'Kiani Akti Katakolo', 'Κυανή Ακτή Κατακόλου', 'beach', 'Katakolo', 19, 44, 37.6535, 21.3189, 6, 'quick swim near port', 'medium', 'free', 'morning', array['beach', 'near-port', 'quick', 'swim']::text[], 'Easy beach option when you''re around Katakolo and don''t want a whole expedition.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Katakolo-Kiani_Akti_beach.jpg/1280px-Katakolo-Kiani_Akti_beach.jpg', 6, 5, 4, 'active', 6, 'published'),
-  ('kourouta-beach', 'Kourouta Beach', 'Παραλία Κουρούτας', 'beach', 'Kourouta', 21, 29, 37.7694054, 21.2938768, 10, 'beach all day, party later', 'high', '€', '18:00 onwards', array['beach', 'party', 'bars', 'after']::text[], 'The obvious beach-party magnet. Come for sea, stay when the lights turn on.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg/1280px-%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg', 10, 10, 8, 'busy', 7, 'published'),
-  ('kourouta-sunset', 'Kourouta Sunset Strip', 'Κουρούτα Sunset', 'night', 'Kourouta', 18, 28, 37.7678, 21.2918, 9, 'sunset into drinks', 'high', '€€', '20:30', array['sunset', 'drinks', 'after', 'music']::text[], 'Where the beach slowly turns into the night plan.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg/1280px-Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg', 9, 10, 7, 'busy', 8, 'published'),
-  ('palouki-beach', 'Palouki Beach', 'Παραλία Παλούκι', 'beach', 'Amaliada Coast', 27, 39, 37.7558463, 21.3063088, 6, 'quieter beach just south of Kourouta', 'medium', 'free', 'late afternoon', array['beach', 'camping', 'quiet', 'near-kourouta']::text[], 'A calmer sandy beach move near Kourouta, with a small port and camping energy.', 'https://www.visit-olympia.gr/sites/default/files/field/image/media/2022-10/9065.jpeg', 6, 5, 4, 'active', 9, 'published'),
-  ('agios-andreas', 'Agios Andreas', 'Άγιος Ανδρέας', 'food', 'Near Katakolo', 17, 38, 37.6650031, 21.3097208, 7, 'seafood and lazy drinks', 'medium', '€€', 'sunset dinner', array['seafood', 'sunset', 'local', 'drinks']::text[], 'Small seaside hang for food, beers, and low-stress sunset.', 'https://upload.wikimedia.org/wikipedia/commons/8/81/Sunset_at_Agios_Andreas.jpg', 7, 7, 5, 'popular', 10, 'published'),
-  ('kyllini-beach', 'Kyllini Beach', 'Παραλία Κυλλήνης', 'beach', 'Kyllini', 19, 12, 37.9379579, 21.1448092, 8, 'long beach energy', 'medium', 'free', 'morning to sunset', array['beach', 'long', 'swim', 'open']::text[], 'Big beach feeling, easier to breathe than the packed spots.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg/1280px-Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg', 8, 9, 6, 'popular', 11, 'published'),
-  ('kyllini-harbor', 'Kyllini Harbor', 'Λιμάνι Κυλλήνης', 'local', 'Kyllini', 16, 14, 37.9378191, 21.1489917, 6, 'ferry port movement', 'medium', 'free', 'before ferry', array['port', 'ferry', 'walk', 'coffee']::text[], 'Ferry movement, quick coffee, sea view, people in transit.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Kyllini_harbor.JPG/1280px-Kyllini_harbor.JPG', 6, 5, 4, 'active', 12, 'published'),
-  ('kyllini-old-beach', 'Kyllini Old Beach', 'Παραλία δίπλα στο λιμάνι', 'beach', 'Kyllini', 17, 16, 37.9348, 21.1406, 5, 'simple port swim', 'low', 'free', 'morning', array['beach', 'port', 'simple', 'swim']::text[], 'Nothing fancy. Just a quick sea reset near the harbor.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4d/Kyllini_beach.JPG/1280px-Kyllini_beach.JPG', 5, 5, 3, 'active', 13, 'published'),
-  ('arkoudi-beach', 'Arkoudi Beach', 'Παραλία Αρκούδι', 'beach', 'Arkoudi', 7, 26, 37.8472474, 21.1083014, 7, 'small resort beach without a big-city feel', 'medium', '€', 'sunset', array['beach', 'north', 'family', 'walk']::text[], 'Compact north-coast beach village for an easy swim and food after.', 'https://visit-olympia.gr/sites/default/files/field/image/media/2022-10/0289.jpeg', 7, 8, 5, 'popular', 14, 'published'),
-  ('glyfa-beach', 'Glyfa Beach', 'Παραλία Γλύφας', 'beach', 'Pineios Coast', 13, 29, 37.826109, 21.17462, 6, 'wide sand, pine shade, low drama', 'low', 'free', 'morning', array['beach', 'pine', 'quiet', 'family']::text[], 'A broad sandy beach between Vartholomio dunes and Arkoudi, better for space than scene.', 'https://visit-olympia.gr/sites/default/files/field/image/media/2022-10/0289.jpeg', 6, 5, 4, 'active', 15, 'published'),
-  ('loutra-kyllinis', 'Loutra Kyllinis', 'Λουτρά Κυλλήνης', 'nature', 'Kastro-Kyllini', 7, 24, 37.8587849, 21.1129738, 5, 'thermal-bath detour near the north coast', 'low', '€€', 'morning', array['thermal', 'spa', 'north', 'quiet']::text[], 'Thermal-bath area near Kyllini for a slower, non-beach reset.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Roman_baths%2C_Loutra_Killinis%2C_Greece.jpg/1280px-Roman_baths%2C_Loutra_Killinis%2C_Greece.jpg', 5, 5, 3, 'active', 16, 'published'),
-  ('chlemoutsi', 'Chlemoutsi Castle', 'Κάστρο Χλεμούτσι', 'culture', 'Kastro-Kyllini', 28, 15, 37.8903641, 21.1412423, 6, 'castle hill flex', 'low', '€', 'golden hour', array['castle', 'view', 'history', 'photo']::text[], 'Castle silhouette, hill views, and a good break from the beach loop.', 'https://upload.wikimedia.org/wikipedia/commons/f/fb/Castello_Chlemoutsi.jpg', 6, 7, 4, 'active', 17, 'published'),
-  ('chlemoutsi-sea-view', 'Chlemoutsi Sea View', 'Χλεμούτσι Θέα', 'culture', 'Kastro-Kyllini', 30, 13, 37.8912, 21.138, 5, 'history with horizon', 'low', '€', 'sunset', array['view', 'castle', 'quiet', 'sunset']::text[], 'A more cinematic angle on the castle and the Ionian horizon.', 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chlemoutsi_castle_from_the_sea.jpg', 5, 4, 3, 'active', 18, 'published'),
-  ('vartholomio', 'Vartholomio', 'Βαρθολομιό', 'local', 'Pineios', 17, 24, 37.8610449, 21.2087496, 5, 'plain-town stop before the north beaches', 'low', '€', 'evening', array['town', 'cheap', 'local', 'north']::text[], 'A practical local stop between the inland plain and the Arkoudi/Glyfa coast.', 'https://visit-olympia.gr/sites/default/files/field/image/media/2022-10/0289.jpeg', 5, 5, 3, 'active', 19, 'published'),
-  ('gastouni', 'Gastouni', 'Γαστούνη', 'local', 'Pineios', 21, 25, 37.8507048, 21.2542417, 5, 'market town, coffee, errands, local week', 'medium', '€', 'morning', array['town', 'coffee', 'local', 'cheap']::text[], 'Real local rhythm: coffee, errands, and a useful stop before the coast.', 'https://upload.wikimedia.org/wikipedia/commons/5/5b/Panagia_Katholiki_%28Gastouni%29_Journal_of_the_Royal_Institute_of_British_Architects_1923-12-08_Vol_31_%282%29.png', 5, 6, 3, 'active', 20, 'published'),
-  ('lechaina', 'Lechaina', 'Λεχαινά', 'local', 'Andravida-Kyllini', 22, 13, 37.9373907, 21.2633204, 5, 'north-plain town, simple food and coffee', 'low', '€', 'evening', array['town', 'coffee', 'north', 'local']::text[], 'A small northern town stop that makes the Kyllini side feel less empty on the map.', 'https://upload.wikimedia.org/wikipedia/commons/8/87/House_of_Andreas_Karkavitsas_at_Lechaina.jpg', 5, 4, 3, 'active', 21, 'published'),
-  ('pineios-reservoir', 'Pinios Reservoir', 'Λίμνη Πηνειού', 'nature', 'Ilida', 43, 19, 37.8940004, 21.4656037, 5, 'inland lake, dam road, quiet views', 'low', 'free', 'late afternoon', array['lake', 'dam', 'nature', 'quiet']::text[], 'Artificial lake and dam country northeast of Amaliada, good for a quiet inland drive.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Kaiafa_lake.jpg/1280px-Kaiafa_lake.jpg', 5, 5, 3, 'active', 22, 'published'),
-  ('kaiafas-lake', 'Kaiafas Lake', 'Λίμνη Καϊάφα', 'nature', 'Zacharo', 38, 72, 37.5053769, 21.6286574, 8, 'strange lake, pine, thermal myth', 'medium', 'free', 'late afternoon', array['lake', 'nature', 'walk', 'weird']::text[], 'Lake, pine forest, strange calm energy. Great contrast after the beach.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Kaiafa_lake.jpg/1280px-Kaiafa_lake.jpg', 8, 9, 6, 'popular', 23, 'published'),
-  ('kaiafas-sunset', 'Kaiafas Sunset', 'Καϊάφας Ηλιοβασίλεμα', 'sunset', 'Zacharo', 35, 74, 37.508, 21.5805, 7, 'quiet cinematic sunset', 'low', 'free', '20:00', array['sunset', 'lake', 'nature', 'quiet']::text[], 'For when you want sunset without the beach bar noise.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Kaiafa_Sunset.jpg/1280px-Kaiafa_Sunset.jpg', 7, 6, 5, 'popular', 24, 'published'),
-  ('zacharo-beach', 'Zacharo Beach', 'Παραλία Ζαχάρως', 'beach', 'Zacharo', 23, 76, 37.4825, 21.587, 8, 'huge sand, free feeling', 'medium', 'free', 'sunset', array['beach', 'sunset', 'long-walk', 'cheap']::text[], 'Long sandy beach, big sky, less polished, more free.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/500px_photo_%28255278229%29.jpeg/1280px-500px_photo_%28255278229%29.jpeg', 8, 8, 6, 'popular', 25, 'published'),
-  ('kakovatos-beach', 'Kakovatos Beach', 'Παραλία Κακόβατου', 'beach', 'Kakovatos', 25, 82, 37.455, 21.598, 7, 'low-key endless beach', 'low', 'free', 'late afternoon', array['beach', 'quiet', 'sand', 'walk']::text[], 'Low-key beach for people who don''t want the obvious scene.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg', 7, 8, 5, 'popular', 26, 'published'),
-  ('kakovatos-inland', 'Kakovatos Dunes', 'Κακόβατος Αμμόλοφοι', 'nature', 'Kakovatos', 27, 84, 37.4577879, 21.6442368, 5, 'sand, fields, no drama', 'low', 'free', 'morning', array['nature', 'beach', 'quiet', 'walk']::text[], 'Beach meets inland fields. Good for a quiet reset.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/Looking_inland_from_the_beach_of_Kakovatos%2C_Elis%2C_Greece.jpg/1280px-Looking_inland_from_the_beach_of_Kakovatos%2C_Elis%2C_Greece.jpg', 5, 4, 3, 'active', 27, 'published'),
-  ('giannitsochori', 'Giannitsochori Beach', 'Παραλία Γιαννιτσοχωρίου', 'beach', 'South Ilia', 22, 89, 37.3931409, 21.6881126, 6, 'remote-ish beach freedom', 'low', 'free', 'sunset', array['beach', 'south', 'quiet', 'raw']::text[], 'South-coast escape when you want more space and fewer people.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9f/Giannitsochori_beach_-_panoramio.jpg/1280px-Giannitsochori_beach_-_panoramio.jpg', 6, 6, 4, 'active', 28, 'published'),
-  ('tholo-beach', 'Tholo Beach', 'Παραλία Θολό', 'beach', 'Zacharo South', 63, 87, 37.409444, 21.666111, 5, 'south-coast camping beach', 'low', 'free', 'sunset', array['beach', 'south', 'camping', 'quiet']::text[], 'A south-coast sandy stop near Zacharo for camping vibes and more breathing room.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg', 5, 6, 3, 'active', 29, 'published'),
-  ('samiko-acropolis', 'Samiko / Samicum', 'Σαμικό', 'culture', 'Kato Samiko', 39, 68, 37.5337646, 21.5984452, 4, 'ancient hill, obscure energy', 'low', 'free', 'morning', array['ancient', 'hill', 'hidden', 'route']::text[], 'For people who like the obscure ancient-place feeling more than guided tours.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8e/Samia_acropolis.jpg/1280px-Samia_acropolis.jpg', 4, 3, 2, 'active', 30, 'published'),
-  ('foloi-forest', 'Foloi Forest', 'Δάσος Φολόης', 'nature', 'Foloi', 72, 31, 37.7396701, 21.7077524, 8, 'mythic forest escape', 'low', 'free', 'morning', array['forest', 'nature', 'shade', 'walk']::text[], 'Oak forest, shade, mythic quiet. The anti-beach day.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg', 8, 8, 6, 'popular', 31, 'published'),
-  ('foloi-deep', 'Deep Foloi', 'Βαθιά Φολόη', 'nature', 'Foloi', 75, 29, 37.789914, 21.7212628, 6, 'offline walk energy', 'low', 'free', 'early', array['forest', 'camping-vibe', 'walk', 'quiet']::text[], 'For the alternative/nature people. Bring water, leave no trash.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/%CE%94%CE%AC%CF%83%CE%BF%CF%82_%CE%A6%CE%BF%CE%BB%CF%8C%CE%B7%CF%82_-_panoramio.jpg/1280px-%CE%94%CE%AC%CF%83%CE%BF%CF%82_%CE%A6%CE%BF%CE%BB%CF%8C%CE%B7%CF%82_-_panoramio.jpg', 6, 7, 4, 'active', 32, 'published'),
-  ('nemouta-waterfalls', 'Nemouta Waterfalls', 'Καταρράκτες Νεμούτας', 'nature', 'Foloi / Erymanthos', 77, 47, 37.6987006, 21.8061752, 6, 'waterfall hike on the Erymanthos side', 'low', 'free', 'spring or early autumn', array['waterfall', 'hike', 'nature', 'shade']::text[], 'A real inland escape: waterfall trail energy near Nemouta and the Erymanthos valley.', 'https://justforonesummer.com/wp-content/uploads/2017/07/Nemouta-Waterfalls-2-1-2000x1333.jpg', 6, 5, 4, 'active', 33, 'published'),
-  ('nemouta-village', 'Nemouta', 'Νεμούτα', 'village', 'Foloi', 75, 46, 37.7007409, 21.79184, 4, 'mountain village base for waterfall walks', 'low', '€', 'midday', array['village', 'waterfall', 'mountain', 'quiet']::text[], 'Small mountain village base before or after the waterfalls.', 'https://justforonesummer.com/wp-content/uploads/2017/07/Nemouta-Waterfalls-9-1170x780.jpg', 4, 4, 2, 'active', 34, 'published'),
-  ('lampeia-divri', 'Lampeia / Divri', 'Λάμπεια / Δίβρη', 'village', 'Mountain Ilia', 77, 24, 37.8579587, 21.8075223, 4, 'cool mountain village above the heat', 'low', '€', 'summer evening', array['village', 'mountain', 'cooler', 'local']::text[], 'A cooler mountain-side village stop when the coast is too hot.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg', 4, 5, 2, 'active', 35, 'published'),
-  ('andritsaina', 'Andritsaina', 'Ανδρίτσαινα', 'village', 'Andritsaina', 78, 76, 37.4838364, 21.9055326, 6, 'stone village, slow night', 'low', '€', 'evening', array['village', 'food', 'slow', 'local']::text[], 'Mountain village energy. Not polished, in a good way.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Andritsaina_overview.jpg/1280px-Andritsaina_overview.jpg', 6, 5, 4, 'active', 36, 'published'),
-  ('andritsaina-streets', 'Andritsaina Streets', 'Σοκάκια Ανδρίτσαινας', 'village', 'Andritsaina', 80, 78, 37.4829, 21.9068, 5, 'stone lanes and quiet beers', 'low', '€', 'evening', array['village', 'walk', 'local', 'quiet']::text[], 'Good for a slow walk before food and mountain air.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Andritsaina.jpg/1280px-Andritsaina.jpg', 5, 5, 3, 'active', 37, 'published'),
-  ('bassae-temple', 'Temple of Apollo Epicurius', 'Ναός Επικούριου Απόλλωνα', 'culture', 'Near Andritsaina', 84, 82, 37.4296358, 21.9002299, 6, 'remote monument trip', 'low', '€', 'morning', array['unesco', 'temple', 'route', 'remote']::text[], 'A serious detour, but the kind that makes the day feel bigger.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Temple_of_Apollo_Bassae_1982.jpg/1280px-Temple_of_Apollo_Bassae_1982.jpg', 6, 7, 4, 'active', 38, 'published'),
-  ('bassae-inside', 'Bassae Route Stop', 'Διαδρομή Βάσσες', 'culture', 'Andritsaina route', 86, 84, 37.4318507, 21.899584, 4, 'deep culture route', 'low', '€', 'morning', array['temple', 'roadtrip', 'culture', 'quiet']::text[], 'For the roadtrip people who want something more than beach bars.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Bassae_Temple_of_Apollo_040911.jpg/1280px-Bassae_Temple_of_Apollo_040911.jpg', 4, 3, 2, 'active', 39, 'published'),
-  ('ancient-elis', 'Ancient Elis', 'Αρχαία Ήλιδα', 'culture', 'Ilida', 51, 22, 37.8912912, 21.3735659, 5, 'ruins without crowds', 'low', '€', 'late afternoon', array['ancient', 'hidden', 'walk', 'quiet']::text[], 'Ancient site without the tourist pressure. Good quiet culture stop.', 'https://upload.wikimedia.org/wikipedia/commons/1/13/Elis_acropolis.JPG', 5, 5, 3, 'active', 40, 'published'),
-  ('elis-agora', 'Elis Agora', 'Αγορά Αρχαίας Ήλιδας', 'culture', 'Ilida', 53, 24, 37.8898, 21.3748, 4, 'quiet archaeology', 'low', '€', 'morning', array['ancient', 'agora', 'quiet', 'culture']::text[], 'A calm archaeology stop for people who hate packed sites.', 'https://upload.wikimedia.org/wikipedia/commons/4/42/Elis_Agora.JPG', 4, 5, 2, 'active', 41, 'published'),
-  ('pyrgos-centre', 'Pyrgos Centre', 'Κέντρο Πύργου', 'local', 'Pyrgos', 38, 39, 37.6721814, 21.4439156, 8, 'local city movement', 'medium', '€', 'evening', array['city', 'coffee', 'local', 'cheap']::text[], 'Not a postcard. More like where the actual local week happens.', 'https://upload.wikimedia.org/wikipedia/commons/e/e8/Pyrgos_rathaus.jpg', 8, 7, 6, 'popular', 42, 'published'),
-  ('pyrgos-night', 'Pyrgos Rex Corner', 'Πύργος Ρεξ', 'night', 'Pyrgos', 39, 41, 37.6712, 21.4418, 7, 'local night start', 'medium', '€', '22:00', array['city', 'night', 'bars', 'local']::text[], 'Start here, ask around, follow the night.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg/1280px-%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg', 7, 7, 5, 'popular', 43, 'published'),
-  ('amaliada-square', 'Amaliada Square', 'Πλατεία Αμαλιάδας', 'local', 'Amaliada', 42, 26, 37.7979165, 21.3533588, 7, 'local coffee and pregame', 'medium', '€', '21:00', array['square', 'coffee', 'local', 'cheap']::text[], 'Coffee, pregame, local movement before Kourouta.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg/1280px-%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg', 7, 8, 5, 'popular', 44, 'published'),
-  ('skafidia', 'Skafidia', 'Σκαφιδιά', 'beach', 'Skafidia', 21, 36, 37.698418, 21.3278037, 6, 'small coastal escape', 'medium', '€', 'late afternoon', array['beach', 'coast', 'sunset', 'chill']::text[], 'Smaller coastal energy near Pyrgos/Katakolo.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/3/32/%CE%A3%CE%BA%CE%B1%CF%86%CE%B9%CE%B4%CE%B9%CE%B1_%CE%B7%CE%BB%CE%B5%CE%B9%CE%B1%CF%82.jpg/1280px-%CE%A3%CE%BA%CE%B1%CF%86%CE%B9%CE%B4%CE%B9%CE%B1_%CE%B7%CE%BB%CE%B5%CE%B9%CE%B1%CF%82.jpg', 6, 5, 4, 'active', 45, 'published'),
-  ('skafidia-monastery', 'Skafidia Monastery', 'Μονή Σκαφιδιάς', 'culture', 'Skafidia', 29, 46, 37.7008192, 21.325745, 4, 'fortified monastery near the sea', 'low', 'free', 'morning', array['monastery', 'culture', 'coast', 'quiet']::text[], 'A compact culture stop near Skafidia, close enough to combine with the coast.', 'https://visitkatakolon.gr/wp-content/uploads/2015/03/monastery2.jpg', 4, 4, 2, 'active', 46, 'published'),
-  ('korakochori', 'Korakochori', 'Κορακοχώρι', 'village', 'Pyrgos Coast', 27, 50, 37.6751019, 21.3144272, 4, 'coastal village between Katakolo and Pyrgos', 'low', '€', 'late afternoon', array['village', 'coast', 'quiet', 'wine']::text[], 'Small coastal village stop that anchors the Katakolo-to-Skafidia stretch.', 'https://visitkatakolon.gr/wp-content/uploads/2015/03/mercury.jpg', 4, 5, 2, 'active', 47, 'published'),
-  ('mercouri-estate', 'Mercouri Estate', 'Κτήμα Μερκούρη', 'food', 'Korakochori', 27, 50, 37.676717759856, 21.310256847083, 6, 'historic winery by the Katakolo coast', 'medium', '€€', 'morning tour', array['wine', 'estate', 'katakolo', 'food']::text[], 'Historic winery and estate near Korakochori, useful for a Katakolo/Olympia day that is not only ruins.', 'https://visitkatakolon.gr/wp-content/uploads/2015/03/Mercouri-Estate.jpeg', 6, 5, 4, 'active', 48, 'published'),
-  ('lechaina-zacharo-flower', 'Wild Coastline', 'Άγρια Ακτογραμμή', 'nature', 'Ilia Coast', 20, 62, 37.63, 21.315, 5, 'raw beach nature', 'low', 'free', 'morning', array['wild', 'coast', 'nature', 'quiet']::text[], 'A raw coastal stretch for quiet walks, salt air, and finding your own spot.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/0/01/Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg/1280px-Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg', 5, 5, 3, 'active', 49, 'published'),
-  ('epitalio', 'Epitalio', 'Επιτάλιο', 'village', 'Alfeios Plain', 46, 57, 37.6270957, 21.4959889, 4, 'plain village near the Alfeios route', 'low', '€', 'evening', array['village', 'alfeios', 'local', 'route']::text[], 'A real local point south of Pyrgos that helps connect the city to the Zacharo side.', 'https://upload.wikimedia.org/wikipedia/commons/1/13/Elis_acropolis.JPG', 4, 5, 2, 'active', 50, 'published')
+  ('ancient-olympia', 'Ancient Olympia', 'Αρχαία Ολυμπία', 'culture', 'Olympia', 63, 48, 37.6441431, 21.6252773, 7, 'historic but still iconic', 'medium', '€€', 'late afternoon', array['culture', 'unesco', 'walk', 'history']::text[], 'Ancient ruins, golden light, and a surprisingly good late-afternoon wander.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg', 7, 6, 5, 'popular', 0, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg']::text[]),
+  ('olympia-stadium', 'Olympia Stadium', 'Στάδιο Ολυμπίας', 'culture', 'Olympia', 65, 49, 37.6392693, 21.6342494, 5, 'quiet flex', 'low', '€€', 'morning', array['ancient', 'walk', 'photo', 'calm']::text[], 'The ancient stadium. Simple, huge, silent. Feels better than expected.', 'https://upload.wikimedia.org/wikipedia/commons/8/8e/Olympia_the_stadium.jpg', 5, 5, 3, 'active', 1, 'published', array['https://upload.wikimedia.org/wikipedia/commons/8/8e/Olympia_the_stadium.jpg']::text[]),
+  ('olympia-museum', 'Archaeological Museum of Olympia', 'Αρχαιολογικό Μουσείο Ολυμπίας', 'culture', 'Olympia', 67, 47, 37.6434963, 21.6295709, 4, 'rainy day save', 'medium', '€€', 'hot midday', array['museum', 'culture', 'indoor', 'rainy']::text[], 'Good indoor move when the sun is too aggressive.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/20190507_061_olympia_museum.jpg/1280px-20190507_061_olympia_museum.jpg', 4, 5, 2, 'active', 2, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/20190507_061_olympia_museum.jpg/1280px-20190507_061_olympia_museum.jpg']::text[]),
+  ('olympic-games-museum', 'Museum of Ancient Olympic Games', 'Μουσείο Αρχαίων Ολυμπιακών Αγώνων', 'culture', 'Olympia', 66, 45, 37.6410748, 21.6255075, 4, 'old-school olympic lore', 'low', '€', 'midday', array['museum', 'olympics', 'quick', 'culture']::text[], 'Small culture hit before going back to beach mode.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/Museum_of_the_History_of_the_Ancient_Olympic_Games%2C_Archaia_Olympia_Greece.jpg/1280px-Museum_of_the_History_of_the_Ancient_Olympic_Games%2C_Archaia_Olympia_Greece.jpg', 4, 3, 2, 'active', 3, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/Museum_of_the_History_of_the_Ancient_Olympic_Games%2C_Archaia_Olympia_Greece.jpg/1280px-Museum_of_the_History_of_the_Ancient_Olympic_Games%2C_Archaia_Olympia_Greece.jpg']::text[]),
+  ('katakolo-port', 'Katakolo Port', 'Λιμάνι Κατακόλου', 'local', 'Katakolo', 20, 42, 37.6455045, 21.3249507, 8, 'port walk energy', 'high when cruise ships arrive', 'free', 'sunset', array['port', 'walk', 'coffee', 'cruise']::text[], 'Port walk, coffee, sea air, cruise chaos, good people-watching.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg', 8, 8, 6, 'popular', 4, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg']::text[]),
+  ('katakolo-sunset', 'Katakolo Sunset', 'Ηλιοβασίλεμα Κατακόλου', 'sunset', 'Katakolo', 18, 40, 37.6493, 21.3155, 7, 'easy sunset spot', 'medium', 'free', '20:00', array['sunset', 'walk', 'date', 'photo']::text[], 'Low-effort sunset spot with port lights and sea breeze.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2f/Katakolo-sunset.jpg/1280px-Katakolo-sunset.jpg', 7, 8, 5, 'popular', 5, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2f/Katakolo-sunset.jpg/1280px-Katakolo-sunset.jpg']::text[]),
+  ('katakolo-kiani-akti', 'Kiani Akti Katakolo', 'Κυανή Ακτή Κατακόλου', 'beach', 'Katakolo', 19, 44, 37.6535, 21.3189, 6, 'quick swim near port', 'medium', 'free', 'morning', array['beach', 'near-port', 'quick', 'swim']::text[], 'Easy beach option when you''re around Katakolo and don''t want a whole expedition.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Katakolo-Kiani_Akti_beach.jpg/1280px-Katakolo-Kiani_Akti_beach.jpg', 6, 5, 4, 'active', 6, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Katakolo-Kiani_Akti_beach.jpg/1280px-Katakolo-Kiani_Akti_beach.jpg']::text[]),
+  ('kourouta-beach', 'Kourouta Beach', 'Παραλία Κουρούτας', 'beach', 'Kourouta', 21, 29, 37.7694054, 21.2938768, 10, 'beach all day, party later', 'high', '€', '18:00 onwards', array['beach', 'party', 'bars', 'after']::text[], 'The obvious beach-party magnet. Come for sea, stay when the lights turn on.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg/1280px-%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg', 10, 10, 8, 'busy', 7, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg/1280px-%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg']::text[]),
+  ('kourouta-sunset', 'Kourouta Sunset Strip', 'Κουρούτα Sunset', 'night', 'Kourouta', 18, 28, 37.7678, 21.2918, 9, 'sunset into drinks', 'high', '€€', '20:30', array['sunset', 'drinks', 'after', 'music']::text[], 'Where the beach slowly turns into the night plan.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg/1280px-Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg', 9, 10, 7, 'busy', 8, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg/1280px-Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg']::text[]),
+  ('palouki-beach', 'Palouki Beach', 'Παραλία Παλούκι', 'beach', 'Amaliada Coast', 27, 39, 37.7558463, 21.3063088, 6, 'quieter beach just south of Kourouta', 'medium', 'free', 'late afternoon', array['beach', 'camping', 'quiet', 'near-kourouta']::text[], 'A calmer sandy beach move near Kourouta, with a small port and camping energy.', 'https://www.visit-olympia.gr/sites/default/files/field/image/media/2022-10/9065.jpeg', 6, 5, 4, 'active', 9, 'published', array['https://www.visit-olympia.gr/sites/default/files/field/image/media/2022-10/9065.jpeg']::text[]),
+  ('agios-andreas', 'Agios Andreas', 'Άγιος Ανδρέας', 'food', 'Near Katakolo', 17, 38, 37.6650031, 21.3097208, 7, 'seafood and lazy drinks', 'medium', '€€', 'sunset dinner', array['seafood', 'sunset', 'local', 'drinks']::text[], 'Small seaside hang for food, beers, and low-stress sunset.', 'https://upload.wikimedia.org/wikipedia/commons/8/81/Sunset_at_Agios_Andreas.jpg', 7, 7, 5, 'popular', 10, 'published', array['https://upload.wikimedia.org/wikipedia/commons/8/81/Sunset_at_Agios_Andreas.jpg']::text[]),
+  ('kyllini-beach', 'Kyllini Beach', 'Παραλία Κυλλήνης', 'beach', 'Kyllini', 19, 12, 37.9379579, 21.1448092, 8, 'long beach energy', 'medium', 'free', 'morning to sunset', array['beach', 'long', 'swim', 'open']::text[], 'Big beach feeling, easier to breathe than the packed spots.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg/1280px-Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg', 8, 9, 6, 'popular', 11, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg/1280px-Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg']::text[]),
+  ('kyllini-harbor', 'Kyllini Harbor', 'Λιμάνι Κυλλήνης', 'local', 'Kyllini', 16, 14, 37.9378191, 21.1489917, 6, 'ferry port movement', 'medium', 'free', 'before ferry', array['port', 'ferry', 'walk', 'coffee']::text[], 'Ferry movement, quick coffee, sea view, people in transit.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Kyllini_harbor.JPG/1280px-Kyllini_harbor.JPG', 6, 5, 4, 'active', 12, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Kyllini_harbor.JPG/1280px-Kyllini_harbor.JPG']::text[]),
+  ('kyllini-old-beach', 'Kyllini Old Beach', 'Παραλία δίπλα στο λιμάνι', 'beach', 'Kyllini', 17, 16, 37.9348, 21.1406, 5, 'simple port swim', 'low', 'free', 'morning', array['beach', 'port', 'simple', 'swim']::text[], 'Nothing fancy. Just a quick sea reset near the harbor.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4d/Kyllini_beach.JPG/1280px-Kyllini_beach.JPG', 5, 5, 3, 'active', 13, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4d/Kyllini_beach.JPG/1280px-Kyllini_beach.JPG']::text[]),
+  ('arkoudi-beach', 'Arkoudi Beach', 'Παραλία Αρκούδι', 'beach', 'Arkoudi', 7, 26, 37.8472474, 21.1083014, 7, 'small resort beach without a big-city feel', 'medium', '€', 'sunset', array['beach', 'north', 'family', 'walk']::text[], 'Compact north-coast beach village for an easy swim and food after.', 'https://visit-olympia.gr/sites/default/files/field/image/media/2022-10/0289.jpeg', 7, 8, 5, 'popular', 14, 'published', array['https://visit-olympia.gr/sites/default/files/field/image/media/2022-10/0289.jpeg']::text[]),
+  ('glyfa-beach', 'Glyfa Beach', 'Παραλία Γλύφας', 'beach', 'Pineios Coast', 13, 29, 37.826109, 21.17462, 6, 'wide sand, pine shade, low drama', 'low', 'free', 'morning', array['beach', 'pine', 'quiet', 'family']::text[], 'A broad sandy beach between Vartholomio dunes and Arkoudi, better for space than scene.', 'https://visit-olympia.gr/sites/default/files/field/image/media/2022-10/0289.jpeg', 6, 5, 4, 'active', 15, 'published', array['https://visit-olympia.gr/sites/default/files/field/image/media/2022-10/0289.jpeg']::text[]),
+  ('loutra-kyllinis', 'Loutra Kyllinis', 'Λουτρά Κυλλήνης', 'nature', 'Kastro-Kyllini', 7, 24, 37.8587849, 21.1129738, 5, 'thermal-bath detour near the north coast', 'low', '€€', 'morning', array['thermal', 'spa', 'north', 'quiet']::text[], 'Thermal-bath area near Kyllini for a slower, non-beach reset.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Roman_baths%2C_Loutra_Killinis%2C_Greece.jpg/1280px-Roman_baths%2C_Loutra_Killinis%2C_Greece.jpg', 5, 5, 3, 'active', 16, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Roman_baths%2C_Loutra_Killinis%2C_Greece.jpg/1280px-Roman_baths%2C_Loutra_Killinis%2C_Greece.jpg']::text[]),
+  ('chlemoutsi', 'Chlemoutsi Castle', 'Κάστρο Χλεμούτσι', 'culture', 'Kastro-Kyllini', 28, 15, 37.8903641, 21.1412423, 6, 'castle hill flex', 'low', '€', 'golden hour', array['castle', 'view', 'history', 'photo']::text[], 'Castle silhouette, hill views, and a good break from the beach loop.', 'https://upload.wikimedia.org/wikipedia/commons/f/fb/Castello_Chlemoutsi.jpg', 6, 7, 4, 'active', 17, 'published', array['https://upload.wikimedia.org/wikipedia/commons/f/fb/Castello_Chlemoutsi.jpg']::text[]),
+  ('chlemoutsi-sea-view', 'Chlemoutsi Sea View', 'Χλεμούτσι Θέα', 'culture', 'Kastro-Kyllini', 30, 13, 37.8912, 21.138, 5, 'history with horizon', 'low', '€', 'sunset', array['view', 'castle', 'quiet', 'sunset']::text[], 'A more cinematic angle on the castle and the Ionian horizon.', 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chlemoutsi_castle_from_the_sea.jpg', 5, 4, 3, 'active', 18, 'published', array['https://upload.wikimedia.org/wikipedia/commons/4/47/Chlemoutsi_castle_from_the_sea.jpg']::text[]),
+  ('vartholomio', 'Vartholomio', 'Βαρθολομιό', 'local', 'Pineios', 17, 24, 37.8610449, 21.2087496, 5, 'plain-town stop before the north beaches', 'low', '€', 'evening', array['town', 'cheap', 'local', 'north']::text[], 'A practical local stop between the inland plain and the Arkoudi/Glyfa coast.', 'https://visit-olympia.gr/sites/default/files/field/image/media/2022-10/0289.jpeg', 5, 5, 3, 'active', 19, 'published', array['https://visit-olympia.gr/sites/default/files/field/image/media/2022-10/0289.jpeg']::text[]),
+  ('gastouni', 'Gastouni', 'Γαστούνη', 'local', 'Pineios', 21, 25, 37.8507048, 21.2542417, 5, 'market town, coffee, errands, local week', 'medium', '€', 'morning', array['town', 'coffee', 'local', 'cheap']::text[], 'Real local rhythm: coffee, errands, and a useful stop before the coast.', 'https://upload.wikimedia.org/wikipedia/commons/5/5b/Panagia_Katholiki_%28Gastouni%29_Journal_of_the_Royal_Institute_of_British_Architects_1923-12-08_Vol_31_%282%29.png', 5, 6, 3, 'active', 20, 'published', array['https://upload.wikimedia.org/wikipedia/commons/5/5b/Panagia_Katholiki_%28Gastouni%29_Journal_of_the_Royal_Institute_of_British_Architects_1923-12-08_Vol_31_%282%29.png']::text[]),
+  ('lechaina', 'Lechaina', 'Λεχαινά', 'local', 'Andravida-Kyllini', 22, 13, 37.9373907, 21.2633204, 5, 'north-plain town, simple food and coffee', 'low', '€', 'evening', array['town', 'coffee', 'north', 'local']::text[], 'A small northern town stop that makes the Kyllini side feel less empty on the map.', 'https://upload.wikimedia.org/wikipedia/commons/8/87/House_of_Andreas_Karkavitsas_at_Lechaina.jpg', 5, 4, 3, 'active', 21, 'published', array['https://upload.wikimedia.org/wikipedia/commons/8/87/House_of_Andreas_Karkavitsas_at_Lechaina.jpg']::text[]),
+  ('pineios-reservoir', 'Pinios Reservoir', 'Λίμνη Πηνειού', 'nature', 'Ilida', 43, 19, 37.8940004, 21.4656037, 5, 'inland lake, dam road, quiet views', 'low', 'free', 'late afternoon', array['lake', 'dam', 'nature', 'quiet']::text[], 'Artificial lake and dam country northeast of Amaliada, good for a quiet inland drive.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Kaiafa_lake.jpg/1280px-Kaiafa_lake.jpg', 5, 5, 3, 'active', 22, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Kaiafa_lake.jpg/1280px-Kaiafa_lake.jpg']::text[]),
+  ('kaiafas-lake', 'Kaiafas Lake', 'Λίμνη Καϊάφα', 'nature', 'Zacharo', 38, 72, 37.5053769, 21.6286574, 8, 'strange lake, pine, thermal myth', 'medium', 'free', 'late afternoon', array['lake', 'nature', 'walk', 'weird']::text[], 'Lake, pine forest, strange calm energy. Great contrast after the beach.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Kaiafa_lake.jpg/1280px-Kaiafa_lake.jpg', 8, 9, 6, 'popular', 23, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Kaiafa_lake.jpg/1280px-Kaiafa_lake.jpg']::text[]),
+  ('kaiafas-sunset', 'Kaiafas Sunset', 'Καϊάφας Ηλιοβασίλεμα', 'sunset', 'Zacharo', 35, 74, 37.508, 21.5805, 7, 'quiet cinematic sunset', 'low', 'free', '20:00', array['sunset', 'lake', 'nature', 'quiet']::text[], 'For when you want sunset without the beach bar noise.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Kaiafa_Sunset.jpg/1280px-Kaiafa_Sunset.jpg', 7, 6, 5, 'popular', 24, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Kaiafa_Sunset.jpg/1280px-Kaiafa_Sunset.jpg']::text[]),
+  ('zacharo-beach', 'Zacharo Beach', 'Παραλία Ζαχάρως', 'beach', 'Zacharo', 23, 76, 37.4825, 21.587, 8, 'huge sand, free feeling', 'medium', 'free', 'sunset', array['beach', 'sunset', 'long-walk', 'cheap']::text[], 'Long sandy beach, big sky, less polished, more free.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/500px_photo_%28255278229%29.jpeg/1280px-500px_photo_%28255278229%29.jpeg', 8, 8, 6, 'popular', 25, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/500px_photo_%28255278229%29.jpeg/1280px-500px_photo_%28255278229%29.jpeg']::text[]),
+  ('kakovatos-beach', 'Kakovatos Beach', 'Παραλία Κακόβατου', 'beach', 'Kakovatos', 25, 82, 37.455, 21.598, 7, 'low-key endless beach', 'low', 'free', 'late afternoon', array['beach', 'quiet', 'sand', 'walk']::text[], 'Low-key beach for people who don''t want the obvious scene.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg', 7, 8, 5, 'popular', 26, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg']::text[]),
+  ('kakovatos-inland', 'Kakovatos Dunes', 'Κακόβατος Αμμόλοφοι', 'nature', 'Kakovatos', 27, 84, 37.4577879, 21.6442368, 5, 'sand, fields, no drama', 'low', 'free', 'morning', array['nature', 'beach', 'quiet', 'walk']::text[], 'Beach meets inland fields. Good for a quiet reset.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/Looking_inland_from_the_beach_of_Kakovatos%2C_Elis%2C_Greece.jpg/1280px-Looking_inland_from_the_beach_of_Kakovatos%2C_Elis%2C_Greece.jpg', 5, 4, 3, 'active', 27, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/Looking_inland_from_the_beach_of_Kakovatos%2C_Elis%2C_Greece.jpg/1280px-Looking_inland_from_the_beach_of_Kakovatos%2C_Elis%2C_Greece.jpg']::text[]),
+  ('giannitsochori', 'Giannitsochori Beach', 'Παραλία Γιαννιτσοχωρίου', 'beach', 'South Ilia', 22, 89, 37.3931409, 21.6881126, 6, 'remote-ish beach freedom', 'low', 'free', 'sunset', array['beach', 'south', 'quiet', 'raw']::text[], 'South-coast escape when you want more space and fewer people.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9f/Giannitsochori_beach_-_panoramio.jpg/1280px-Giannitsochori_beach_-_panoramio.jpg', 6, 6, 4, 'active', 28, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9f/Giannitsochori_beach_-_panoramio.jpg/1280px-Giannitsochori_beach_-_panoramio.jpg']::text[]),
+  ('tholo-beach', 'Tholo Beach', 'Παραλία Θολό', 'beach', 'Zacharo South', 63, 87, 37.409444, 21.666111, 5, 'south-coast camping beach', 'low', 'free', 'sunset', array['beach', 'south', 'camping', 'quiet']::text[], 'A south-coast sandy stop near Zacharo for camping vibes and more breathing room.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg', 5, 6, 3, 'active', 29, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg/1280px-Beach_of_Kakovatos%2C_Elis%2C_Greece_%281%29.jpg']::text[]),
+  ('samiko-acropolis', 'Samiko / Samicum', 'Σαμικό', 'culture', 'Kato Samiko', 39, 68, 37.5337646, 21.5984452, 4, 'ancient hill, obscure energy', 'low', 'free', 'morning', array['ancient', 'hill', 'hidden', 'route']::text[], 'For people who like the obscure ancient-place feeling more than guided tours.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8e/Samia_acropolis.jpg/1280px-Samia_acropolis.jpg', 4, 3, 2, 'active', 30, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8e/Samia_acropolis.jpg/1280px-Samia_acropolis.jpg']::text[]),
+  ('foloi-forest', 'Foloi Forest', 'Δάσος Φολόης', 'nature', 'Foloi', 72, 31, 37.7396701, 21.7077524, 8, 'mythic forest escape', 'low', 'free', 'morning', array['forest', 'nature', 'shade', 'walk']::text[], 'Oak forest, shade, mythic quiet. The anti-beach day.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg', 8, 8, 6, 'popular', 31, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg']::text[]),
+  ('foloi-deep', 'Deep Foloi', 'Βαθιά Φολόη', 'nature', 'Foloi', 75, 29, 37.789914, 21.7212628, 6, 'offline walk energy', 'low', 'free', 'early', array['forest', 'camping-vibe', 'walk', 'quiet']::text[], 'For the alternative/nature people. Bring water, leave no trash.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/%CE%94%CE%AC%CF%83%CE%BF%CF%82_%CE%A6%CE%BF%CE%BB%CF%8C%CE%B7%CF%82_-_panoramio.jpg/1280px-%CE%94%CE%AC%CF%83%CE%BF%CF%82_%CE%A6%CE%BF%CE%BB%CF%8C%CE%B7%CF%82_-_panoramio.jpg', 6, 7, 4, 'active', 32, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/%CE%94%CE%AC%CF%83%CE%BF%CF%82_%CE%A6%CE%BF%CE%BB%CF%8C%CE%B7%CF%82_-_panoramio.jpg/1280px-%CE%94%CE%AC%CF%83%CE%BF%CF%82_%CE%A6%CE%BF%CE%BB%CF%8C%CE%B7%CF%82_-_panoramio.jpg']::text[]),
+  ('nemouta-waterfalls', 'Nemouta Waterfalls', 'Καταρράκτες Νεμούτας', 'nature', 'Foloi / Erymanthos', 77, 47, 37.6987006, 21.8061752, 6, 'waterfall hike on the Erymanthos side', 'low', 'free', 'spring or early autumn', array['waterfall', 'hike', 'nature', 'shade']::text[], 'A real inland escape: waterfall trail energy near Nemouta and the Erymanthos valley.', 'https://justforonesummer.com/wp-content/uploads/2017/07/Nemouta-Waterfalls-2-1-2000x1333.jpg', 6, 5, 4, 'active', 33, 'published', array['https://justforonesummer.com/wp-content/uploads/2017/07/Nemouta-Waterfalls-2-1-2000x1333.jpg']::text[]),
+  ('nemouta-village', 'Nemouta', 'Νεμούτα', 'village', 'Foloi', 75, 46, 37.7007409, 21.79184, 4, 'mountain village base for waterfall walks', 'low', '€', 'midday', array['village', 'waterfall', 'mountain', 'quiet']::text[], 'Small mountain village base before or after the waterfalls.', 'https://justforonesummer.com/wp-content/uploads/2017/07/Nemouta-Waterfalls-9-1170x780.jpg', 4, 4, 2, 'active', 34, 'published', array['https://justforonesummer.com/wp-content/uploads/2017/07/Nemouta-Waterfalls-9-1170x780.jpg']::text[]),
+  ('lampeia-divri', 'Lampeia / Divri', 'Λάμπεια / Δίβρη', 'village', 'Mountain Ilia', 77, 24, 37.8579587, 21.8075223, 4, 'cool mountain village above the heat', 'low', '€', 'summer evening', array['village', 'mountain', 'cooler', 'local']::text[], 'A cooler mountain-side village stop when the coast is too hot.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg', 4, 5, 2, 'active', 35, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg']::text[]),
+  ('andritsaina', 'Andritsaina', 'Ανδρίτσαινα', 'village', 'Andritsaina', 78, 76, 37.4838364, 21.9055326, 6, 'stone village, slow night', 'low', '€', 'evening', array['village', 'food', 'slow', 'local']::text[], 'Mountain village energy. Not polished, in a good way.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Andritsaina_overview.jpg/1280px-Andritsaina_overview.jpg', 6, 5, 4, 'active', 36, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Andritsaina_overview.jpg/1280px-Andritsaina_overview.jpg']::text[]),
+  ('andritsaina-streets', 'Andritsaina Streets', 'Σοκάκια Ανδρίτσαινας', 'village', 'Andritsaina', 80, 78, 37.4829, 21.9068, 5, 'stone lanes and quiet beers', 'low', '€', 'evening', array['village', 'walk', 'local', 'quiet']::text[], 'Good for a slow walk before food and mountain air.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Andritsaina.jpg/1280px-Andritsaina.jpg', 5, 5, 3, 'active', 37, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Andritsaina.jpg/1280px-Andritsaina.jpg']::text[]),
+  ('bassae-temple', 'Temple of Apollo Epicurius', 'Ναός Επικούριου Απόλλωνα', 'culture', 'Near Andritsaina', 84, 82, 37.4296358, 21.9002299, 6, 'remote monument trip', 'low', '€', 'morning', array['unesco', 'temple', 'route', 'remote']::text[], 'A serious detour, but the kind that makes the day feel bigger.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Temple_of_Apollo_Bassae_1982.jpg/1280px-Temple_of_Apollo_Bassae_1982.jpg', 6, 7, 4, 'active', 38, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Temple_of_Apollo_Bassae_1982.jpg/1280px-Temple_of_Apollo_Bassae_1982.jpg']::text[]),
+  ('bassae-inside', 'Bassae Route Stop', 'Διαδρομή Βάσσες', 'culture', 'Andritsaina route', 86, 84, 37.4318507, 21.899584, 4, 'deep culture route', 'low', '€', 'morning', array['temple', 'roadtrip', 'culture', 'quiet']::text[], 'For the roadtrip people who want something more than beach bars.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Bassae_Temple_of_Apollo_040911.jpg/1280px-Bassae_Temple_of_Apollo_040911.jpg', 4, 3, 2, 'active', 39, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Bassae_Temple_of_Apollo_040911.jpg/1280px-Bassae_Temple_of_Apollo_040911.jpg']::text[]),
+  ('ancient-elis', 'Ancient Elis', 'Αρχαία Ήλιδα', 'culture', 'Ilida', 51, 22, 37.8912912, 21.3735659, 5, 'ruins without crowds', 'low', '€', 'late afternoon', array['ancient', 'hidden', 'walk', 'quiet']::text[], 'Ancient site without the tourist pressure. Good quiet culture stop.', 'https://upload.wikimedia.org/wikipedia/commons/1/13/Elis_acropolis.JPG', 5, 5, 3, 'active', 40, 'published', array['https://upload.wikimedia.org/wikipedia/commons/1/13/Elis_acropolis.JPG']::text[]),
+  ('elis-agora', 'Elis Agora', 'Αγορά Αρχαίας Ήλιδας', 'culture', 'Ilida', 53, 24, 37.8898, 21.3748, 4, 'quiet archaeology', 'low', '€', 'morning', array['ancient', 'agora', 'quiet', 'culture']::text[], 'A calm archaeology stop for people who hate packed sites.', 'https://upload.wikimedia.org/wikipedia/commons/4/42/Elis_Agora.JPG', 4, 5, 2, 'active', 41, 'published', array['https://upload.wikimedia.org/wikipedia/commons/4/42/Elis_Agora.JPG']::text[]),
+  ('pyrgos-centre', 'Pyrgos Centre', 'Κέντρο Πύργου', 'local', 'Pyrgos', 38, 39, 37.6721814, 21.4439156, 8, 'local city movement', 'medium', '€', 'evening', array['city', 'coffee', 'local', 'cheap']::text[], 'Not a postcard. More like where the actual local week happens.', 'https://upload.wikimedia.org/wikipedia/commons/e/e8/Pyrgos_rathaus.jpg', 8, 7, 6, 'popular', 42, 'published', array['https://upload.wikimedia.org/wikipedia/commons/e/e8/Pyrgos_rathaus.jpg']::text[]),
+  ('pyrgos-night', 'Pyrgos Rex Corner', 'Πύργος Ρεξ', 'night', 'Pyrgos', 39, 41, 37.6712, 21.4418, 7, 'local night start', 'medium', '€', '22:00', array['city', 'night', 'bars', 'local']::text[], 'Start here, ask around, follow the night.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg/1280px-%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg', 7, 7, 5, 'popular', 43, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg/1280px-%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg']::text[]),
+  ('amaliada-square', 'Amaliada Square', 'Πλατεία Αμαλιάδας', 'local', 'Amaliada', 42, 26, 37.7979165, 21.3533588, 7, 'local coffee and pregame', 'medium', '€', '21:00', array['square', 'coffee', 'local', 'cheap']::text[], 'Coffee, pregame, local movement before Kourouta.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg/1280px-%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg', 7, 8, 5, 'popular', 44, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg/1280px-%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg']::text[]),
+  ('skafidia', 'Skafidia', 'Σκαφιδιά', 'beach', 'Skafidia', 21, 36, 37.698418, 21.3278037, 6, 'small coastal escape', 'medium', '€', 'late afternoon', array['beach', 'coast', 'sunset', 'chill']::text[], 'Smaller coastal energy near Pyrgos/Katakolo.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/3/32/%CE%A3%CE%BA%CE%B1%CF%86%CE%B9%CE%B4%CE%B9%CE%B1_%CE%B7%CE%BB%CE%B5%CE%B9%CE%B1%CF%82.jpg/1280px-%CE%A3%CE%BA%CE%B1%CF%86%CE%B9%CE%B4%CE%B9%CE%B1_%CE%B7%CE%BB%CE%B5%CE%B9%CE%B1%CF%82.jpg', 6, 5, 4, 'active', 45, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/3/32/%CE%A3%CE%BA%CE%B1%CF%86%CE%B9%CE%B4%CE%B9%CE%B1_%CE%B7%CE%BB%CE%B5%CE%B9%CE%B1%CF%82.jpg/1280px-%CE%A3%CE%BA%CE%B1%CF%86%CE%B9%CE%B4%CE%B9%CE%B1_%CE%B7%CE%BB%CE%B5%CE%B9%CE%B1%CF%82.jpg']::text[]),
+  ('skafidia-monastery', 'Skafidia Monastery', 'Μονή Σκαφιδιάς', 'culture', 'Skafidia', 29, 46, 37.7008192, 21.325745, 4, 'fortified monastery near the sea', 'low', 'free', 'morning', array['monastery', 'culture', 'coast', 'quiet']::text[], 'A compact culture stop near Skafidia, close enough to combine with the coast.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Monastery_of_Skafidia.JPG/1280px-Monastery_of_Skafidia.JPG', 4, 4, 2, 'active', 46, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Monastery_of_Skafidia.JPG/1280px-Monastery_of_Skafidia.JPG']::text[]),
+  ('korakochori', 'Korakochori', 'Κορακοχώρι', 'village', 'Pyrgos Coast', 27, 50, 37.6751019, 21.3144272, 4, 'coastal village between Katakolo and Pyrgos', 'low', '€', 'late afternoon', array['village', 'coast', 'quiet', 'wine']::text[], 'Small coastal village stop that anchors the Katakolo-to-Skafidia stretch.', 'https://visitkatakolon.gr/wp-content/uploads/2015/03/mercury.jpg', 4, 5, 2, 'active', 47, 'published', array['https://visitkatakolon.gr/wp-content/uploads/2015/03/mercury.jpg']::text[]),
+  ('mercouri-estate', 'Mercouri Estate', 'Κτήμα Μερκούρη', 'food', 'Korakochori', 27, 50, 37.676717759856, 21.310256847083, 6, 'historic winery by the Katakolo coast', 'medium', '€€', 'morning tour', array['wine', 'estate', 'katakolo', 'food']::text[], 'Historic winery and estate near Korakochori, useful for a Katakolo/Olympia day that is not only ruins.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/%CE%9A%CF%84%CE%AE%CE%BC%CE%B1_%CE%9C%CE%B5%CF%81%CE%BA%CE%BF%CF%8D%CF%81%CE%B7_-_panoramio.jpg/1280px-%CE%9A%CF%84%CE%AE%CE%BC%CE%B1_%CE%9C%CE%B5%CF%81%CE%BA%CE%BF%CF%8D%CF%81%CE%B7_-_panoramio.jpg', 6, 5, 4, 'active', 48, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/%CE%9A%CF%84%CE%AE%CE%BC%CE%B1_%CE%9C%CE%B5%CF%81%CE%BA%CE%BF%CF%8D%CF%81%CE%B7_-_panoramio.jpg/1280px-%CE%9A%CF%84%CE%AE%CE%BC%CE%B1_%CE%9C%CE%B5%CF%81%CE%BA%CE%BF%CF%8D%CF%81%CE%B7_-_panoramio.jpg']::text[]),
+  ('lechaina-zacharo-flower', 'Wild Coastline', 'Άγρια Ακτογραμμή', 'nature', 'Ilia Coast', 20, 62, 37.63, 21.315, 5, 'raw beach nature', 'low', 'free', 'morning', array['wild', 'coast', 'nature', 'quiet']::text[], 'A raw coastal stretch for quiet walks, salt air, and finding your own spot.', 'https://thumb.wikimedia.org/wikipedia/commons/thumb/0/01/Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg/1280px-Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg', 5, 5, 3, 'active', 49, 'published', array['https://thumb.wikimedia.org/wikipedia/commons/thumb/0/01/Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg/1280px-Pancratium_Maritimum_Lechaina-Zaharo_beach_20140816.jpg']::text[]),
+  ('epitalio', 'Epitalio', 'Επιτάλιο', 'village', 'Alfeios Plain', 46, 57, 37.6270957, 21.4959889, 4, 'plain village near the Alfeios route', 'low', '€', 'evening', array['village', 'alfeios', 'local', 'route']::text[], 'A real local point south of Pyrgos that helps connect the city to the Zacharo side.', 'https://upload.wikimedia.org/wikipedia/commons/1/13/Elis_acropolis.JPG', 4, 5, 2, 'active', 50, 'published', array['https://upload.wikimedia.org/wikipedia/commons/1/13/Elis_acropolis.JPG']::text[])
 on conflict (id) do update set
     name = excluded.name,
     greek_name = excluded.greek_name,
@@ -89,7 +89,8 @@ on conflict (id) do update set
     recent_post_count = excluded.recent_post_count,
     status = excluded.status,
     sort_order = excluded.sort_order,
-    moderation_status = excluded.moderation_status;
+    moderation_status = excluded.moderation_status,
+    photos = excluded.photos;
 
 delete from public.place_avatars where place_id in ('ancient-olympia', 'olympia-stadium', 'olympia-museum', 'olympic-games-museum', 'katakolo-port', 'katakolo-sunset', 'katakolo-kiani-akti', 'kourouta-beach', 'kourouta-sunset', 'palouki-beach', 'agios-andreas', 'kyllini-beach', 'kyllini-harbor', 'kyllini-old-beach', 'arkoudi-beach', 'glyfa-beach', 'loutra-kyllinis', 'chlemoutsi', 'chlemoutsi-sea-view', 'vartholomio', 'gastouni', 'lechaina', 'pineios-reservoir', 'kaiafas-lake', 'kaiafas-sunset', 'zacharo-beach', 'kakovatos-beach', 'kakovatos-inland', 'giannitsochori', 'tholo-beach', 'samiko-acropolis', 'foloi-forest', 'foloi-deep', 'nemouta-waterfalls', 'nemouta-village', 'lampeia-divri', 'andritsaina', 'andritsaina-streets', 'bassae-temple', 'bassae-inside', 'ancient-elis', 'elis-agora', 'pyrgos-centre', 'pyrgos-night', 'amaliada-square', 'skafidia', 'skafidia-monastery', 'korakochori', 'mercouri-estate', 'lechaina-zacharo-flower', 'epitalio');
 
@@ -336,21 +337,234 @@ on conflict (route_id, position) do update set
     title = excluded.title,
     body = excluded.body;
 
-insert into public.stories (id, label, place_id, position, media_url, moderation_status)
+-- Development/demo fixtures, rendered into supabase/seed.sql after places.
+-- Source: 20260617161000; expiry contract: 20260907130000.
+-- Relative times intentionally keep local demo content visible after each reset.
+
+insert into public.stories (
+  id, label, place_id, position, kind, author_name, author_type, author_avatar_url,
+  media_url, caption, expires_after_hours, crowd, parking, condition, created_at, moderation_status
+)
 values
-  ('story-kourouta', 'Kourouta', 'kourouta-beach', 0, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg/1280px-%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg', 'published'),
-  ('story-zacharo', 'Zacharo', 'zacharo-beach', 1, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/500px_photo_%28255278229%29.jpeg/1280px-500px_photo_%28255278229%29.jpeg', 'published'),
-  ('story-olympia', 'Olympia', 'ancient-olympia', 2, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg', 'published'),
-  ('story-foloi', 'Foloi', 'foloi-forest', 3, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg', 'published'),
-  ('story-katakolo', 'Katakolo', 'katakolo-port', 4, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg', 'published'),
-  ('story-andritsaina', 'Andritsaina', 'andritsaina', 5, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Andritsaina_overview.jpg/1280px-Andritsaina_overview.jpg', 'published'),
-  ('story-kyllini', 'Kyllini', 'kyllini-beach', 6, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg/1280px-Aerial_view_of_Kyllini_Beach%2C_Greece_%2851224121780%29.jpg', 'published')
+  (
+    'story-kourouta', 'Kourouta', 'kourouta-beach', 0, 'report', 'Nikos', 'LOCAL',
+    'https://i.pravatar.cc/120?img=12', '/story-feature/kourouta-online-story.jpg',
+    'Filling up fast. Wind dropped, water is glassy. Parking already tight near the bars.',
+    6, 'high', 'tight', array['clean', 'calm']::text[], now() - interval '14 minutes', 'published'
+  ),
+  (
+    'story-kourouta-sunbeds', 'Kourouta', 'kourouta-beach', 1, 'beach_status', 'Maria', 'TOURIST',
+    'https://i.pravatar.cc/120?img=32', '/story-feature/kourouta-online-story.jpg',
+    'Sunbeds gone by 16:00. Free patch of sand left of the lifeguard tower.',
+    6, 'high', 'full', array[]::text[], now() - interval '52 minutes', 'published'
+  ),
+  (
+    'story-katakolo', 'Katakolo', 'katakolo-sunset', 2, 'photo', 'Eleni', 'EDITOR',
+    'https://i.pravatar.cc/120?img=47', '/story-feature/katakolo-sunset-online-story.jpg',
+    'Golden hour hitting the port lights. Walk the mole, not the promenade.',
+    24, null, null, array[]::text[], now() - interval '22 minutes', 'published'
+  ),
+  (
+    'story-olympia', 'Olympia', 'ancient-olympia', 3, 'editor_note', 'Eleni', 'EDITOR',
+    'https://i.pravatar.cc/120?img=47', '/story-feature/ancient-olympia-online-story.jpg',
+    'Go late afternoon. The light on the columns is the whole point. Skip midday.',
+    24, null, null, array[]::text[], now() - interval '35 minutes', 'published'
+  ),
+  (
+    'story-foloi', 'Foloi', 'foloi-forest', 4, 'editor_note', 'Nikos', 'LOCAL',
+    'https://i.pravatar.cc/120?img=12', '/story-feature/foloi-oak-forest-online-story.jpg',
+    'Bring water. No bins up here. Shade is unreal right now.',
+    24, null, null, array[]::text[], now() - interval '40 minutes', 'published'
+  ),
+  (
+    'story-kyllini', 'Kyllini', 'kyllini-beach', 5, 'beach_status', 'Andreas', 'BUSINESS',
+    'https://i.pravatar.cc/120?img=58', '/story-feature/kyllini-beach-online-story.jpg',
+    'Long open stretch, never feels packed. North end is the quieter bit.',
+    6, 'medium', 'easy', array['clean']::text[], now() - interval '70 minutes', 'published'
+  ),
+  (
+    'story-zacharo', 'Zacharo', 'zacharo-beach', 6, 'report', 'Nikos', 'LOCAL',
+    'https://i.pravatar.cc/120?img=12', '/story-feature/zacharo-sunset-online-story.jpg',
+    'Big sky, almost empty. Sand is hot, bring shoes. Sunset is the move.',
+    6, 'low', 'easy', array['quiet', 'clean']::text[], now() - interval '18 minutes', 'published'
+  ),
+  (
+    'story-andritsaina', 'Andritsaina', 'andritsaina', 7, 'editor_note', 'Eleni', 'EDITOR',
+    'https://i.pravatar.cc/120?img=47', '/story-feature/andritsaina-online-story.jpg',
+    'Cooler up here by evening. Stone lanes, slow food, cold beer.',
+    24, null, null, array[]::text[], now() - interval '95 minutes', 'published'
+  ),
+  (
+    'story-kakovatos', 'Kakovatos', 'kakovatos-beach', 8, 'report', 'Maria', 'TOURIST',
+    'https://i.pravatar.cc/120?img=32', '/story-feature/kakovatos-beach-online-story.jpg',
+    'Endless sand, barely anyone. The not-obvious-scene beach.',
+    6, 'low', 'easy', array['quiet']::text[], now() - interval '28 minutes', 'published'
+  ),
+  (
+    'story-kaiafas', 'Kaiafas', 'kaiafas-lake', 9, 'editor_note', 'Eleni', 'EDITOR',
+    'https://i.pravatar.cc/120?img=47', '/story-feature/kaiafas-lake-sunset-online-story.jpg',
+    'Pine, lake, and weird calm. Do the loop, then sunset ten minutes south.',
+    24, null, null, array[]::text[], now() - interval '110 minutes', 'published'
+  ),
+  (
+    'story-chlemoutsi', 'Chlemoutsi', 'chlemoutsi', 10, 'photo', 'Maria', 'TOURIST',
+    'https://i.pravatar.cc/120?img=32', '/story-feature/chlemoutsi-castle-online-story.jpg',
+    'Castle on the hill, Ionian on the horizon. Best at golden hour.',
+    24, null, null, array[]::text[], now() - interval '160 minutes', 'published'
+  )
 on conflict (id) do update set
-    label = excluded.label,
-    place_id = excluded.place_id,
-    position = excluded.position,
-    media_url = excluded.media_url,
-    moderation_status = excluded.moderation_status;
+  label = excluded.label,
+  place_id = excluded.place_id,
+  position = excluded.position,
+  kind = excluded.kind,
+  author_name = excluded.author_name,
+  author_type = excluded.author_type,
+  author_avatar_url = excluded.author_avatar_url,
+  media_url = excluded.media_url,
+  caption = excluded.caption,
+  expires_after_hours = excluded.expires_after_hours,
+  crowd = excluded.crowd,
+  parking = excluded.parking,
+  condition = excluded.condition,
+  created_at = excluded.created_at,
+  moderation_status = excluded.moderation_status,
+  updated_at = now();
+
+with seed_events (
+  id, place_id, title, host_name, host_avatar_url, host_type, starts_offset,
+  duration_min, category, vibe, price, capacity, description, tags,
+  seed_going_count, seed_maybe_count, hot, attendee_avatar_urls
+) as (
+  values
+    (
+      'meet-kourouta-sunset-swim', 'kourouta-beach', 'Sunset swim + paddleboards',
+      'Nikos P.', 'https://i.pravatar.cc/120?img=12', 'GUIDE', interval '2 hours',
+      120, 'beach', 'Chill & social', 'Free', null,
+      'Meet at the rocks, swim until golden hour, then beach snacks.',
+      array['beach', 'sunset', 'social']::text[], 12, 3, true,
+      array['https://i.pravatar.cc/80?img=20', 'https://i.pravatar.cc/80?img=21', 'https://i.pravatar.cc/80?img=22']::text[]
+    ),
+    (
+      'meet-amaliada-panigyri', 'amaliada-square', 'Village panigyri - live music till late',
+      'Eleni K.', 'https://i.pravatar.cc/120?img=5', 'LOCAL', interval '5 hours',
+      300, 'panigyri', 'Traditional & loud', 'Free', null,
+      'Annual feast in the square. Food, dancing, and a late local crowd.',
+      array['panigyri', 'music', 'village']::text[], 18, 4, true,
+      array['https://i.pravatar.cc/80?img=24', 'https://i.pravatar.cc/80?img=25', 'https://i.pravatar.cc/80?img=26']::text[]
+    ),
+    (
+      'meet-zacharo-sunset', 'zacharo-beach', 'Sunset watch + wine',
+      'Maria D.', 'https://i.pravatar.cc/120?img=32', 'LOCAL', interval '1 day 3 hours',
+      75, 'sunset', 'Quiet & warm', 'Free', 18,
+      'Bring something small to share. North access, quieter sand.',
+      array['sunset', 'quiet', 'beach']::text[], 7, 2, false,
+      array['https://i.pravatar.cc/80?img=27', 'https://i.pravatar.cc/80?img=28']::text[]
+    ),
+    (
+      'meet-foloi-cleanup', 'foloi-forest', 'Morning forest walk + cleanup',
+      'Sofia V.', 'https://i.pravatar.cc/120?img=45', 'LOCAL', interval '2 days 16 hours',
+      90, 'cleanup', 'Useful & calm', 'Free', null,
+      'Easy shaded loop. Bring water; bags are provided.',
+      array['forest', 'cleanup', 'walk']::text[], 5, 1, false,
+      array['https://i.pravatar.cc/80?img=29', 'https://i.pravatar.cc/80?img=30']::text[]
+    ),
+    (
+      'meet-katakolo-coffee', 'katakolo-port', 'Coffee & tips - new in town?',
+      'Lucas', 'https://i.pravatar.cc/120?img=14', 'TOURIST', interval '3 days 10 hours',
+      60, 'social', 'Friendly', 'Coffee', 16,
+      'Locals answer questions, visitors swap plans, no pressure.',
+      array['coffee', 'tips', 'port']::text[], 4, 3, false,
+      array['https://i.pravatar.cc/80?img=31', 'https://i.pravatar.cc/80?img=32']::text[]
+    ),
+    (
+      'meet-pyrgos-night', 'pyrgos-night', 'Live DJ set on the deck',
+      'Taverna Kostas', 'https://i.pravatar.cc/120?img=51', 'BUSINESS', interval '4 days 4 hours',
+      240, 'music', 'Dancey', 'EUR 5', 36,
+      'Local selectors, sundown to midnight. Kitchen open late.',
+      array['music', 'night', 'local']::text[], 16, 5, true,
+      array['https://i.pravatar.cc/80?img=33', 'https://i.pravatar.cc/80?img=34', 'https://i.pravatar.cc/80?img=35']::text[]
+    )
+)
+insert into public.meet_events (
+  id, place_id, title, host_name, host_avatar_url, host_type, starts_at, duration_min,
+  category, vibe, price, capacity, description, cover_url, tags, seed_going_count,
+  seed_maybe_count, going_count, maybe_count, hot, attendee_avatar_urls, moderation_status
+)
+select
+  seed_events.id,
+  seed_events.place_id,
+  seed_events.title,
+  seed_events.host_name,
+  seed_events.host_avatar_url,
+  seed_events.host_type,
+  now() + seed_events.starts_offset,
+  seed_events.duration_min,
+  seed_events.category,
+  seed_events.vibe,
+  seed_events.price,
+  seed_events.capacity,
+  seed_events.description,
+  places.image_url,
+  seed_events.tags,
+  seed_events.seed_going_count,
+  seed_events.seed_maybe_count,
+  seed_events.seed_going_count,
+  seed_events.seed_maybe_count,
+  seed_events.hot,
+  seed_events.attendee_avatar_urls,
+  'published'
+from seed_events
+join public.places on places.id = seed_events.place_id
+on conflict (id) do update set
+  place_id = excluded.place_id,
+  title = excluded.title,
+  host_name = excluded.host_name,
+  host_avatar_url = excluded.host_avatar_url,
+  host_type = excluded.host_type,
+  starts_at = excluded.starts_at,
+  duration_min = excluded.duration_min,
+  category = excluded.category,
+  vibe = excluded.vibe,
+  price = excluded.price,
+  capacity = excluded.capacity,
+  description = excluded.description,
+  cover_url = excluded.cover_url,
+  tags = excluded.tags,
+  seed_going_count = excluded.seed_going_count,
+  seed_maybe_count = excluded.seed_maybe_count,
+  going_count = excluded.seed_going_count + (select count(*) from public.event_rsvps where event_id = excluded.id and status = 'going'),
+  maybe_count = excluded.seed_maybe_count + (select count(*) from public.event_rsvps where event_id = excluded.id and status = 'maybe'),
+  hot = excluded.hot,
+  attendee_avatar_urls = excluded.attendee_avatar_urls,
+  moderation_status = excluded.moderation_status,
+  updated_at = now();
+
+
+update public.cultural_events c
+set place_id = links.place_id
+from (values
+  ('municipal-2026-saske-kyllini', 'kyllini-harbor'),
+  ('municipal-2026-anthestiria-gastouni', 'gastouni'),
+  ('municipal-2026-ilida-revue', 'ancient-elis'),
+  ('municipal-2026-ilida-antigone', 'ancient-elis'),
+  ('municipal-2026-ilida-full-moon', 'ancient-elis')
+) as links(event_id, place_id)
+where c.id = links.event_id and c.place_id is null;
+
+insert into auth.users (id, aud, role, email, encrypted_password, banned_until,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values
+  ('00000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated',
+   'seed-reader-a@hleias.invalid', '', 'infinity', '{}', '{"display_name":"Seed reader A"}', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('00000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated',
+   'seed-reader-b@hleias.invalid', '', 'infinity', '{}', '{"display_name":"Seed reader B"}', '2026-01-01T00:00:01Z', '2026-01-01T00:00:01Z'),
+  ('00000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated',
+   'seed-owner@hleias.invalid', '', 'infinity', '{}', '{"display_name":"Inert local owner"}', '2026-01-01T00:00:02Z', '2026-01-01T00:00:02Z')
+on conflict (id) do nothing;
+
+insert into public.admin_members (user_id, role)
+values ('00000000-0000-4000-8000-000000000003', 'owner')
+on conflict (user_id) do nothing;
 
 insert into public.vibe_chips (id, label, position)
 values

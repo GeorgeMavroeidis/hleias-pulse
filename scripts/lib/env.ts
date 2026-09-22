@@ -14,12 +14,15 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 /**
- * Read `name` from `.env`, falling back to the real environment.
+ * Explicit process settings override `.env`. Local recovery never reads `.env`.
  *
  * Deliberately a hand-rolled parser rather than a dotenv dependency: these are
  * dev-only scripts and `.env` here holds one flat `KEY=value` per line.
  */
 export function readEnvValue(name: string) {
+  if (process.env.HLEIAS_LOCAL_ONLY === "1" || process.env[name] !== undefined) {
+    return process.env[name];
+  }
   try {
     const env = readFileSync(".env", "utf8");
     const value = env
@@ -61,6 +64,16 @@ export const projectRef = readEnvValue("SUPABASE_PROJECT_REF") ?? PRODUCTION_PRO
  * (which grants it directly).
  */
 export function assertTargetIsSafeForCI() {
+  if (process.env.HLEIAS_LOCAL_ONLY === "1") {
+    const url = new URL(process.env.SUPABASE_URL ?? "https://invalid.invalid");
+    if (
+      projectRef !== "local" ||
+      !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) ||
+      !["127.0.0.1", "localhost", "::1"].includes(process.env.SUPABASE_DB_HOST ?? "")
+    ) {
+      throw new Error("Local recovery requires loopback API and database targets and ref=local.");
+    }
+  }
   if (!process.env.CI) return;
   if (projectRef === PRODUCTION_PROJECT_REF) {
     throw new Error(
@@ -125,6 +138,10 @@ export function readServiceRoleKey() {
       );
     }
     return fromEnv;
+  }
+
+  if (process.env.HLEIAS_LOCAL_ONLY === "1") {
+    throw new Error("Local service key missing; refusing to look up hosted credentials.");
   }
 
   const output = execFileSync(

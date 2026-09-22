@@ -65,6 +65,10 @@
       "searchPath": "search_path=public"
     },
     {
+      "name": "refresh_generic_stories",
+      "searchPath": "search_path=public"
+    },
+    {
       "name": "refresh_meet_event_rsvp_counts",
       "searchPath": "search_path=public"
     },
@@ -103,386 +107,185 @@
     {
       "name": "private.refresh_push_outbox_status",
       "searchPath": "search_path=\"\""
+    },
+    {
+      "name": "private.write_route_stop_audit_log",
+      "searchPath": "search_path=public"
     }
   ],
   "grants": {
     "admin_audit_logs": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ]
     },
     "admin_members": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "authors": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ]
     },
     "businesses": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "comments": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "content_reports": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
-        "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "cultural_event_likes": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ]
     },
     "cultural_events": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "deal_redemptions": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "event_rsvps": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "events": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ]
     },
     "meet_events": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "organizers": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "place_avatars": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "place_business_profiles": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "places": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "post_likes": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ]
     },
     "posts": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "profiles": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
-        "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
@@ -496,222 +299,93 @@
     },
     "route_stops": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "routes": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "saved_items": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ]
     },
     "stories": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "story_views": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "user_activity_days": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
-        "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "user_blocks": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "user_place_visits": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ]
     },
     "user_preferences": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
         "DELETE",
         "INSERT",
-        "REFERENCES",
         "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
         "UPDATE"
       ]
     },
     "user_security_events": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
-      ],
       "authenticated": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ]
     },
     "vibe_chips": {
       "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ],
       "authenticated": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
-        "SELECT",
-        "TRIGGER",
-        "TRUNCATE",
-        "UPDATE"
+        "SELECT"
       ]
     }
   },
@@ -1032,6 +706,9 @@
       ],
       "SELECT": [
         "Users can read own story views [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own story views [authenticated]"
       ]
     },
     "user_activity_days": {
@@ -1040,6 +717,9 @@
       ],
       "SELECT": [
         "Users can read own activity days [authenticated]"
+      ],
+      "UPDATE": [
+        "Users can update own activity days [authenticated]"
       ]
     },
     "user_blocks": {
@@ -1052,10 +732,10 @@
         "Users can delete own place visits [authenticated]"
       ],
       "INSERT": [
-        "Users can create own place visits [public]"
+        "Users can create own place visits [authenticated]"
       ],
       "SELECT": [
-        "Users can read own place visits [public]"
+        "Users can read own place visits [authenticated]"
       ]
     },
     "user_preferences": {

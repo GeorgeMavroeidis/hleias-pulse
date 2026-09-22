@@ -1609,7 +1609,9 @@ export async function setPlaceDeal(
   }
   const result = await client.rpc("set_place_deal", {
     claim_id: claimId,
-    deal_text: trimmed,
+    // The RPC canonicalizes an empty string to NULL. Keep its generated
+    // PostgreSQL `text` argument type instead of hand-editing generated types.
+    deal_text: trimmed ?? "",
     deal_active: dealActive,
   });
   if (result.error) throw result.error;
