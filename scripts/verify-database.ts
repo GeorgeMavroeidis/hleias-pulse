@@ -118,6 +118,7 @@ for (const script of [
   "smoke:admin",
   "smoke:verification-guards",
   "smoke:routes",
+  "smoke:saved-items",
   "smoke:push-security",
 ])
   run(script, env);
