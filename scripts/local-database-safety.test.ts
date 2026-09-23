@@ -6,12 +6,13 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 
 const envModule = resolve("scripts/lib/env.ts");
+const clientModule = resolve("src/lib/supabase/client.ts");
 const tsx = resolve("node_modules/tsx/dist/cli.mjs");
-function evaluate(code: string, env: NodeJS.ProcessEnv = {}, dotenv = "") {
+function evaluate(code: string, env: NodeJS.ProcessEnv = {}, dotenv = "", module = envModule) {
   const cwd = mkdtempSync(`${tmpdir()}/hleias-env-test-`);
   try {
     writeFileSync(`${cwd}/.env`, dotenv);
-    return spawnSync(process.execPath, [tsx, "-e", code.replaceAll("$MODULE", envModule)], {
+    return spawnSync(process.execPath, [tsx, "-e", code.replaceAll("$MODULE", module)], {
       cwd,
       encoding: "utf8",
       env: {
@@ -60,6 +61,34 @@ test("missing local service key fails without hosted key discovery", () => {
   const result = evaluate(`import {readServiceRoleKey} from '$MODULE'; readServiceRoleKey();`);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /refusing to look up hosted credentials/);
+});
+
+test("a destructive smoke refuses an unwrapped production default", () => {
+  const result = evaluate(
+    `import {assertSmokeTargetIsLocal} from '$MODULE'; assertSmokeTargetIsLocal();`,
+    { HLEIAS_LOCAL_ONLY: "0", SUPABASE_PROJECT_REF: "kfxfnqryfmuxiwlswyyn" },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /disposable local stack/);
+});
+
+test("local mode never falls back to the application's production client", () => {
+  const result = evaluate(
+    `import {readSupabaseClientConfig} from '$MODULE'; readSupabaseClientConfig();`,
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /local publishable key/);
+});
+
+test("the app singleton refuses a hosted URL in local smoke mode", () => {
+  const result = evaluate(
+    `import '$MODULE';`,
+    { SUPABASE_URL: "https://live.invalid", SUPABASE_PUBLISHABLE_KEY: "test-only-key" },
+    "",
+    clientModule,
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /explicit loopback URL/);
 });
 
 test("explicit environment overrides .env outside recovery too", () => {

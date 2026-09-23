@@ -48,7 +48,7 @@
  *                        real reviewer would pass every negative test above and
  *                        be useless.
  *
- * Needs the local Supabase CLI session (service_role key, to create the
+ * Needs a disposable local Supabase stack (service_role key, to create the
  * disposable users) and SUPABASE_DB_PASSWORD, like the other smokes. Everything
  * it creates is removed in a `finally`.
  *

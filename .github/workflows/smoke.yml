@@ -26,8 +26,7 @@
 #
 # WHAT IT DOES NOT CHECK: the local stack has no connection pooler, so every
 # script gets session semantics whichever mode it asked for. See the fidelity
-# note in scripts/lib/pg.ts — running the suite against the hosted project from
-# a maintainer's machine is still worth doing before anything ships.
+# note in scripts/lib/pg.ts. Destructive smokes only accept local targets.
 #
 # WHY A SEPARATE WORKFLOW FROM ci.yml. It is slower (the stack takes a minute or
 # two to boot) and it needs Docker, so keeping it beside the fast build check

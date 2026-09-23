@@ -34,7 +34,7 @@
  * admin-authored, so there is no user content behind that; it is a curation
  * wrinkle, not a leak.
  *
- * Needs the local Supabase CLI session (service_role key, to create the two
+ * Needs a disposable local Supabase stack (service_role key, to create the two
  * disposable users) and SUPABASE_DB_PASSWORD, like the other smokes. Everything
  * it creates is removed in a `finally`.
  *
@@ -160,42 +160,50 @@ async function main() {
     // callback would fail on the duplicate key rather than the original
     // connection error, hiding what actually went wrong.
     await db.once(async (client) => {
-      // Cleanup deletes the disposable owner, cascading into admin_members and
-      // firing prevent_last_owner_removal(). Refuse to start if ours would be
-      // the only owner left, or cleanup would wedge.
-      const owners = await client.query<{ count: number }>(
-        "select count(*)::int as count from public.admin_members where role = 'owner'",
-      );
-      assert(
-        (owners.rows[0]?.count ?? 0) >= 1,
-        "This project has no existing admin owner. Adding a disposable one would make it " +
-          "the last owner, and prevent_last_owner_removal() would then block cleanup.",
-      );
-      await client.query("insert into public.admin_members (user_id, role) values ($1, 'owner')", [
-        state.users.owner,
-      ]);
+      await client.query("begin");
+      try {
+        // Cleanup deletes the disposable owner, cascading into admin_members and
+        // firing prevent_last_owner_removal(). Refuse to start if ours would be
+        // the only owner left, or cleanup would wedge.
+        const owners = await client.query<{ count: number }>(
+          "select count(*)::int as count from public.admin_members where role = 'owner'",
+        );
+        assert(
+          (owners.rows[0]?.count ?? 0) >= 1,
+          "This project has no existing admin owner. Adding a disposable one would make it " +
+            "the last owner, and prevent_last_owner_removal() would then block cleanup.",
+        );
+        await client.query(
+          "insert into public.admin_members (user_id, role) values ($1, 'owner')",
+          [state.users.owner],
+        );
 
-      const author = await client.query<{ id: string }>("select id from public.authors limit 1");
-      assert(author.rowCount, "No author available for the fixture route.");
-      authorId = author.rows[0].id;
+        const author = await client.query<{ id: string }>("select id from public.authors limit 1");
+        assert(author.rowCount, "No author available for the fixture route.");
+        authorId = author.rows[0].id;
 
-      const places = await client.query<{ id: string }>(
-        "select id from public.places where moderation_status = 'published' order by id limit 2",
-      );
-      assert(places.rowCount === 2, "Need two published places for the fixture stops.");
-      existingPlaces = places.rows.map((row) => row.id);
+        const places = await client.query<{ id: string }>(
+          "select id from public.places where moderation_status = 'published' order by id limit 2",
+        );
+        assert(places.rowCount === 2, "Need two published places for the fixture stops.");
+        existingPlaces = places.rows.map((row) => row.id);
 
-      // A disposable place, so the ON DELETE RESTRICT assertion can try to
-      // delete something real without touching curated content.
-      await client.query(
-        `insert into public.places
+        // A disposable place, so the ON DELETE RESTRICT assertion can try to
+        // delete something real without touching curated content.
+        await client.query(
+          `insert into public.places
            (id, name, greek_name, type, area, x, y, lat, lng, pulse, mood, crowd, budget,
             best_time, short, image_url, hotness, status, moderation_status)
          values ($1, 'Routes smoke place', 'Δοκιμαστικό σημείο', 'beach', 'Smoke', 0, 0,
                  37.67, 21.44, 0, 'test', 'empty', 'free', 'never', 'Disposable fixture.',
                  '', 0, 'quiet', 'pending')`,
-        [PLACE_ID],
-      );
+          [PLACE_ID],
+        );
+        await client.query("commit");
+      } catch (error) {
+        await client.query("rollback").catch(() => {});
+        throw error;
+      }
     });
     console.log("[fixture] disposable owner promoted, disposable place created");
 
