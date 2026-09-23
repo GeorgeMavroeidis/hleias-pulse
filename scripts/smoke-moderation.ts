@@ -32,8 +32,8 @@
  *   unmuteUser()       is kind-scoped: it must not clear a block
  *   unblockUser()      removes the row
  *
- * Needs the local Supabase CLI session (service_role key, to create the two
- * disposable users) and SUPABASE_DB_PASSWORD, like the other smokes. Everything
+ * Needs a disposable local Supabase stack (service_role key, to create the two
+ * disposable users) and its local Postgres password. Everything
  * it creates is removed in a `finally`.
  *
  *   npm run smoke:moderation

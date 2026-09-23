@@ -32,12 +32,17 @@ async function createUser(
   url: string,
   publishableKey: string,
   label: string,
+  createdIds: string[],
+  createdEmails: string[],
 ): Promise<UserFixture> {
   const email = `push-smoke-${label}-${suffix}@example.invalid`;
+  createdEmails.push(email);
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
   if (created.error || !created.data.user) {
     throw new Error(`create ${label}: ${created.error?.message ?? "no user returned"}`);
   }
+  // Record the account before sign-in: a later auth failure must still remove it.
+  createdIds.push(created.data.user.id);
 
   const client = createClient(url, publishableKey, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
@@ -59,22 +64,29 @@ async function setupContent(
   ownerId: string,
   unrelatedId: string,
 ): Promise<void> {
-  const author = await client.query<{ id: string }>("select id from public.authors limit 1");
-  const place = await client.query<{ id: string }>("select id from public.places limit 1");
-  assert(author.rowCount && place.rowCount, "seed must contain an author and place");
+  await client.query("begin");
+  try {
+    const author = await client.query<{ id: string }>("select id from public.authors limit 1");
+    const place = await client.query<{ id: string }>("select id from public.places limit 1");
+    assert(author.rowCount && place.rowCount, "seed must contain an author and place");
 
-  for (const [id, userId, moderationStatus] of [
-    [questionId, ownerId, "published"],
-    [unrelatedQuestionId, unrelatedId, "published"],
-  ] as const) {
-    await client.query(
-      `insert into public.posts
+    for (const [id, userId, moderationStatus] of [
+      [questionId, ownerId, "published"],
+      [unrelatedQuestionId, unrelatedId, "published"],
+    ] as const) {
+      await client.query(
+        `insert into public.posts
          (id, author_id, place_id, kind, display_time, text, image_url,
           user_id, profile_id, author_kind, moderation_status)
        values ($1, $2, $3, 'question', 'now', 'push security fixture', '',
                $4, $4, 'user', $5)`,
-      [id, author.rows[0].id, place.rows[0].id, userId, moderationStatus],
-    );
+        [id, author.rows[0].id, place.rows[0].id, userId, moderationStatus],
+      );
+    }
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
   }
 }
 
@@ -94,14 +106,35 @@ async function main() {
   const db = createPgSession("session", "push-smoke-admin");
   const claimA = await connectGuarded("session", "push-claim-a");
   const claimB = await connectGuarded("session", "push-claim-b");
-  const users: UserFixture[] = [];
+  const createdIds: string[] = [];
+  const createdEmails: string[] = [];
   const commentIds: string[] = [];
 
   try {
-    const owner = await createUser(adminApi, url, publishableKey, "owner");
-    const answerer = await createUser(adminApi, url, publishableKey, "answerer");
-    const unrelated = await createUser(adminApi, url, publishableKey, "unrelated");
-    users.push(owner, answerer, unrelated);
+    const owner = await createUser(
+      adminApi,
+      url,
+      publishableKey,
+      "owner",
+      createdIds,
+      createdEmails,
+    );
+    const answerer = await createUser(
+      adminApi,
+      url,
+      publishableKey,
+      "answerer",
+      createdIds,
+      createdEmails,
+    );
+    const unrelated = await createUser(
+      adminApi,
+      url,
+      publishableKey,
+      "unrelated",
+      createdIds,
+      createdEmails,
+    );
 
     await db.once((client) => setupContent(client, owner.id, unrelated.id));
 
@@ -568,9 +601,10 @@ async function main() {
         await client.query("delete from public.posts where id = any($1::text[])", [
           [questionId, unrelatedQuestionId],
         ]);
-        for (const user of users) {
-          await client.query("delete from auth.users where id = $1", [user.id]);
+        for (const id of createdIds) {
+          await client.query("delete from auth.users where id = $1", [id]);
         }
+        await client.query("delete from auth.users where email = any($1::text[])", [createdEmails]);
       })
       .catch((error) => console.error("push security fixture cleanup failed", error));
     await db.close();

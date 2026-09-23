@@ -280,15 +280,13 @@ _(real scripts, from package.json)_
 
 **Which of these run offline.** `lint`, `check:secrets`, `typecheck`,
 `test:intelligence`, `test:discovery`, `test:map-visuals` and `build` need nothing
-— that is exactly the set CI runs. An unwrapped `smoke:*` command defaults to the
-live Supabase project, creates real rows/users, and cleans up in a `finally`.
-Several also shell out to `npx supabase … api-keys` for a `service_role` key from
-your local CLI session, and `smoke:admin` / `smoke:block-enforcement` /
+— that is exactly the set fast CI runs. Destructive `smoke:*` commands now refuse
+to run unless the local-only wrapper supplies loopback targets and the disposable
+stack's credentials. They never discover a hosted `service_role` key.
+`smoke:admin` / `smoke:block-enforcement` /
 `smoke:deal-race` / `smoke:moderation` / `smoke:routes` /
 `smoke:verification-guards` / `audit:rls` additionally need
-`SUPABASE_DB_PASSWORD` in `.env` for a direct `pg` connection — via the pooler
-(`aws-0-eu-central-1.pooler.supabase.com`, user `postgres.<ref>`), because this
-project has no `db.<ref>.supabase.co` direct host.
+`SUPABASE_DB_PASSWORD` from local `supabase status` for direct `pg` access.
 
 **Use `npm run supabase:local -- <script>` for a local stack.** It reads only
 loopback credentials from `supabase status` and refuses linked/remote targets.
@@ -296,10 +294,9 @@ In CI, `.github/workflows/smoke.yml` runs `db:verify` against a throwaway stack,
 rebuilding twice from migrations and seed. Nothing about that touches the live
 project, and no real credential is involved. `assertTargetIsSafeForCI()` and the
 local-only wrapper both fail closed on a hosted target.
-What CI cannot check is pooler behaviour: the local stack has no pooler, so every
-script gets session semantics whichever mode it asked for (see the fidelity note
-in `scripts/lib/pg.ts`). Running the suite against the hosted project by hand is
-still worth doing before anything ships.
+What CI cannot check is hosted pooler behaviour: the local stack has no pooler,
+so every script gets session semantics whichever mode it asked for (see the
+fidelity note in `scripts/lib/pg.ts`).
 
 ## Where things stand
 

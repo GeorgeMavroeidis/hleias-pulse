@@ -6,11 +6,9 @@
  * PR #58 it was pasted into three of the eight `pg` scripts and the other five
  * silently kept the bug. One copy, imported everywhere, is the actual fix.
  *
- * Nothing here is secret. The publishable key is public by design; the
- * service_role key is never stored — it is read from the maintainer's own
- * logged-in Supabase CLI session at run time.
+ * Nothing here is secret. The publishable key is public by design; destructive
+ * smokes receive the disposable stack's service_role key from local status.
  */
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 /**
@@ -38,15 +36,12 @@ export function readEnvValue(name: string) {
 }
 
 /**
- * The live project these scripts point at unless told otherwise.
- *
- * Kept as the default on purpose: a maintainer running a smoke script on their
- * own machine means the real database, and having to set three variables first
- * would just get skipped.
+ * The live project reference is retained for read-only preflight and explicit,
+ * approval-gated provisioning. Destructive smokes reject this target.
  */
 export const PRODUCTION_PROJECT_REF = "kfxfnqryfmuxiwlswyyn";
 
-/** Which project the scripts act on. Override to point CI at its own project. */
+/** Which project a non-smoke script acts on. Local smokes require ref=local. */
 export const projectRef = readEnvValue("SUPABASE_PROJECT_REF") ?? PRODUCTION_PROJECT_REF;
 
 /**
@@ -87,50 +82,35 @@ export function assertTargetIsSafeForCI() {
   }
 }
 
-/**
- * Scrape the URL and publishable key out of the app's own client module, so a
- * smoke script can never drift onto a different project than the app uses.
- */
-export function readSupabaseClientConfig() {
-  // Env first, so CI can be pointed at its own project. Falling back to the
-  // app's own client module keeps a local run on exactly the project the app
-  // uses, with no chance of drifting onto a different one.
-  const envUrl = readEnvValue("SUPABASE_URL");
-  const envKey = readEnvValue("SUPABASE_PUBLISHABLE_KEY");
-  if (envUrl && envKey) return { publishableKey: envKey, url: envUrl };
-
-  const source = readFileSync("src/lib/supabase/client.ts", "utf8");
-  // Matches the production constants, not the resolved values: since the client
-  // module gained a Node-only override, `supabaseUrl` there is an expression
-  // rather than a literal. These two are still the project the app ships with.
-  const url = source.match(/const productionUrl = "([^"]+)"/)?.[1];
-  const publishableKey = source.match(/const productionPublishableKey\s*=\s*"([^"]+)"/)?.[1];
-
-  if (!url || !publishableKey) {
-    throw new Error("Could not read Supabase URL/publishable key from src/lib/supabase/client.ts.");
+/** Destructive acceptance tests must be launched with status-derived local settings. */
+export function assertSmokeTargetIsLocal() {
+  if (process.env.HLEIAS_LOCAL_ONLY !== "1") {
+    throw new Error("Smoke tests require the disposable local stack; use npm run supabase:local.");
   }
+  assertTargetIsSafeForCI();
+}
 
+/** The local URL and publishable key, supplied together by `supabase status`. */
+export function readSupabaseClientConfig() {
+  assertSmokeTargetIsLocal();
+  const url = process.env.SUPABASE_URL;
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !publishableKey) {
+    throw new Error("Local smoke target requires both a loopback URL and local publishable key.");
+  }
   return { publishableKey, url };
 }
 
 /**
- * The service_role key, from the environment first and the local Supabase CLI
- * session second.
+ * The disposable local stack's service_role key, from the wrapper environment.
  *
- * It is never written to disk — a service_role key bypasses every RLS policy,
- * so committing one would hand over the database.
- *
- * The environment branch exists because CI has no logged-in Supabase CLI
- * session, so the `npx supabase projects api-keys` path below cannot work
- * there. Without this, adding the key to GitHub Actions secrets would not be
- * enough to make the smoke suite runnable in CI — every script would still
- * fail trying to shell out. Locally the CLI path stays the default, so nobody
- * has to keep a copy of the key in their `.env`.
+ * It is never written to disk or looked up from a hosted project. A service_role
+ * key bypasses RLS, so the smoke runner only accepts a loopback target.
  */
 export function readServiceRoleKey() {
-  assertTargetIsSafeForCI();
+  assertSmokeTargetIsLocal();
 
-  const fromEnv = readEnvValue("SUPABASE_SERVICE_ROLE_KEY");
+  const fromEnv = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (fromEnv) {
     if (fromEnv.length < 100) {
       throw new Error(
@@ -140,29 +120,5 @@ export function readServiceRoleKey() {
     return fromEnv;
   }
 
-  if (process.env.HLEIAS_LOCAL_ONLY === "1") {
-    throw new Error("Local service key missing; refusing to look up hosted credentials.");
-  }
-
-  const output = execFileSync(
-    "npx",
-    ["supabase", "projects", "api-keys", "--project-ref", projectRef, "--output", "json"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const parsed = JSON.parse(output);
-  const keys = Array.isArray(parsed) ? parsed : (parsed.api_keys ?? parsed.keys ?? []);
-  const serviceRole = keys.find((key: Record<string, unknown>) => {
-    const name = String(key.name ?? key.api_key_type ?? key.type ?? key.key_type ?? "");
-    return name === "service_role";
-  });
-  const value = serviceRole?.api_key ?? serviceRole?.key ?? serviceRole?.value;
-
-  if (typeof value !== "string" || value.length < 100) {
-    throw new Error(
-      "Could not read Supabase service_role key. Either sign in to the Supabase CLI " +
-        "(`npx supabase login`) or set SUPABASE_SERVICE_ROLE_KEY in the environment.",
-    );
-  }
-
-  return value;
+  throw new Error("Local service key missing; refusing to look up hosted credentials.");
 }

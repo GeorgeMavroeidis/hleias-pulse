@@ -54,8 +54,8 @@ npm run supabase:local -- audit:rls --check
 
 The local wrapper reads addresses/credentials from `supabase status`, requires
 loopback addresses, and ignores `.env`, including any hosted database password.
-Run the wrapper even outside CI. Unwrapped historical smoke scripts still default
-to the hosted project and create/delete records there.
+Run the wrapper even outside CI. Unwrapped destructive smoke scripts now fail
+before connecting to any database.
 
 To discard **this local project's** containers and persisted data before a clean
 restart (only when those local data are disposable):

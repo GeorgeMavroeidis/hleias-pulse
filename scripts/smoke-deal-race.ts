@@ -27,11 +27,17 @@
  *
  *   npm run smoke:deal-race
  */
+import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
 
+import { assertSmokeTargetIsLocal, readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
+import { cleanupAll } from "./lib/cleanup";
 import { connectGuarded, createPgSession, endQuietly } from "./lib/pg";
 
-const CODE = `RACE${Math.floor(Math.random() * 90 + 10)}`;
+assertSmokeTargetIsLocal();
+
+const CODE = `RACE${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
 
 /** Run the rest of this transaction as `authenticated` with auth.uid() = userId. */
 async function actAs(client: pg.Client, userId: string) {
@@ -41,21 +47,34 @@ async function actAs(client: pg.Client, userId: string) {
   await client.query("set local role authenticated");
 }
 
+async function waitForBlockedRedeemer(
+  admin: ReturnType<typeof createPgSession>,
+  backendPid: number,
+  finished: () => boolean,
+) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    if (finished()) throw new Error("B finished before waiting on A's row lock.");
+    const wait = await admin.withPg((client) =>
+      client.query<{ wait_event_type: string | null }>(
+        "select wait_event_type from pg_stat_activity where pid = $1",
+        [backendPid],
+      ),
+    );
+    if (wait.rows[0]?.wait_event_type === "Lock") return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("B did not reach A's row lock within 10 seconds.");
+}
+
 type Fixture = { businessId: string; claimId: string; ownerId: string; placeId: string };
 
-async function setup(admin: pg.Client): Promise<Fixture> {
-  // An auth user who does not already own a business (businesses.user_id is
-  // unique), and a place with no live claim (place_business_profiles has a
-  // partial unique index on place_id where status <> 'rejected').
-  const owner = await admin.query<{ id: string }>(`
-    select u.id from auth.users u
-    where not exists (select 1 from public.businesses b where b.user_id = u.id)
-    limit 1
-  `);
-  if (!owner.rowCount)
-    throw new Error("No auth user available that does not already own a business.");
-
-  const place = await admin.query<{ id: string }>(`
+async function setup(admin: pg.Client, ownerId: string): Promise<Fixture> {
+  await admin.query("begin");
+  try {
+    // A committed seed place is read-only support for this fixture. The owner,
+    // business, claim and code all belong to this test.
+    const place = await admin.query<{ id: string }>(`
     select p.id from public.places p
     where not exists (
       select 1 from public.place_business_profiles c
@@ -63,43 +82,53 @@ async function setup(admin: pg.Client): Promise<Fixture> {
     )
     limit 1
   `);
-  if (!place.rowCount) throw new Error("No unclaimed place available for the fixture.");
+    if (!place.rowCount) throw new Error("No unclaimed place available for the fixture.");
 
-  const ownerId = owner.rows[0].id;
-  const placeId = place.rows[0].id;
+    const placeId = place.rows[0].id;
 
-  // Inserted verified outright. prevent_business_self_verification() is a
-  // BEFORE UPDATE trigger, so it does not fire here — and this is the postgres
-  // role setting up a fixture, not a user escalating themselves.
-  const business = await admin.query<{ id: string }>(
-    `insert into public.businesses (user_id, display_name, verification_status)
+    // Inserted verified outright. prevent_business_self_verification() is a
+    // BEFORE UPDATE trigger, so it does not fire here — and this is the postgres
+    // role setting up a fixture, not a user escalating themselves.
+    const business = await admin.query<{ id: string }>(
+      `insert into public.businesses (user_id, display_name, verification_status)
      values ($1, 'Deal race fixture', 'verified') returning id`,
-    [ownerId],
-  );
-  const businessId = business.rows[0].id;
+      [ownerId],
+    );
+    const businessId = business.rows[0].id;
 
-  const claim = await admin.query<{ id: string }>(
-    `insert into public.place_business_profiles
+    const claim = await admin.query<{ id: string }>(
+      `insert into public.place_business_profiles
        (place_id, business_id, status, deal_text, deal_active)
      values ($1, $2, 'approved', 'Fixture deal', true) returning id`,
-    [placeId, businessId],
-  );
-  const claimId = claim.rows[0].id;
+      [placeId, businessId],
+    );
+    const claimId = claim.rows[0].id;
 
-  await admin.query(
-    `insert into public.deal_redemptions
+    await admin.query(
+      `insert into public.deal_redemptions
        (profile_claim_id, place_id, business_id, code, user_id, expires_at)
      values ($1, $2, $3, $4, $5, now() + interval '1 hour')`,
-    [claimId, placeId, businessId, CODE, ownerId],
-  );
+      [claimId, placeId, businessId, CODE, ownerId],
+    );
 
-  return { businessId, claimId, ownerId, placeId };
+    await admin.query("commit");
+    return { businessId, claimId, ownerId, placeId };
+  } catch (error) {
+    await admin.query("rollback").catch(() => {});
+    throw error;
+  }
 }
 
-async function teardown(admin: pg.Client, fixture: Fixture | null) {
-  if (!fixture) return;
+async function teardown(admin: pg.Client, ownerId: string | undefined) {
+  if (!ownerId) return;
+  const owned = await admin.query<{ id: string }>(
+    "select id from public.businesses where user_id = $1",
+    [ownerId],
+  );
+  const businessId = owned.rows[0]?.id;
+  if (!businessId) return;
   // deal_redemptions and place_business_profiles both cascade from businesses.
-  await admin.query("delete from public.businesses where id = $1", [fixture.businessId]);
+  await admin.query("delete from public.businesses where id = $1", [businessId]);
 
   // 20260907120000 put an audit trigger on businesses, and this fixture trips
   // it twice: once on insert, because it is created already 'verified' rather
@@ -110,7 +139,7 @@ async function teardown(admin: pg.Client, fixture: Fixture | null) {
   // has not been written yet.
   await admin.query(
     "delete from public.admin_audit_logs where entity_type = 'businesses' and entity_id = $1",
-    [fixture.businessId],
+    [businessId],
   );
 }
 
@@ -130,11 +159,26 @@ async function main() {
     connectGuarded("session", "a"),
     connectGuarded("session", "b"),
   ]);
+  const { url } = readSupabaseClientConfig();
+  const authAdmin = createClient(url, readServiceRoleKey(), {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+  });
+  const ownerEmail = `deal-race-${randomUUID()}@smoke.invalid`;
+  let ownerId: string | undefined;
   let fixture: Fixture | null = null;
+  let testFailure: unknown;
 
   try {
+    const created = await authAdmin.auth.admin.createUser({
+      email: ownerEmail,
+      password: `Smoke-${randomUUID()}-Aa1!`,
+      email_confirm: true,
+    });
+    if (created.error) throw new Error(`Creating deal fixture owner: ${created.error.message}`);
+    ownerId = created.data.user?.id;
+    if (!ownerId) throw new Error("Auth did not return the deal fixture owner ID.");
     // `once`, not `withPg`: setup inserts rows and is not safe to replay.
-    fixture = await admin.once(setup);
+    fixture = await admin.once((client) => setup(client, ownerId!));
 
     // --- A redeems and holds the lock ------------------------------------
     await a.query("begin");
@@ -148,8 +192,11 @@ async function main() {
     // --- B redeems the same code and blocks on A -------------------------
     await b.query("begin");
     await actAs(b, fixture.ownerId);
+    const backendPid = (await b.query<{ pid: number }>("select pg_backend_pid() as pid")).rows[0]
+      .pid;
     let secondError: string | null = null;
     let secondSucceeded = false;
+    let secondFinished = false;
     const bDone = b
       .query("select public.redeem_deal_code($1)", [CODE])
       .then(() => {
@@ -157,17 +204,14 @@ async function main() {
       })
       .catch((error: unknown) => {
         secondError = error instanceof Error ? error.message : String(error);
+      })
+      .finally(() => {
+        secondFinished = true;
       });
 
-    // Give B time to reach the lock. If it has already finished here, it never
-    // blocked at all, which is itself the bug.
-    await new Promise((resolve) => setTimeout(resolve, 750));
-    if (secondSucceeded || secondError) {
-      throw new Error(
-        `B did not block on A's row lock (succeeded=${secondSucceeded}, error=${secondError}). ` +
-          "The redemption is not taking a lock at all.",
-      );
-    }
+    // Observe PostgreSQL's lock wait, instead of relying on a fixed sleep that
+    // can race with a busy CI runner before B reaches the UPDATE.
+    await waitForBlockedRedeemer(admin, backendPid, () => secondFinished);
 
     await a.query("commit");
     await bDone;
@@ -211,18 +255,31 @@ async function main() {
         2,
       ),
     );
+  } catch (error) {
+    testFailure = error;
+    throw error;
   } finally {
     // Release the row locks first, so teardown's delete is not blocked by them.
     await a.query("rollback").catch(() => {});
     await b.query("rollback").catch(() => {});
-    // A delete, so replaying it on a fresh connection is safe.
-    await admin
-      .withPg((client) => teardown(client, fixture))
-      .catch((error) => {
-        console.error("Fixture cleanup failed — remove it by hand:", fixture, error);
-      });
-    await admin.close();
-    await endQuietly(a, b);
+    try {
+      await cleanupAll(
+        [
+          ["deal fixture", () => admin.withPg((client) => teardown(client, ownerId))],
+          [
+            "deal owner",
+            () =>
+              admin.withPg((client) =>
+                client.query("delete from auth.users where email = $1", [ownerEmail]),
+              ),
+          ],
+        ],
+        testFailure,
+      );
+    } finally {
+      await admin.close();
+      await endQuietly(a, b);
+    }
   }
 }
 
