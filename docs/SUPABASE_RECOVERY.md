@@ -98,12 +98,25 @@ npm run supabase:generate-seed
 npx --no-install supabase gen types --lang typescript --local --schema public > /tmp/hleias-database.types.ts
 npx --no-install prettier --write /tmp/hleias-database.types.ts --config .prettierrc
 cp /tmp/hleias-database.types.ts src/lib/supabase/database.types.ts
-npm run supabase:local -- audit:rls
+npm run supabase:local -- audit:rls --write
+# Review the displayed diff and the migration that explains each change.
+npm run supabase:local -- audit:rls --write --accept=PASTE_REVIEW_DIGEST
 npm run db:verify
 ```
 
-Review the policy diff with its migration; never refresh the snapshot just to
-make a failed check green.
+The first write command only previews a line-oriented diff and exits with an
+error. Acceptance requires the exact digest printed for that diff, an actual
+local Supabase Docker database, and cannot
+use a loopback SSH tunnel. Review the policy diff with its migration; never
+refresh the snapshot just to make a failed check green. The default `audit:rls`
+invocation intentionally does nothing; specify `--check` or `--write`.
+
+`db:verify` also refuses to start while its configured database port is already
+in use. Stop a legitimate local stack before invoking it. This prevents the
+CLI from sending initialization or reset SQL through a loopback SSH tunnel. If
+the port is needed by another service, use an isolated checkout with a unique
+Supabase project ID and unused ports in its temporary `config.toml`; restore
+the committed config after verification.
 
 ## Production and migration-history audit (2026-09-20 through 2026-09-22)
 
@@ -133,14 +146,15 @@ The route-stop audit trigger and redemption cleanup FKs were also invalid when
 exercised from a clean stack. These differences are all represented by the new
 forward migration; no historical migration was edited.
 
-The new migration is intentionally **pending** in production. It converges those
+At the time of that audit, the new migration was **pending** in production. It converges those
 catalog objects, declares API table/RPC grants explicitly, removes legacy
 `TRUNCATE/REFERENCES/TRIGGER` and implicit function privileges, adds the two
 upsert UPDATE policies, repairs the route-stop audit trigger, and makes deal
 cleanup cascades explicit. Service-role access is declared; private push queues
 and the route-stop trigger function remain inaccessible directly. The reviewed
-snapshot records this target schema, so it should differ from live until an
-independently approved deployment applies the migration.
+snapshot records this target schema. A read-only ledger check on 2026-09-24
+confirmed `20260920193000` is now applied in production. The later
+`20260924110000` default-function privilege migration remains local only.
 
 To repeat a live inventory, use an explicitly read-only session and query only
 metadata; compare the returned version **and name** with `supabase/migrations`:

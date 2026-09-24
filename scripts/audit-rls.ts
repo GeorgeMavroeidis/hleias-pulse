@@ -1,286 +1,359 @@
-/**
- * Snapshot the live security posture of the client-facing `public` schema and
- * the locked `private` schema, and diff it.
- *
- * Why this exists: on 2026-09-05 an audit found that meet_events had carried
- * two INSERT policies since August. A migration had tried to retire the old one
- * and dropped the wrong policy name; a second migration repeated the same wrong
- * name. `drop policy if exists` on a name that does not exist is a silent
- * no-op, so both attempts did nothing and the table quietly kept a policy that
- * let any authenticated user publish straight past moderation.
- *
- * Nothing caught it because nothing recorded what the policies were supposed to
- * be. Reconstructing that took reading all 24 migrations by hand. This turns
- * that reconstruction into a file: a table silently gaining a second INSERT
- * policy shows up as one added line in a reviewable diff.
- *
- * It captures three things, because all three are load-bearing:
- *
- *   1. RLS enabled, per table. Anything false is an open door.
- *   2. Every policy, per table, per command.
- *   3. Table grants to anon and authenticated. This is the one people skip, and
- *      it is why the policies matter so much here: Supabase's default
- *      privileges hand `anon` a blanket SELECT on tables our migrations never
- *      granted it, so RLS is the ONLY thing keeping content_reports,
- *      user_blocks, admin_members and deal_redemptions shut. Every policy slip
- *      is instantly public. The snapshot should make that obvious rather than
- *      leave it as folklore.
- *
- * Plus the SECURITY DEFINER function inventory, since a definer function that
- * loses its explicit search_path is its own privilege-escalation route.
- *
- *   npm run audit:rls            # write supabase/policy-snapshot.json
- *   npm run audit:rls -- --check # exit 1 if live state has drifted from it
- *   npm run audit:rls -- --check --scope=push
- *                                # compare only the P0 push trust boundary
- *
- * Needs SUPABASE_DB_PASSWORD (.env or environment), like the smoke scripts.
- * CI runs the push-scoped check against its disposable local stack; the full
- * check remains the production preflight gate.
- */
-import { readFileSync, writeFileSync } from "node:fs";
+/** Snapshot the API-facing security catalogue. Generate only from a fresh local stack. */
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import pg from "pg";
-
+import { readEnvValue } from "./lib/env";
 import { createPgSession } from "./lib/pg";
 
-const SNAPSHOT_PATH = "supabase/policy-snapshot.json";
-
+const PATH = "supabase/policy-snapshot.json";
+type Row = Record<string, unknown>;
 type Snapshot = {
-  definerFunctions: { name: string; searchPath: string | null }[];
-  grants: Record<string, Record<string, string[]>>;
-  policies: Record<string, Record<string, string[]>>;
-  rlsDisabled: string[];
-  tables: string[];
+  version: number;
+  publicRelations: Row[];
+  privateRelations: Row[];
+  publicPolicies: Row[];
+  privatePolicies: Row[];
+  publicFunctions: Row[];
+  privateFunctions: Row[];
+  otherPrivilegedFunctions: Row[];
+  storageBuckets: Row[];
+  storageObjects: Row[];
+  storagePolicies: Row[];
+  defaultPrivileges: Row[];
 };
 
-const PUSH_DEFINER_FUNCTIONS = new Set([
-  "claim_push_delivery_batch",
-  "complete_push_delivery",
-  "prepare_push_delivery",
-  "private.enforce_push_subscription_endpoint",
-  "private.enqueue_published_question_answer",
-  "private.invoke_push_worker",
-  "private.refresh_push_outbox_status",
-]);
+// Direct catalogue ACLs include PUBLIC and privileges inherited from PostgreSQL
+// defaults. information_schema.role_table_grants silently omits some of these.
+const acl = (value: string, owner: string, kind: string) => `
+  select coalesce(r.rolname, 'PUBLIC') as grantee,
+         pg_get_userbyid(a.grantor) as grantor,
+         a.privilege_type as privilege, a.is_grantable as grantable
+  from aclexplode(coalesce(${value}, acldefault(${kind.length === 1 ? `'${kind}'` : kind}, ${owner}))) a
+  left join pg_roles r on r.oid = a.grantee
+  order by grantee, privilege, grantable, grantor`;
 
-function isPushTable(table: string) {
-  return table === "push_subscriptions" || table.startsWith("private.push_notification_");
-}
-
-/**
- * Local bootstrap intentionally differs from the production-wide snapshot in
- * legacy, unrelated objects. The P0 CI gate therefore compares only the trust
- * boundary this change owns; the default audit remains a full production
- * posture comparison for rollout preflight.
- */
-function pushScope(snapshot: Snapshot): Snapshot {
-  return {
-    definerFunctions: snapshot.definerFunctions.filter(({ name }) =>
-      PUSH_DEFINER_FUNCTIONS.has(name),
-    ),
-    grants: Object.fromEntries(
-      Object.entries(snapshot.grants).filter(([table]) => isPushTable(table)),
-    ),
-    policies: Object.fromEntries(
-      Object.entries(snapshot.policies).filter(([table]) => isPushTable(table)),
-    ),
-    rlsDisabled: snapshot.rlsDisabled.filter(isPushTable),
-    tables: snapshot.tables.filter(isPushTable),
-  };
+async function rows(client: pg.Client, sql: string): Promise<Row[]> {
+  return (await client.query<Row>(sql)).rows;
 }
 
 async function collect(client: pg.Client): Promise<Snapshot> {
-  const tables = await client.query<{
-    relname: string;
-    relrowsecurity: boolean;
-    schema_name: string;
-  }>(`
-    select n.nspname as schema_name, c.relname, c.relrowsecurity
-    from pg_class c
-    join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname in ('public', 'private') and c.relkind in ('r', 'p')
-    order by case when n.nspname = 'public' then 0 else 1 end, c.relname
-  `);
-
-  const policies = await client.query<{
-    cmd: string;
-    permissive: string;
-    policyname: string;
-    roles: string;
-    schemaname: string;
-    tablename: string;
-  }>(`
-    select schemaname, tablename, policyname, cmd, permissive, array_to_string(roles, ',') as roles
-    from pg_policies
-    where schemaname in ('public', 'private')
-    order by case when schemaname = 'public' then 0 else 1 end, tablename, cmd, policyname
-  `);
-
-  // Client roles matter for the public schema. service_role is included as
-  // well because the private queue intentionally denies even direct table
-  // access to the worker; it must go through the narrow RPC surface.
-  const grants = await client.query<{
-    grantee: string;
-    privilege_type: string;
-    table_schema: string;
-    table_name: string;
-  }>(`
-    select table_schema, table_name, grantee, privilege_type
-    from information_schema.role_table_grants
-    where (table_schema = 'public' and grantee in ('anon', 'authenticated'))
-       or (table_schema = 'private' and grantee in ('anon', 'authenticated', 'service_role'))
-    order by case when table_schema = 'public' then 0 else 1 end,
-             table_name, grantee, privilege_type
-  `);
-
-  const definer = await client.query<{
-    name: string;
-    schema_name: string;
-    search_path: string | null;
-  }>(`
-    select n.nspname as schema_name, p.proname as name,
-           (select cfg from unnest(coalesce(p.proconfig, '{}')) cfg
-             where cfg like 'search_path=%' limit 1) as search_path
-    from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname in ('public', 'private') and p.prosecdef
-    order by case when n.nspname = 'public' then 0 else 1 end, p.proname
-  `);
-
-  const policyMap: Snapshot["policies"] = {};
-  for (const row of policies.rows) {
-    const table =
-      row.schemaname === "public" ? row.tablename : `${row.schemaname}.${row.tablename}`;
-    const byCmd = (policyMap[table] ??= {});
-    (byCmd[row.cmd] ??= []).push(
-      `${row.policyname} [${row.roles}]${row.permissive === "PERMISSIVE" ? "" : " RESTRICTIVE"}`,
+  await client.query("begin transaction isolation level repeatable read read only");
+  try {
+    const relationsSql = (schema: string) => `
+      select c.relname as name,
+             case c.relkind when 'r' then 'table' when 'p' then 'partitioned table'
+               when 'f' then 'foreign table' when 'v' then 'view' else 'materialized view' end as kind,
+             pg_get_userbyid(c.relowner) as owner,
+             case when c.relkind in ('r','p') then c.relrowsecurity else null end as "rlsEnabled",
+             case when c.relkind in ('r','p') then c.relforcerowsecurity else null end as "rlsForced",
+             c.reloptions as options,
+             case when c.relkind in ('v','m') then pg_get_viewdef(c.oid, true) else null end as definition,
+             coalesce((select jsonb_agg(to_jsonb(g) order by g.grantee, g.privilege, g.grantor) from lateral
+               (${acl("c.relacl", "c.relowner", "r")}) g), '[]'::jsonb) as grants
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = '${schema}' and c.relkind in ('r','p','f','v','m')
+      order by c.relname`;
+    const publicRelations = await rows(client, relationsSql("public"));
+    const privateRelations = await rows(client, relationsSql("private"));
+    const policiesSql = (schema: string) => `
+      select tablename as relation, policyname as name, cmd as command,
+             permissive, array(select role::text from unnest(roles) role order by role) as roles,
+             qual as "using", with_check as "withCheck"
+      from pg_policies where schemaname = '${schema}'
+      order by tablename, policyname`;
+    const publicPolicies = await rows(client, policiesSql("public"));
+    const privatePolicies = await rows(client, policiesSql("private"));
+    const functionsSql = (schema: string) => `
+      select format('%I.%I(%s)', n.nspname, p.proname,
+                    pg_get_function_identity_arguments(p.oid)) as signature,
+             case p.prokind when 'p' then 'procedure' else 'function' end as kind,
+             pg_get_function_arguments(p.oid) as arguments,
+             pg_get_userbyid(p.proowner) as owner,
+             p.prosecdef as "securityDefiner",
+             (select substr(cfg, length('search_path=') + 1)
+                from unnest(p.proconfig) cfg where cfg like 'search_path=%' limit 1) as "searchPath",
+             coalesce((select jsonb_agg(to_jsonb(g) order by g.grantee, g.privilege, g.grantor) from lateral
+               (${acl("p.proacl", "p.proowner", "f")}) g), '[]'::jsonb) as "executeGrants",
+             case when p.prosecdef then pg_get_functiondef(p.oid) else null end as definition
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = '${schema}' and p.prokind in ('f', 'p')
+      order by signature`;
+    const publicFunctions = await rows(client, functionsSql("public"));
+    const privateFunctions = await rows(client, functionsSql("private"));
+    const otherPrivilegedFunctions = await rows(
+      client,
+      `select format('%I.%I(%s)', n.nspname, p.proname,
+                     pg_get_function_identity_arguments(p.oid)) as signature,
+              case p.prokind when 'p' then 'procedure' else 'function' end as kind,
+              pg_get_function_arguments(p.oid) as arguments,
+              pg_get_userbyid(p.proowner) as owner,
+              p.prosecdef as "securityDefiner",
+              (select substr(cfg, length('search_path=') + 1)
+                 from unnest(p.proconfig) cfg where cfg like 'search_path=%' limit 1) as "searchPath",
+              coalesce((select jsonb_agg(to_jsonb(g) order by g.grantee, g.privilege, g.grantor)
+                        from lateral (${acl("p.proacl", "p.proowner", "f")}) g), '[]'::jsonb) as "executeGrants",
+              pg_get_functiondef(p.oid) as definition
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where p.prosecdef and n.nspname not in ('public', 'pg_catalog', 'information_schema')
+         and n.nspname <> 'private'
+         and n.nspname not like 'pg_%'
+       order by signature`,
     );
+    const storageBuckets = await rows(
+      client,
+      `
+      select id, name, public, file_size_limit as "fileSizeLimit",
+             allowed_mime_types as "allowedMimeTypes"
+      from storage.buckets order by id`,
+    );
+    const storageObjects = await rows(
+      client,
+      `
+      select c.relrowsecurity as "rlsEnabled", c.relforcerowsecurity as "rlsForced",
+             coalesce((select jsonb_agg(to_jsonb(g) order by g.grantee, g.privilege, g.grantor) from lateral
+               (${acl("c.relacl", "c.relowner", "r")}) g), '[]'::jsonb) as grants
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'storage' and c.relname = 'objects'`,
+    );
+    const storagePolicies = await rows(
+      client,
+      `
+      select tablename as relation, policyname as name, cmd as command,
+             permissive, array(select role::text from unnest(roles) role order by role) as roles,
+             qual as "using", with_check as "withCheck"
+      from pg_policies where schemaname = 'storage' and tablename = 'objects'
+      order by tablename, policyname`,
+    );
+    const defaultPrivileges = await rows(
+      client,
+      `
+      select pg_get_userbyid(d.defaclrole) as owner, n.nspname as schema,
+             case d.defaclobjtype when 'r' then 'tables' else 'functions' end as "objectType",
+             coalesce((select jsonb_agg(to_jsonb(g) order by g.grantee, g.privilege, g.grantor) from lateral
+               (${acl("d.defaclacl", "d.defaclrole", "d.defaclobjtype")}) g), '[]'::jsonb) as grants
+      from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace
+      where d.defaclobjtype in ('r','f') and (d.defaclnamespace = 0 or n.nspname = 'public')
+      order by owner, schema nulls first, "objectType"`,
+    );
+    await client.query("commit");
+    const readable = ({ definition, ...f }: Row) => ({
+      ...f,
+      ...(typeof definition === "string"
+        ? { definitionLines: definition.replace(/\r\n?/g, "\n").trimEnd().split("\n") }
+        : {}),
+    });
+    return {
+      version: 4,
+      publicRelations,
+      privateRelations,
+      publicPolicies,
+      privatePolicies,
+      publicFunctions: publicFunctions.map(readable),
+      privateFunctions: privateFunctions.map(readable),
+      otherPrivilegedFunctions: otherPrivilegedFunctions.map(readable),
+      storageBuckets,
+      storageObjects,
+      storagePolicies,
+      defaultPrivileges,
+    };
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
   }
-
-  const grantMap: Snapshot["grants"] = {};
-  for (const row of grants.rows) {
-    const table =
-      row.table_schema === "public" ? row.table_name : `${row.table_schema}.${row.table_name}`;
-    const byGrantee = (grantMap[table] ??= {});
-    (byGrantee[row.grantee] ??= []).push(row.privilege_type);
-  }
-
-  return {
-    definerFunctions: definer.rows.map((row) => ({
-      name: row.schema_name === "public" ? row.name : `${row.schema_name}.${row.name}`,
-      searchPath: row.search_path,
-    })),
-    grants: grantMap,
-    policies: policyMap,
-    rlsDisabled: tables.rows
-      .filter((row) => !row.relrowsecurity)
-      .map((row) =>
-        row.schema_name === "public" ? row.relname : `${row.schema_name}.${row.relname}`,
-      ),
-    tables: tables.rows.map((row) =>
-      row.schema_name === "public" ? row.relname : `${row.schema_name}.${row.relname}`,
-    ),
-  };
 }
 
-/** Human-readable, line-oriented, so a diff points at the thing that changed. */
-function render(snapshot: Snapshot) {
-  return `${JSON.stringify(snapshot, null, 2)}\n`;
+function unifiedDiff(before: string, after: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "rls-audit-"));
+  try {
+    const oldPath = join(dir, "committed");
+    const newPath = join(dir, "database");
+    writeFileSync(oldPath, before);
+    writeFileSync(newPath, after);
+    try {
+      return execFileSync(
+        "diff",
+        ["-u", "--label", "committed baseline", "--label", "database state", oldPath, newPath],
+        { encoding: "utf8" },
+      );
+    } catch (error) {
+      return (error as { stdout?: string }).stdout ?? String(error);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function changeSummary(expectedText: string, current: Snapshot): string {
+  let expected: Snapshot;
+  try {
+    expected = JSON.parse(expectedText) as Snapshot;
+  } catch {
+    return "Existing snapshot is missing or not valid JSON; inspect the full diff.";
+  }
+  if (expected.version !== current.version)
+    return `Snapshot format: v${expected.version ?? "legacy"} → v${current.version}; inspect the full diff.`;
+  const sections: { name: keyof Snapshot; id: (row: Row) => string }[] = [
+    { name: "publicRelations", id: (r) => String(r.name) },
+    { name: "privateRelations", id: (r) => String(r.name) },
+    { name: "publicPolicies", id: (r) => `${r.relation} / ${r.name}` },
+    { name: "privatePolicies", id: (r) => `${r.relation} / ${r.name}` },
+    { name: "publicFunctions", id: (r) => String(r.signature) },
+    { name: "privateFunctions", id: (r) => String(r.signature) },
+    { name: "otherPrivilegedFunctions", id: (r) => String(r.signature) },
+    { name: "storageBuckets", id: (r) => String(r.id) },
+    { name: "storagePolicies", id: (r) => `${r.relation} / ${r.name}` },
+    {
+      name: "defaultPrivileges",
+      id: (r) => `${r.owner} / ${r.schema ?? "global"} / ${r.objectType}`,
+    },
+  ];
+  const lines: string[] = [];
+  for (const section of sections) {
+    const before = new Map((expected[section.name] as Row[]).map((r) => [section.id(r), r]));
+    const after = new Map((current[section.name] as Row[]).map((r) => [section.id(r), r]));
+    for (const id of [...new Set([...before.keys(), ...after.keys()])].sort()) {
+      const old = before.get(id);
+      const next = after.get(id);
+      if (!old) lines.push(`+ ${section.name}: ${id}`);
+      else if (!next) lines.push(`- ${section.name}: ${id}`);
+      else if (JSON.stringify(old) !== JSON.stringify(next)) {
+        const fields = [...new Set([...Object.keys(old), ...Object.keys(next)])].filter(
+          (key) => JSON.stringify(old[key]) !== JSON.stringify(next[key]),
+        );
+        lines.push(`~ ${section.name}: ${id} (${fields.join(", ")})`);
+      }
+    }
+  }
+  if (JSON.stringify(expected.storageObjects) !== JSON.stringify(current.storageObjects))
+    lines.push("~ storageObjects (RLS or grants)");
+  return lines.length ? `Changed objects:\n${lines.join("\n")}\n` : "";
+}
+
+/** A loopback address may be an SSH tunnel. Prove it is the Docker database. */
+async function assertLocalDockerDatabase(client: pg.Client) {
+  const port = Number(readEnvValue("SUPABASE_DB_PORT") ?? "54322");
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new Error("A valid local SUPABASE_DB_PORT is required for snapshot writes.");
+  const connected = (
+    await client.query<{ system_identifier: string }>(
+      "select system_identifier from pg_control_system()",
+    )
+  ).rows[0]?.system_identifier;
+  const names = execFileSync(
+    "docker",
+    ["ps", "--filter", `publish=${port}`, "--format", "{{.Names}}"],
+    { encoding: "utf8" },
+  )
+    .trim()
+    .split("\n");
+  for (const name of names.filter((n) => n.startsWith("supabase_db_"))) {
+    const dockerId = execFileSync(
+      "docker",
+      [
+        "exec",
+        name,
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "postgres",
+        "-Atqc",
+        "select system_identifier from pg_control_system()",
+      ],
+      { encoding: "utf8" },
+    ).trim();
+    if (dockerId === connected) return;
+  }
+  throw new Error(
+    `Port ${port} does not reach its local Supabase Docker database. Check for an SSH tunnel or port conflict.`,
+  );
 }
 
 async function main() {
   const check = process.argv.includes("--check");
-  const scopeArgument = process.argv.find((argument) => argument.startsWith("--scope="));
-  if (scopeArgument && scopeArgument !== "--scope=push") {
-    throw new Error(`Unsupported audit scope: ${scopeArgument.slice("--scope=".length)}`);
-  }
-  const scopedToPush = scopeArgument === "--scope=push";
-  // Session mode: read-only introspection, but this script has always used
-  // 5432 and there is no reason to move it. The session's value here is the
-  // guarded connection — a drop used to kill the process with a raw stack
-  // trace instead of a readable failure.
-  const db = createPgSession("session", "audit-rls");
+  const write = process.argv.includes("--write");
+  const acceptance = process.argv.find((arg) => arg.startsWith("--accept"));
+  if (check === write || (acceptance && (!write || !/^--accept=[a-f0-9]{64}$/.test(acceptance))))
+    throw new Error(
+      "Use --check or --write [--accept=<review digest>]. --write previews the diff.",
+    );
+  if (
+    write &&
+    (!["127.0.0.1", "localhost", "::1"].includes(readEnvValue("SUPABASE_DB_HOST") ?? "") ||
+      readEnvValue("SUPABASE_PROJECT_REF") !== "local")
+  )
+    throw new Error(
+      "Snapshot writes require SUPABASE_DB_HOST=127.0.0.1 and SUPABASE_PROJECT_REF=local.",
+    );
 
+  const db = createPgSession("session", "audit-rls");
   let snapshot: Snapshot;
   try {
-    snapshot = await db.withPg(collect);
+    snapshot = await db.withPg(async (client) => {
+      if (write) await assertLocalDockerDatabase(client);
+      return collect(client);
+    });
   } finally {
     await db.close();
   }
-
-  const rendered = render(snapshot);
-
-  // A table with RLS off, or one with no policy at all, is a finding on its
-  // own — loud, whether or not the snapshot matches.
-  const unprotected = snapshot.tables.filter(
-    (table) => !table.startsWith("private.") && !snapshot.policies[table],
+  const badTables = snapshot.publicRelations.filter(
+    (r) => (r.kind === "table" || r.kind === "partitioned table") && !r.rlsEnabled,
   );
-  const privateGrants = Object.keys(snapshot.grants).filter((table) =>
-    table.startsWith("private."),
+  const badFunctions = [...snapshot.publicFunctions, ...snapshot.privateFunctions].filter(
+    (f) => f.securityDefiner && f.searchPath === null,
   );
-  if (snapshot.rlsDisabled.length || unprotected.length || privateGrants.length) {
-    console.error("RLS COVERAGE FAILURE");
-    if (snapshot.rlsDisabled.length) {
-      console.error(`  RLS disabled: ${snapshot.rlsDisabled.join(", ")}`);
-    }
-    if (unprotected.length) {
-      console.error(`  No policy at all: ${unprotected.join(", ")}`);
-    }
-    if (privateGrants.length) {
-      console.error(`  Client/service grants on private tables: ${privateGrants.join(", ")}`);
-    }
-    process.exit(1);
-  }
-
-  if (!check) {
-    writeFileSync(SNAPSHOT_PATH, rendered);
-    const policyCount = Object.values(snapshot.policies).reduce(
-      (total, byCmd) => total + Object.values(byCmd).reduce((n, list) => n + list.length, 0),
-      0,
+  if (
+    badTables.length ||
+    badFunctions.length ||
+    snapshot.storageObjects.length !== 1 ||
+    !snapshot.storageObjects[0].rlsEnabled
+  )
+    throw new Error(
+      [
+        ...badTables.map((r) => `RLS disabled: public.${r.name}`),
+        ...badFunctions.map((f) => `SECURITY DEFINER missing search_path: ${f.signature}`),
+        ...(!snapshot.storageObjects[0]?.rlsEnabled
+          ? ["RLS disabled or missing: storage.objects"]
+          : []),
+      ].join("\n"),
     );
-    console.log(
-      `Wrote ${SNAPSHOT_PATH}: ${snapshot.tables.length} tables, ${policyCount} policies, ` +
-        `${snapshot.definerFunctions.length} SECURITY DEFINER functions.`,
-    );
-    return;
-  }
 
-  let expected: string;
+  const current = `${JSON.stringify(snapshot, null, 2)}\n`;
+  let expected = "";
   try {
-    expected = readFileSync(SNAPSHOT_PATH, "utf8");
+    expected = readFileSync(PATH, "utf8");
   } catch {
-    console.error(`${SNAPSHOT_PATH} does not exist yet. Run \`npm run audit:rls\` to create it.`);
-    process.exit(1);
+    /* first baseline */
+  }
+  if (expected === current) {
+    console.log(`Security state matches ${PATH}.`);
     return;
   }
-
-  const expectedSnapshot = JSON.parse(expected) as Snapshot;
-  const expectedForComparison = render(
-    scopedToPush ? pushScope(expectedSnapshot) : expectedSnapshot,
-  );
-  const actualForComparison = render(scopedToPush ? pushScope(snapshot) : snapshot);
-  const scopeLabel = scopedToPush ? "push security scope in " : "";
-
-  if (expectedForComparison === actualForComparison) {
-    console.log(`Live policy state matches ${scopeLabel}${SNAPSHOT_PATH}.`);
-    return;
+  console.error(changeSummary(expected, snapshot));
+  console.error(unifiedDiff(expected, current));
+  const digest = createHash("sha256").update(expected).update("\0").update(current).digest("hex");
+  if (check) {
+    console.error(
+      "Security baseline drift. Review the diff and migrations; never accept hosted state as baseline.",
+    );
+    process.exitCode = 1;
+  } else if (acceptance === `--accept=${digest}`) {
+    writeFileSync(PATH, current);
+    console.log(`Accepted local migration state in ${PATH}.`);
+  } else if (acceptance) {
+    throw new Error("Review digest does not match this diff; preview and inspect it again.");
+  } else {
+    console.error(
+      `Preview only. Review the diff, then run --write --accept=${digest} on the fresh local database.`,
+    );
+    process.exitCode = 1;
   }
-
-  console.error(`Live policy state has DRIFTED from ${scopeLabel}${SNAPSHOT_PATH}.`);
-  const before = expectedForComparison.split("\n");
-  const after = actualForComparison.split("\n");
-  const seen = new Set(before);
-  const gone = new Set(after);
-  for (const line of after) if (!seen.has(line)) console.error(`  + ${line.trim()}`);
-  for (const line of before) if (!gone.has(line)) console.error(`  - ${line.trim()}`);
-  console.error(
-    "\nIf this is intentional, re-run `npm run audit:rls` and commit the snapshot " +
-      "with the migration that caused it.",
-  );
-  process.exit(1);
 }
 
 main().catch((error) => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });
