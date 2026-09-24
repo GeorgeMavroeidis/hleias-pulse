@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { createServer } from "node:net";
 import pg from "pg";
 import { format, resolveConfig } from "prettier";
 import { databaseCatalog, fixtureIdentities } from "./lib/database-catalog";
@@ -68,6 +69,24 @@ async function catalog(env: NodeJS.ProcessEnv, fixtures = false) {
 }
 
 console.log("[verify] Start disposable local Supabase");
+// A loopback listener can be an SSH tunnel to production. The CLI may run
+// initialization SQL before reporting a port collision, so check first.
+const config = readFileSync("supabase/config.toml", "utf8");
+const dbSection = config.split(/^\[db\]\s*$/m)[1]?.split(/^\[/m)[0];
+const dbPort = Number(dbSection?.match(/^port\s*=\s*(\d+)/m)?.[1]);
+assert(Number.isInteger(dbPort) && dbPort > 0 && dbPort < 65536, "Cannot read local DB port");
+await new Promise<void>((resolve, reject) => {
+  const listener = createServer();
+  listener.once("error", () =>
+    reject(
+      new Error(
+        `Local DB port ${dbPort} is occupied. Stop its listener and rerun db:verify; ` +
+          "an SSH tunnel here could forward reset SQL to production.",
+      ),
+    ),
+  );
+  listener.listen(dbPort, "0.0.0.0", () => listener.close(() => resolve()));
+});
 // Studio and telemetry are optional UI/observability sidecars, not backend APIs.
 supabase("start", "--exclude", "studio,logflare,vector");
 const env = localStackEnv();
@@ -189,6 +208,52 @@ for (const script of [
 ])
   await runSmoke(script);
 run("audit:rls", env, ["--check"]);
+// Exercise the gate against real catalog changes. Each probe is committed on
+// the disposable database so the independent audit connection can see it.
+async function expectAuditRejects(sql: string, cleanup: string, marker: string) {
+  const db = new pg.Client({
+    host: env.SUPABASE_DB_HOST,
+    port: Number(env.SUPABASE_DB_PORT),
+    user: env.SUPABASE_DB_USER,
+    password: env.SUPABASE_DB_PASSWORD,
+    database: "postgres",
+  });
+  await db.connect();
+  try {
+    await db.query(sql);
+    if (marker === "rls_audit_ci_probe") {
+      const privilege = await db.query<{ executable: boolean }>(
+        "select has_function_privilege('anon', 'public.rls_audit_ci_probe()', 'execute') as executable",
+      );
+      assert.equal(
+        privilege.rows[0]?.executable,
+        false,
+        "New functions must not be callable by anon",
+      );
+    }
+    const audit = spawnSync("npm", ["run", "audit:rls", "--", "--check"], {
+      env,
+      encoding: "utf8",
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    if (audit.error) throw audit.error;
+    assert.equal(audit.status, 1, `Audit accepted unexpected ${marker}`);
+    assert.match(audit.stderr + audit.stdout, new RegExp(marker));
+  } finally {
+    await db.query(cleanup);
+    await db.end();
+  }
+}
+await expectAuditRejects(
+  'create policy "rls_audit_ci_policy_probe" on public.posts for select to anon using (false)',
+  'drop policy if exists "rls_audit_ci_policy_probe" on public.posts',
+  "rls_audit_ci_policy_probe",
+);
+await expectAuditRejects(
+  "create function public.rls_audit_ci_probe() returns integer language sql security definer set search_path = public as 'select 1'",
+  "drop function if exists public.rls_audit_ci_probe()",
+  "rls_audit_ci_probe",
+);
 run("db:contract", env, ["--after-smokes"]);
 assert.deepEqual(
   JSON.parse(await catalog(env, true)),
