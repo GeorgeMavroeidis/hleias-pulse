@@ -78,6 +78,18 @@ test("db-password rule draws the same line, at the first character", () => {
   allows(pattern, "SUPABASE_DB_PASSWORD=$SUPABASE_DB_PASSWORD");
 });
 
+test("server credential assignments catch literals but allow environment references", () => {
+  const pattern = rule("server-credential-assignment");
+  flags(pattern, `VAPID_PRIVATE_KEY=${"A".repeat(43)}`);
+  flags(pattern, `PUSH_INTERNAL_SECRET="${"B".repeat(43)}"`);
+  flags(pattern, `SUPABASE_SERVICE_ROLE_KEY: ${"C".repeat(32)}`);
+  flags(pattern, `ORS_API_KEY=${"D".repeat(32)}`);
+  allows(pattern, "VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}");
+  allows(pattern, "PUSH_INTERNAL_SECRET=$PUSH_INTERNAL_SECRET");
+  allows(pattern, "SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}");
+  allows(pattern, "ORS_API_KEY=your-openrouteservice-key");
+});
+
 test("every rule is usable: named, hinted, and not accidentally global", () => {
   assert.ok(RULES.length > 0, "no rules defined");
   for (const r of RULES) {

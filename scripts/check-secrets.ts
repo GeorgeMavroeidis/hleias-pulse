@@ -11,14 +11,16 @@
  * be verified by running it. A general scanner is worth adding later; an
  * unverified one that red-lights `main` on day one is worth less than nothing.
  *
- * Scans git-tracked files only. Anything untracked is not about to be
- * committed, and node_modules is not ours to police.
+ * Scans tracked and untracked project source, plus generated browser assets
+ * when a build is present. Ignored local .env files and dependencies are not
+ * source artifacts; tracked .env files are always rejected.
  *
  *   npm run check:secrets
  */
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 type Rule = { hint: string; name: string; pattern: RegExp };
 
@@ -27,6 +29,12 @@ export const RULES: Rule[] = [
     hint: "Supabase secret (service-role) key. It bypasses RLS entirely — read it from the CLI session or .env at runtime, as the smoke scripts do.",
     name: "supabase-secret-key",
     pattern: /\bsb_secret_[A-Za-z0-9_-]{20,}/,
+  },
+  {
+    hint: "Server-only credential assigned inline. Read it from the secret manager or environment at runtime.",
+    name: "server-credential-assignment",
+    pattern:
+      /\b(?:VAPID_PRIVATE_KEY|PUSH_INTERNAL_SECRET|SUPABASE_SERVICE_ROLE_KEY|ORS_API_KEY)\s*[:=]\s*["']?(?!(?:your|replace|example|placeholder)[-_])[A-Za-z0-9_-]{24,}/,
   },
   {
     hint: "JWT. The publishable/anon key is fine in source, but a service_role JWT is not — and they look identical here, so neither belongs in a committed file.",
@@ -87,18 +95,41 @@ const ALLOWED_VALUE = /\bsb_publishable_[A-Za-z0-9_-]+/g;
 /** Never allow these to be tracked at all, whatever is inside them. */
 const FORBIDDEN_PATHS = [/^\.env(\.|$)/, /(^|\/)\.env$/, /(^|\/)\.env\.local$/];
 
-function trackedFiles() {
-  return execFileSync("git", ["ls-files", "-z"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+function sourceFiles() {
+  return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  })
     .split("\0")
     .filter(Boolean);
+}
+
+function builtBrowserFiles(root = "cloudflare-static-dist"): string[] {
+  try {
+    if (!lstatSync(root).isDirectory()) return [];
+  } catch {
+    return [];
+  }
+  const files: string[] = [];
+  const visit = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) visit(path);
+      else if (entry.isFile() && /\.(?:js|mjs|css|html|json|map|svg|txt|webmanifest)$/i.test(path))
+        files.push(path);
+    }
+  };
+  visit(root);
+  return files;
 }
 
 function isProbablyText(path: string) {
   if (/\.(png|jpe?g|gif|webp|ico|icns|pdf|zip|woff2?|ttf|otf|mp4|mov|car)$/i.test(path))
     return false;
   try {
-    // A 2 MB source file is a generated bundle, not something a human put a key in.
-    return statSync(path).size <= 2 * 1024 * 1024;
+    // Large generated JS can carry inlined credentials too. This cap only
+    // prevents accidentally loading an enormous non-source artifact at once.
+    return statSync(path).size <= 20 * 1024 * 1024;
   } catch {
     return false;
   }
@@ -107,7 +138,7 @@ function isProbablyText(path: string) {
 function main() {
   const findings: string[] = [];
 
-  for (const path of trackedFiles()) {
+  for (const path of new Set([...sourceFiles(), ...builtBrowserFiles()])) {
     if (FORBIDDEN_PATHS.some((rule) => rule.test(path))) {
       findings.push(`${path}: env file is tracked by git. It must never be committed.`);
       continue;

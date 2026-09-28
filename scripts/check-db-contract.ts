@@ -141,8 +141,8 @@ try {
   ]);
   await count(
     `select policyname from pg_policies where schemaname='storage' and tablename='objects'`,
-    14,
-    "All avatar/content/poster storage policies exist",
+    17,
+    "All avatar/content/poster and registered-account storage policies exist",
   );
   await count(
     `select n.nspname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','private') and c.relkind='r' and not c.relrowsecurity`,
