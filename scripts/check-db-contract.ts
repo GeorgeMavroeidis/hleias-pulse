@@ -161,15 +161,15 @@ try {
   );
   const anonFunctions = [
     "blocked_user_ids()",
-    "current_admin_role()",
-    "current_business_id()",
-    "current_organizer_id()",
     "get_pulse_bootstrap()",
-    "has_admin_role(text[])",
     "refresh_generic_stories()",
   ];
   const authenticatedFunctions = [
     ...anonFunctions,
+    "current_admin_role()",
+    "current_business_id()",
+    "current_organizer_id()",
+    "has_admin_role(text[])",
     "issue_deal_code(text)",
     "moderate_content(text,text,text)",
     "redeem_deal_code(text)",
@@ -195,11 +195,23 @@ try {
       `${role} can execute every declared public function`,
     );
   }
+  const workerFunctions = [
+    "claim_push_delivery_batch()",
+    "complete_push_delivery(uuid,uuid,text,text)",
+    "prepare_push_delivery(uuid,uuid)",
+  ];
   await count(
     `select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-     where n.nspname='public' and not has_function_privilege('service_role',p.oid,'execute')`,
+     where n.nspname='public' and has_function_privilege('service_role',p.oid,'execute')
+       and p.oid::regprocedure::text not in (${workerFunctions.map((signature) => `'${signature}'`).join(",")})`,
     0,
-    "Service role can execute every public function explicitly",
+    "Service role cannot execute undeclared public functions",
+  );
+  await count(
+    `select signature from (values ${workerFunctions.map((signature) => `('public.${signature}')`).join(",")}) expected(signature)
+     where not has_function_privilege('service_role',to_regprocedure(signature),'execute')`,
+    0,
+    "Service role can execute worker RPCs",
   );
   await count(
     `select name from vault.secrets where name like 'push_worker_%'`,

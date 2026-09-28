@@ -77,7 +77,7 @@ async function collect(client: pg.Client): Promise<Snapshot> {
                 from unnest(p.proconfig) cfg where cfg like 'search_path=%' limit 1) as "searchPath",
              coalesce((select jsonb_agg(to_jsonb(g) order by g.grantee, g.privilege, g.grantor) from lateral
                (${acl("p.proacl", "p.proowner", "f")}) g), '[]'::jsonb) as "executeGrants",
-             case when p.prosecdef then pg_get_functiondef(p.oid) else null end as definition
+             pg_get_functiondef(p.oid) as definition
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = '${schema}' and p.prokind in ('f', 'p')
       order by signature`;
@@ -135,7 +135,8 @@ async function collect(client: pg.Client): Promise<Snapshot> {
              coalesce((select jsonb_agg(to_jsonb(g) order by g.grantee, g.privilege, g.grantor) from lateral
                (${acl("d.defaclacl", "d.defaclrole", "d.defaclobjtype")}) g), '[]'::jsonb) as grants
       from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace
-      where d.defaclobjtype in ('r','f') and (d.defaclnamespace = 0 or n.nspname = 'public')
+      where d.defaclobjtype in ('r','f')
+        and (d.defaclnamespace = 0 or n.nspname in ('public', 'private'))
       order by owner, schema nulls first, "objectType"`,
     );
     await client.query("commit");

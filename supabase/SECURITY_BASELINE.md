@@ -11,10 +11,10 @@ The snapshot records all `public` tables, views and materialized views; their
 owners, RLS flags, view definitions/options and direct grants; every `public`
 policy's name, command, roles, `USING` and `WITH CHECK`; all `public` and
 `private` functions, including argument types, overloads, owners, `EXECUTE`
-grants and `search_path`; definitions of privileged functions in other
+grants, `search_path` and complete definitions; definitions of privileged functions in other
 non-system schemas; `private` queue tables/policies; storage buckets and
 `storage.objects` RLS, grants and policies; and table/function default ACLs
-for the global and `public` scopes. Public tables without RLS, `storage.objects`
+for the global, `public` and `private` scopes. Public tables without RLS, `storage.objects`
 without RLS, and application `SECURITY DEFINER` functions without an explicit
 `search_path` fail even when they happen to match a snapshot.
 
@@ -77,3 +77,19 @@ No corrective production SQL was run. `db:verify` now refuses an occupied DB
 port before invoking the CLI, and snapshot writes compare the connected cluster
 with the local Docker database. Any production remediation requires a separately
 reviewed deployment and explicit approval.
+
+## Function privilege hardening — 2026-09-28
+
+Three forward migrations on top of current `main` narrow the 32 application
+functions to the callers in `FUNCTION_PRIVILEGE_AUDIT.md`. Trigger-only routines
+and the RSVP counter move to `private`; retained public RPCs receive exact grants
+and an empty `search_path`. New `postgres` functions start without `PUBLIC` or
+Data API execution grants. Deal issuance is serialized and capped per account;
+push subscription count, payload size, recovery and fanout are bounded.
+
+The snapshot now records definitions for `SECURITY INVOKER` as well as
+`SECURITY DEFINER` functions. Its new delta was reviewed on a fresh local
+replay: function moves, execution grants, paths, the new deal/push bodies and
+the extra invoker definitions. No live migration was applied. The migration
+impact, remaining guest-callable editorial refresh and rollback procedure are
+recorded in `FUNCTION_PRIVILEGE_AUDIT.md`.

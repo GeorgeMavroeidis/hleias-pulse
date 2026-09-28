@@ -32,17 +32,14 @@ async function createUser(
   url: string,
   publishableKey: string,
   label: string,
-  createdIds: string[],
-  createdEmails: string[],
+  onCreated: (id: string) => void,
 ): Promise<UserFixture> {
   const email = `push-smoke-${label}-${suffix}@example.invalid`;
-  createdEmails.push(email);
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
   if (created.error || !created.data.user) {
     throw new Error(`create ${label}: ${created.error?.message ?? "no user returned"}`);
   }
-  // Record the account before sign-in: a later auth failure must still remove it.
-  createdIds.push(created.data.user.id);
+  onCreated(created.data.user.id);
 
   const client = createClient(url, publishableKey, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
@@ -64,29 +61,22 @@ async function setupContent(
   ownerId: string,
   unrelatedId: string,
 ): Promise<void> {
-  await client.query("begin");
-  try {
-    const author = await client.query<{ id: string }>("select id from public.authors limit 1");
-    const place = await client.query<{ id: string }>("select id from public.places limit 1");
-    assert(author.rowCount && place.rowCount, "seed must contain an author and place");
+  const author = await client.query<{ id: string }>("select id from public.authors limit 1");
+  const place = await client.query<{ id: string }>("select id from public.places limit 1");
+  assert(author.rowCount && place.rowCount, "seed must contain an author and place");
 
-    for (const [id, userId, moderationStatus] of [
-      [questionId, ownerId, "published"],
-      [unrelatedQuestionId, unrelatedId, "published"],
-    ] as const) {
-      await client.query(
-        `insert into public.posts
+  for (const [id, userId, moderationStatus] of [
+    [questionId, ownerId, "published"],
+    [unrelatedQuestionId, unrelatedId, "published"],
+  ] as const) {
+    await client.query(
+      `insert into public.posts
          (id, author_id, place_id, kind, display_time, text, image_url,
           user_id, profile_id, author_kind, moderation_status)
        values ($1, $2, $3, 'question', 'now', 'push security fixture', '',
                $4, $4, 'user', $5)`,
-        [id, author.rows[0].id, place.rows[0].id, userId, moderationStatus],
-      );
-    }
-    await client.query("commit");
-  } catch (error) {
-    await client.query("rollback").catch(() => {});
-    throw error;
+      [id, author.rows[0].id, place.rows[0].id, userId, moderationStatus],
+    );
   }
 }
 
@@ -106,35 +96,14 @@ async function main() {
   const db = createPgSession("session", "push-smoke-admin");
   const claimA = await connectGuarded("session", "push-claim-a");
   const claimB = await connectGuarded("session", "push-claim-b");
-  const createdIds: string[] = [];
-  const createdEmails: string[] = [];
+  const createdUserIds: string[] = [];
   const commentIds: string[] = [];
 
   try {
-    const owner = await createUser(
-      adminApi,
-      url,
-      publishableKey,
-      "owner",
-      createdIds,
-      createdEmails,
-    );
-    const answerer = await createUser(
-      adminApi,
-      url,
-      publishableKey,
-      "answerer",
-      createdIds,
-      createdEmails,
-    );
-    const unrelated = await createUser(
-      adminApi,
-      url,
-      publishableKey,
-      "unrelated",
-      createdIds,
-      createdEmails,
-    );
+    const trackCreated = (id: string) => createdUserIds.push(id);
+    const owner = await createUser(adminApi, url, publishableKey, "owner", trackCreated);
+    const answerer = await createUser(adminApi, url, publishableKey, "answerer", trackCreated);
+    const unrelated = await createUser(adminApi, url, publishableKey, "unrelated", trackCreated);
 
     await db.once((client) => setupContent(client, owner.id, unrelated.id));
 
@@ -593,6 +562,94 @@ async function main() {
       "expired fourth attempt did not terminalize its outbox",
     );
 
+    // A user cannot store unlimited devices or oversized payloads. Use the
+    // unrelated account so the earlier per-device delivery assertions stay
+    // focused on the original three subscriptions.
+    await expectRejected("oversized endpoint", async () =>
+      unrelated.client.from("push_subscriptions").insert({
+        auth_key: "auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${"x".repeat(2100)}`,
+        p256dh: "key",
+        user_id: unrelated.id,
+      }),
+    );
+    await expectRejected("oversized encryption key", async () =>
+      unrelated.client.from("push_subscriptions").insert({
+        auth_key: "auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-oversized-key`,
+        p256dh: "x".repeat(257),
+        user_id: unrelated.id,
+      }),
+    );
+    await expectRejected("oversized authentication key", async () =>
+      unrelated.client.from("push_subscriptions").insert({
+        auth_key: "x".repeat(129),
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-oversized-auth`,
+        p256dh: "key",
+        user_id: unrelated.id,
+      }),
+    );
+    for (let device = 0; device < 10; device += 1) {
+      const inserted = await unrelated.client.from("push_subscriptions").insert({
+        auth_key: "auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-device-${device}`,
+        p256dh: "key",
+        user_id: unrelated.id,
+      });
+      assert(!inserted.error, `device ${device} registration failed: ${inserted.error?.message}`);
+    }
+    await expectRejected("eleventh device", async () =>
+      unrelated.client.from("push_subscriptions").insert({
+        auth_key: "auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-device-over-limit`,
+        p256dh: "key",
+        user_id: unrelated.id,
+      }),
+    );
+
+    // One claim call may fan out at most 20 outboxes to at most ten devices.
+    // Roll back the synthetic queue rows so they never escape this test.
+    await db.withPg(async (client) => {
+      await client.query("begin");
+      try {
+        const created = await client.query<{ id: string }>(
+          `insert into private.push_notification_outbox
+             (event_type,source_comment_id,recipient_id,created_at)
+           select 'question_answer_published',extensions.gen_random_uuid(),$1,
+                  now()-interval '1 day'
+           from generate_series(1,25)
+           returning id`,
+          [unrelated.id],
+        );
+        const ids = created.rows.map((row) => row.id);
+        assert(ids.length === 25, "bounded fanout fixture was incomplete");
+        const claimed = await client.query("select * from public.claim_push_delivery_batch()");
+        assert(claimed.rowCount !== null && claimed.rowCount <= 20, "worker claimed over 20 rows");
+        const result = await client.query<{
+          deliveries: string;
+          outboxes_with_deliveries: string;
+          queued_without_deliveries: string;
+        }>(
+          `select count(d.id) as deliveries,
+                  count(distinct d.outbox_id) as outboxes_with_deliveries,
+                  count(distinct o.id) filter (where d.id is null and o.status='queued')
+                    as queued_without_deliveries
+           from private.push_notification_outbox as o
+           left join private.push_notification_deliveries as d on d.outbox_id=o.id
+           where o.id=any($1::uuid[])`,
+          [ids],
+        );
+        assert(
+          Number(result.rows[0].deliveries) === 200 &&
+            Number(result.rows[0].outboxes_with_deliveries) === 20 &&
+            Number(result.rows[0].queued_without_deliveries) === 5,
+          "one worker call did not bound fanout to 20 outboxes and ten devices",
+        );
+      } finally {
+        await client.query("rollback");
+      }
+    });
+
     console.log(JSON.stringify({ ok: true, claims: claims.length, outbox: "durable" }, null, 2));
   } finally {
     await db
@@ -601,10 +658,9 @@ async function main() {
         await client.query("delete from public.posts where id = any($1::text[])", [
           [questionId, unrelatedQuestionId],
         ]);
-        for (const id of createdIds) {
-          await client.query("delete from auth.users where id = $1", [id]);
+        for (const userId of createdUserIds) {
+          await client.query("delete from auth.users where id = $1", [userId]);
         }
-        await client.query("delete from auth.users where email = any($1::text[])", [createdEmails]);
       })
       .catch((error) => console.error("push security fixture cleanup failed", error));
     await db.close();

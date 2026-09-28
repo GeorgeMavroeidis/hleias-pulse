@@ -10,6 +10,7 @@ export type ValidPushEndpoint = {
 const APPLE_SUFFIX = ".push.apple.com";
 
 export function validatePushEndpoint(candidate: string): ValidPushEndpoint | null {
+  if (new TextEncoder().encode(candidate).byteLength > 2048) return null;
   let url: URL;
   try {
     url = new URL(candidate);

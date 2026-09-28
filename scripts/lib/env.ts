@@ -10,6 +10,7 @@
  * smokes receive the disposable stack's service_role key from local status.
  */
 import { readFileSync } from "node:fs";
+import { localStackEnv } from "./local-stack";
 
 /**
  * Explicit process settings override `.env`. Local recovery never reads `.env`.
@@ -88,16 +89,36 @@ export function assertSmokeTargetIsLocal() {
     throw new Error("Smoke tests require the disposable local stack; use npm run supabase:local.");
   }
   assertTargetIsSafeForCI();
+  // A loopback URL may be an SSH tunnel. Bind both API credentials and the DB
+  // endpoint to the same CLI-owned local stack before any smoke can write.
+  const fields = [
+    "SUPABASE_URL",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_DB_HOST",
+    "SUPABASE_DB_PORT",
+    "SUPABASE_DB_USER",
+    "SUPABASE_DB_PASSWORD",
+  ];
+  if (fields.some((name) => !process.env[name])) {
+    throw new Error("Local smoke target requires complete status-derived API and DB credentials.");
+  }
+  const local = localStackEnv();
+  for (const name of fields) {
+    if (!process.env[name] || process.env[name] !== local[name]) {
+      throw new Error(`${name} does not match this Supabase local stack.`);
+    }
+  }
 }
 
 /** The local URL and publishable key, supplied together by `supabase status`. */
 export function readSupabaseClientConfig() {
-  assertSmokeTargetIsLocal();
   const url = process.env.SUPABASE_URL;
   const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
   if (!url || !publishableKey) {
     throw new Error("Local smoke target requires both a loopback URL and local publishable key.");
   }
+  assertSmokeTargetIsLocal();
   return { publishableKey, url };
 }
 
@@ -108,8 +129,6 @@ export function readSupabaseClientConfig() {
  * key bypasses RLS, so the smoke runner only accepts a loopback target.
  */
 export function readServiceRoleKey() {
-  assertSmokeTargetIsLocal();
-
   const fromEnv = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (fromEnv) {
     if (fromEnv.length < 100) {
@@ -117,6 +136,7 @@ export function readServiceRoleKey() {
         "SUPABASE_SERVICE_ROLE_KEY is set but looks too short to be a service_role key.",
       );
     }
+    assertSmokeTargetIsLocal();
     return fromEnv;
   }
 

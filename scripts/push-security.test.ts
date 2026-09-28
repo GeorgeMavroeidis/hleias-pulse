@@ -180,6 +180,13 @@ describe("push endpoint policy", () => {
       assert.equal(validatePushEndpoint(endpoint), null);
     });
   }
+
+  test("rejects an allowed provider URL with an oversized path", () => {
+    assert.equal(
+      validatePushEndpoint(`https://fcm.googleapis.com/fcm/send/${"x".repeat(2100)}`),
+      null,
+    );
+  });
 });
 
 function delivery(endpoint = "https://fcm.googleapis.com/fcm/send/token"): PreparedDelivery {
