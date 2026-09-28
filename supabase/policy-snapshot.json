@@ -1044,12 +1044,6 @@
           "grantee": "authenticated",
           "grantor": "postgres",
           "grantable": false,
-          "privilege": "INSERT"
-        },
-        {
-          "grantee": "authenticated",
-          "grantor": "postgres",
-          "grantable": false,
           "privilege": "SELECT"
         },
         {
@@ -4160,6 +4154,39 @@
       "withCheck": null
     },
     {
+      "relation": "admin_audit_logs",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "admin_audit_logs",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "admin_audit_logs",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
       "relation": "admin_members",
       "name": "Admin members can read their membership",
       "command": "SELECT",
@@ -4204,6 +4231,39 @@
       "withCheck": "has_admin_role(ARRAY['owner'::text])"
     },
     {
+      "relation": "admin_members",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "admin_members",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "admin_members",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
       "relation": "authors",
       "name": "Public can read authors",
       "command": "SELECT",
@@ -4214,6 +4274,39 @@
       ],
       "using": "true",
       "withCheck": null
+    },
+    {
+      "relation": "authors",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "authors",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "authors",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "businesses",
@@ -4248,6 +4341,39 @@
       ],
       "using": "(verification_status = 'verified'::text)",
       "withCheck": null
+    },
+    {
+      "relation": "businesses",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "businesses",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "businesses",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "businesses",
@@ -4329,6 +4455,39 @@
     },
     {
       "relation": "comments",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "comments",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "comments",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "comments",
       "name": "Users can delete own comments",
       "command": "DELETE",
       "permissive": "PERMISSIVE",
@@ -4359,6 +4518,39 @@
       ],
       "using": "(user_id = ( SELECT auth.uid() AS uid))",
       "withCheck": "((user_id = ( SELECT auth.uid() AS uid)) AND ((profile_id IS NULL) OR (profile_id = ( SELECT auth.uid() AS uid))) AND (moderation_status = 'pending'::text))"
+    },
+    {
+      "relation": "content_reports",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "content_reports",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "content_reports",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "content_reports",
@@ -4414,6 +4606,39 @@
       ],
       "using": "((reporter_id = ( SELECT auth.uid() AS uid)) AND (status = 'open'::text))",
       "withCheck": "((reporter_id = ( SELECT auth.uid() AS uid)) AND (status = 'open'::text))"
+    },
+    {
+      "relation": "cultural_event_likes",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "cultural_event_likes",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "cultural_event_likes",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "cultural_event_likes",
@@ -4506,6 +4731,39 @@
     },
     {
       "relation": "cultural_events",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "cultural_events",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "cultural_events",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "cultural_events",
       "name": "Users can read own cultural event submissions",
       "command": "SELECT",
       "permissive": "PERMISSIVE",
@@ -4561,6 +4819,39 @@
     },
     {
       "relation": "deal_redemptions",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "deal_redemptions",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "deal_redemptions",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "deal_redemptions",
       "name": "Users can read own deal redemptions",
       "command": "SELECT",
       "permissive": "PERMISSIVE",
@@ -4569,6 +4860,39 @@
       ],
       "using": "(user_id = ( SELECT auth.uid() AS uid))",
       "withCheck": null
+    },
+    {
+      "relation": "event_rsvps",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "event_rsvps",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "event_rsvps",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "event_rsvps",
@@ -4627,6 +4951,39 @@
       "withCheck": null
     },
     {
+      "relation": "events",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "events",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "events",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
       "relation": "meet_events",
       "name": "Admins can read all meet events",
       "command": "SELECT",
@@ -4670,6 +5027,39 @@
       ],
       "using": "((moderation_status = 'published'::text) AND ((user_id IS NULL) OR (NOT (user_id = ANY (blocked_user_ids())))))",
       "withCheck": null
+    },
+    {
+      "relation": "meet_events",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "meet_events",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "meet_events",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "meet_events",
@@ -4740,6 +5130,39 @@
     },
     {
       "relation": "organizers",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "organizers",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "organizers",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "organizers",
       "name": "Users can apply to become an organizer",
       "command": "INSERT",
       "permissive": "PERMISSIVE",
@@ -4782,6 +5205,39 @@
       ],
       "using": "true",
       "withCheck": null
+    },
+    {
+      "relation": "place_avatars",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "place_avatars",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "place_avatars",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "place_avatars",
@@ -4884,6 +5340,39 @@
       "withCheck": null
     },
     {
+      "relation": "place_business_profiles",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "place_business_profiles",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "place_business_profiles",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
       "relation": "places",
       "name": "Admins can read all places",
       "command": "SELECT",
@@ -4930,6 +5419,39 @@
     },
     {
       "relation": "places",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "places",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "places",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "places",
       "name": "Users can delete own places",
       "command": "DELETE",
       "permissive": "PERMISSIVE",
@@ -4960,6 +5482,39 @@
       ],
       "using": "(user_id = ( SELECT auth.uid() AS uid))",
       "withCheck": "((user_id = ( SELECT auth.uid() AS uid)) AND ((profile_id IS NULL) OR (profile_id = ( SELECT auth.uid() AS uid))) AND (moderation_status = 'pending'::text))"
+    },
+    {
+      "relation": "post_likes",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "post_likes",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "post_likes",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "post_likes",
@@ -5041,6 +5596,39 @@
     },
     {
       "relation": "posts",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "posts",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "posts",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "posts",
       "name": "Users can delete own posts",
       "command": "DELETE",
       "permissive": "PERMISSIVE",
@@ -5086,6 +5674,39 @@
     },
     {
       "relation": "profiles",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "profiles",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "profiles",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "profiles",
       "name": "Users can insert own profile",
       "command": "INSERT",
       "permissive": "PERMISSIVE",
@@ -5105,6 +5726,39 @@
       ],
       "using": "(id = ( SELECT auth.uid() AS uid))",
       "withCheck": "(id = ( SELECT auth.uid() AS uid))"
+    },
+    {
+      "relation": "push_subscriptions",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "push_subscriptions",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "push_subscriptions",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "push_subscriptions",
@@ -5141,6 +5795,39 @@
       "withCheck": null
     },
     {
+      "relation": "route_stops",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "route_stops",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "route_stops",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
       "relation": "routes",
       "name": "Editors can manage routes",
       "command": "ALL",
@@ -5162,6 +5849,72 @@
       ],
       "using": "true",
       "withCheck": null
+    },
+    {
+      "relation": "routes",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "routes",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "routes",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "saved_items",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "saved_items",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "saved_items",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "saved_items",
@@ -5243,6 +5996,39 @@
     },
     {
       "relation": "stories",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "stories",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "stories",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "stories",
       "name": "Users can delete own stories",
       "command": "DELETE",
       "permissive": "PERMISSIVE",
@@ -5273,6 +6059,39 @@
       ],
       "using": "(user_id = ( SELECT auth.uid() AS uid))",
       "withCheck": "((user_id = ( SELECT auth.uid() AS uid)) AND ((profile_id IS NULL) OR (profile_id = ( SELECT auth.uid() AS uid))) AND (moderation_status = 'pending'::text))"
+    },
+    {
+      "relation": "story_views",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "story_views",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "story_views",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "story_views",
@@ -5320,6 +6139,39 @@
     },
     {
       "relation": "user_activity_days",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "user_activity_days",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "user_activity_days",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "user_activity_days",
       "name": "Users can create own activity days",
       "command": "INSERT",
       "permissive": "PERMISSIVE",
@@ -5353,6 +6205,39 @@
     },
     {
       "relation": "user_blocks",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "user_blocks",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "user_blocks",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "user_blocks",
       "name": "user_blocks_all_own",
       "command": "ALL",
       "permissive": "PERMISSIVE",
@@ -5361,6 +6246,39 @@
       ],
       "using": "(blocker_id = ( SELECT auth.uid() AS uid))",
       "withCheck": "(blocker_id = ( SELECT auth.uid() AS uid))"
+    },
+    {
+      "relation": "user_place_visits",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "user_place_visits",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "user_place_visits",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "user_place_visits",
@@ -5394,6 +6312,39 @@
       ],
       "using": "(user_id = ( SELECT auth.uid() AS uid))",
       "withCheck": null
+    },
+    {
+      "relation": "user_preferences",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "user_preferences",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "user_preferences",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "user_preferences",
@@ -5441,6 +6392,39 @@
     },
     {
       "relation": "user_security_events",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "user_security_events",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "user_security_events",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "user_security_events",
       "name": "Users can read own security events",
       "command": "SELECT",
       "permissive": "PERMISSIVE",
@@ -5461,6 +6445,39 @@
       ],
       "using": "true",
       "withCheck": null
+    },
+    {
+      "relation": "vibe_chips",
+      "name": "Registered accounts can delete",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "vibe_chips",
+      "name": "Registered accounts can insert",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "vibe_chips",
+      "name": "Registered accounts can update",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     }
   ],
   "privatePolicies": [],
@@ -5780,9 +6797,9 @@
         " STABLE SECURITY DEFINER",
         " SET search_path TO ''",
         "AS $function$",
-        "  select role",
-        "  from public.admin_members",
+        "  select role from public.admin_members",
         "  where user_id = auth.uid()",
+        "    and (auth.jwt()->>'is_anonymous') is distinct from 'true'",
         "  limit 1;",
         "$function$"
       ]
@@ -5815,10 +6832,10 @@
         " STABLE SECURITY DEFINER",
         " SET search_path TO ''",
         "AS $function$",
-        "  select id",
-        "  from public.businesses",
+        "  select id from public.businesses",
         "  where user_id = auth.uid()",
         "    and verification_status = 'verified'",
+        "    and (auth.jwt()->>'is_anonymous') is distinct from 'true'",
         "  limit 1;",
         "$function$"
       ]
@@ -5851,10 +6868,10 @@
         " STABLE SECURITY DEFINER",
         " SET search_path TO ''",
         "AS $function$",
-        "  select id",
-        "  from public.organizers",
+        "  select id from public.organizers",
         "  where user_id = auth.uid()",
         "    and verification_status = 'verified'",
+        "    and (auth.jwt()->>'is_anonymous') is distinct from 'true'",
         "  limit 1;",
         "$function$"
       ]
@@ -6089,10 +7106,10 @@
         " SET search_path TO ''",
         "AS $function$",
         "  select exists (",
-        "    select 1",
-        "    from public.admin_members",
+        "    select 1 from public.admin_members",
         "    where user_id = auth.uid()",
         "      and role = any(required_roles)",
+        "      and (auth.jwt()->>'is_anonymous') is distinct from 'true'",
         "  );",
         "$function$"
       ]
@@ -6136,13 +7153,10 @@
         "  v_expires timestamptz;",
         "  v_char int;",
         "begin",
-        "  if v_user_id is null then",
-        "    raise exception 'Sign-in required to get a code';",
+        "  if v_user_id is null or (auth.jwt()->>'is_anonymous') = 'true' then",
+        "    raise exception 'Registered account required to get a code';",
         "  end if;",
         "",
-        "  -- Serialize issuance before checking deal eligibility. Lock the current",
-        "  -- claim and business rows so an admin cannot revoke either between this check",
-        "  -- and the returned code or insert.",
         "  perform pg_catalog.pg_advisory_xact_lock(",
         "    76218811,",
         "    pg_catalog.hashtext(v_user_id::text)",
@@ -6213,8 +7227,7 @@
         "        'deal_text', v_claim.deal_text",
         "      );",
         "    exception when unique_violation then",
-        "      -- The six-character code collided with an existing code. Retry with a",
-        "      -- fresh random value without releasing the user's advisory lock.",
+        "      -- Retry a short-code collision while keeping the user's lock.",
         "    end;",
         "  end loop;",
         "",
@@ -6849,6 +7862,10 @@
         "  avatar_url_value text;",
         "  default_identity_value text;",
         "begin",
+        "  if new.is_anonymous then",
+        "    return new;",
+        "  end if;",
+        "",
         "  display_name_value := nullif(",
         "    coalesce(",
         "      new.raw_user_meta_data->>'display_name',",
@@ -8284,6 +9301,39 @@
       ],
       "using": null,
       "withCheck": "((bucket_id = 'content-media'::text) AND (name ~~ (('cultural-events/'::text || (( SELECT auth.uid() AS uid))::text) || '/%'::text)) AND (current_organizer_id() IS NOT NULL))"
+    },
+    {
+      "relation": "objects",
+      "name": "Registered accounts can delete objects",
+      "command": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": null
+    },
+    {
+      "relation": "objects",
+      "name": "Registered accounts can insert objects",
+      "command": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
+    },
+    {
+      "relation": "objects",
+      "name": "Registered accounts can update objects",
+      "command": "UPDATE",
+      "permissive": "RESTRICTIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))",
+      "withCheck": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text) IS DISTINCT FROM 'true'::text))"
     },
     {
       "relation": "objects",

@@ -174,6 +174,18 @@ async function main() {
       );
     }
 
+    const dealInsertGrants = (
+      await client.query<{ normal: boolean; worker: boolean }>(`
+        select has_table_privilege('authenticated','public.deal_redemptions','INSERT') as normal,
+               has_table_privilege('service_role','public.deal_redemptions','INSERT') as worker
+      `)
+    ).rows[0];
+    assert.deepEqual(
+      dealInsertGrants,
+      { normal: false, worker: true },
+      "Deal codes must be minted through issue_deal_code(), never a direct API insert",
+    );
+
     await expectDenied("anon", "select public.issue_deal_code('missing')");
     await expectDenied("anon", "select public.moderate_content('post','missing','hidden')");
     await expectDenied("anon", "select * from public.claim_push_delivery_batch()");
@@ -190,6 +202,237 @@ async function main() {
     await expectAllowed("authenticated", "select public.current_admin_role()");
     await expectAllowed("authenticated", "select public.has_admin_role(array['owner'])");
     await expectAllowed("service_role", "select * from public.claim_push_delivery_batch()");
+
+    // Supabase anonymous Auth tokens use role=authenticated. Verify that a
+    // restrictive write guard exists on every app table and Storage objects,
+    // including both sides of UPDATE, so a later permissive policy cannot
+    // accidentally reopen anonymous writes.
+    const writableRelations = (
+      await client.query<{ schema: string; name: string }>(`
+        select n.nspname as schema, c.relname as name
+        from pg_class c join pg_namespace n on n.oid=c.relnamespace
+        where ((n.nspname='public' and c.relkind in ('r','p') and c.relrowsecurity)
+               or (n.nspname='storage' and c.relname='objects'))
+        order by n.nspname,c.relname
+      `)
+    ).rows;
+    assert.ok(writableRelations.length > 20, "Expected the full application schema");
+    const writeGuards = (
+      await client.query<{
+        schemaname: string;
+        tablename: string;
+        policyname: string;
+        cmd: string;
+        permissive: string;
+        roles: string[];
+        qual: string | null;
+        with_check: string | null;
+      }>(`
+        select schemaname,tablename,policyname,cmd,permissive,roles::text[] as roles,qual,with_check
+        from pg_policies
+        where schemaname in ('public','storage')
+          and policyname like 'Registered accounts can %'
+      `)
+    ).rows;
+    for (const relation of writableRelations) {
+      const guards = writeGuards.filter(
+        (policy) => policy.schemaname === relation.schema && policy.tablename === relation.name,
+      );
+      assert.deepEqual(
+        guards.map((policy) => policy.cmd).sort(),
+        ["DELETE", "INSERT", "UPDATE"],
+        `Missing anonymous write guard on ${relation.schema}.${relation.name}`,
+      );
+      for (const guard of guards) {
+        assert.equal(guard.permissive, "RESTRICTIVE", `${relation.name}: ${guard.cmd}`);
+        assert.deepEqual(guard.roles, ["authenticated"], `${relation.name}: ${guard.cmd}`);
+        for (const expression of [guard.qual, guard.with_check].filter(Boolean)) {
+          assert.match(expression!, /is_anonymous/, `${relation.name}: ${guard.cmd}`);
+          assert.match(expression!, /uid\(/, `${relation.name}: ${guard.cmd}`);
+        }
+        if (guard.cmd === "INSERT") assert.ok(guard.with_check);
+        if (guard.cmd === "DELETE") assert.ok(guard.qual);
+        if (guard.cmd === "UPDATE") assert.ok(guard.qual && guard.with_check);
+      }
+    }
+
+    // Exercise actual RLS and SECURITY DEFINER calls with anonymous, signed
+    // out, normal and second-user JWT contexts. All fixtures are rolled back.
+    await client.query("begin");
+    try {
+      const normalId = randomUUID();
+      const otherId = randomUUID();
+      const anonymousId = randomUUID();
+      await client.query("insert into auth.users(id) values($1),($2)", [normalId, otherId]);
+      await client.query(
+        "insert into auth.users(id,is_anonymous,raw_user_meta_data) values($1,true,$2::jsonb)",
+        [anonymousId, JSON.stringify({ display_name: "Anonymous injection" })],
+      );
+      assert.equal(
+        Number(
+          (
+            await client.query("select count(*) as n from public.profiles where id=$1", [
+              anonymousId,
+            ])
+          ).rows[0].n,
+        ),
+        0,
+        "Anonymous Auth signup created a public profile",
+      );
+      assert.equal(
+        Number(
+          (await client.query("select count(*) as n from public.profiles where id=$1", [normalId]))
+            .rows[0].n,
+        ),
+        1,
+        "Normal Auth signup did not create a profile",
+      );
+
+      // Simulate legacy rows made before the guard; anonymous owners still
+      // cannot edit or remove them after the migration.
+      await client.query("insert into public.profiles(id) values($1)", [anonymousId]);
+      await client.query("insert into public.user_preferences(user_id) values($1)", [anonymousId]);
+      await client.query("insert into public.admin_members(user_id,role) values($1,'moderator')", [
+        anonymousId,
+      ]);
+      await client.query(
+        "insert into public.businesses(user_id,display_name,verification_status) values($1,'Anonymous fixture','verified')",
+        [anonymousId],
+      );
+      await client.query(
+        "insert into public.user_blocks(blocker_id,blocked_id,kind) values($1,$2,'block')",
+        [anonymousId, otherId],
+      );
+
+      const setJwt = async (role: "anon" | "authenticated", id?: string, isAnonymous = false) => {
+        await client.query(`set local role ${role}`);
+        await client.query("select set_config('request.jwt.claims',$1,true)", [
+          JSON.stringify({ role, ...(id ? { sub: id } : {}), is_anonymous: isAnonymous }),
+        ]);
+      };
+      const expectRlsDenied = async (sql: string, params: unknown[]) => {
+        await client.query("savepoint denied_write");
+        try {
+          await assert.rejects(client.query(sql, params), (error: unknown) => {
+            assert.equal((error as { code?: string }).code, "42501", sql);
+            return true;
+          });
+        } finally {
+          await client.query("rollback to savepoint denied_write");
+          await client.query("release savepoint denied_write");
+        }
+      };
+
+      await setJwt("anon");
+      await expectRlsDenied(
+        "insert into public.user_blocks(blocker_id,blocked_id,kind) values($1,$2,'block')",
+        [normalId, otherId],
+      );
+
+      await setJwt("authenticated", anonymousId, true);
+      await expectRlsDenied(
+        "insert into public.user_blocks(blocker_id,blocked_id,kind) values($1,$2,'block')",
+        [anonymousId, normalId],
+      );
+      await expectRlsDenied("insert into storage.objects(bucket_id,name) values('avatars',$1)", [
+        `${anonymousId}/anonymous.png`,
+      ]);
+      assert.equal(
+        (
+          await client.query(
+            "update public.profiles set bio='anonymous edit' where id=$1 returning id",
+            [anonymousId],
+          )
+        ).rowCount,
+        0,
+        "Anonymous account updated its legacy profile",
+      );
+      assert.equal(
+        (
+          await client.query(
+            "delete from public.user_blocks where blocker_id=$1 returning blocker_id",
+            [anonymousId],
+          )
+        ).rowCount,
+        0,
+        "Anonymous account deleted its legacy block",
+      );
+      assert.equal(
+        (await client.query("select public.current_admin_role() as role")).rows[0].role,
+        null,
+      );
+      assert.equal(
+        (await client.query("select public.has_admin_role(array['moderator']) as ok")).rows[0].ok,
+        false,
+      );
+      assert.equal(
+        (await client.query("select public.current_business_id() as id")).rows[0].id,
+        null,
+      );
+      await client.query("savepoint denied_deal");
+      try {
+        await assert.rejects(
+          client.query("select public.issue_deal_code('missing')"),
+          /Registered account required/,
+        );
+      } finally {
+        await client.query("rollback to savepoint denied_deal");
+        await client.query("release savepoint denied_deal");
+      }
+
+      await setJwt("authenticated", normalId);
+      assert.equal(
+        (
+          await client.query(
+            "update public.profiles set bio='normal edit' where id=$1 returning id",
+            [normalId],
+          )
+        ).rowCount,
+        1,
+        "Normal account could not update its own profile",
+      );
+      const ownPreferences = await client.query<{ user_id: string }>(
+        "select user_id from public.user_preferences order by user_id",
+      );
+      assert.deepEqual(
+        ownPreferences.rows.map((row) => row.user_id),
+        [normalId],
+      );
+      const ownBlock = await client.query(
+        "insert into public.user_blocks(blocker_id,blocked_id,kind) values($1,$2,'block') returning blocker_id",
+        [normalId, otherId],
+      );
+      assert.equal(ownBlock.rowCount, 1);
+      const ownAvatar = await client.query(
+        "insert into storage.objects(bucket_id,name) values('avatars',$1) returning id",
+        [`${normalId}/normal.png`],
+      );
+      assert.equal(ownAvatar.rowCount, 1, "Normal account could not upload its own avatar");
+
+      await setJwt("authenticated", otherId);
+      assert.equal(
+        (
+          await client.query(
+            "update public.profiles set bio='cross-user edit' where id=$1 returning id",
+            [normalId],
+          )
+        ).rowCount,
+        0,
+        "Second account updated the first account's profile",
+      );
+      assert.equal(
+        (
+          await client.query(
+            "delete from public.user_blocks where blocker_id=$1 returning blocker_id",
+            [normalId],
+          )
+        ).rowCount,
+        0,
+        "Second account deleted the first account's block",
+      );
+    } finally {
+      await client.query("rollback");
+    }
 
     // Moving trigger routines to private must not break their OID-bound
     // triggers. Exercise the auth profile trigger and all three RSVP paths in

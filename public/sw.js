@@ -19,9 +19,30 @@ self.addEventListener("push", (event) => {
   );
 });
 
+function safeNotificationUrl(value) {
+  if (typeof value !== "string") return "/";
+
+  let url;
+  try {
+    url = new URL(value, self.location.origin);
+  } catch {
+    return "/";
+  }
+
+  // A push payload may be malformed or forged. A notification opens only this
+  // app's home page or its supported post deep link.
+  if (url.origin !== self.location.origin || url.pathname !== "/" || url.hash) return "/";
+  if (!url.search) return "/";
+  if (url.searchParams.size !== 1 || !url.searchParams.has("post")) return "/";
+
+  const postId = url.searchParams.get("post");
+  if (!postId || postId.length > 256) return "/";
+  return `/?post=${encodeURIComponent(postId)}`;
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/";
+  const url = safeNotificationUrl(event.notification.data?.url);
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {

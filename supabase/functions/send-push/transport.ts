@@ -90,10 +90,12 @@ export function createWebPushTransport(
         delivery.comment_text.length > 140
           ? `${delivery.comment_text.slice(0, 137)}…`
           : delivery.comment_text;
+      const encodedPostId =
+        delivery.post_id.length <= 256 ? encodeURIComponent(delivery.post_id) : null;
       const payload = JSON.stringify({
         title: "Κάποιος απάντησε στην ερώτησή σου",
         body,
-        url: `/?post=${encodeURIComponent(delivery.post_id)}`,
+        url: encodedPostId && encodedPostId.length <= 512 ? `/?post=${encodedPostId}` : "/",
       });
       const request = builder.generateRequestDetails(
         {

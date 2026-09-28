@@ -139,6 +139,43 @@ async function main() {
         firstSubscription.error?.message ?? "unknown_message"
       }`,
     );
+
+    // Endpoint and encryption keys are private to their owner, including for
+    // direct REST calls made by another signed-in account.
+    const otherRead = await answerer.client
+      .from("push_subscriptions")
+      .select("id")
+      .eq("id", firstSubscription.data.id);
+    assert(!otherRead.error && otherRead.data?.length === 0, "another user read a subscription");
+    const otherUpdate = await answerer.client
+      .from("push_subscriptions")
+      .update({ auth_key: "forged" })
+      .eq("id", firstSubscription.data.id)
+      .select("id");
+    assert(
+      !otherUpdate.error && otherUpdate.data?.length === 0,
+      "another user updated a subscription",
+    );
+    const otherDelete = await answerer.client
+      .from("push_subscriptions")
+      .delete()
+      .eq("id", firstSubscription.data.id)
+      .select("id");
+    assert(
+      !otherDelete.error && otherDelete.data?.length === 0,
+      "another user deleted a subscription",
+    );
+    const signedOut = createClient(url, publishableKey, {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    });
+    await expectRejected("signed-out subscription insert", async () =>
+      signedOut.from("push_subscriptions").insert({
+        auth_key: "auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-signed-out`,
+        p256dh: "key",
+        user_id: owner.id,
+      }),
+    );
     const secondSubscription = await owner.client
       .from("push_subscriptions")
       .insert({
@@ -230,6 +267,16 @@ async function main() {
     assert(
       (await db.withPg((client) => outboxCount(client, answer.data.id))) === 1,
       "publish did not enqueue exactly once",
+    );
+    const queuedRecipient = await db.withPg((client) =>
+      client.query<{ recipient_id: string }>(
+        "select recipient_id from private.push_notification_outbox where source_comment_id = $1",
+        [answer.data.id],
+      ),
+    );
+    assert(
+      queuedRecipient.rows[0]?.recipient_id === owner.id,
+      "published answer was queued for a caller-chosen recipient",
     );
     await db.once(async (client) => {
       await client.query("update public.comments set text = 'edited after publish' where id = $1", [
@@ -589,16 +636,22 @@ async function main() {
         user_id: unrelated.id,
       }),
     );
-    for (let device = 0; device < 10; device += 1) {
-      const inserted = await unrelated.client.from("push_subscriptions").insert({
-        auth_key: "auth",
-        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-device-${device}`,
-        p256dh: "key",
-        user_id: unrelated.id,
-      });
-      assert(!inserted.error, `device ${device} registration failed: ${inserted.error?.message}`);
-    }
-    await expectRejected("eleventh device", async () =>
+    const deviceRegistrations = await Promise.all(
+      Array.from({ length: 11 }, (_, device) =>
+        unrelated.client.from("push_subscriptions").insert({
+          auth_key: "auth",
+          endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-device-${device}`,
+          p256dh: "key",
+          user_id: unrelated.id,
+        }),
+      ),
+    );
+    assert(
+      deviceRegistrations.filter((result) => !result.error).length === 10 &&
+        deviceRegistrations.filter((result) => result.error).length === 1,
+      "concurrent device registrations exceeded the ten-subscription limit",
+    );
+    await expectRejected("twelfth device", async () =>
       unrelated.client.from("push_subscriptions").insert({
         auth_key: "auth",
         endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-device-over-limit`,

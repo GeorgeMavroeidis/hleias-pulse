@@ -11,6 +11,12 @@ readable/writable by anyone holding your public API key — effectively everyone
 `npm run audit:rls` already checks this. Run it before every deploy, not once
 and forget it.
 
+Supabase anonymous Auth sessions receive the `authenticated` database role.
+Restrictive write policies on every application table and `storage.objects`
+require an account whose JWT is not marked `is_anonymous`; privileged helpers
+and deal issuance enforce the same boundary. The fresh-database privilege test
+checks these guards and actual anonymous write attempts.
+
 ## Secrets
 `npm run check:secrets` scans for leaked credentials. Run before every deploy.
 
@@ -27,10 +33,12 @@ Push delivery has four layers with deliberately different authority:
 3. The queue lives in the `private` schema with RLS enabled and no grants to
    `anon`, `authenticated`, or `service_role`. The Edge Function can operate it
    only through three `SECURITY DEFINER` RPCs granted to `service_role`.
-4. Cron calls the Edge Function with the public project key (only to cross the
-   Supabase gateway) plus a separate 256-bit internal secret. The handler checks
-   that secret with SHA-256 and timing-safe comparison before parsing a body or
-   opening a database connection.
+4. Cron calls the Edge Function with the public project key and a separate
+   256-bit internal secret. Gateway JWT verification is disabled because this
+   scheduled call does not carry a user JWT. The public key is not worker
+   authorization: the handler checks the internal secret with SHA-256 and
+   timing-safe comparison before parsing a body or opening a database
+   connection.
 
 The HTTP interface is intentionally narrow: `POST`, JSON content type, and an
 empty object no larger than 256 streamed bytes. It has no CORS response and no
@@ -66,7 +74,7 @@ deceptive suffix. The only accepted hosts are:
 
 - `fcm.googleapis.com`
 - `updates.push.services.mozilla.com`
-- a boundary-safe subdomain of `push.apple.com`
+- a single-label subdomain of `push.apple.com`
 
 `web-push` generates the encrypted request and VAPID headers; `fetch` performs
 the request with redirects disabled, a five-second abort, and an 8 KiB bounded
@@ -96,9 +104,9 @@ After approval, use this order:
    without printing it, writes the Function secret first, and parameterizes the
    matching Vault values `push_worker_url`, `push_worker_apikey`, and
    `push_worker_secret`.
-2. Deploy `send-push` first with JWT verification enabled. The legacy trigger
-   then fails the internal-secret check, deliberately pausing push while closing
-   the public-call vulnerability.
+2. Deploy `send-push` with gateway JWT verification disabled, as declared in
+   `supabase/config.toml`. The handler must reject a missing or incorrect
+   internal secret before it reaches the service-role client.
 3. Apply the migration. It removes direct delivery, creates the private queue,
    and schedules the once-per-minute job. Delivery resumes within a minute.
 4. Verify a public-key call and a normal user-JWT call are rejected, an approved
@@ -131,7 +139,7 @@ location pings need to be kept at all, or just the current one?
 One pass, all in one place, before opening this to real outside users:
 - [ ] Full RLS audit across every table — not spot-checks
 - [ ] Secrets scan clean
-- [ ] Push worker secret, Vault names, JWT verification, and cron preflight pass
+- [ ] Push worker secret, Vault names, ordinary-client rejection, and cron preflight pass
 - [ ] `npm run test:push-security` and `npm run smoke:push-security` pass
 - [ ] Deals redemption re-verified against reuse/replay (already smoke-tested —
       confirm again right before launch, not just once during development)
