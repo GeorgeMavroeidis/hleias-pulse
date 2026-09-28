@@ -90,6 +90,25 @@ await new Promise<void>((resolve, reject) => {
 // Studio and telemetry are optional UI/observability sidecars, not backend APIs.
 supabase("start", "--exclude", "studio,logflare,vector");
 const env = localStackEnv();
+// Prove a loopback tunnel and a foreign service key cannot pass the smoke guard.
+for (const [name, value] of [
+  ["SUPABASE_URL", "http://127.0.0.1:59999"],
+  ["SUPABASE_SERVICE_ROLE_KEY", "x".repeat(120)],
+]) {
+  const guarded = spawnSync(
+    "npx",
+    [
+      "--no-install",
+      "tsx",
+      "-e",
+      "import { readServiceRoleKey } from './scripts/lib/env'; readServiceRoleKey();",
+    ],
+    { env: { ...env, [name]: value }, encoding: "utf8", timeout: 30_000 },
+  );
+  assert.equal(guarded.error, undefined, `Local guard probe failed to start for ${name}`);
+  assert.notEqual(guarded.status, 0, `Local guard accepted a foreign ${name}`);
+  assert.match(guarded.stderr, new RegExp(`${name} does not match this Supabase local stack`));
+}
 let firstSchema: string | undefined;
 for (const iteration of [1, 2]) {
   console.log(`[verify] Reset ${iteration}/2 (local only)`);
@@ -103,6 +122,7 @@ for (const iteration of [1, 2]) {
     );
   }
   run("db:contract", env);
+  run("test:function-privileges", env);
 }
 
 const typesPath = "src/lib/supabase/database.types.ts";

@@ -35,6 +35,7 @@
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
     "test:push-security": "tsx --test scripts/push-security.test.ts",
+    "test:function-privileges": "tsx scripts/test-function-privileges.ts",
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
     "test:map-visuals": "tsx scripts/check-map-visuals.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",

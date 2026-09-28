@@ -1502,10 +1502,6 @@ export type Database = {
       };
       redeem_deal_code: { Args: { code: string }; Returns: Json };
       refresh_generic_stories: { Args: never; Returns: undefined };
-      refresh_meet_event_rsvp_counts: {
-        Args: { target_event_id: string };
-        Returns: undefined;
-      };
       review_place_claim: {
         Args: { claim_id: string; next_status: string };
         Returns: undefined;

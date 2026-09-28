@@ -1,7 +1,7 @@
 /**
- * Concurrency check for public.redeem_deal_code().
+ * Concurrency checks for public.issue_deal_code() and redeem_deal_code().
  *
- * Before 20260905180000 the function read the code with a plain SELECT, checked
+ * Before 20260905180000, redeem_deal_code read the code with a plain SELECT, checked
  * status = 'issued', and then updated by primary key with no row lock and no
  * status test in the UPDATE's WHERE. Two sessions redeeming the same code could
  * both pass the SELECT and both succeed: one coupon, honoured twice.
@@ -9,6 +9,10 @@
  * This does not fire N requests and hope they collide — a race that only
  * sometimes reproduces is a test that only sometimes fails. It drives the
  * interleaving by hand over two connections:
+ *
+ * Issuance is also interleaved: A issues and holds the per-user advisory lock;
+ * B's issuance must wait, then return the same code. The test then checks the
+ * hourly and daily per-user quotas using redeemed fixture codes.
  *
  *   A: begin; redeem(CODE)          -> succeeds, holds the row lock, uncommitted
  *   B: begin; redeem(CODE)          -> blocks on A's lock
@@ -23,21 +27,15 @@
  *
  * Needs SUPABASE_DB_PASSWORD (.env or environment), like the other smokes.
  * Creates its own fixture — a verified business, an approved claim on an
- * unclaimed place, one issued code — and removes it again in a finally block.
+ * unclaimed place and a fresh user — and removes them in a finally block.
  *
  *   npm run smoke:deal-race
  */
-import { randomUUID } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
+import { randomUUID } from "node:crypto";
 
-import { assertSmokeTargetIsLocal, readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
-import { cleanupAll } from "./lib/cleanup";
+import { assertSmokeTargetIsLocal } from "./lib/env";
 import { connectGuarded, createPgSession, endQuietly } from "./lib/pg";
-
-assertSmokeTargetIsLocal();
-
-const CODE = `RACE${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
 
 /** Run the rest of this transaction as `authenticated` with auth.uid() = userId. */
 async function actAs(client: pg.Client, userId: string) {
@@ -47,33 +45,29 @@ async function actAs(client: pg.Client, userId: string) {
   await client.query("set local role authenticated");
 }
 
-async function waitForBlockedRedeemer(
-  admin: ReturnType<typeof createPgSession>,
-  backendPid: number,
-  finished: () => boolean,
-) {
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    if (finished()) throw new Error("B finished before waiting on A's row lock.");
-    const wait = await admin.withPg((client) =>
-      client.query<{ wait_event_type: string | null }>(
-        "select wait_event_type from pg_stat_activity where pid = $1",
-        [backendPid],
-      ),
-    );
-    if (wait.rows[0]?.wait_event_type === "Lock") return;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  throw new Error("B did not reach A's row lock within 10 seconds.");
-}
-
 type Fixture = { businessId: string; claimId: string; ownerId: string; placeId: string };
 
-async function setup(admin: pg.Client, ownerId: string): Promise<Fixture> {
+async function waitForLock(admin: ReturnType<typeof createPgSession>, contenderPid: number) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const state = await admin.withPg((client) =>
+      client.query<{ wait_event_type: string | null }>(
+        "select wait_event_type from pg_stat_activity where pid=$1",
+        [contenderPid],
+      ),
+    );
+    if (state.rows[0]?.wait_event_type === "Lock") return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("The contender never reached a PostgreSQL lock wait.");
+}
+
+async function setup(admin: pg.Client): Promise<Fixture> {
   await admin.query("begin");
   try {
-    // A committed seed place is read-only support for this fixture. The owner,
-    // business, claim and code all belong to this test.
+    // A fresh user and an unclaimed place keep this smoke self-contained on a
+    // migration-built database, with no standing admin or business fixture.
+    const ownerId = randomUUID();
+    await admin.query("insert into auth.users(id) values($1)", [ownerId]);
     const place = await admin.query<{ id: string }>(`
     select p.id from public.places p
     where not exists (
@@ -104,13 +98,6 @@ async function setup(admin: pg.Client, ownerId: string): Promise<Fixture> {
     );
     const claimId = claim.rows[0].id;
 
-    await admin.query(
-      `insert into public.deal_redemptions
-       (profile_claim_id, place_id, business_id, code, user_id, expires_at)
-     values ($1, $2, $3, $4, $5, now() + interval '1 hour')`,
-      [claimId, placeId, businessId, CODE, ownerId],
-    );
-
     await admin.query("commit");
     return { businessId, claimId, ownerId, placeId };
   } catch (error) {
@@ -119,16 +106,15 @@ async function setup(admin: pg.Client, ownerId: string): Promise<Fixture> {
   }
 }
 
-async function teardown(admin: pg.Client, ownerId: string | undefined) {
-  if (!ownerId) return;
-  const owned = await admin.query<{ id: string }>(
-    "select id from public.businesses where user_id = $1",
-    [ownerId],
-  );
-  const businessId = owned.rows[0]?.id;
-  if (!businessId) return;
-  // deal_redemptions and place_business_profiles both cascade from businesses.
-  await admin.query("delete from public.businesses where id = $1", [businessId]);
+async function teardown(admin: pg.Client, fixture: Fixture | null) {
+  if (!fixture) return;
+  // These foreign keys do not cascade from businesses. Remove the redemption
+  // and claim explicitly before deleting their owning business.
+  await admin.query("delete from public.deal_redemptions where business_id = $1", [
+    fixture.businessId,
+  ]);
+  await admin.query("delete from public.place_business_profiles where id = $1", [fixture.claimId]);
+  await admin.query("delete from public.businesses where id = $1", [fixture.businessId]);
 
   // 20260907120000 put an audit trigger on businesses, and this fixture trips
   // it twice: once on insert, because it is created already 'verified' rather
@@ -139,11 +125,13 @@ async function teardown(admin: pg.Client, ownerId: string | undefined) {
   // has not been written yet.
   await admin.query(
     "delete from public.admin_audit_logs where entity_type = 'businesses' and entity_id = $1",
-    [businessId],
+    [fixture.businessId],
   );
+  await admin.query("delete from auth.users where id = $1", [fixture.ownerId]);
 }
 
 async function main() {
+  assertSmokeTargetIsLocal();
   // `admin` runs plain fixture statements, so it can be a reconnecting session
   // — that is what keeps `teardown` reachable after a failure instead of
   // leaking a business, its place claim and the redemption row.
@@ -159,59 +147,94 @@ async function main() {
     connectGuarded("session", "a"),
     connectGuarded("session", "b"),
   ]);
-  const { url } = readSupabaseClientConfig();
-  const authAdmin = createClient(url, readServiceRoleKey(), {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
-  });
-  const ownerEmail = `deal-race-${randomUUID()}@smoke.invalid`;
-  let ownerId: string | undefined;
+  const bPid = Number(
+    (await b.query<{ pid: number }>("select pg_backend_pid() as pid")).rows[0].pid,
+  );
   let fixture: Fixture | null = null;
-  let testFailure: unknown;
 
   try {
-    const created = await authAdmin.auth.admin.createUser({
-      email: ownerEmail,
-      password: `Smoke-${randomUUID()}-Aa1!`,
-      email_confirm: true,
-    });
-    if (created.error) throw new Error(`Creating deal fixture owner: ${created.error.message}`);
-    ownerId = created.data.user?.id;
-    if (!ownerId) throw new Error("Auth did not return the deal fixture owner ID.");
     // `once`, not `withPg`: setup inserts rows and is not safe to replay.
-    fixture = await admin.once((client) => setup(client, ownerId!));
+    fixture = await admin.once(setup);
+
+    // --- A issues a code and holds the per-user advisory lock ------------
+    await a.query("begin");
+    await actAs(a, fixture.ownerId);
+    const firstIssue = await a.query<{ payload: { code: string } }>(
+      "select public.issue_deal_code($1) as payload",
+      [fixture.placeId],
+    );
+    const code = firstIssue.rows[0]?.payload.code;
+    if (!code) throw new Error("A: issue_deal_code returned no code.");
+
+    // B must wait, then see and reuse A's committed code.
+    await b.query("begin");
+    await actAs(b, fixture.ownerId);
+    let secondIssue: string | null = null;
+    let issueError: string | null = null;
+    const issueDone = b
+      .query<{ payload: { code: string } }>("select public.issue_deal_code($1) as payload", [
+        fixture.placeId,
+      ])
+      .then((result) => {
+        secondIssue = result.rows[0]?.payload.code ?? null;
+      })
+      .catch((error: unknown) => {
+        issueError = error instanceof Error ? error.message : String(error);
+      });
+    await waitForLock(admin, bPid);
+    if (secondIssue || issueError) {
+      throw new Error("B did not wait for A's deal issuance transaction.");
+    }
+    await a.query("commit");
+    await issueDone;
+    if (issueError || secondIssue !== code) {
+      throw new Error(
+        `Concurrent issuance returned ${secondIssue ?? issueError} instead of ${code}.`,
+      );
+    }
+    await b.query("commit");
+    const issuedRows = await admin.withPg((client) =>
+      client.query<{ count: string }>(
+        "select count(*) from public.deal_redemptions where profile_claim_id=$1 and user_id=$2",
+        [fixture!.claimId, fixture!.ownerId],
+      ),
+    );
+    if (Number(issuedRows.rows[0].count) !== 1) {
+      throw new Error("Concurrent issuance created more than one redemption row.");
+    }
 
     // --- A redeems and holds the lock ------------------------------------
     await a.query("begin");
     await actAs(a, fixture.ownerId);
     const first = await a.query<{ redeem_deal_code: unknown }>(
       "select public.redeem_deal_code($1)",
-      [CODE],
+      [code],
     );
     if (!first.rowCount) throw new Error("A: redeem_deal_code returned no row.");
 
     // --- B redeems the same code and blocks on A -------------------------
     await b.query("begin");
     await actAs(b, fixture.ownerId);
-    const backendPid = (await b.query<{ pid: number }>("select pg_backend_pid() as pid")).rows[0]
-      .pid;
     let secondError: string | null = null;
     let secondSucceeded = false;
-    let secondFinished = false;
     const bDone = b
-      .query("select public.redeem_deal_code($1)", [CODE])
+      .query("select public.redeem_deal_code($1)", [code])
       .then(() => {
         secondSucceeded = true;
       })
       .catch((error: unknown) => {
         secondError = error instanceof Error ? error.message : String(error);
-      })
-      .finally(() => {
-        secondFinished = true;
       });
 
-    // Observe PostgreSQL's lock wait, instead of relying on a fixed sleep that
-    // can race with a busy CI runner before B reaches the UPDATE.
-    await waitForBlockedRedeemer(admin, backendPid, () => secondFinished);
+    // Give B time to reach the lock. If it has already finished here, it never
+    // blocked at all, which is itself the bug.
+    await waitForLock(admin, bPid);
+    if (secondSucceeded || secondError) {
+      throw new Error(
+        `B did not block on A's row lock (succeeded=${secondSucceeded}, error=${secondError}). ` +
+          "The redemption is not taking a lock at all.",
+      );
+    }
 
     await a.query("commit");
     await bDone;
@@ -231,7 +254,7 @@ async function main() {
     const row = await admin.withPg((client) =>
       client.query<{ redeemed_at: string | null; status: string }>(
         "select status, redeemed_at from public.deal_redemptions where code = $1",
-        [CODE],
+        [code],
       ),
     );
     if (row.rows[0]?.status !== "redeemed") {
@@ -241,11 +264,100 @@ async function main() {
     }
     if (!row.rows[0].redeemed_at) throw new Error("redeemed_at was not set.");
 
+    // The deal may be revoked while a caller waits for its per-user lock.
+    // Eligibility must be read after the wait, not from a stale pre-lock row.
+    await a.query("begin");
+    await a.query("select pg_advisory_xact_lock(76218811, hashtext($1))", [fixture.ownerId]);
+    await b.query("begin");
+    await actAs(b, fixture.ownerId);
+    let revokedError = "";
+    const revokedIssue = b
+      .query("select public.issue_deal_code($1)", [fixture.placeId])
+      .catch((error: unknown) => {
+        revokedError = error instanceof Error ? error.message : String(error);
+      });
+    await waitForLock(admin, bPid);
+    await admin.withPg((client) =>
+      client.query("update public.place_business_profiles set deal_active=false where id=$1", [
+        fixture!.claimId,
+      ]),
+    );
+    await a.query("commit");
+    await revokedIssue;
+    await b.query("rollback");
+    if (!revokedError.includes("This place has no active deal")) {
+      throw new Error(`Revoked deal remained issuable after lock wait: ${revokedError}`);
+    }
+    await admin.withPg((client) =>
+      client.query("update public.place_business_profiles set deal_active=true where id=$1", [
+        fixture!.claimId,
+      ]),
+    );
+
+    // The redeemed code still counts toward the quota. Nine more recent
+    // redeemed rows bring this user's hourly total to ten, so a new request
+    // must be rejected even though there is no active code to reuse.
+    await admin.withPg((client) =>
+      client.query(
+        `insert into public.deal_redemptions
+           (profile_claim_id,place_id,business_id,code,status,user_id,redeemed_at)
+         select $1,$2,$3,'RATE-' || extensions.gen_random_uuid()::text,
+                'redeemed',$4,now()
+         from generate_series(1,9)`,
+        [fixture!.claimId, fixture!.placeId, fixture!.businessId, fixture!.ownerId],
+      ),
+    );
+    await a.query("begin");
+    await actAs(a, fixture.ownerId);
+    let quotaError = "";
+    try {
+      await a.query("select public.issue_deal_code($1)", [fixture.placeId]);
+    } catch (error) {
+      quotaError = error instanceof Error ? error.message : String(error);
+    }
+    await a.query("rollback");
+    if (!quotaError.includes("Deal code limit reached")) {
+      throw new Error(`Hourly issuance quota did not reject the eleventh code: ${quotaError}`);
+    }
+
+    // Move the ten prior issuances outside the hour, then add twenty more.
+    // The hourly counter is zero while the daily counter is thirty.
+    await admin.withPg(async (client) => {
+      await client.query(
+        "update public.deal_redemptions set issued_at=now()-interval '2 hours' where user_id=$1",
+        [fixture!.ownerId],
+      );
+      await client.query(
+        `insert into public.deal_redemptions
+           (profile_claim_id,place_id,business_id,code,status,user_id,issued_at,redeemed_at)
+         select $1,$2,$3,'DAY-' || extensions.gen_random_uuid()::text,
+                'redeemed',$4,now()-interval '2 hours',now()
+         from generate_series(1,20)`,
+        [fixture!.claimId, fixture!.placeId, fixture!.businessId, fixture!.ownerId],
+      );
+    });
+    await a.query("begin");
+    await actAs(a, fixture.ownerId);
+    let dailyError = "";
+    try {
+      await a.query("select public.issue_deal_code($1)", [fixture.placeId]);
+    } catch (error) {
+      dailyError = error instanceof Error ? error.message : String(error);
+    }
+    await a.query("rollback");
+    if (!dailyError.includes("Deal code limit reached")) {
+      throw new Error(`Daily issuance quota did not reject the 31st code: ${dailyError}`);
+    }
+
     console.log(
       JSON.stringify(
         {
           ok: true,
-          code: CODE,
+          code,
+          concurrentIssuanceReusedOneCode: true,
+          hourlyIssuanceQuotaRejected: true,
+          dailyIssuanceQuotaRejected: true,
+          revokedDealRejectedAfterLockWait: true,
           firstSessionRedeemed: true,
           secondSessionBlockedThenRejected: true,
           secondSessionError: secondError,
@@ -255,31 +367,19 @@ async function main() {
         2,
       ),
     );
-  } catch (error) {
-    testFailure = error;
-    throw error;
   } finally {
     // Release the row locks first, so teardown's delete is not blocked by them.
     await a.query("rollback").catch(() => {});
     await b.query("rollback").catch(() => {});
-    try {
-      await cleanupAll(
-        [
-          ["deal fixture", () => admin.withPg((client) => teardown(client, ownerId))],
-          [
-            "deal owner",
-            () =>
-              admin.withPg((client) =>
-                client.query("delete from auth.users where email = $1", [ownerEmail]),
-              ),
-          ],
-        ],
-        testFailure,
-      );
-    } finally {
-      await admin.close();
-      await endQuietly(a, b);
-    }
+    // A delete, so replaying it on a fresh connection is safe.
+    await admin
+      .withPg((client) => teardown(client, fixture))
+      .catch((error) => {
+        console.error("Fixture cleanup failed — remove it by hand:", fixture, error);
+        process.exitCode = 1;
+      });
+    await admin.close();
+    await endQuietly(a, b);
   }
 }
 
