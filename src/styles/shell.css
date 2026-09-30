@@ -20,3 +20,110 @@
   max-height: calc(88vh - env(safe-area-inset-top, 0px));
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
 }
+
+/* Shared top navigation: typography and alignment carry the hierarchy. */
+.hp-topbar {
+  flex: none;
+  background: var(--hp-paper);
+}
+
+.hp-topbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hp-space-2);
+  padding-top: var(--hp-space-2);
+}
+
+.hp-topbar-brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--hp-space-2);
+}
+
+.hp-topbar-logo {
+  width: 32px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.hp-topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-left: auto;
+  align-items: center;
+  gap: var(--hp-space-1);
+}
+
+.hp-topbar-subtitle {
+  padding-top: var(--hp-space-1);
+  padding-bottom: var(--hp-space-2);
+}
+
+.hp-topbar-subtitle-copy {
+  color: var(--hp-text-secondary);
+  font-size: var(--hp-type-meta);
+  line-height: 1.4;
+}
+
+.hp-deals-action {
+  display: inline-flex;
+  flex: none;
+  min-height: var(--hp-control-target);
+  min-width: var(--hp-control-target);
+  align-items: center;
+  justify-content: center;
+  gap: var(--hp-space-1);
+  padding: 0 var(--hp-space-1);
+  border: 0;
+  border-radius: var(--hp-radius-control);
+  background: transparent;
+  color: var(--hp-text-accent);
+  font-size: var(--hp-type-control);
+  font-weight: 600;
+}
+
+.hp-account-avatar {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.hp-account-avatar:not(.is-signed-in) svg {
+  width: 20px;
+  height: 20px;
+}
+
+@media (hover: hover) {
+  .hp-deals-action:hover {
+    background: color-mix(in srgb, var(--hp-sunset) 8%, var(--hp-paper));
+  }
+}
+
+/* The app is capped at 440px; respond to its width, not the desktop viewport. */
+.hp-app-shell {
+  container-type: inline-size;
+}
+
+@container (max-width: 359px) {
+  .hp-deals-action-label {
+    display: none;
+  }
+  .hp-topbar-actions {
+    gap: 0;
+  }
+}
+
+@container (min-width: 360px) and (max-width: 389px) {
+  .hp-topbar-actions {
+    gap: 0;
+  }
+  .hp-deals-action {
+    font-size: var(--hp-type-meta);
+  }
+}

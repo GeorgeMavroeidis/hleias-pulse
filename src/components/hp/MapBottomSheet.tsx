@@ -204,15 +204,15 @@ export function MapBottomSheet({
       style={{ height }}
       animate={{ height }}
       transition={isDraggingSheet ? { duration: 0 } : HP_TRANSITION.panel}
-      className={`hp-map-sheet ${!cluster ? "is-idle" : ""} absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-t-3xl border-t border-hp-ink/10 bg-hp-paper/98 shadow-[0_-12px_40px_rgba(23,20,17,0.18)]`}
+      className={`hp-map-sheet ${!cluster ? "is-idle" : ""} absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overflow-hidden overscroll-contain`}
     >
       {/* Drag handle */}
       <div
         ref={handleRef}
         {...sheetDragHandlers}
-        className="hp-map-sheet-handle touch-none select-none cursor-grab pt-2 pb-1 active:cursor-grabbing"
+        className="hp-map-sheet-handle touch-none select-none cursor-grab active:cursor-grabbing"
       >
-        <div className="mx-auto h-1.5 w-12 rounded-full bg-hp-ink/15" />
+        <div className="hp-sheet-handle-mark" />
         {cluster && !isSelectedCollapsed && (
           <div className="flex justify-center gap-2 pt-2">
             {[

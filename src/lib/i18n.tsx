@@ -35,6 +35,7 @@ const EL: Record<string, string> = {
   Saved: "Αποθηκευμένα",
   "Tonight's pulse": "Ο παλμός της βραδιάς",
   "Tap a bubble to see what's happening.": "Πάτησε ένα σημείο για να δεις τι συμβαίνει.",
+  "Main navigation": "Κύρια πλοήγηση",
   "Map discovery lenses": "Φίλτρα ανακάλυψης χάρτη",
   Chill: "Χαλάρωση",
   "Activity is rising near {area} · {distance} km":

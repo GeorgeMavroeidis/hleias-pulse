@@ -1,3 +1,5 @@
+import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, Crosshair, MapPinned, Minus, Plus } from "lucide-react";
 import Supercluster from "supercluster";
@@ -1427,6 +1429,8 @@ export function SocialMap({
       .then(([maplibre, basemapStyle]) => {
         if (cancelled || !mapNodeRef.current) return;
 
+        // Vite must emit the module worker and its imports in the shipped bundle.
+        maplibre.setWorkerUrl(mapWorkerUrl);
         maplibreModuleRef.current = maplibre;
         map = new maplibre.Map({
           container: mapNodeRef.current,
@@ -2335,14 +2339,16 @@ export function SocialMap({
       )}
 
       {canGoBack && onBack && (
-        <button
+        <Button
+          variant="hpGhost"
+          size="hpIcon"
           type="button"
           onClick={onBack}
-          className="hp-icon-button hp-control-surface hp-map-back absolute"
+          className="hp-control-surface hp-map-back absolute"
           aria-label={t("Back to previous map view")}
         >
           <ChevronLeft size={18} strokeWidth={2.5} />
-        </button>
+        </Button>
       )}
 
       <div className="hp-map-summary pointer-events-none">
@@ -2366,12 +2372,12 @@ export function SocialMap({
                 onClick={() => selectDiscoveryCluster(cluster)}
                 aria-pressed={selected}
                 tabIndex={mapChromeHidden ? -1 : undefined}
-                className={`hp-chip hp-map-chip ${selected ? "is-active" : ""}`}
+                className={`hp-map-chip ${selected ? "is-active" : ""}`}
               >
                 <span className="hp-map-chip__face">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
                   {cluster.name}
-                  <span className="text-hp-muted">{cluster.places.length}</span>
+                  <span className="hp-map-chip__count">{cluster.places.length}</span>
                 </span>
               </button>
             );
@@ -2385,48 +2391,52 @@ export function SocialMap({
         aria-hidden={utilityRailHidden ? true : undefined}
       >
         <div className="hp-map-control-group" role="group" aria-label={t("Map zoom controls")}>
-          <button
+          <Button
+            variant="hpMap"
+            size="hpIcon"
             type="button"
             onClick={() => mapRef.current?.zoomIn()}
             disabled={!mapReady || zoom >= MAX_ZOOM}
             tabIndex={utilityRailHidden ? -1 : undefined}
-            className="hp-icon-button hp-map-icon-button"
             aria-label={t("Zoom in map")}
           >
             <Plus size={17} strokeWidth={2.5} />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="hpMap"
+            size="hpIcon"
             type="button"
             onClick={zoomOut}
             disabled={!mapReady || zoom <= MIN_ZOOM}
             tabIndex={utilityRailHidden ? -1 : undefined}
-            className="hp-icon-button hp-map-icon-button"
             aria-label={t("Zoom out map")}
           >
             <Minus size={17} strokeWidth={2.5} />
-          </button>
+          </Button>
         </div>
         <div className="hp-map-control-group" role="group" aria-label={t("Map view controls")}>
-          <button
+          <Button
+            variant="hpMap"
+            size="hpIcon"
             type="button"
             onClick={locateUser}
             disabled={!mapReady}
             tabIndex={utilityRailHidden ? -1 : undefined}
-            className="hp-icon-button hp-map-icon-button"
             aria-label={t("Find my location")}
           >
             <Crosshair size={17} strokeWidth={2.2} />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="hpMap"
+            size="hpIcon"
             type="button"
             onClick={resetToOverview}
             disabled={!mapReady}
             tabIndex={utilityRailHidden ? -1 : undefined}
-            className="hp-icon-button hp-map-icon-button"
             aria-label={t("Show Ilia overview")}
           >
             <MapPinned size={17} strokeWidth={2.2} />
-          </button>
+          </Button>
         </div>
       </div>
     </div>

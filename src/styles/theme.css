@@ -7,7 +7,7 @@
  * classes (e.g. --color-primary -> bg-primary, text-primary).
  *
  * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
+ * Brand colors retain their established values; semantic colors reference tokens.
  *
  * To add a new semantic color:
  * 1. Add the variable to :root (light value) and .dark (dark value)
@@ -59,6 +59,31 @@
 
 :root {
   --radius: 1rem;
+  /* Phase 1 interface foundation; existing marker palette stays intact. */
+  --hp-space-1: 0.25rem;
+  --hp-space-2: 0.5rem;
+  --hp-space-3: 0.75rem;
+  --hp-space-4: 1rem;
+  --hp-space-6: 1.5rem;
+  --hp-space-8: 2rem;
+  --hp-radius-control: 0.5rem;
+  --hp-radius-card: 0.75rem;
+  --hp-radius-surface: 1.5rem;
+  --hp-control-target: 2.75rem;
+  --hp-type-control: 0.875rem;
+  --hp-type-meta: 0.75rem;
+  --hp-type-title: 1rem;
+  --hp-text-secondary: #746c61;
+  --hp-text-accent: #ad471f;
+  --hp-focus-color: var(--hp-deep);
+  --hp-shadow-control: 0 2px 8px rgb(23 20 17 / 0.07);
+  --hp-shadow-sheet: 0 -3px 16px rgb(23 20 17 / 0.07);
+  --hp-shadow-popover: 0 6px 24px rgb(23 20 17 / 0.12);
+  --hp-safe-left: max(var(--hp-space-4), env(safe-area-inset-left, 0px));
+  --hp-safe-right: max(var(--hp-space-4), env(safe-area-inset-right, 0px));
+  --hp-motion-state: 160ms;
+  --hp-motion-press: 90ms;
+  --hp-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --hp-font-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --hp-font-display:
     "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;

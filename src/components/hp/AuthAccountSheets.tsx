@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -100,27 +101,31 @@ export function AccountBubble({
   const loading = account.status === "loading";
 
   return (
-    <button
+    <Button
+      variant="hpGhost"
+      size="hpIcon"
       type="button"
       onClick={signedIn ? onOpenAccount : onOpenAuth}
-      className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-full border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+      className="hp-account-button"
       aria-label={t(signedIn ? "Account settings" : "Sign in")}
     >
-      {avatarUrl ? (
-        <img src={avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-      ) : signedIn ? (
-        <span className="grid h-full w-full place-items-center bg-hp-ink text-[11px] font-black text-hp-paper">
-          {profileInitials(profile)}
-        </span>
-      ) : loading ? (
-        <span className="h-4 w-4 rounded-full border-2 border-hp-ink/15 border-t-hp-sunset" />
-      ) : (
-        <UserCircle2 size={17} />
-      )}
+      <span className={`hp-account-avatar ${signedIn ? "is-signed-in" : ""}`}>
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+        ) : signedIn ? (
+          <span className="grid h-full w-full place-items-center bg-hp-ink text-[11px] font-black text-hp-paper">
+            {profileInitials(profile)}
+          </span>
+        ) : loading ? (
+          <span className="h-4 w-4 rounded-full border-2 border-hp-ink/15 border-t-hp-sunset" />
+        ) : (
+          <UserCircle2 size={17} />
+        )}
+      </span>
       {needsProfile && (
-        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-hp-paper bg-hp-sunset" />
+        <span className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-hp-paper bg-hp-sunset" />
       )}
-    </button>
+    </Button>
   );
 }
 
