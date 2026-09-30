@@ -34,6 +34,20 @@ function nodeEnv(name: string): string | undefined {
 const supabaseUrl = nodeEnv("SUPABASE_URL") ?? productionUrl;
 const supabasePublishableKey = nodeEnv("SUPABASE_PUBLISHABLE_KEY") ?? productionPublishableKey;
 
+if (nodeEnv("HLEIAS_LOCAL_ONLY") === "1") {
+  const configuredUrl = nodeEnv("SUPABASE_URL");
+  const configuredKey = nodeEnv("SUPABASE_PUBLISHABLE_KEY");
+  if (
+    !configuredUrl ||
+    !configuredKey ||
+    !["127.0.0.1", "localhost", "[::1]"].includes(new URL(configuredUrl).hostname)
+  ) {
+    throw new Error(
+      "Local smoke client requires an explicit loopback URL and local publishable key.",
+    );
+  }
+}
+
 // The backstop the missing guard should have been. Configuration alone is not
 // enough: the failure mode is a variable that quietly does not arrive, and the
 // scripts that import this client create and delete real rows and real users.

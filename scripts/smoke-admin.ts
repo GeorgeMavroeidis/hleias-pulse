@@ -82,7 +82,7 @@
  * What is deliberately NOT audited is asserted as well: a self-service business
  * application (a row that starts `pending`) writes no line.
  *
- * Needs the local Supabase CLI session (service_role key, to create the four
+ * Needs a disposable local Supabase stack (service_role key, to create the four
  * disposable users) and SUPABASE_DB_PASSWORD, like the other smokes. Everything
  * it creates is removed in a `finally`.
  *
@@ -357,7 +357,16 @@ async function main() {
     // business, organizer and claim. A replayed callback would create a second
     // set and strand the first — the ids of the replay are the only ones the
     // state keeps, so the originals would never be cleaned up.
-    await db.once((client) => setupFixtures(client, state));
+    await db.once(async (client) => {
+      await client.query("begin");
+      try {
+        await setupFixtures(client, state);
+        await client.query("commit");
+      } catch (error) {
+        await client.query("rollback").catch(() => {});
+        throw error;
+      }
+    });
     console.log("[fixture] post, business, organizer, place claim and admin rows created");
 
     // Those admin_members rows went in over `pg`: the postgres role, no JWT, so

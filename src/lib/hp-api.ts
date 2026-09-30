@@ -10,6 +10,7 @@ import {
 import type { CreateMeetInput, MeetEvent, RsvpStatus } from "./hp/meet-types";
 import type { StreakState } from "./hp/meet-store";
 import { initialsAvatarDataUri } from "./hp/avatar";
+import { parseRouteGeometry } from "./hp/route-preview";
 import type {
   CreateCulturalEventInput,
   CulturalEvent,
@@ -111,6 +112,12 @@ type RouteRow = Pick<
   | "image_url"
   | "comment_count"
   | "saves_count"
+  | "routing_profile"
+  | "route_geometry"
+  | "route_distance_m"
+  | "route_duration_s"
+  | "route_input_hash"
+  | "route_generated_at"
 >;
 type RouteStopRow = Pick<
   TableRow<"route_stops">,
@@ -831,6 +838,12 @@ function mapRoute(row: RouteRow, stopsByRoute: Record<string, RouteStopRow[]>): 
     imageUrl: row.image_url,
     commentCount: row.comment_count,
     saves: row.saves_count,
+    routingProfile: row.routing_profile === "foot-walking" ? "foot-walking" : "driving-car",
+    routeGeometry: parseRouteGeometry(row.route_geometry),
+    routeDistanceMeters: row.route_distance_m,
+    routeDurationSeconds: row.route_duration_s,
+    routeInputHash: row.route_input_hash,
+    routeGeneratedAt: row.route_generated_at,
   };
 }
 
@@ -908,8 +921,21 @@ async function fetchPulseData(): Promise<PulseData> {
     console.warn("Could not refresh generic stories.", refreshResult.error);
   }
 
-  const result = await client.rpc("get_pulse_bootstrap");
+  const [result, routePreviewResult] = await Promise.all([
+    client.rpc("get_pulse_bootstrap"),
+    client
+      .from("routes")
+      .select(
+        "id,routing_profile,route_geometry,route_distance_m,route_duration_s,route_input_hash,route_generated_at",
+      ),
+  ]);
   if (result.error) throw result.error;
+  // Deploys remain readable during the brief migration/code rollout window.
+  // Once the preview columns exist, this query begins enriching routes; until
+  // then routes use the safe stop-to-stop fallback without an ETA.
+  if (routePreviewResult.error) {
+    console.warn("Route previews are not available yet.", routePreviewResult.error);
+  }
 
   const data = (result.data ?? {
     authors: [],
@@ -941,6 +967,9 @@ async function fetchPulseData(): Promise<PulseData> {
   );
   const avatarsByPlace = groupBy(data.place_avatars ?? [], (avatar) => avatar.place_id);
   const stopsByRoute = groupBy(data.route_stops ?? [], (stop) => stop.route_id);
+  const routePreviewById = new Map(
+    (routePreviewResult.data ?? []).map((route) => [route.id, route] as const),
+  );
 
   const places = (data.places ?? []).map((place) => mapPlace(place, avatarsByPlace));
   const placeById = new Map(places.map((place) => [place.id, place]));
@@ -955,7 +984,21 @@ async function fetchPulseData(): Promise<PulseData> {
       mapMeetEvent(event, placeById.get(event.place_id)),
     ),
     culturalEvents: (data.cultural_events ?? []).map(mapCulturalEvent),
-    routes: (data.routes ?? []).map((route) => mapRoute(route, stopsByRoute)),
+    routes: (data.routes ?? []).map((route) => {
+      const preview = routePreviewById.get(route.id);
+      return mapRoute(
+        {
+          ...route,
+          routing_profile: preview?.routing_profile ?? "driving-car",
+          route_geometry: preview?.route_geometry ?? null,
+          route_distance_m: preview?.route_distance_m ?? null,
+          route_duration_s: preview?.route_duration_s ?? null,
+          route_input_hash: preview?.route_input_hash ?? null,
+          route_generated_at: preview?.route_generated_at ?? null,
+        },
+        stopsByRoute,
+      );
+    }),
     stories: (data.stories ?? []).map(mapStory),
     vibeChips: (data.vibe_chips ?? []).map((chip) => chip.label),
     claimedPlaceIds: Array.isArray(data.claimed_place_ids) ? data.claimed_place_ids : [],

@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 import { readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
+import { cleanupAll } from "./lib/cleanup";
+import { createPgSession } from "./lib/pg";
 import {
   createPulseMeetEvent,
   createPulseStory,
@@ -33,6 +35,8 @@ async function main() {
   let userId: string | undefined;
   let storyId: string | undefined;
   let eventId: string | undefined;
+  const db = createPgSession("session", "live-surfaces-cleanup");
+  let testFailure: unknown;
 
   try {
     const bootstrap = await loadPulseData();
@@ -138,11 +142,52 @@ async function main() {
         2,
       ),
     );
+  } catch (error) {
+    testFailure = error;
+    throw error;
   } finally {
-    if (eventId) await admin.from("meet_events").delete().eq("id", eventId);
-    if (storyId) await admin.from("stories").delete().eq("id", storyId);
-    if (userId) await admin.auth.admin.deleteUser(userId);
-    await supabase.auth.signOut();
+    try {
+      await cleanupAll(
+        [
+          [
+            "meet events",
+            () =>
+              db.withPg((client) =>
+                client.query(
+                  `delete from public.meet_events where id = $1 or user_id in
+           (select id from auth.users where email = $2)`,
+                  [eventId ?? "", email],
+                ),
+              ),
+          ],
+          [
+            "stories",
+            () =>
+              db.withPg((client) =>
+                client.query(
+                  `delete from public.stories where id = $1 or user_id in
+           (select id from auth.users where email = $2)`,
+                  [storyId ?? "", email],
+                ),
+              ),
+          ],
+          [
+            "sign out",
+            () => supabase.auth.signOut().then(({ error }) => requireOk("sign out", error)),
+          ],
+          [
+            "auth user",
+            () =>
+              db.withPg((client) =>
+                client.query("delete from auth.users where email = $1", [email]),
+              ),
+          ],
+        ],
+        testFailure,
+      );
+    } finally {
+      await db.close();
+    }
   }
 }
 

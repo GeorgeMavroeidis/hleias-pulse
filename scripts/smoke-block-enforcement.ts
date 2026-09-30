@@ -21,8 +21,14 @@
  *   npm run smoke:block-enforcement
  */
 import pg from "pg";
+import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 
+import { assertSmokeTargetIsLocal, readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
+import { cleanupAll } from "./lib/cleanup";
 import { connectGuarded, createPgSession, endQuietly } from "./lib/pg";
+
+assertSmokeTargetIsLocal();
 
 const stamp = Date.now();
 const POST_A = `block-smoke-a-${stamp}`;
@@ -54,44 +60,45 @@ async function visiblePostsAs(client: pg.Client, userId: string | null) {
 
 type Fixture = { authorId: string; placeId: string; userA: string; userB: string };
 
-async function setup(admin: pg.Client): Promise<Fixture> {
-  const users = await admin.query<{ id: string }>(
-    "select id from auth.users order by created_at limit 2",
-  );
-  if (users.rowCount !== 2) throw new Error("Need at least two auth users to test blocking.");
+async function setup(admin: pg.Client, userA: string, userB: string): Promise<Fixture> {
+  await admin.query("begin");
+  try {
+    const author = await admin.query<{ id: string }>("select id from public.authors limit 1");
+    const place = await admin.query<{ id: string }>("select id from public.places limit 1");
+    if (!author.rowCount || !place.rowCount)
+      throw new Error("No author/place available for the fixture.");
 
-  const author = await admin.query<{ id: string }>("select id from public.authors limit 1");
-  const place = await admin.query<{ id: string }>("select id from public.places limit 1");
-  if (!author.rowCount || !place.rowCount)
-    throw new Error("No author/place available for the fixture.");
+    const fixture: Fixture = {
+      authorId: author.rows[0].id,
+      placeId: place.rows[0].id,
+      userA,
+      userB,
+    };
 
-  const fixture: Fixture = {
-    authorId: author.rows[0].id,
-    placeId: place.rows[0].id,
-    userA: users.rows[0].id,
-    userB: users.rows[1].id,
-  };
-
-  for (const [id, userId] of [
-    [POST_A, fixture.userA],
-    [POST_B, fixture.userB],
-  ] as const) {
-    await admin.query(
-      `insert into public.posts
+    for (const [id, userId] of [
+      [POST_A, fixture.userA],
+      [POST_B, fixture.userB],
+    ] as const) {
+      await admin.query(
+        `insert into public.posts
          (id, author_id, place_id, kind, display_time, text, image_url, user_id, moderation_status)
        values ($1, $2, $3, 'tip', 'now', 'block enforcement fixture', '', $4, 'published')`,
-      [id, fixture.authorId, fixture.placeId, userId],
+        [id, fixture.authorId, fixture.placeId, userId],
+      );
+    }
+
+    // A blocks B.
+    await admin.query(
+      `insert into public.user_blocks (blocker_id, blocked_id, kind) values ($1, $2, 'block')`,
+      [fixture.userA, fixture.userB],
     );
+
+    await admin.query("commit");
+    return fixture;
+  } catch (error) {
+    await admin.query("rollback").catch(() => {});
+    throw error;
   }
-
-  // A blocks B.
-  await admin.query(
-    `insert into public.user_blocks (blocker_id, blocked_id, kind) values ($1, $2, 'block')
-     on conflict (blocker_id, blocked_id) do update set kind = 'block'`,
-    [fixture.userA, fixture.userB],
-  );
-
-  return fixture;
 }
 
 async function teardown(admin: pg.Client, fixture: Fixture | null) {
@@ -124,11 +131,47 @@ async function main() {
   // (port 5432) for the same reason.
   const admin = createPgSession("session", "admin");
   const reader = await connectGuarded("session", "reader");
+  const { url } = readSupabaseClientConfig();
+  const authAdmin = createClient(url, readServiceRoleKey(), {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+  });
+  const emailA = `block-a-${randomUUID()}@smoke.invalid`;
+  const emailB = `block-b-${randomUUID()}@smoke.invalid`;
+  let userA: string | undefined;
+  let userB: string | undefined;
   let fixture: Fixture | null = null;
+  let testFailure: unknown;
 
   try {
+    for (const [email, assign] of [
+      [
+        emailA,
+        (id: string) => {
+          userA = id;
+        },
+      ],
+      [
+        emailB,
+        (id: string) => {
+          userB = id;
+        },
+      ],
+    ] as const) {
+      const created = await authAdmin.auth.admin.createUser({
+        email,
+        password: `Smoke-${randomUUID()}-Aa1!`,
+        email_confirm: true,
+      });
+      if (created.error) throw new Error(`Creating block fixture user: ${created.error.message}`);
+      const id = created.data.user?.id;
+      if (!id) throw new Error(`Auth did not return the block fixture user ID for ${email}`);
+      assign(id);
+    }
     // `once`, not `withPg`: setup inserts rows and is not safe to replay.
-    fixture = await admin.once(setup);
+    fixture = await admin.once((client) => setup(client, userA!, userB!));
+    if (process.env.HLEIAS_SMOKE_INJECT_FAILURE === "after-block-fixtures") {
+      throw new Error("Intentional failure after block fixtures for cleanup verification.");
+    }
 
     const asB = await visiblePostsAs(reader, fixture.userB);
     const asA = await visiblePostsAs(reader, fixture.userA);
@@ -148,15 +191,30 @@ async function main() {
         2,
       ),
     );
+  } catch (error) {
+    testFailure = error;
+    throw error;
   } finally {
-    // Deletes only, so replaying them on a fresh connection is safe.
-    await admin
-      .withPg((client) => teardown(client, fixture))
-      .catch((error) => {
-        console.error("Fixture cleanup failed — remove it by hand:", { POST_A, POST_B }, error);
-      });
-    await admin.close();
-    await endQuietly(reader);
+    try {
+      await cleanupAll(
+        [
+          ["block posts and relation", () => admin.withPg((client) => teardown(client, fixture))],
+          [
+            "block fixture users",
+            () =>
+              admin.withPg((client) =>
+                client.query("delete from auth.users where email = any($1::text[])", [
+                  [emailA, emailB],
+                ]),
+              ),
+          ],
+        ],
+        testFailure,
+      );
+    } finally {
+      await admin.close();
+      await endQuietly(reader);
+    }
   }
 }
 

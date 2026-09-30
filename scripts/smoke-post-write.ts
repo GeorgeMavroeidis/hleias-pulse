@@ -17,6 +17,8 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 import { readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
+import { cleanupAll } from "./lib/cleanup";
+import { createPgSession } from "./lib/pg";
 import { createPulsePost, loadPulseData } from "../src/lib/hp-api";
 import { supabase } from "../src/lib/supabase/client";
 
@@ -39,6 +41,8 @@ async function main() {
   const password = `Smoke-${randomUUID()}-Aa1!`;
   let userId: string | undefined;
   let postId: string | undefined;
+  const db = createPgSession("session", "post-write-cleanup");
+  let testFailure: unknown;
 
   try {
     // Read first, still anonymous: a tourist browsing before signing in is the
@@ -97,13 +101,43 @@ async function main() {
         2,
       ),
     );
+  } catch (error) {
+    testFailure = error;
+    throw error;
   } finally {
-    // Service-role sweep, so a failure part-way through cannot strand a row or a
-    // user the way four leaked accounts did on 2026-09-07. Runs even when the
-    // author-delete above never happened.
-    if (postId) await admin.from("posts").delete().eq("id", postId);
-    await supabase.auth.signOut();
-    if (userId) await admin.auth.admin.deleteUser(userId);
+    try {
+      // The email is known before createUser. If Auth committed but its reply
+      // was lost, the database still finds and removes the fixture account.
+      await cleanupAll(
+        [
+          [
+            "posts",
+            () =>
+              db.withPg((client) =>
+                client.query(
+                  `delete from public.posts where id = $1 or user_id in
+           (select id from auth.users where email = $2)`,
+                  [postId ?? "", email],
+                ),
+              ),
+          ],
+          [
+            "sign out",
+            () => supabase.auth.signOut().then(({ error }) => requireOk("sign out", error)),
+          ],
+          [
+            "auth user",
+            () =>
+              db.withPg((client) =>
+                client.query("delete from auth.users where email = $1", [email]),
+              ),
+          ],
+        ],
+        testFailure,
+      );
+    } finally {
+      await db.close();
+    }
   }
 }
 

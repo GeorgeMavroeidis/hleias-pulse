@@ -1104,6 +1104,12 @@ export type Database = {
           id: string;
           image_url: string;
           lede: string;
+          route_distance_m: number | null;
+          route_duration_s: number | null;
+          route_generated_at: string | null;
+          route_geometry: Json | null;
+          route_input_hash: string | null;
+          routing_profile: string;
           saves_count: number;
           sort_order: number;
           tags: string[];
@@ -1119,6 +1125,12 @@ export type Database = {
           id: string;
           image_url: string;
           lede: string;
+          route_distance_m?: number | null;
+          route_duration_s?: number | null;
+          route_generated_at?: string | null;
+          route_geometry?: Json | null;
+          route_input_hash?: string | null;
+          routing_profile?: string;
           saves_count?: number;
           sort_order?: number;
           tags?: string[];
@@ -1134,6 +1146,12 @@ export type Database = {
           id?: string;
           image_url?: string;
           lede?: string;
+          route_distance_m?: number | null;
+          route_duration_s?: number | null;
+          route_generated_at?: string | null;
+          route_geometry?: Json | null;
+          route_input_hash?: string | null;
+          routing_profile?: string;
           saves_count?: number;
           sort_order?: number;
           tags?: string[];
@@ -1467,6 +1485,7 @@ export type Database = {
           outbox_id: string;
         }[];
       };
+      claim_route_preview_quota: { Args: never; Returns: boolean };
       complete_push_delivery: {
         Args: {
           error_code?: string;
@@ -1502,13 +1521,44 @@ export type Database = {
       };
       redeem_deal_code: { Args: { code: string }; Returns: Json };
       refresh_generic_stories: { Args: never; Returns: undefined };
-      refresh_meet_event_rsvp_counts: {
-        Args: { target_event_id: string };
-        Returns: undefined;
-      };
       review_place_claim: {
         Args: { claim_id: string; next_status: string };
         Returns: undefined;
+      };
+      save_admin_route_with_stops: {
+        Args: {
+          preview_coordinates: Json;
+          preview_profile: string;
+          route_payload: Json;
+          stops_payload: Json;
+        };
+        Returns: {
+          author_id: string;
+          budget: string;
+          comment_count: number;
+          created_at: string;
+          duration: string;
+          id: string;
+          image_url: string;
+          lede: string;
+          route_distance_m: number | null;
+          route_duration_s: number | null;
+          route_generated_at: string | null;
+          route_geometry: Json | null;
+          route_input_hash: string | null;
+          routing_profile: string;
+          saves_count: number;
+          sort_order: number;
+          tags: string[];
+          title: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "routes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
       set_place_deal: {
         Args: { claim_id: string; deal_active: boolean; deal_text: string };

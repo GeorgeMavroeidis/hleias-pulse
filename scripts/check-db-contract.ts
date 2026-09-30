@@ -83,6 +83,7 @@ try {
     "push_subscriptions",
     "private.push_notification_outbox",
     "private.push_notification_deliveries",
+    "private.route_preview_requests",
   ]) {
     const qualified = table.includes(".") ? table : `public.${table}`;
     await count(`select 1 from ${qualified}`, 0, `No leaked fixtures in ${table}`);
@@ -141,8 +142,8 @@ try {
   ]);
   await count(
     `select policyname from pg_policies where schemaname='storage' and tablename='objects'`,
-    14,
-    "All avatar/content/poster storage policies exist",
+    17,
+    "All avatar/content/poster and registered-account storage policies exist",
   );
   await count(
     `select n.nspname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','private') and c.relkind='r' and not c.relrowsecurity`,
@@ -152,7 +153,13 @@ try {
   await count(
     `select table_name from information_schema.role_table_grants where table_schema='private' and grantee in ('anon','authenticated','service_role')`,
     0,
-    "Private push queue has no direct API grants",
+    "Private queue and route preview quota have no direct API grants",
+  );
+  await count(
+    `select c.oid from pg_class c join pg_namespace n on n.oid=c.relnamespace
+     where n.nspname='private' and c.relname='route_preview_requests' and c.relrowsecurity`,
+    1,
+    "Route preview quota ledger has RLS",
   );
   await count(
     `select table_name from information_schema.role_table_grants where table_schema='public' and grantee in ('anon','authenticated') and privilege_type in ('TRUNCATE','REFERENCES','TRIGGER')`,
@@ -161,19 +168,21 @@ try {
   );
   const anonFunctions = [
     "blocked_user_ids()",
-    "current_admin_role()",
-    "current_business_id()",
-    "current_organizer_id()",
     "get_pulse_bootstrap()",
-    "has_admin_role(text[])",
     "refresh_generic_stories()",
   ];
   const authenticatedFunctions = [
     ...anonFunctions,
+    "current_admin_role()",
+    "claim_route_preview_quota()",
+    "current_business_id()",
+    "current_organizer_id()",
+    "has_admin_role(text[])",
     "issue_deal_code(text)",
     "moderate_content(text,text,text)",
     "redeem_deal_code(text)",
     "review_place_claim(uuid,text)",
+    "save_admin_route_with_stops(jsonb,jsonb,jsonb,text)",
     "set_place_deal(uuid,text,boolean)",
   ];
   for (const [role, allowed] of [
@@ -195,11 +204,23 @@ try {
       `${role} can execute every declared public function`,
     );
   }
+  const workerFunctions = [
+    "claim_push_delivery_batch()",
+    "complete_push_delivery(uuid,uuid,text,text)",
+    "prepare_push_delivery(uuid,uuid)",
+  ];
   await count(
     `select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-     where n.nspname='public' and not has_function_privilege('service_role',p.oid,'execute')`,
+     where n.nspname='public' and has_function_privilege('service_role',p.oid,'execute')
+       and p.oid::regprocedure::text not in (${workerFunctions.map((signature) => `'${signature}'`).join(",")})`,
     0,
-    "Service role can execute every public function explicitly",
+    "Service role cannot execute undeclared public functions",
+  );
+  await count(
+    `select signature from (values ${workerFunctions.map((signature) => `('public.${signature}')`).join(",")}) expected(signature)
+     where not has_function_privilege('service_role',to_regprocedure(signature),'execute')`,
+    0,
+    "Service role can execute worker RPCs",
   );
   await count(
     `select name from vault.secrets where name like 'push_worker_%'`,

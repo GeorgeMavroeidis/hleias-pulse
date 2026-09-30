@@ -7,9 +7,10 @@ export type ValidPushEndpoint = {
   url: URL;
 };
 
-const APPLE_SUFFIX = ".push.apple.com";
+const APPLE_HOST = /^[a-z0-9-]+\.push\.apple\.com$/;
 
 export function validatePushEndpoint(candidate: string): ValidPushEndpoint | null {
+  if (new TextEncoder().encode(candidate).byteLength > 2048) return null;
   let url: URL;
   try {
     url = new URL(candidate);
@@ -27,7 +28,7 @@ export function validatePushEndpoint(candidate: string): ValidPushEndpoint | nul
 
   if (hostname === "fcm.googleapis.com") return { provider: "google", url };
   if (hostname === "updates.push.services.mozilla.com") return { provider: "mozilla", url };
-  if (hostname.endsWith(APPLE_SUFFIX) && hostname.length > APPLE_SUFFIX.length) {
+  if (APPLE_HOST.test(hostname)) {
     return { provider: "apple", url };
   }
 

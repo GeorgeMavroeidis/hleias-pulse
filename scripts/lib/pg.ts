@@ -49,9 +49,8 @@
  * still fail against the hosted pooler in "transaction" mode.
  *
  * So CI proves the SQL and the policies are right. It does not prove the pooler
- * mode chosen for each script is right. That distinction is only exercised by
- * running the suite against the hosted project from a maintainer's machine,
- * which is still worth doing before anything ships.
+ * mode chosen for each script is right. Destructive smoke scripts are local-only;
+ * pooler behaviour needs a separate, read-only check if it matters before ship.
  */
 import pg from "pg";
 
@@ -71,13 +70,12 @@ const POOLER_PORT: Record<PoolerMode, number> = { session: 5432, transaction: 65
 const LOCAL_DB_PORT = 54322;
 
 /**
- * Is the target the local Supabase stack (`supabase start`) rather than a
- * hosted project?
+ * Is the target the local Supabase stack (`supabase start`)?
  *
  * This is one decision, not four knobs, because the three settings below only
  * make sense together — a half-configured target fails in a confusing way. CI
- * runs against the local stack (see .github/workflows/smoke.yml); a maintainer's
- * machine runs against the hosted project.
+ * runs against the local stack (see .github/workflows/smoke.yml). Destructive
+ * smoke entrypoints enforce this even outside CI.
  */
 function isLocalStack(host: string) {
   return host === "127.0.0.1" || host === "localhost" || host === "::1";
@@ -90,9 +88,7 @@ function clientConfig(mode: PoolerMode): pg.ClientConfig {
 
   const password = readEnvValue("SUPABASE_DB_PASSWORD");
   if (!password) {
-    throw new Error(
-      "SUPABASE_DB_PASSWORD is missing. Put it in .env, like the smoke scripts expect.",
-    );
+    throw new Error("Local SUPABASE_DB_PASSWORD is missing; use npm run supabase:local.");
   }
 
   const local = isLocalStack(DB_HOST);

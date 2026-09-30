@@ -84,8 +84,8 @@ free-tier services. The paid/Apple track starts in February.
    one guarded connection helper (`scripts/lib/pg.ts`) instead of eight
    hand-copied ones. Left over: `smoke:admin`, `smoke:routes` and
    `smoke:verification-guards` still carry their own copy of that block.
-3. **Confirm the web deploy works end to end** — _build artifact verified
-   (2026-09-07), actual live Cloudflare deploy still unverified._ Built
+3. **Confirm the web deploy works end to end** — *build artifact verified
+   (2026-09-07), actual live Cloudflare deploy still unverified.* Built
    `cloudflare-static-dist` fresh off `main` and served it through
    `wrangler dev` (the same static-assets + SPA-fallback runtime Cloudflare
    uses, no account needed to run it locally): onboarding, map, Pulse feed,

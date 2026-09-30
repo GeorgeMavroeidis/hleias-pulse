@@ -1,5 +1,6 @@
 import { supabase } from "./supabase/client";
 import type { Database } from "./supabase/database.types";
+import type { RouteCoordinate } from "./hp/route-preview";
 
 export type AdminRole = "owner" | "editor" | "moderator";
 export type ModerationStatus = "pending" | "published" | "hidden";
@@ -409,6 +410,45 @@ export async function saveAdminRoute(route: Database["public"]["Tables"]["routes
   const result = await supabase.from("routes").upsert(route).select("*").single();
   if (result.error) throw result.error;
   return result.data;
+}
+
+/** Save a route and its ordered stops in one database transaction. */
+export async function saveAdminRouteWithStops(
+  route: Database["public"]["Tables"]["routes"]["Insert"],
+  stops: Database["public"]["Tables"]["route_stops"]["Insert"][],
+  previewCoordinates: RouteCoordinate[] | null,
+) {
+  const result = await supabase.rpc("save_admin_route_with_stops", {
+    route_payload: route,
+    stops_payload: stops,
+    preview_coordinates: previewCoordinates?.map(([lng, lat]) => [lng, lat]) ?? null,
+    preview_profile: route.routing_profile ?? "driving-car",
+  });
+  if (result.error) throw result.error;
+  if (!result.data) throw new Error("The route was not saved.");
+  return result.data;
+}
+
+export async function buildAdminRoutePreview(body: {
+  profile: "driving-car" | "foot-walking";
+  coordinates: [number, number][];
+}) {
+  const result = await supabase.functions.invoke("build-route-preview", { body });
+  if (result.error) {
+    const response = result.error.context;
+    if (response instanceof Response) {
+      const payload = await response.json().catch(() => null);
+      if (
+        payload &&
+        typeof payload === "object" &&
+        "error" in payload &&
+        typeof payload.error === "string"
+      )
+        throw new Error(payload.error);
+    }
+    throw result.error;
+  }
+  return result.data as unknown;
 }
 
 export async function replaceAdminRouteStops(

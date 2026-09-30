@@ -32,12 +32,14 @@ async function createUser(
   url: string,
   publishableKey: string,
   label: string,
+  onCreated: (id: string) => void,
 ): Promise<UserFixture> {
   const email = `push-smoke-${label}-${suffix}@example.invalid`;
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
   if (created.error || !created.data.user) {
     throw new Error(`create ${label}: ${created.error?.message ?? "no user returned"}`);
   }
+  onCreated(created.data.user.id);
 
   const client = createClient(url, publishableKey, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
@@ -94,14 +96,14 @@ async function main() {
   const db = createPgSession("session", "push-smoke-admin");
   const claimA = await connectGuarded("session", "push-claim-a");
   const claimB = await connectGuarded("session", "push-claim-b");
-  const users: UserFixture[] = [];
+  const createdUserIds: string[] = [];
   const commentIds: string[] = [];
 
   try {
-    const owner = await createUser(adminApi, url, publishableKey, "owner");
-    const answerer = await createUser(adminApi, url, publishableKey, "answerer");
-    const unrelated = await createUser(adminApi, url, publishableKey, "unrelated");
-    users.push(owner, answerer, unrelated);
+    const trackCreated = (id: string) => createdUserIds.push(id);
+    const owner = await createUser(adminApi, url, publishableKey, "owner", trackCreated);
+    const answerer = await createUser(adminApi, url, publishableKey, "answerer", trackCreated);
+    const unrelated = await createUser(adminApi, url, publishableKey, "unrelated", trackCreated);
 
     await db.once((client) => setupContent(client, owner.id, unrelated.id));
 
@@ -136,6 +138,43 @@ async function main() {
       `valid FCM subscription rejected: ${firstSubscription.error?.code ?? "unknown_code"} ${
         firstSubscription.error?.message ?? "unknown_message"
       }`,
+    );
+
+    // Endpoint and encryption keys are private to their owner, including for
+    // direct REST calls made by another signed-in account.
+    const otherRead = await answerer.client
+      .from("push_subscriptions")
+      .select("id")
+      .eq("id", firstSubscription.data.id);
+    assert(!otherRead.error && otherRead.data?.length === 0, "another user read a subscription");
+    const otherUpdate = await answerer.client
+      .from("push_subscriptions")
+      .update({ auth_key: "forged" })
+      .eq("id", firstSubscription.data.id)
+      .select("id");
+    assert(
+      !otherUpdate.error && otherUpdate.data?.length === 0,
+      "another user updated a subscription",
+    );
+    const otherDelete = await answerer.client
+      .from("push_subscriptions")
+      .delete()
+      .eq("id", firstSubscription.data.id)
+      .select("id");
+    assert(
+      !otherDelete.error && otherDelete.data?.length === 0,
+      "another user deleted a subscription",
+    );
+    const signedOut = createClient(url, publishableKey, {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    });
+    await expectRejected("signed-out subscription insert", async () =>
+      signedOut.from("push_subscriptions").insert({
+        auth_key: "auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-signed-out`,
+        p256dh: "key",
+        user_id: owner.id,
+      }),
     );
     const secondSubscription = await owner.client
       .from("push_subscriptions")
@@ -228,6 +267,16 @@ async function main() {
     assert(
       (await db.withPg((client) => outboxCount(client, answer.data.id))) === 1,
       "publish did not enqueue exactly once",
+    );
+    const queuedRecipient = await db.withPg((client) =>
+      client.query<{ recipient_id: string }>(
+        "select recipient_id from private.push_notification_outbox where source_comment_id = $1",
+        [answer.data.id],
+      ),
+    );
+    assert(
+      queuedRecipient.rows[0]?.recipient_id === owner.id,
+      "published answer was queued for a caller-chosen recipient",
     );
     await db.once(async (client) => {
       await client.query("update public.comments set text = 'edited after publish' where id = $1", [
@@ -560,6 +609,100 @@ async function main() {
       "expired fourth attempt did not terminalize its outbox",
     );
 
+    // A user cannot store unlimited devices or oversized payloads. Use the
+    // unrelated account so the earlier per-device delivery assertions stay
+    // focused on the original three subscriptions.
+    await expectRejected("oversized endpoint", async () =>
+      unrelated.client.from("push_subscriptions").insert({
+        auth_key: "auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${"x".repeat(2100)}`,
+        p256dh: "key",
+        user_id: unrelated.id,
+      }),
+    );
+    await expectRejected("oversized encryption key", async () =>
+      unrelated.client.from("push_subscriptions").insert({
+        auth_key: "auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-oversized-key`,
+        p256dh: "x".repeat(257),
+        user_id: unrelated.id,
+      }),
+    );
+    await expectRejected("oversized authentication key", async () =>
+      unrelated.client.from("push_subscriptions").insert({
+        auth_key: "x".repeat(129),
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-oversized-auth`,
+        p256dh: "key",
+        user_id: unrelated.id,
+      }),
+    );
+    const deviceRegistrations = await Promise.all(
+      Array.from({ length: 11 }, (_, device) =>
+        unrelated.client.from("push_subscriptions").insert({
+          auth_key: "auth",
+          endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-device-${device}`,
+          p256dh: "key",
+          user_id: unrelated.id,
+        }),
+      ),
+    );
+    assert(
+      deviceRegistrations.filter((result) => !result.error).length === 10 &&
+        deviceRegistrations.filter((result) => result.error).length === 1,
+      "concurrent device registrations exceeded the ten-subscription limit",
+    );
+    await expectRejected("twelfth device", async () =>
+      unrelated.client.from("push_subscriptions").insert({
+        auth_key: "auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}-device-over-limit`,
+        p256dh: "key",
+        user_id: unrelated.id,
+      }),
+    );
+
+    // One claim call may fan out at most 20 outboxes to at most ten devices.
+    // Roll back the synthetic queue rows so they never escape this test.
+    await db.withPg(async (client) => {
+      await client.query("begin");
+      try {
+        const created = await client.query<{ id: string }>(
+          `insert into private.push_notification_outbox
+             (event_type,source_comment_id,recipient_id,created_at)
+           select 'question_answer_published',extensions.gen_random_uuid(),$1,
+                  now()-interval '1 day'
+           from generate_series(1,25)
+           returning id`,
+          [unrelated.id],
+        );
+        const ids = created.rows.map((row) => row.id);
+        assert(ids.length === 25, "bounded fanout fixture was incomplete");
+        const claimed = await client.query("select * from public.claim_push_delivery_batch()");
+        assert(claimed.rowCount !== null && claimed.rowCount <= 20, "worker claimed over 20 rows");
+        const result = await client.query<{
+          deliveries: string;
+          outboxes_with_deliveries: string;
+          queued_without_deliveries: string;
+        }>(
+          `select count(d.id) as deliveries,
+                  count(distinct d.outbox_id) as outboxes_with_deliveries,
+                  count(distinct o.id) filter (where d.id is null and o.status='queued')
+                    as queued_without_deliveries
+           from private.push_notification_outbox as o
+           left join private.push_notification_deliveries as d on d.outbox_id=o.id
+           where o.id=any($1::uuid[])`,
+          [ids],
+        );
+        assert(
+          Number(result.rows[0].deliveries) === 200 &&
+            Number(result.rows[0].outboxes_with_deliveries) === 20 &&
+            Number(result.rows[0].queued_without_deliveries) === 5,
+          "one worker call did not bound fanout to 20 outboxes and ten devices",
+        );
+      } finally {
+        await client.query("rollback");
+      }
+    });
+
     console.log(JSON.stringify({ ok: true, claims: claims.length, outbox: "durable" }, null, 2));
   } finally {
     await db
@@ -568,8 +711,8 @@ async function main() {
         await client.query("delete from public.posts where id = any($1::text[])", [
           [questionId, unrelatedQuestionId],
         ]);
-        for (const user of users) {
-          await client.query("delete from auth.users where id = $1", [user.id]);
+        for (const userId of createdUserIds) {
+          await client.query("delete from auth.users where id = $1", [userId]);
         }
       })
       .catch((error) => console.error("push security fixture cleanup failed", error));

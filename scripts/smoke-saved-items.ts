@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 import { readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
+import { cleanupAll } from "./lib/cleanup";
 import { loadPulseUserState, setSavedItem } from "../src/lib/hp-api";
 import { supabase } from "../src/lib/supabase/client";
 
@@ -26,6 +27,7 @@ async function main() {
   const password = `Smoke-${randomUUID()}-Aa1!`;
   const emails = [0, 1].map((index) => `smoke-saved-${index}-${suffix}@example.invalid`);
   const userIds: string[] = [];
+  let testFailure: unknown;
 
   async function signIn(index: number) {
     assertOk(
@@ -130,12 +132,35 @@ async function main() {
     assert.equal(saved[0].user_id, userIds[1]);
 
     console.log("smoke_saved_items_ok");
+  } catch (error) {
+    testFailure = error;
+    throw error;
   } finally {
-    await supabase.auth.signOut();
-    for (const userId of userIds) {
-      assertOk("delete disposable user", (await admin.auth.admin.deleteUser(userId)).error);
-    }
-    if (userIds.length) assert.equal((await rows()).length, 0, "Saved rows survived user cleanup.");
+    await cleanupAll(
+      [
+        ["sign out", async () => assertOk("sign out", (await supabase.auth.signOut()).error)],
+        ...userIds.map(
+          (userId) =>
+            [
+              `delete disposable user ${userId}`,
+              async () =>
+                assertOk(
+                  "delete disposable user",
+                  (await admin.auth.admin.deleteUser(userId)).error,
+                ),
+            ] as [string, () => Promise<void>],
+        ),
+        [
+          "verify saved-row cleanup",
+          async () => {
+            if (userIds.length) {
+              assert.equal((await rows()).length, 0, "Saved rows survived user cleanup.");
+            }
+          },
+        ],
+      ],
+      testFailure,
+    );
   }
 }
 

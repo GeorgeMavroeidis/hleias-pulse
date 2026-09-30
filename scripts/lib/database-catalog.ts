@@ -54,8 +54,8 @@ export async function databaseCatalog(client: pg.Client) {
   return result;
 }
 
-/** IDs must be identical before/after smokes, including content with SET NULL FKs.
- * Audit records intentionally survive deleted actors and are the sole exclusion.
+/** Primary-key identities must be identical before and after every smoke,
+ * including audit records that survive deleted actors through SET NULL FKs.
  */
 export async function fixtureIdentities(client: pg.Client) {
   const tables = (
@@ -67,7 +67,7 @@ export async function fixtureIdentities(client: pg.Client) {
     cross join lateral unnest(p.conkey) with ordinality k(attnum,ordinality)
     join pg_attribute a on a.attrelid=c.oid and a.attnum=k.attnum
     where p.contype='p' and (
-      (n.nspname in ('public','private') and c.relname<>'admin_audit_logs')
+      n.nspname in ('public','private')
       or (n.nspname='auth' and c.relname='users')
       or (n.nspname='storage' and c.relname='objects'))
     group by n.nspname,c.relname order by 1,2

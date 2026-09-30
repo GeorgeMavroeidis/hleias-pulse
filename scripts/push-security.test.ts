@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
+import { runInNewContext } from "node:vm";
 
 import { upsertVaultSecret } from "./provision-push-worker.ts";
 import { createHandler } from "../supabase/functions/send-push/handler.ts";
@@ -161,6 +163,7 @@ describe("push endpoint policy", () => {
     "https://[::ffff:127.0.0.1]/push",
     "https://fcm.googleapis.com.evil.example/push",
     "https://evilpush.apple.com/push",
+    "https://nested.web.push.apple.com/push",
     "https://user:pass@fcm.googleapis.com/push",
     "https://fcm.googleapis.com:444/push",
     "https://fcm.googleapis.com/push#fragment",
@@ -180,6 +183,13 @@ describe("push endpoint policy", () => {
       assert.equal(validatePushEndpoint(endpoint), null);
     });
   }
+
+  test("rejects an allowed provider URL with an oversized path", () => {
+    assert.equal(
+      validatePushEndpoint(`https://fcm.googleapis.com/fcm/send/${"x".repeat(2100)}`),
+      null,
+    );
+  });
 });
 
 function delivery(endpoint = "https://fcm.googleapis.com/fcm/send/token"): PreparedDelivery {
@@ -251,6 +261,44 @@ describe("bounded Web Push transport", () => {
     );
   });
 
+  test("bounds a user-controlled post id in the push payload", async () => {
+    let payload = "";
+    const transport = createWebPushTransport(
+      builder((builtPayload) => {
+        payload = builtPayload;
+      }),
+      { fetchImpl: async () => new Response(null, { status: 201 }) },
+    );
+    await transport.send({ ...delivery(), post_id: "x".repeat(5000) });
+    assert.equal((JSON.parse(payload) as { url: string }).url, "/");
+    assert.ok(new TextEncoder().encode(payload).byteLength < 1024);
+  });
+
+  test("rejects a generated endpoint again immediately before fetch", async () => {
+    let fetchCalls = 0;
+    const requestBuilder: WebPushRequestBuilder = {
+      generateRequestDetails() {
+        return {
+          endpoint: "https://127.0.0.1/private",
+          method: "POST",
+          headers: {},
+          body: null,
+        };
+      },
+    };
+    const transport = createWebPushTransport(requestBuilder, {
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        return new Response(null, { status: 201 });
+      },
+    });
+    await assert.rejects(
+      transport.send(delivery()),
+      (error: unknown) => error instanceof PushTransportError && error.category === "network_error",
+    );
+    assert.equal(fetchCalls, 0);
+  });
+
   test("classifies aborted requests without returning network detail", async () => {
     const transport = createWebPushTransport(builder(), {
       fetchImpl: async () => {
@@ -261,6 +309,52 @@ describe("bounded Web Push transport", () => {
       transport.send(delivery()),
       (error: unknown) => error instanceof PushTransportError && error.category === "timeout",
     );
+  });
+});
+
+describe("notification navigation", () => {
+  test("opens only the app root or a single encoded post link", async () => {
+    const opened: string[] = [];
+    const listeners = new Map<string, (event: unknown) => void>();
+    const serviceWorker = {
+      location: { origin: "https://pulse.example" },
+      addEventListener(name: string, listener: (event: unknown) => void) {
+        listeners.set(name, listener);
+      },
+      clients: {
+        matchAll: async () => [],
+        openWindow: async (url: string) => {
+          opened.push(url);
+        },
+      },
+    };
+    const source = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
+    runInNewContext(source, { self: serviceWorker, URL });
+    const click = listeners.get("notificationclick");
+    assert.ok(click, "service worker has no notification click handler");
+
+    for (const [payloadUrl, expectedUrl] of [
+      ["/", "/"],
+      ["/?post=question%2Fid%3Funsafe%3Dyes", "/?post=question%2Fid%3Funsafe%3Dyes"],
+      ["https://evil.example/phish", "/"],
+      ["//evil.example/phish", "/"],
+      ["javascript:alert(1)", "/"],
+      ["/admin", "/"],
+      ["/?post=one&post=two", "/"],
+      ["/?post=one&redirect=https://evil.example", "/"],
+      ["/?post=one#fragment", "/"],
+      [{ path: "/admin" }, "/"],
+    ] as const) {
+      let completion: Promise<unknown> | undefined;
+      click({
+        notification: { data: { url: payloadUrl }, close() {} },
+        waitUntil(work: Promise<unknown>) {
+          completion = work;
+        },
+      });
+      await completion;
+      assert.equal(opened.pop(), expectedUrl);
+    }
   });
 });
 
