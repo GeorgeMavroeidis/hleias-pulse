@@ -61,7 +61,9 @@ free-tier services. The paid/Apple track starts in February.
    `smoke:admin` now covers the whole owner/editor/moderator permission model,
    including the privilege-escalation path; `smoke:verification-guards` covers
    organizer and business self-verification; `smoke:routes` covers routes /
-   route stops. Left: cultural-event publishing, place claims, `saved_items`.
+   route stops. `saved_items` now has a disposable local-stack smoke covering
+   the app's save/load path and per-user isolation. Left: cultural-event
+   publishing and place claims.
    Pure code, no migration, no cost. That pass also turned up an audit-trail
    gap — **closed 2026-09-07**: `businesses`, `organizers` and `admin_members`
    now carry audit triggers (`20260907120000`, applied live), and the admin API
