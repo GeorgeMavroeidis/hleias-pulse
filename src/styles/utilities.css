@@ -25,14 +25,6 @@
   scrollbar-width: none;
 }
 
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--hp-sunset) !important;
-  outline-offset: 2px !important;
-}
-
 @media (pointer: coarse) {
   input,
   textarea,

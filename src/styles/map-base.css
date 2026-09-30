@@ -30,12 +30,12 @@
 .hp-map-attribution__info {
   border: 1px solid color-mix(in srgb, var(--hp-ink) 10%, transparent);
   background: color-mix(in srgb, var(--hp-paper) 92%, transparent);
-  box-shadow: 0 3px 12px rgba(23, 20, 17, 0.08);
+  box-shadow: var(--hp-shadow-control);
   backdrop-filter: blur(8px);
 }
 .hp-map-attribution__credits {
-  max-width: min(72vw, 430px);
-  border-radius: 9999px;
+  max-width: min(64vw, 320px);
+  border-radius: var(--hp-radius-control);
   padding: 0.22rem 0.5rem;
 }
 .hp-map-attribution__credits a {
@@ -44,10 +44,10 @@
 }
 .hp-map-attribution__info {
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: var(--hp-control-target);
+  height: var(--hp-control-target);
   place-items: center;
-  border-radius: 9999px;
+  border-radius: var(--hp-radius-control);
   color: var(--hp-deep);
   font-size: 15px;
   font-weight: 800;

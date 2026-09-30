@@ -220,6 +220,9 @@
   --hp-paper: #211b3a;
   --hp-ink: #f3ecdc;
   --hp-muted: #a79fc4;
+  --hp-text-secondary: #c5bcb0;
+  --hp-text-accent: #ffb68c;
+  --hp-focus-color: var(--hp-sea);
 }
 .hp-app-shell.is-night .hp-real-map .maplibregl-canvas {
   filter: invert(1) hue-rotate(180deg) brightness(0.92) saturate(0.7);
@@ -262,28 +265,5 @@ h3 {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-/* TopBar "Deals" pill: a subtle, periodic attention pulse — a soft sunset
-   glow plus a micro-bounce that rests for most of the cycle, so it draws
-   the eye toward offers without nagging. */
-.hp-deals-pill {
-  animation: hp-deals-pulse 3.4s ease-in-out infinite;
-}
-@keyframes hp-deals-pulse {
-  0%,
-  68%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--hp-sunset) 0%, transparent);
-  }
-  78% {
-    transform: scale(1.06);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--hp-sunset) 22%, transparent);
-  }
-  88% {
-    transform: scale(0.99);
-    box-shadow: 0 0 0 7px color-mix(in srgb, var(--hp-sunset) 0%, transparent);
   }
 }
