@@ -70,6 +70,7 @@ jobs:
       # CLI 2.106 pulls these images from ECR, which rate-limits anonymous
       # GitHub runners. The matching GHCR tags have identical linux/amd64
       # manifests and are tagged locally before the disposable stack starts.
+      # `start` and `gen types --db-url` use different postgres-meta tags.
       - name: Preload Supabase CLI images from GHCR
         run: |
           while read -r image tag; do
@@ -81,7 +82,8 @@ jobs:
           gotrue v2.189.0
           realtime v2.106.0
           edge-runtime v1.74.1
-          postgrest v14.5
+          postgrest v14.13
+          postgres-meta v0.96.6
           postgres-meta v0.96.1
           mailpit v1.22.3
           kong 2.8.1
