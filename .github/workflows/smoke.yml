@@ -67,13 +67,26 @@ jobs:
       - name: Test local target safety
         run: npm run test:db-safety
 
-      # CLI 2.106 starts this image during `gen types --db-url`. The ECR endpoint
-      # rate-limits anonymous GitHub runners; Supabase's GHCR tag has the same
-      # image digest and is pulled before the deterministic database check.
-      - name: Cache type generator image from Supabase GHCR
+      # CLI 2.106 pulls these images from ECR, which rate-limits anonymous
+      # GitHub runners. The matching GHCR tags have identical linux/amd64
+      # manifests and are tagged locally before the disposable stack starts.
+      - name: Preload Supabase CLI images from GHCR
         run: |
-          docker pull ghcr.io/supabase/postgres-meta:v0.96.1
-          docker tag ghcr.io/supabase/postgres-meta:v0.96.1 public.ecr.aws/supabase/postgres-meta:v0.96.1
+          while read -r image tag; do
+            docker pull "ghcr.io/supabase/${image}:${tag}"
+            docker tag "ghcr.io/supabase/${image}:${tag}" "public.ecr.aws/supabase/${image}:${tag}"
+          done <<'IMAGES'
+          postgres 17.6.1.134
+          storage-api v1.60.15
+          gotrue v2.189.0
+          realtime v2.106.0
+          edge-runtime v1.74.1
+          postgrest v14.5
+          postgres-meta v0.96.1
+          mailpit v1.22.3
+          kong 2.8.1
+          imgproxy v3.8.0
+          IMAGES
 
       # Two resets, complete schema comparison, deterministic seed/types, every
       # smoke, full RLS snapshot, and explicit post-suite fixture cleanup checks.
