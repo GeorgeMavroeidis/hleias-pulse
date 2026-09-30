@@ -60,6 +60,7 @@ import {
   type Comment,
   type RouteItem,
 } from "@/lib/hp-model";
+import { openExternalNavigation, type NavigationProvider } from "@/lib/hp/route-navigation";
 import {
   addPulseComment,
   applyToBecomeOrganizer,
@@ -1072,16 +1073,18 @@ export function PulseApp() {
     () => (activeRouteId ? (routeById.get(activeRouteId) ?? null) : null),
     [activeRouteId, routeById],
   );
-  const activeRoutePath = useMemo(() => {
+  const activeRoutePreview = useMemo(() => {
     if (!activeRoute) return null;
-    const path = activeRoute.stops
+    const stops = activeRoute.stops
       .map((stop) => {
         const place = placeById.get(stop.placeId);
         if (!place) return null;
         return { lat: place.lat, lng: place.lng, label: place.name };
       })
       .filter((stop): stop is { lat: number; lng: number; label: string } => Boolean(stop));
-    return path.length >= 2 ? path : null;
+    return stops.length >= 2
+      ? { stops, geometry: activeRoute.routeGeometry?.coordinates ?? null }
+      : null;
   }, [activeRoute, placeById]);
   const profileStats = useMemo(() => {
     const ownedPosts = accountProfileId
@@ -1901,6 +1904,22 @@ export function PulseApp() {
     centerRouteStop(activeRoute.stops[nextIndex].placeId, nextIndex);
   };
 
+  const navigateRouteStop = async (placeId: string, provider: NavigationProvider) => {
+    if (!activeRoute) return;
+    const place = findPlace(placeId);
+    if (!place) return;
+    try {
+      await openExternalNavigation(
+        provider,
+        { lat: place.lat, lng: place.lng, label: place.name },
+        activeRoute.routingProfile,
+      );
+    } catch (error) {
+      console.warn("Could not open external navigation.", error);
+      showToast(t("Could not open navigation"));
+    }
+  };
+
   const closeOnboarding = () => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem("hp.onboarding.seen.v1", "1");
@@ -2082,7 +2101,7 @@ export function PulseApp() {
             onBack={goBackMapView}
             bottomOverlayHeight={sheetH}
             availableMapHeight={availableMapHeight}
-            routePath={activeRoutePath}
+            routePreview={activeRoutePreview}
             onMapLongPress={(lat, lng) => {
               openComposer("place", { lat, lng });
               showToast(t("Drop a new spot"));
@@ -2097,6 +2116,7 @@ export function PulseApp() {
                   findPlace={findPlace}
                   onOpenStop={centerRouteStop}
                   onNext={nextRouteStop}
+                  onNavigate={(placeId, provider) => void navigateRouteStop(placeId, provider)}
                   onClose={() => setActiveRouteId(null)}
                 />
               </Suspense>

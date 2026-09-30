@@ -94,6 +94,12 @@ export interface RouteStop {
   body: string;
 }
 
+export type RouteRoutingProfile = "driving-car" | "foot-walking";
+export interface RouteGeometry {
+  type: "LineString";
+  coordinates: [number, number][];
+}
+
 export interface RouteItem {
   id: string;
   title: string;
@@ -106,6 +112,12 @@ export interface RouteItem {
   imageUrl: string;
   commentCount: number;
   saves: number;
+  routingProfile: RouteRoutingProfile;
+  routeGeometry: RouteGeometry | null;
+  routeDistanceMeters: number | null;
+  routeDurationSeconds: number | null;
+  routeInputHash: string | null;
+  routeGeneratedAt: string | null;
 }
 
 export interface StoryItem {

@@ -224,6 +224,7 @@ for (const script of [
   "smoke:admin",
   "smoke:verification-guards",
   "smoke:routes",
+  "smoke:route-preview",
   "smoke:push-security",
 ])
   await runSmoke(script);

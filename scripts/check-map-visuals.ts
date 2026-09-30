@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  coordinateBounds,
+  isFatalBasemapError,
+  removeAdministrativeBoundaries,
+  toMapLibreCoordinate,
+} from "../src/lib/hp/map-core";
+import {
   childMarkerSize,
   markerPresenceScale,
   markerMotionPhase,
@@ -134,6 +140,75 @@ const mapSource = readFileSync(
   new URL("../src/components/hp/SocialMap.tsx", import.meta.url),
   "utf8",
 );
+assert.ok(mapSource.includes("https://tiles.openfreemap.org/styles/bright"));
+assert.ok(mapSource.includes('import("maplibre-gl")'));
+assert.ok(mapSource.includes("new maplibre.Map"));
+assert.ok(mapSource.includes("attributionControl: false"));
+assert.ok(mapSource.includes("hp-map-attribution__info"));
+assert.doesNotMatch(mapSource, /maplibre-gl-leaflet|import\("leaflet"\)|OPENFREEMAP_ATTRIBUTION/);
+assert.doesNotMatch(
+  mapSource,
+  /tile\.openstreetmap\.org/,
+  "The public map must not silently restore OSM Standard administrative boundaries",
+);
+assert.doesNotMatch(mapSource, /VITE_MAP_TILE_/);
+assert.doesNotMatch(mapSource, /ORS_API_KEY|VITE_[A-Z_]*ROUT/);
+const style = removeAdministrativeBoundaries({
+  version: 8,
+  sources: {},
+  layers: [
+    { id: "water", type: "background" },
+    { id: "boundary_2", type: "line", source: "openmaptiles", "source-layer": "boundary" },
+    { id: "admin-boundary-label", type: "symbol", source: "openmaptiles", "source-layer": "place" },
+    { id: "road", type: "line", source: "openmaptiles", "source-layer": "transportation" },
+  ],
+});
+assert.deepEqual(
+  style.layers.map((layer) => layer.id),
+  ["water", "road"],
+);
+assert.deepEqual(toMapLibreCoordinate(37.64, 21.31), [21.31, 37.64]);
+assert.deepEqual(
+  coordinateBounds([
+    [21, 37],
+    [22, 38],
+    [20, 37.5],
+  ]),
+  [
+    [20, 37],
+    [22, 38],
+  ],
+);
+function* manyMapCoordinates(): Iterable<readonly [number, number]> {
+  for (let index = 0; index < 100_000; index += 1) {
+    yield index === 99_999 ? [22, 38] : [21, 37];
+  }
+}
+assert.deepEqual(coordinateBounds(manyMapCoordinates()), [
+  [21, 37],
+  [22, 38],
+]);
+assert.throws(() => coordinateBounds([]), /At least one coordinate/);
+assert.equal(
+  isFatalBasemapError(false, undefined),
+  true,
+  "An initial style failure must be visible",
+);
+assert.equal(isFatalBasemapError(false, "openmaptiles"), false, "A source error is recoverable");
+assert.equal(
+  isFatalBasemapError(true, undefined),
+  false,
+  "An error after load must leave the map usable",
+);
+assert.equal(
+  isFatalBasemapError(true, "openmaptiles"),
+  false,
+  "A tile error after load must leave the map usable",
+);
+console.log(
+  "Basemap contract: direct MapLibre, one compact credit control and boundary-free vector style passed.",
+);
+
 const markerKeyframes = [...css.matchAll(/@keyframes (hp-marker-[\w-]+)\s*\{([\s\S]*?)\n\}/g)];
 assert.ok(markerKeyframes.length >= 10);
 for (const [, name, body] of markerKeyframes) {

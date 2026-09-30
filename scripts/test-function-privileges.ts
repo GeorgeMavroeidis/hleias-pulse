@@ -33,6 +33,7 @@ const signedIn = ["authenticated"];
 const worker = ["service_role"];
 const publicRpc: Record<string, string[]> = {
   "blocked_user_ids()": guest,
+  "claim_route_preview_quota()": signedIn,
   "current_admin_role()": signedIn,
   "current_business_id()": signedIn,
   "current_organizer_id()": signedIn,
@@ -43,6 +44,8 @@ const publicRpc: Record<string, string[]> = {
   "redeem_deal_code(code text)": signedIn,
   "refresh_generic_stories()": guest,
   "review_place_claim(claim_id uuid, next_status text)": signedIn,
+  "save_admin_route_with_stops(route_payload jsonb, stops_payload jsonb, preview_coordinates jsonb, preview_profile text)":
+    signedIn,
   "set_place_deal(claim_id uuid, deal_text text, deal_active boolean)": signedIn,
 };
 const pushWorkerRpc: Record<string, string[]> = {
@@ -57,6 +60,9 @@ const internal = new Set([
   "enqueue_published_question_answer()",
   "handle_event_rsvp_counts()",
   "handle_new_auth_user()",
+  "invalidate_route_preview_from_place()",
+  "invalidate_route_preview_from_profile()",
+  "invalidate_route_preview_from_stop()",
   "invoke_push_worker()",
   "is_allowed_push_endpoint(candidate text)",
   "prevent_business_self_verification()",
@@ -148,7 +154,13 @@ async function main() {
       assert.equal(row.serviceRole, allowed.includes("service_role"), `service_role: ${name}`);
       assert.equal(row.path, '""', `Unsafe search_path: ${row.schema}.${name}`);
       if (row.schema === "public") {
-        assert.equal(row.definer, name !== "get_pulse_bootstrap()", `SECURITY mode: ${name}`);
+        assert.equal(
+          row.definer,
+          name !== "get_pulse_bootstrap()" &&
+            name !==
+              "save_admin_route_with_stops(route_payload jsonb, stops_payload jsonb, preview_coordinates jsonb, preview_profile text)",
+          `SECURITY mode: ${name}`,
+        );
       }
       if (row.schema === "private" && internal.has(name)) {
         assert.equal(
@@ -187,6 +199,16 @@ async function main() {
     );
 
     await expectDenied("anon", "select public.issue_deal_code('missing')");
+    await expectDenied("anon", "select public.claim_route_preview_quota()");
+    await expectDenied(
+      "anon",
+      "select public.save_admin_route_with_stops('{}'::jsonb, '[]'::jsonb, null::jsonb, null::text)",
+    );
+    await expectDenied("authenticated", "select public.claim_route_preview_quota()");
+    await expectDenied(
+      "authenticated",
+      "select public.save_admin_route_with_stops('{}'::jsonb, '[]'::jsonb, null::jsonb, null::text)",
+    );
     await expectDenied("anon", "select public.moderate_content('post','missing','hidden')");
     await expectDenied("anon", "select * from public.claim_push_delivery_batch()");
     await expectDenied("authenticated", "select * from public.claim_push_delivery_batch()");
