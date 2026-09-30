@@ -1,4 +1,4 @@
-import { Children, useEffect, useMemo, useState } from "react";
+import { Children, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -42,6 +42,7 @@ import {
   type OrganizerVerificationStatus,
   type PlaceClaimStatus,
   clearPlaceDeal,
+  buildAdminRoutePreview,
   getClaimRedemptionCounts,
   createAdminBusiness,
   deleteAdminPlace,
@@ -51,19 +52,25 @@ import {
   loadAdminData,
   moderateContent,
   removeAdminMember,
-  replaceAdminRouteStops,
   reviewPlaceClaim,
   saveAdminCulturalEvent,
   createAdminOrganizer,
   saveAdminMeetEvent,
   saveAdminPlace,
-  saveAdminRoute,
+  saveAdminRouteWithStops,
   saveAdminStory,
   setAdminMember,
   setBusinessVerification,
   setOrganizerVerification,
   uploadContentMedia,
 } from "@/lib/admin-api";
+import {
+  parseRoutePreviewResponse,
+  resolveRoutePreviewForSave,
+  routeInputHash,
+  type RouteCoordinate,
+} from "@/lib/hp/route-preview";
+import type { RouteRoutingProfile } from "@/lib/hp-model";
 import { getCurrentPulseAccount, type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { CULTURAL_EVENT_TYPES, CULTURAL_EVENT_TYPE_META, tr } from "@/lib/hp/cultural-events-types";
@@ -2535,7 +2542,8 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
 }
 
 function RoutesPanel({ data, onSaved, setNotice }: PanelProps) {
-  const [selected, setSelected] = useState<AdminRoute | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = data.routes.find((route) => route.id === selectedId) ?? null;
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_470px]">
       <div>
@@ -2543,26 +2551,31 @@ function RoutesPanel({ data, onSaved, setNotice }: PanelProps) {
           title="Routes"
           detail="Editorial itineraries and their stop-by-stop guides."
           action={
-            <ActionButton onClick={() => setSelected(null)}>
+            <ActionButton onClick={() => setSelectedId(null)}>
               <Route size={16} /> Add route
             </ActionButton>
           }
         />
         <ContentList
           items={data.routes}
-          selectedId={selected?.id}
-          onSelect={setSelected}
+          selectedId={selectedId ?? undefined}
+          onSelect={(route) => setSelectedId(route.id)}
           title={(item) => item.title}
           subtitle={(item) => `${item.duration} · ${item.budget}`}
           image={(item) => item.image_url}
         />
       </div>
       <RouteEditor
-        key={selected?.id ?? "new"}
+        key={selectedId ?? "new"}
         route={selected}
         places={data.places}
         routeStops={data.routeStops}
+        nextSortOrder={Math.min(
+          2_147_483_647,
+          data.routes.reduce((max, item) => Math.max(max, item.sort_order), 0) + 1,
+        )}
         onSaved={onSaved}
+        onSelected={setSelectedId}
         setNotice={setNotice}
       />
     </div>
@@ -2573,13 +2586,17 @@ function RouteEditor({
   route,
   places,
   routeStops,
+  nextSortOrder,
   onSaved,
+  onSelected,
   setNotice,
 }: {
   route: AdminRoute | null;
   places: AdminPlace[];
   routeStops: AdminRouteStop[];
+  nextSortOrder: number;
   onSaved: () => Promise<void>;
+  onSelected: (routeId: string) => void;
   setNotice: (notice: Notice) => void;
 }) {
   const { t } = useI18n();
@@ -2589,12 +2606,16 @@ function RouteEditor({
   const [budget, setBudget] = useState(route?.budget ?? "Free");
   const [imageUrl, setImageUrl] = useState(route?.image_url ?? "");
   const [tagText, setTagText] = useState(route?.tags.join(", ") ?? "");
+  const [routingProfile, setRoutingProfile] = useState<RouteRoutingProfile>(
+    route?.routing_profile === "foot-walking" ? "foot-walking" : "driving-car",
+  );
   const [stops, setStops] = useState(() =>
     route
       ? routeStops.filter((stop) => stop.route_id === route.id).map((stop) => ({ ...stop }))
       : [],
   );
   const [saving, setSaving] = useState(false);
+  const forcePreviewRebuildRef = useRef(false);
   const upload = async (file: File | null) => {
     if (!file) return;
     try {
@@ -2628,34 +2649,97 @@ function RouteEditor({
         tone: "error",
         message: t("Title, summary, duration, and image are required."),
       });
+    if (stops.length > 50)
+      return setNotice({ tone: "error", message: t("A route may have at most 50 stops.") });
+    const stopPlaces = stops.map((stop) => places.find((place) => place.id === stop.place_id));
+    if (stopPlaces.some((place) => !place))
+      return setNotice({
+        tone: "error",
+        message: t("Choose a valid place for every stop."),
+      });
     const routeId = route?.id ?? `route-${slug(title)}-${Date.now()}`;
+    const coordinates = stopPlaces
+      .filter((place): place is AdminPlace => Boolean(place))
+      .map((place) => [place.lng, place.lat] as RouteCoordinate);
+    const inputHash = coordinates.length >= 2 ? routeInputHash(routingProfile, coordinates) : null;
+    let preview: ReturnType<typeof parseRoutePreviewResponse> | null = null;
+    let previewWarning: string | null = null;
     try {
       setSaving(true);
-      await saveAdminRoute({
-        id: routeId,
-        title: title.trim(),
-        author_id: route?.author_id ?? "you",
-        lede: lede.trim(),
-        duration: duration.trim(),
-        budget: budget.trim(),
-        tags: tags(tagText),
-        image_url: imageUrl.trim(),
-        comment_count: route?.comment_count ?? 0,
-        saves_count: route?.saves_count ?? 0,
-        sort_order: route?.sort_order ?? Date.now(),
-      });
-      await replaceAdminRouteStops(
-        routeId,
+      const inputsChanged = !inputHash || route?.route_input_hash !== inputHash;
+      const previewChanged = forcePreviewRebuildRef.current || inputsChanged;
+      if (previewChanged && coordinates.length >= 2) {
+        try {
+          preview = parseRoutePreviewResponse(
+            await buildAdminRoutePreview({
+              profile: routingProfile,
+              coordinates: coordinates.map((item) => [...item]),
+            }),
+          );
+        } catch (error) {
+          previewWarning =
+            error instanceof Error ? error.message : t("Could not rebuild the route preview.");
+        }
+      }
+      const cachedPreview = resolveRoutePreviewForSave(
+        route
+          ? {
+              geometry: route.route_geometry,
+              distanceMeters: route.route_distance_m,
+              durationSeconds: route.route_duration_s,
+              inputHash: route.route_input_hash,
+              generatedAt: route.route_generated_at,
+            }
+          : null,
+        inputHash,
+        preview
+          ? {
+              geometry: preview.geometry as unknown as AdminRoute["route_geometry"],
+              distanceMeters: preview.distanceMeters,
+              durationSeconds: preview.durationSeconds,
+            }
+          : null,
+        new Date().toISOString(),
+      );
+      await saveAdminRouteWithStops(
+        {
+          id: routeId,
+          title: title.trim(),
+          author_id: route?.author_id ?? "you",
+          lede: lede.trim(),
+          duration: duration.trim(),
+          budget: budget.trim(),
+          tags: tags(tagText),
+          image_url: imageUrl.trim(),
+          comment_count: route?.comment_count ?? 0,
+          saves_count: route?.saves_count ?? 0,
+          sort_order: route?.sort_order ?? nextSortOrder,
+          routing_profile: routingProfile,
+          route_geometry: cachedPreview.geometry,
+          route_distance_m: cachedPreview.distanceMeters,
+          route_duration_s: cachedPreview.durationSeconds,
+          route_input_hash: cachedPreview.inputHash,
+          route_generated_at: cachedPreview.generatedAt,
+        },
         stops.map((stop, position) => ({ ...stop, route_id: routeId, position })),
+        cachedPreview.geometry ? coordinates : null,
       );
       await onSaved();
-      setNotice({ tone: "success", message: t("Route and stops saved.") });
+      onSelected(routeId);
+      forcePreviewRebuildRef.current = false;
+      setNotice({
+        tone: previewWarning ? "error" : "success",
+        message: previewWarning
+          ? `${t("Route and stops saved.")} ${t(inputsChanged ? "The road preview was cleared:" : "The existing road preview was kept:")} ${previewWarning}`
+          : t("Route and stops saved."),
+      });
     } catch (error) {
       setNotice({
         tone: "error",
         message: error instanceof Error ? error.message : t("Could not save route."),
       });
     } finally {
+      forcePreviewRebuildRef.current = false;
       setSaving(false);
     }
   };
@@ -2693,6 +2777,16 @@ function RouteEditor({
             />
           </Field>
         </div>
+        <Field label="Travel mode">
+          <select
+            className={inputClass}
+            value={routingProfile}
+            onChange={(event) => setRoutingProfile(event.target.value as RouteRoutingProfile)}
+          >
+            <option value="driving-car">Driving</option>
+            <option value="foot-walking">Walking</option>
+          </select>
+        </Field>
         <Field label="Tags">
           <input
             className={inputClass}
@@ -2801,9 +2895,22 @@ function RouteEditor({
             ))}
           </div>
         </div>
-        <ActionButton type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save route"}
-        </ActionButton>
+        <div className="flex gap-2">
+          <ActionButton type="submit" disabled={saving}>
+            {saving ? "Saving…" : "Save route"}
+          </ActionButton>
+          <ActionButton
+            type="button"
+            tone="muted"
+            disabled={saving || stops.length < 2}
+            onClick={(event) => {
+              forcePreviewRebuildRef.current = true;
+              event.currentTarget.form?.requestSubmit();
+            }}
+          >
+            Rebuild route preview
+          </ActionButton>
+        </div>
       </div>
     </form>
   );

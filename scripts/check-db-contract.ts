@@ -83,6 +83,7 @@ try {
     "push_subscriptions",
     "private.push_notification_outbox",
     "private.push_notification_deliveries",
+    "private.route_preview_requests",
   ]) {
     const qualified = table.includes(".") ? table : `public.${table}`;
     await count(`select 1 from ${qualified}`, 0, `No leaked fixtures in ${table}`);
@@ -152,7 +153,13 @@ try {
   await count(
     `select table_name from information_schema.role_table_grants where table_schema='private' and grantee in ('anon','authenticated','service_role')`,
     0,
-    "Private push queue has no direct API grants",
+    "Private queue and route preview quota have no direct API grants",
+  );
+  await count(
+    `select c.oid from pg_class c join pg_namespace n on n.oid=c.relnamespace
+     where n.nspname='private' and c.relname='route_preview_requests' and c.relrowsecurity`,
+    1,
+    "Route preview quota ledger has RLS",
   );
   await count(
     `select table_name from information_schema.role_table_grants where table_schema='public' and grantee in ('anon','authenticated') and privilege_type in ('TRUNCATE','REFERENCES','TRIGGER')`,
@@ -167,6 +174,7 @@ try {
   const authenticatedFunctions = [
     ...anonFunctions,
     "current_admin_role()",
+    "claim_route_preview_quota()",
     "current_business_id()",
     "current_organizer_id()",
     "has_admin_role(text[])",
@@ -174,6 +182,7 @@ try {
     "moderate_content(text,text,text)",
     "redeem_deal_code(text)",
     "review_place_claim(uuid,text)",
+    "save_admin_route_with_stops(jsonb,jsonb,jsonb,text)",
     "set_place_deal(uuid,text,boolean)",
   ];
   for (const [role, allowed] of [

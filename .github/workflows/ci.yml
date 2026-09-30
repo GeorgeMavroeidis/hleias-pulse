@@ -61,6 +61,9 @@ jobs:
       - name: Test — map visuals
         run: npm run test:map-visuals
 
+      - name: Test — route previews
+        run: npm run test:routing
+
       # The secret-scanning rules themselves. Added after a narrowing of the
       # postgres-url rule silently stopped flagging any password containing
       # `$`, `{` or `}` — which Supabase-generated passwords routinely do.

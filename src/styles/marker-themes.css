@@ -23,7 +23,7 @@
 
 .hp-marker-effects {
   z-index: 0;
-  /* Only the outer Leaflet crossfade attenuates the entire marker. */
+  /* Only the outer MapLibre marker crossfade attenuates the entire marker. */
   opacity: 1;
   transition: opacity 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
