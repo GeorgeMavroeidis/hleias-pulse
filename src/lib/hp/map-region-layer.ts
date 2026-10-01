@@ -10,7 +10,7 @@ import type { TranslationParams } from "../i18n";
 
 export const REGION_SOURCE_ID = "hp-regional-discovery";
 export const REGION_LAYER_ID = "hp-regional-signals";
-const PULSE_NAMES = {
+export const PULSE_NAMES = {
   quiet: "Quiet",
   emerging: "Emerging",
   active: "Active",
@@ -67,7 +67,16 @@ export function regionalGeoJson(
                 ? -row.contextualPlaceIds.length
                 : 1,
           selected: row.region.id === selectedId,
-          contextOpacity: row.contextualPlaceIds.length ? 1 : 0.55,
+          contextOpacity:
+            row.region.id === selectedId
+              ? 1
+              : selectedId
+                ? row.contextualPlaceIds.length
+                  ? 0.76
+                  : 0.62
+                : row.contextualPlaceIds.length
+                  ? 1
+                  : 0.55,
         },
       })),
   };

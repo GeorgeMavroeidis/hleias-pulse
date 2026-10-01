@@ -1,114 +1,79 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import {
-  Radio,
   Bookmark,
   Share2,
-  Clock,
   MapPin,
   ExternalLink,
   BadgeCheck,
   Gift,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  X,
+  CalendarDays,
 } from "lucide-react";
-import { typeColor, type Place } from "@/lib/hp-model";
-import { type PulseData } from "@/lib/hp-api";
+import type { Place } from "@/lib/hp-model";
 import { useI18n } from "@/lib/i18n";
-import { ImageBox } from "./ImageBox";
-import { type MapAreaCluster } from "./SocialMap";
-import { toneStyle, type PlaceStoryGroup } from "@/lib/hp/place-stories";
-import { type DiscoveryLens, type DiscoveryRecommendation } from "@/lib/hp/discovery";
+import { PULSE_NAMES, regionalDescription } from "@/lib/hp/map-region-layer";
+import { markerPulseForPlace, type MarkerPulseSnapshot } from "@/lib/hp/marker-pulse";
 import {
-  AREA_STATE_LABEL,
-  SIGNAL_QUALITY_LABEL,
-  HP_TRANSITION,
-  openStreetMapUrl,
-} from "./pulse-shared";
+  releaseSheetSnap,
+  sheetSnapPoints,
+  type MapDiscoveryState,
+  type SheetSnap,
+  type SheetSnapHeights,
+} from "@/lib/hp/map-discovery-state";
+import type {
+  DiscoveryEvent,
+  DiscoveryRegionRow,
+  MapDiscoveryContent,
+} from "@/lib/hp/map-discovery-content";
+import type { SheetGeometry } from "@/lib/hp/sheet-geometry";
+import type { PlaceStoryGroup } from "@/lib/hp/place-stories";
+import { ImageBox } from "./ImageBox";
+import { DISCOVERY_LENS_LABEL, HP_TRANSITION, openStreetMapUrl } from "./pulse-shared";
 
-type SheetDragHandlers = {
-  onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
-};
-
-export type DiscoverySuggestion = {
-  recommendation: DiscoveryRecommendation;
-  cluster: MapAreaCluster;
-};
-
-export function MapBottomSheet({
-  cluster,
-  selectedPlace,
-  events,
-  storyGroups,
-  onOpenStory,
-  height,
-  peek,
-  half,
-  full,
-  onSetSnap,
-  onIdleHeightMeasured,
-  onOpenDetails,
-  onSavePlace,
-  onSharePlace,
-  savedPlaceIds,
-  claimedPlaceIds,
-  dealPlaceIds,
-  activeLens,
-  searchQuery,
-  showDiscoveryEmptyState,
-  discoverySuggestion,
-  onOpenDiscoverySuggestion,
-  onClearLens,
-  onClearSearch,
-}: {
-  cluster: MapAreaCluster | null;
+type Props = {
+  state: MapDiscoveryState;
+  content: MapDiscoveryContent;
   selectedPlace: Place | null;
-  events: PulseData["events"];
-  storyGroups: PlaceStoryGroup[];
-  onOpenStory: (placeId: string) => void;
-  height: number;
-  peek: number;
-  half: number;
-  full: number;
-  onSetSnap: (h: number) => void;
-  onIdleHeightMeasured: (height: number) => void;
-  onOpenDetails: (p: Place) => void;
+  markerPulseSnapshot: MarkerPulseSnapshot;
+  heights: SheetSnapHeights;
+  geometry: SheetGeometry;
+  onSnap: (snap: SheetSnap) => void;
+  onCollapsedHeightMeasured: (height: number) => void;
+  onSelectRegion: (regionId: string) => void;
+  onSelectPlace: (place: Place) => void;
+  onClear: () => void;
+  onBack: () => void;
+  onOpenDetails: (place: Place) => void;
+  onOpenEvent: (event: DiscoveryEvent) => void;
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
+  onOpenStory: (placeId: string) => void;
+  onClearLens: () => void;
+  onClearSearch: () => void;
   savedPlaceIds: string[];
   claimedPlaceIds: string[];
   dealPlaceIds: string[];
-  activeLens: DiscoveryLens | null;
+  storyGroups: PlaceStoryGroup[];
   searchQuery: string;
-  showDiscoveryEmptyState: boolean;
-  discoverySuggestion: DiscoverySuggestion | null;
-  onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
-  onClearLens: () => void;
-  onClearSearch: () => void;
-}) {
+  dataStatus: "loading" | "ready" | "error";
+  selectedPlaceMatchesLens: boolean;
+};
+
+export function MapBottomSheet(props: Props) {
+  const { state, content, selectedPlace, heights, geometry, onSnap, onCollapsedHeightMeasured } =
+    props;
   const { t } = useI18n();
-  const [isDraggingSheet, setIsDraggingSheet] = useState(false);
-  const handleRef = useRef<HTMLDivElement>(null);
-  const idleContentRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (cluster) return;
-    const handle = handleRef.current;
-    const content = idleContentRef.current;
-    if (!handle || !content) return;
-    // Measure intrinsic children, not the animated/constrained sheet height.
-    // This also responds to translated wrapping, font loading and text zoom.
-    const measure = () =>
-      onIdleHeightMeasured(Math.max(72, Math.ceil(handle.offsetHeight + content.offsetHeight + 1)));
-    const observer = new ResizeObserver(measure);
-    observer.observe(handle);
-    observer.observe(content);
-    measure();
-    return () => observer.disconnect();
-  }, [cluster, onIdleHeightMeasured]);
-  const isSelectedCollapsed = Boolean(cluster) && height <= peek + 8;
-  const isExpanded = Boolean(cluster) && height >= full - 24;
-  const dragState = useRef<{
+  const reducedMotion = useReducedMotion();
+  const height = useMotionValue(heights[state.snap]);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLButtonElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{
     pointerId: number;
     startHeight: number;
     startY: number;
@@ -116,578 +81,502 @@ export function MapBottomSheet({
     lastAt: number;
     velocityY: number;
   } | null>(null);
+  const selectionKey =
+    state.selection.kind === "idle"
+      ? "idle"
+      : state.selection.kind === "placeSelected"
+        ? state.selection.placeId
+        : state.selection.regionId;
+  const previousKey = useRef(selectionKey);
+  const row =
+    state.selection.kind !== "idle" ? content.regions.get(state.selection.regionId) : null;
+  const lensLabel = state.activeLens ? t(DISCOVERY_LENS_LABEL[state.activeLens]) : null;
+  const title = selectedPlace?.name ?? (row ? t(row.discovery.region.name) : t("Tonight's pulse"));
+  const count = selectedPlace
+    ? content.events.filter((event) => event.placeId === selectedPlace.id).length
+    : (row?.places.length ?? content.matchingVisiblePlaceCount);
+  const summary = selectedPlace
+    ? `${t(selectedPlace.type)} · ${t(count === 1 ? "{count} scheduled event" : "{count} scheduled events", { count })}`
+    : props.dataStatus !== "ready" || (!state.viewport && !row)
+      ? t("Explore what is happening around Ilia")
+      : t(
+          row
+            ? count === 1
+              ? "{count} matching place"
+              : "{count} matching places"
+            : count === 1
+              ? "{count} matching place in view"
+              : "{count} matching places in view",
+          { count },
+        );
 
-  const clampSheetHeight = (value: number) =>
-    cluster ? Math.min(full, Math.max(peek, value)) : peek;
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () =>
+      onCollapsedHeightMeasured(Math.ceil(header.getBoundingClientRect().height) + 1);
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    measure();
+    return () => observer.disconnect();
+  }, [onCollapsedHeightMeasured]);
 
-  const snapSheet = (currentHeight: number, velocityY: number) => {
-    const height = clampSheetHeight(currentHeight);
-    const snapPoints = cluster ? [peek, half, full] : [peek];
-    const closestSnap = snapPoints.reduce((closest, point) =>
-      Math.abs(point - height) < Math.abs(closest - height) ? point : closest,
-    );
-
-    if (!cluster) {
-      onSetSnap(peek);
-      return;
-    }
-
-    if (velocityY < -180) {
-      onSetSnap(snapPoints.find((point) => point > height + 4) ?? full);
-    } else if (velocityY > 180) {
-      onSetSnap([...snapPoints].reverse().find((point) => point < height - 4) ?? peek);
-    } else {
-      onSetSnap(closestSnap);
-    }
-  };
-
-  const onHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    if ((event.target as HTMLElement).closest("button")) return;
-    dragState.current = {
-      pointerId: event.pointerId,
-      startHeight: height,
-      startY: event.clientY,
-      lastY: event.clientY,
-      lastAt: event.timeStamp,
-      velocityY: 0,
+  useEffect(
+    () => height.on("change", (value) => geometry.set({ height: value, moving: true })),
+    [geometry, height],
+  );
+  useEffect(() => {
+    if (dragging) return;
+    let cancelled = false;
+    const target = heights[state.snap];
+    geometry.set({ height: height.get(), moving: true });
+    const animation = animate(height, target, {
+      ...HP_TRANSITION.panel,
+      duration: reducedMotion ? 0 : HP_TRANSITION.panel.duration,
+    });
+    void animation.then(() => {
+      if (!cancelled) geometry.set({ height: target, moving: false });
+    });
+    return () => {
+      cancelled = true;
+      animation.stop();
     };
-    setIsDraggingSheet(true);
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // Pointer capture can fail for synthetic or already-cancelled pointer streams.
+  }, [dragging, geometry, height, heights, state.snap, reducedMotion, selectionKey]);
+
+  useEffect(() => {
+    if (previousKey.current === selectionKey) return;
+    previousKey.current = selectionKey;
+    if (drag.current) {
+      const pointerId = drag.current.pointerId;
+      if (headerRef.current?.hasPointerCapture(pointerId))
+        headerRef.current.releasePointerCapture(pointerId);
+      drag.current = null;
+      setDragging(false);
     }
-    event.preventDefault();
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+    if (state.selection.kind === "idle" && document.activeElement === document.body)
+      summaryRef.current?.focus({ preventScroll: true });
+  }, [selectionKey, state.selection.kind]);
+
+  const clamp = (value: number) => Math.min(heights.expanded, Math.max(heights.collapsed, value));
+  const finish = (event: ReactPointerEvent<HTMLDivElement>, cancelled = false) => {
+    const current = drag.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    setDragging(false);
+    onSnap(
+      cancelled
+        ? state.snap
+        : releaseSheetSnap(
+            clamp(current.startHeight - event.clientY + current.startY),
+            current.velocityY,
+            heights,
+          ),
+    );
   };
-
-  const onHandlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const state = dragState.current;
-    if (!state || state.pointerId !== event.pointerId) return;
-
-    const elapsed = Math.max(event.timeStamp - state.lastAt, 16);
-    state.velocityY = ((event.clientY - state.lastY) / elapsed) * 1000;
-    state.lastY = event.clientY;
-    state.lastAt = event.timeStamp;
-
-    onSetSnap(clampSheetHeight(state.startHeight - (event.clientY - state.startY)));
-    event.preventDefault();
-  };
-
-  const finishHandleDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const state = dragState.current;
-    if (!state || state.pointerId !== event.pointerId) return;
-
-    const currentHeight = clampSheetHeight(state.startHeight - (event.clientY - state.startY));
-    const velocityY = state.velocityY;
-    dragState.current = null;
-    setIsDraggingSheet(false);
-    try {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-    } catch {
-      // The drag has already ended; keeping the last computed height is fine.
-    }
-    snapSheet(currentHeight, velocityY);
-  };
-
-  const sheetDragHandlers: SheetDragHandlers = {
-    onPointerCancel: finishHandleDrag,
-    onPointerDown: onHandlePointerDown,
-    onPointerMove: onHandlePointerMove,
-    onPointerUp: finishHandleDrag,
+  const points = sheetSnapPoints(heights);
+  const nextSnap =
+    state.snap === "expanded"
+      ? "preview"
+      : (points.find((snap) => heights[snap] > heights[state.snap] + 1) ?? "expanded");
+  const dismiss = () => {
+    props.onClear();
+    summaryRef.current?.focus({ preventScroll: true });
   };
 
   return (
-    <motion.div
+    <motion.section
       style={{ height }}
-      animate={{ height }}
-      transition={isDraggingSheet ? { duration: 0 } : HP_TRANSITION.panel}
-      className={`hp-map-sheet ${!cluster ? "is-idle" : ""} absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overflow-hidden overscroll-contain`}
+      className="hp-map-sheet hp-discovery-sheet absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overflow-hidden"
+      role="region"
+      aria-labelledby="hp-discovery-title"
+      data-selection={state.selection.kind}
+      data-snap={state.snap}
+      data-dragging={dragging ? "true" : "false"}
     >
-      {/* Drag handle */}
       <div
-        ref={handleRef}
-        {...sheetDragHandlers}
-        className="hp-map-sheet-handle touch-none select-none cursor-grab active:cursor-grabbing"
+        ref={headerRef}
+        className="hp-discovery-sheet__header touch-none select-none"
+        onPointerDown={(event) => {
+          if (event.button !== 0 || (event.target as HTMLElement).closest("button, a")) return;
+          height.stop();
+          drag.current = {
+            pointerId: event.pointerId,
+            startHeight: height.get(),
+            startY: event.clientY,
+            lastY: event.clientY,
+            lastAt: event.timeStamp,
+            velocityY: 0,
+          };
+          setDragging(true);
+          geometry.set({ height: height.get(), moving: true });
+          event.currentTarget.setPointerCapture(event.pointerId);
+          event.preventDefault();
+        }}
+        onPointerMove={(event) => {
+          const current = drag.current;
+          if (!current || current.pointerId !== event.pointerId) return;
+          current.velocityY =
+            ((event.clientY - current.lastY) / Math.max(event.timeStamp - current.lastAt, 16)) *
+            1000;
+          current.lastY = event.clientY;
+          current.lastAt = event.timeStamp;
+          height.set(clamp(current.startHeight - event.clientY + current.startY));
+          event.preventDefault();
+        }}
+        onPointerUp={(event) => finish(event)}
+        onPointerCancel={(event) => finish(event, true)}
+        onLostPointerCapture={(event) => finish(event, true)}
       >
-        <div className="hp-sheet-handle-mark" />
-        {cluster && !isSelectedCollapsed && (
-          <div className="flex justify-center gap-2 pt-2">
-            {[
-              { h: peek, label: "collapsed" },
-              { h: half, label: "preview" },
-              { h: full, label: "full" },
-            ].map((s) => (
-              <button
-                key={s.label}
-                type="button"
-                onClick={() => onSetSnap(s.h)}
-                aria-label={t("Set sheet to {position}", { position: t(s.label) })}
-                aria-pressed={Math.abs(height - s.h) < 4}
-                className="hp-sheet-snap-button"
-              >
-                <span
-                  className={`hp-sheet-snap-indicator ${Math.abs(height - s.h) < 4 ? "is-active" : ""}`}
-                />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <AnimatePresence initial={false} mode="popLayout">
-        {!isSelectedCollapsed && (
-          <motion.div
-            ref={cluster ? undefined : idleContentRef}
-            key={
-              selectedPlace ? `place-${selectedPlace.id}` : cluster ? `area-${cluster.id}` : "idle"
-            }
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -3 }}
-            transition={HP_TRANSITION.sheetContent}
-            className={`hp-safe-px min-h-0 pt-0 ${cluster ? "pb-5" : "hp-map-sheet__idle-content"} ${
-              cluster
-                ? `flex flex-1 overscroll-contain ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`
-                : "overscroll-contain"
-            }`}
-          >
-            {cluster ? (
-              <AreaSheetContent
-                cluster={cluster}
-                selectedPlace={selectedPlace}
-                events={events}
-                expanded={isExpanded}
-                savedPlaceIds={savedPlaceIds}
-                claimedPlaceIds={claimedPlaceIds}
-                dealPlaceIds={dealPlaceIds}
-                storyGroups={storyGroups}
-                onOpenStory={onOpenStory}
-                onSavePlace={onSavePlace}
-                onSharePlace={onSharePlace}
-                onOpenDetails={onOpenDetails}
-                showDiscoveryEmptyState={showDiscoveryEmptyState}
-                discoverySuggestion={discoverySuggestion}
-                onOpenDiscoverySuggestion={onOpenDiscoverySuggestion}
-                activeLens={activeLens}
-                onClearLens={onClearLens}
-              />
-            ) : (
-              <TonightPulseContent
-                searchQuery={searchQuery}
-                activeLens={activeLens}
-                showDiscoveryEmptyState={showDiscoveryEmptyState}
-                discoverySuggestion={discoverySuggestion}
-                onOpenDiscoverySuggestion={onOpenDiscoverySuggestion}
-                onClearLens={onClearLens}
-                onClearSearch={onClearSearch}
-              />
+        <div className="hp-sheet-handle-mark" aria-hidden="true" />
+        <div className="hp-discovery-sheet__summary-row">
+          <h2 className="min-w-0 flex-1" aria-label={title}>
+            <button
+              ref={summaryRef}
+              type="button"
+              className="hp-discovery-sheet__summary"
+              aria-expanded={state.snap !== "collapsed"}
+              aria-controls="hp-discovery-content"
+              aria-label={`${title}. ${summary}. ${t(
+                state.snap === "expanded" ? "Set sheet to preview" : "Expand discovery sheet",
+              )}`}
+              onClick={() => onSnap(nextSnap)}
+            >
+              <span id="hp-discovery-title">{title}</span>
+              <span className="hp-discovery-sheet__subtitle">{summary}</span>
+            </button>
+          </h2>
+          {state.selection.kind !== "idle" && (
+            <button
+              type="button"
+              className="hp-discovery-sheet__icon"
+              onClick={props.onBack}
+              aria-label={t("Back to previous map view")}
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="hp-discovery-sheet__icon"
+            onClick={() => onSnap(nextSnap)}
+            aria-label={t(
+              state.snap === "expanded" ? "Set sheet to preview" : "Expand discovery sheet",
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          >
+            {state.snap === "expanded" ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          </button>
+          {state.snap !== "collapsed" && (
+            <button
+              type="button"
+              className="hp-discovery-sheet__icon"
+              onClick={dismiss}
+              aria-label={t(
+                state.selection.kind === "idle"
+                  ? "Collapse discovery sheet"
+                  : "Clear map selection",
+              )}
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {state.selection.kind !== "idle" ? t("Selected {name}", { name: title }) : ""}
+      </span>
+      {state.snap !== "collapsed" && (
+        <div
+          id="hp-discovery-content"
+          ref={contentRef}
+          className="hp-discovery-sheet__content hp-safe-px min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        >
+          {state.activeLens && selectedPlace && !props.selectedPlaceMatchesLens && (
+            <p className="hp-discovery-sheet__notice">
+              {t("This place does not match the {filter} lens.", { filter: lensLabel ?? "" })}{" "}
+              <button type="button" onClick={props.onClearLens}>
+                {t("Clear lens")}
+              </button>
+            </p>
+          )}
+          {selectedPlace ? (
+            <PlaceDiscoveryContent {...props} place={selectedPlace} />
+          ) : row ? (
+            <RegionDiscoveryContent {...props} row={row} lensLabel={lensLabel} />
+          ) : (
+            <>
+              <h3 className="hp-discovery-sheet__section-title">{t("Explore this view")}</h3>
+              {content.visibleRegions.length ? (
+                <ul className="hp-discovery-sheet__list">
+                  {content.visibleRegions.map((region) => (
+                    <li key={region.discovery.region.id}>
+                      <button
+                        type="button"
+                        className="hp-discovery-sheet__row"
+                        onClick={() => props.onSelectRegion(region.discovery.region.id)}
+                      >
+                        <MapPin size={18} aria-hidden="true" />
+                        <span className="min-w-0 flex-1">
+                          <strong>{t(region.discovery.region.name)}</strong>
+                          <span>
+                            {t(
+                              region.visiblePlaceCount === 1
+                                ? "{count} place in view"
+                                : "{count} places in view",
+                              { count: region.visiblePlaceCount },
+                            )}
+                            {region.visibleEventCount > 0
+                              ? ` · ${t(region.visibleEventCount === 1 ? "{count} scheduled event" : "{count} scheduled events", { count: region.visibleEventCount })}`
+                              : ""}
+                          </span>
+                          <span>
+                            {region.discovery.signal.level
+                              ? regionalDescription(
+                                  {
+                                    ...region.discovery,
+                                    contextualPlaceIds: region.places
+                                      .filter((place) =>
+                                        state.viewport?.visiblePlaceIds.includes(place.id),
+                                      )
+                                      .map((place) => place.id),
+                                  },
+                                  lensLabel,
+                                  t,
+                                )
+                              : region.categories.map((category) => t(category)).join(" · ")}
+                          </span>
+                        </span>
+                        <ChevronUp size={16} className="rotate-90" aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <DiscoveryEmpty {...props} />
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </motion.section>
   );
 }
 
-function TonightPulseContent({
-  searchQuery,
-  activeLens,
-  showDiscoveryEmptyState,
-  discoverySuggestion,
-  onOpenDiscoverySuggestion,
-  onClearLens,
-  onClearSearch,
-}: {
-  searchQuery: string;
-  activeLens: DiscoveryLens | null;
-  showDiscoveryEmptyState: boolean;
-  discoverySuggestion: DiscoverySuggestion | null;
-  onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
-  onClearLens: () => void;
-  onClearSearch: () => void;
-}) {
+function DiscoveryEmpty(props: Props) {
   const { t } = useI18n();
-  if (searchQuery.trim()) {
-    return (
-      <div className="hp-map-sheet__idle-copy hp-discovery-empty-state">
-        <h3 className="text-[16px] font-black text-hp-ink">{t("No matching places here")}</h3>
-        <p className="text-[12px] text-hp-muted">
-          {t("Clear the search to see nearby activity again.")}
-        </p>
-        <button type="button" onClick={onClearSearch} className="hp-discovery-empty-action">
+  const title =
+    props.dataStatus === "loading"
+      ? "Loading pulse data…"
+      : props.dataStatus === "error"
+        ? "Could not load pulse data."
+        : props.searchQuery.trim()
+          ? "No matching places here"
+          : "No matching places in this view";
+  return (
+    <div className="hp-discovery-sheet__empty">
+      <p>{t(title)}</p>
+      <p>{t("Explore what is happening around Ilia")}</p>
+      {props.searchQuery.trim() && (
+        <button type="button" onClick={props.onClearSearch}>
           {t("Clear search")}
         </button>
-      </div>
-    );
-  }
-
-  if (showDiscoveryEmptyState) {
-    return (
-      <DiscoveryEmptyState
-        activeLens={activeLens}
-        suggestion={discoverySuggestion}
-        onOpenSuggestion={onOpenDiscoverySuggestion}
-        onClearLens={onClearLens}
-      />
-    );
-  }
-  return (
-    <div className="hp-map-sheet__idle-copy">
-      <h3 className="text-[16px] font-black text-hp-ink">{t("Tonight's pulse")}</h3>
-      <p className="text-[12px] text-hp-muted">{t("Tap a bubble to see what's happening.")}</p>
-    </div>
-  );
-}
-
-function DiscoveryEmptyState({
-  activeLens,
-  suggestion,
-  onOpenSuggestion,
-  onClearLens,
-}: {
-  activeLens: DiscoveryLens | null;
-  suggestion: DiscoverySuggestion | null;
-  onOpenSuggestion: (cluster: MapAreaCluster) => void;
-  onClearLens: () => void;
-}) {
-  const { t } = useI18n();
-  const reason = suggestion?.recommendation.reason;
-  const message = suggestion
-    ? reason === "emerging" || reason === "rising"
-      ? t("Activity is rising near {area} · {distance} km", {
-          area: suggestion.cluster.name,
-          distance: Math.max(1, Math.round(suggestion.recommendation.distanceKm)),
-        })
-      : reason === "hot"
-        ? t("{area} is active now · {distance} km", {
-            area: suggestion.cluster.name,
-            distance: Math.max(1, Math.round(suggestion.recommendation.distanceKm)),
-          })
-        : t("{area} is becoming more active · {distance} km", {
-            area: suggestion.cluster.name,
-            distance: Math.max(1, Math.round(suggestion.recommendation.distanceKm)),
-          })
-    : null;
-
-  return (
-    <div className="hp-map-sheet__idle-copy hp-discovery-empty-state">
-      <h3 className="text-[16px] font-black text-hp-ink">{t("Quiet here right now")}</h3>
-      {message ? (
-        <button
-          type="button"
-          onClick={() => suggestion && onOpenSuggestion(suggestion.cluster)}
-          className="hp-discovery-recommendation"
-        >
-          <MapPin size={15} aria-hidden="true" />
-          <span>{message}</span>
-        </button>
-      ) : (
-        <p className="text-[12px] text-hp-muted">
-          {t("No strong nearby signal yet. Try another lens or explore the map.")}
-        </p>
       )}
-      {activeLens && (
-        <button type="button" onClick={onClearLens} className="hp-discovery-empty-action">
+      {props.state.activeLens && (
+        <button type="button" onClick={props.onClearLens}>
           {t("Clear lens")}
         </button>
       )}
     </div>
   );
 }
-
-function AreaSheetContent({
-  cluster,
-  selectedPlace,
+function RegionDiscoveryContent(
+  props: Props & { row: DiscoveryRegionRow; lensLabel: string | null },
+) {
+  const { t } = useI18n();
+  const { row } = props;
+  return (
+    <>
+      <p className="hp-discovery-sheet__context">
+        {regionalDescription(row.discovery, props.lensLabel, t)}
+      </p>
+      {row.categories.length > 0 && (
+        <p className="hp-discovery-sheet__description">
+          {row.categories.map((category) => t(category)).join(" · ")}
+        </p>
+      )}
+      <div className="hp-discovery-sheet__section-heading">
+        <h3>{t("Places")}</h3>
+        <button type="button" onClick={() => props.onSnap("expanded")}>
+          {t("Explore {area}", { area: t(row.discovery.region.name) })} →
+        </button>
+      </div>
+      {row.places.length ? (
+        <ul className="hp-discovery-sheet__list">
+          {row.places.map((place) => (
+            <li key={place.id}>
+              <button
+                type="button"
+                className="hp-discovery-sheet__row"
+                onClick={() => props.onSelectPlace(place)}
+              >
+                <ImageBox
+                  key={`${place.id}:${place.imageUrl}`}
+                  src={place.imageUrl}
+                  alt=""
+                  className="h-12 w-12 shrink-0"
+                  rounded="rounded-xl"
+                />
+                <span className="min-w-0 flex-1">
+                  <strong>{place.name}</strong>
+                  <span>
+                    {t(place.type)} · {place.area}
+                  </span>
+                </span>
+                <span aria-hidden="true">→</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <DiscoveryEmpty {...props} />
+      )}
+      <DiscoveryEvents events={row.events} onOpen={props.onOpenEvent} />
+    </>
+  );
+}
+function DiscoveryEvents({
   events,
-  expanded,
-  savedPlaceIds,
-  claimedPlaceIds,
-  dealPlaceIds,
-  storyGroups,
-  onOpenStory,
-  onSavePlace,
-  onSharePlace,
-  onOpenDetails,
-  showDiscoveryEmptyState,
-  discoverySuggestion,
-  onOpenDiscoverySuggestion,
-  activeLens,
-  onClearLens,
+  onOpen,
 }: {
-  cluster: MapAreaCluster;
-  selectedPlace: Place | null;
-  events: PulseData["events"];
-  expanded: boolean;
-  savedPlaceIds: string[];
-  claimedPlaceIds: string[];
-  dealPlaceIds: string[];
-  storyGroups: PlaceStoryGroup[];
-  onOpenStory: (placeId: string) => void;
-  onSavePlace: (id: string) => void;
-  onSharePlace: (place: Place) => void;
-  onOpenDetails: (p: Place) => void;
-  showDiscoveryEmptyState: boolean;
-  discoverySuggestion: DiscoverySuggestion | null;
-  onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
-  activeLens: DiscoveryLens | null;
-  onClearLens: () => void;
+  events: DiscoveryEvent[];
+  onOpen: (event: DiscoveryEvent) => void;
 }) {
   const { language, t } = useI18n();
-  const placeIds = new Set(cluster.places.map((place) => place.id));
-  const isPlaceSheet = Boolean(selectedPlace && placeIds.has(selectedPlace.id));
-  const areaStoryGroups = storyGroups.filter((group) => placeIds.has(group.placeId));
-
-  if (!isPlaceSheet) {
-    const intelligence = cluster.intelligence;
-    return (
-      <div className="flex h-full min-h-0 w-full flex-col">
-        <div className="flex gap-3">
-          <div className="grid h-16 w-16 shrink-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-ink/5">
-            {cluster.places.slice(0, 4).map((place) => (
-              <ImageBox
-                key={place.id}
-                src={place.imageUrl}
-                alt=""
-                className="h-8 w-full"
-                rounded="rounded-none"
-              />
-            ))}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-[11px] font-bold text-hp-ink/70">
-              <span className="inline-block h-2 w-2 rounded-full bg-hp-sunset" />
-              <span>{cluster.activityLine}</span>
-            </div>
-            <h3 className="mt-1 text-[16px] font-black text-hp-ink">{cluster.name}</h3>
-            {intelligence && (
-              <div
-                className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-hp-ink/65"
-                data-area-state={intelligence.state}
-                data-signal-quality={intelligence.signalQuality}
-                data-emerging={intelligence.emerging ? "true" : "false"}
-              >
-                <span>
-                  {t(AREA_STATE_LABEL[intelligence.state])} ·{" "}
-                  {t(SIGNAL_QUALITY_LABEL[intelligence.signalQuality])}
-                </span>
-                {intelligence.emerging && (
-                  <span className="rounded-full border border-hp-sunset/25 bg-hp-sunset/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-hp-sunset">
-                    {t("Emerging")}
-                  </span>
-                )}
-              </div>
-            )}
-            {showDiscoveryEmptyState && (
-              <div className="mt-2">
-                <DiscoveryEmptyState
-                  activeLens={activeLens}
-                  suggestion={discoverySuggestion}
-                  onOpenSuggestion={onOpenDiscoverySuggestion}
-                  onClearLens={onClearLens}
-                />
-              </div>
-            )}
-            <p className="text-[11px] text-hp-muted">
-              {language === "GR"
-                ? `${cluster.places.length} σημεία σε αυτή την περιοχή`
-                : `${cluster.places.length} clustered places in this area`}
-            </p>
-            <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
-              <span className="inline-flex items-center gap-0.5">
-                <Radio size={11} />
-                {cluster.postCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
-              </span>
-              <span className="inline-flex items-center gap-0.5">
-                <Clock size={11} />
-                {cluster.eventCount} {language === "GR" ? "εκδηλώσεις" : "events"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-            {language === "GR" ? "Σημεία της περιοχής" : "Clustered elements"}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {cluster.places.map((place) => (
-              <span
-                key={place.id}
-                className="rounded-full bg-hp-ink/5 px-2 py-1 text-[11px] font-bold text-hp-ink/75"
-              >
-                {place.name}
-                {claimedPlaceIds.includes(place.id) && (
-                  <BadgeCheck size={11} className="ml-1 inline" />
-                )}
-                {dealPlaceIds.includes(place.id) && <Gift size={11} className="ml-1 inline" />}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {areaStoryGroups.length > 0 && (
-          <div className="mt-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                {language === "GR" ? `Stories από ${cluster.name}` : `Stories from ${cluster.name}`}
-              </span>
-              <span className="text-[10px] font-semibold text-hp-muted">
-                {areaStoryGroups.length}
-              </span>
-            </div>
-            <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              {areaStoryGroups.map((group) => {
-                const tone = toneStyle(group.hasUnseen ? group.tone : "muted");
-                return (
-                  <button
-                    key={group.placeId}
-                    type="button"
-                    onClick={() => onOpenStory(group.placeId)}
-                    aria-label={
-                      language === "GR"
-                        ? `Άνοιγμα stories για ${group.placeName}`
-                        : `Open stories for ${group.placeName}`
-                    }
-                    className="flex w-14 shrink-0 flex-col items-center gap-1"
-                  >
-                    <div className="rounded-full p-[2px]" style={{ background: tone.gradient }}>
-                      <ImageBox
-                        src={group.stories[0].mediaUrl}
-                        alt={group.placeName}
-                        className="h-12 w-12"
-                        rounded="rounded-full"
-                      />
-                    </div>
-                    <span className="block w-full truncate text-center text-[9px] font-bold text-hp-ink/80">
-                      {group.placeName}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  const focusPlace = selectedPlace;
-  if (!focusPlace) return null;
-
-  const saved = savedPlaceIds.includes(focusPlace.id);
-  const placeEvents = events.filter((event) => event.placeId === focusPlace.id);
-
   return (
-    <div className={expanded ? "w-full" : "flex h-full min-h-0 w-full flex-col"}>
-      <div className="flex gap-3">
-        <ImageBox
-          src={focusPlace.imageUrl}
-          alt={focusPlace.name}
-          className="h-16 w-16 shrink-0"
-          rounded="rounded-2xl"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[11px] font-bold text-hp-ink/70">
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ background: typeColor[focusPlace.type] }}
-            />
-            <span>
-              {focusPlace.type} · {focusPlace.bestTime}
-            </span>
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <h3 className="text-[16px] font-black text-hp-ink">{focusPlace.name}</h3>
-            {claimedPlaceIds.includes(focusPlace.id) && (
-              <span
-                className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset/12 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-hp-sunset"
-                title={t("Verified business")}
+    <>
+      <h3 className="hp-discovery-sheet__section-title">
+        {t(events.length === 1 ? "{count} scheduled event" : "{count} scheduled events", {
+          count: events.length,
+        })}
+      </h3>
+      {events.length > 0 && (
+        <ul className="hp-discovery-sheet__list">
+          {events.map((event) => (
+            <li key={event.key}>
+              <button
+                type="button"
+                className="hp-discovery-sheet__row"
+                onClick={() => onOpen(event)}
               >
-                <BadgeCheck size={10} /> {t("Business")}
-              </span>
-            )}
-            {dealPlaceIds.includes(focusPlace.id) && (
-              <span
-                className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset/12 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-hp-sunset"
-                title={t("This place has an app deal")}
-              >
-                <Gift size={10} /> {t("Deal")}
-              </span>
-            )}
-          </div>
-          <p className="text-[11px] text-hp-muted">
-            {focusPlace.greekName} · {focusPlace.area}
-          </p>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
-            <span className="inline-flex items-center gap-0.5">
-              <Radio size={11} />
-              {focusPlace.recentPostCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
-            </span>
-            <span className="inline-flex items-center gap-0.5">
-              <Clock size={11} />
-              {placeEvents.length} {language === "GR" ? "εκδηλώσεις" : "events"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <p
-        className={`mt-3 text-[13px] leading-snug text-hp-ink/80 ${expanded ? "" : "line-clamp-2"}`}
-      >
-        {focusPlace.short}
-      </p>
-
-      {expanded && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {focusPlace.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-hp-ink/5 px-2 py-1 text-[10px] font-bold text-hp-ink/65"
-            >
-              #{tag}
-            </span>
+                <CalendarDays size={18} aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <strong>
+                    {event.kind === "cultural" && language === "GR"
+                      ? event.event.greekTitle || event.title
+                      : event.title}
+                  </strong>
+                  <span>
+                    {new Intl.DateTimeFormat(language === "GR" ? "el-GR" : "en-GB", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(event.date))}
+                  </span>
+                </span>
+                <span aria-hidden="true">→</span>
+              </button>
+            </li>
           ))}
+        </ul>
+      )}
+    </>
+  );
+}
+function PlaceDiscoveryContent(props: Props & { place: Place }) {
+  const { place, state } = props;
+  const { t } = useI18n();
+  const saved = props.savedPlaceIds.includes(place.id);
+  const story = props.storyGroups.find((group) => group.placeId === place.id);
+  const signal = markerPulseForPlace(place.id, props.markerPulseSnapshot);
+  return (
+    <>
+      {place.imageUrl ? (
+        <ImageBox
+          key={`${place.id}:${place.imageUrl}`}
+          src={place.imageUrl}
+          alt={t("Photo of {place}", { place: place.name })}
+          failedContent={t("No photo available")}
+          className={`hp-discovery-sheet__photo ${state.snap === "expanded" ? "is-expanded" : ""}`}
+        />
+      ) : (
+        <div className="hp-discovery-sheet__photo hp-discovery-sheet__photo-fallback">
+          {t("No photo available")}
         </div>
       )}
-
-      <div className={`${expanded ? "mt-2" : "mt-auto pt-2"} flex items-center gap-2`}>
-        <button
-          type="button"
-          onClick={() => onSavePlace(focusPlace.id)}
-          className={`flex-1 whitespace-nowrap rounded-full border py-2 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
-        >
-          <Bookmark size={13} className="mr-1 inline" /> {t(saved ? "Saved" : "Save")}
+      <div className="hp-discovery-sheet__place-meta">
+        <span>{place.area}</span>
+        {props.claimedPlaceIds.includes(place.id) && (
+          <span>
+            <BadgeCheck size={13} aria-hidden="true" /> {t("Verified business")}
+          </span>
+        )}
+        {props.dealPlaceIds.includes(place.id) && (
+          <span>
+            <Gift size={13} aria-hidden="true" /> {t("Deal")}
+          </span>
+        )}
+      </div>
+      {signal.level && (
+        <p className="hp-discovery-sheet__context">
+          {t("Recent community activity: {level}", { level: t(PULSE_NAMES[signal.level]) })}
+        </p>
+      )}
+      <p className="hp-discovery-sheet__description">{place.short}</p>
+      <div className="hp-discovery-sheet__place-meta">
+        {place.budget && <span>{place.budget}</span>}
+        {place.bestTime && <span>{place.bestTime}</span>}
+      </div>
+      <div className="hp-discovery-sheet__actions">
+        <button type="button" onClick={() => props.onSavePlace(place.id)} aria-pressed={saved}>
+          <Bookmark size={15} aria-hidden="true" />
+          {t(saved ? "Saved" : "Save")}
         </button>
-        <button
-          type="button"
-          onClick={() => onOpenDetails(focusPlace)}
-          className="flex-1 whitespace-nowrap rounded-full bg-hp-ink py-2 text-[12px] font-bold text-hp-paper"
-        >
-          {language === "GR" ? "Λεπτομέρειες" : "Details"}
+        <button type="button" className="is-primary" onClick={() => props.onOpenDetails(place)}>
+          {t("Details")}
         </button>
         <a
-          href={openStreetMapUrl(focusPlace)}
+          href={openStreetMapUrl(place)}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={t("Open {place} in OpenStreetMap", { place: focusPlace.name })}
-          className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+          aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
         >
-          <ExternalLink size={13} />
+          <ExternalLink size={16} />
         </a>
         <button
           type="button"
-          onClick={() => onSharePlace(focusPlace)}
-          aria-label={t("Share {place}", { place: focusPlace.name })}
-          className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+          onClick={() => props.onSharePlace(place)}
+          aria-label={t("Share {place}", { place: place.name })}
         >
-          <Share2 size={13} />
+          <Share2 size={16} />
         </button>
       </div>
-    </div>
+      {story && (
+        <button
+          type="button"
+          className="hp-discovery-sheet__story"
+          onClick={() => props.onOpenStory(place.id)}
+        >
+          {t("Open stories for {place}", { place: place.name })} →
+        </button>
+      )}
+      {state.snap === "expanded" && place.tags.length > 0 && (
+        <p className="hp-discovery-sheet__tags">{place.tags.map((tag) => `#${tag}`).join(" · ")}</p>
+      )}
+      <DiscoveryEvents
+        events={props.content.events.filter((event) => event.placeId === place.id)}
+        onOpen={props.onOpenEvent}
+      />
+    </>
   );
 }
-
-/* ============== Pulse Feed ============== */
