@@ -14,6 +14,12 @@ export type TranslationParams = Record<string, string | number>;
 const STORAGE_KEY = "ilia-pulse-language";
 
 const EL: Record<string, string> = {
+  "Explore · {places}": "Εξερεύνησε · {places}",
+  "{count} place": "{count} σημείο",
+  "{count} {filter} place": "{count} σημείο · {filter}",
+  "{count} {filter} places": "{count} σημεία · {filter}",
+  "No matching places": "Δεν υπάρχουν σχετικά σημεία",
+  "Visible map areas": "Ορατές περιοχές χάρτη",
   "Local spots, routes, and tips.": "Τοπικά σημεία, διαδρομές και συμβουλές.",
   "Open search": "Άνοιγμα αναζήτησης",
   "Close search": "Κλείσιμο αναζήτησης",

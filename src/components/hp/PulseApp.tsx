@@ -1,3 +1,4 @@
+import { buildMapRegions, deriveRegionalDiscovery } from "@/lib/hp/regional-discovery";
 import {
   lazy,
   Suspense,
@@ -1976,6 +1977,19 @@ export function PulseApp() {
     const [first] = [...filteredPlaces].sort((a, b) => b.hotness - a.hotness);
     return first ?? null;
   }, [filteredPlaces]);
+  const mapRegions = useMemo(() => buildMapRegions(places), [places]);
+  const regionalDiscovery = useMemo(
+    () =>
+      deriveRegionalDiscovery(
+        mapRegions,
+        new Set(mapPlaces.map((place) => place.id)),
+        activeLens,
+        discoverySnapshot,
+        markerPulseInput,
+        markerPulseNow,
+      ),
+    [mapRegions, mapPlaces, activeLens, discoverySnapshot, markerPulseInput, markerPulseNow],
+  );
   const mapClusters = useMemo(
     () => buildAreaClusters(mapPlaces, events, activitySnapshot, areaIntelligence),
     [activitySnapshot, areaIntelligence, events, mapPlaces],
@@ -2103,6 +2117,7 @@ export function PulseApp() {
         >
           <SocialMap
             clusters={mapClusters}
+            regions={regionalDiscovery}
             events={events}
             activitySnapshot={activitySnapshot}
             markerPulseSnapshot={markerPulseSnapshot}
