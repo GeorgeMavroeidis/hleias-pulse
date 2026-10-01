@@ -1,0 +1,321 @@
+/* One Ilia Pulse grammar. The core is a geographic point; only rings move. */
+.hp-app-shell[data-marker-motion="pulse"],
+.hp-animation-theme-option[data-marker-motion="pulse"] {
+  --hp-motion-factor: 1;
+}
+.hp-app-shell[data-marker-motion="calm"],
+.hp-animation-theme-option[data-marker-motion="calm"] {
+  --hp-motion-factor: 2;
+}
+
+.hp-pulse-marker {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  overflow: visible;
+  touch-action: manipulation;
+  user-select: none;
+}
+.hp-pulse-shell,
+.hp-pulse-preview {
+  --hp-core-size: 14px;
+  --hp-marker-context-opacity: 1;
+  --hp-motion-cycle: calc(8s * var(--hp-motion-factor, 1));
+  --hp-ring-opacity: 0;
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 44px;
+  opacity: calc(var(--hp-marker-lens-opacity-target, 1) * var(--hp-marker-context-opacity));
+  transform: scale(var(--hp-marker-lens-scale-target, 1));
+  transform-origin: center;
+  pointer-events: inherit;
+  transition: opacity 160ms ease-out;
+}
+.hp-pulse-shell > *,
+.hp-pulse-preview > * {
+  pointer-events: none;
+}
+.hp-pulse-core {
+  position: absolute;
+  left: calc(50% - var(--hp-core-size) / 2);
+  top: calc(50% - var(--hp-core-size) / 2);
+  display: grid;
+  width: var(--hp-core-size);
+  height: var(--hp-core-size);
+  place-items: center;
+  box-sizing: border-box;
+  border: 2px solid var(--hp-paper);
+  border-radius: 50%;
+  background: var(--hp-sunset);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hp-ink) 76%, transparent);
+  color: var(--hp-paper);
+  font: 700 12px/1 var(--hp-font-body);
+  font-variant-numeric: tabular-nums;
+}
+.hp-pulse-shell[data-pulse-level="neutral"] .hp-pulse-core {
+  outline: 1px dashed color-mix(in srgb, var(--hp-ink) 56%, transparent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.hp-pulse-shell[data-pulse-level="quiet"] .hp-pulse-core {
+  background: color-mix(in srgb, var(--hp-sunset) 66%, var(--hp-paper));
+}
+.hp-pulse-shell[data-pulse-level="fading"] .hp-pulse-core {
+  background: color-mix(in srgb, var(--hp-sunset) 54%, var(--hp-paper));
+}
+.hp-pulse-marker:not([data-marker-kind="child"]) .hp-pulse-core {
+  background: var(--hp-ink);
+  box-shadow: 0 0 0 1px var(--hp-sunset);
+  outline: none;
+}
+
+.hp-pulse-ring,
+.hp-pulse-selection-accent {
+  position: absolute;
+  left: calc(50% - 12px);
+  top: calc(50% - 12px);
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  border: 1px solid var(--hp-sunset);
+  border-radius: 50%;
+  opacity: 0;
+  transform-origin: center;
+}
+.hp-pulse-shell[data-pulse-level="emerging"],
+.hp-pulse-preview {
+  --hp-motion-cycle: calc(8s * var(--hp-motion-factor, 1));
+  --hp-ring-opacity: 0.26;
+}
+.hp-pulse-shell[data-pulse-level="active"],
+.hp-pulse-preview[data-pulse-level="active"] {
+  --hp-motion-cycle: calc(6s * var(--hp-motion-factor, 1));
+  --hp-ring-opacity: 0.4;
+}
+.hp-pulse-shell[data-pulse-level="lively"] {
+  --hp-motion-cycle: calc(5s * var(--hp-motion-factor, 1));
+  --hp-ring-opacity: 0.55;
+}
+.hp-pulse-shell[data-pulse-level="fading"] {
+  --hp-motion-cycle: calc(10s * var(--hp-motion-factor, 1));
+  --hp-ring-opacity: 0.2;
+}
+:is(.hp-pulse-shell, .hp-pulse-preview):is(
+    [data-pulse-level="emerging"],
+    [data-pulse-level="active"],
+    [data-pulse-level="lively"],
+    [data-pulse-level="fading"]
+  )
+  .hp-pulse-ring {
+  animation: hp-pulse-breathe var(--hp-motion-cycle) ease-in-out infinite;
+  animation-delay: calc(var(--hp-motion-cycle) * var(--hp-motion-phase, 0) * -1);
+  will-change: transform, opacity;
+}
+.hp-pulse-shell[data-pulse-level="lively"] .hp-pulse-ring {
+  animation-name: hp-pulse-radiate;
+}
+.hp-pulse-shell[data-pulse-level="fading"] .hp-pulse-ring {
+  animation-name: hp-pulse-fade;
+}
+
+.hp-pulse-selection-ring {
+  position: absolute;
+  left: calc(50% - (var(--hp-core-size) + 10px) / 2);
+  top: calc(50% - (var(--hp-core-size) + 10px) / 2);
+  width: calc(var(--hp-core-size) + 10px);
+  height: calc(var(--hp-core-size) + 10px);
+  box-sizing: border-box;
+  border: 1.5px solid var(--hp-sunset);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px var(--hp-paper),
+    0 0 0 3px color-mix(in srgb, var(--hp-ink) 68%, transparent);
+  opacity: 0;
+}
+.hp-pulse-shell.is-selected {
+  --hp-marker-lens-opacity-target: 1;
+  --hp-marker-context-opacity: 1;
+}
+.hp-pulse-shell.is-selected .hp-pulse-selection-ring {
+  opacity: 1;
+}
+.hp-pulse-shell.is-selected:is(
+    [data-pulse-level="emerging"],
+    [data-pulse-level="active"],
+    [data-pulse-level="lively"],
+    [data-pulse-level="fading"]
+  )
+  .hp-pulse-selection-accent {
+  animation: hp-pulse-select 650ms ease-out 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hp-pulse-marker:not([aria-pressed="true"]):hover .hp-pulse-selection-ring {
+    opacity: 0.48;
+  }
+  .hp-pulse-marker:hover .hp-pulse-label {
+    opacity: 1;
+  }
+}
+.hp-pulse-marker:not([aria-pressed="true"]):active .hp-pulse-selection-ring {
+  opacity: 0.65;
+}
+.hp-pulse-marker:focus-visible .hp-pulse-selection-ring {
+  border-color: var(--hp-deep);
+  opacity: 1;
+}
+.hp-pulse-marker:focus-within {
+  z-index: 2500 !important;
+}
+.hp-pulse-marker:focus-visible .hp-pulse-label,
+.hp-pulse-shell.is-selected .hp-pulse-label,
+.hp-pulse-shell.has-visible-label .hp-pulse-label {
+  opacity: 1;
+}
+.hp-pulse-label {
+  position: absolute;
+  left: calc(50% - 64px);
+  top: calc(50% + 17px);
+  box-sizing: border-box;
+  width: 128px;
+  height: 22px;
+  overflow: hidden;
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--hp-paper) 94%, transparent);
+  color: var(--hp-ink);
+  font: 600 11px/16px var(--hp-font-body);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+}
+.hp-pulse-marker:not([data-marker-kind="child"]) .hp-pulse-label {
+  top: calc(50% + 27px);
+}
+
+.hp-pulse-event,
+.hp-pulse-story {
+  position: absolute;
+  box-sizing: border-box;
+  opacity: 0;
+}
+.hp-pulse-event {
+  left: calc(50% - 11px);
+  top: calc(50% - 11px);
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid transparent;
+  border-top-color: var(--hp-deep);
+  border-right-color: var(--hp-deep);
+  border-radius: 50%;
+  transform: rotate(-20deg);
+}
+.hp-pulse-story {
+  left: calc(50% + 8px);
+  top: calc(50% + 5px);
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--hp-deep);
+  border-radius: 50%;
+  background: var(--hp-paper);
+}
+.has-events .hp-pulse-event,
+.has-stories .hp-pulse-story {
+  opacity: 1;
+}
+
+/* Preserve the small appearance previews without a second marker identity. */
+.hp-pulse-preview {
+  width: 32px;
+  height: 32px;
+  opacity: 1;
+  pointer-events: none;
+}
+
+:is(.hp-map-is-moving, .hp-pulse-paused, .is-viewport-paused)
+  :is(.hp-pulse-ring, .hp-pulse-selection-accent) {
+  animation-play-state: paused !important;
+  will-change: auto;
+}
+.hp-map-is-moving :is(.hp-pulse-ring, .hp-pulse-selection-accent) {
+  opacity: 0 !important;
+}
+.hp-map-motion-far :is(.hp-pulse-ring, .hp-pulse-selection-accent),
+.is-motion-suppressed:not(.is-selected) :is(.hp-pulse-ring, .hp-pulse-selection-accent) {
+  animation: none !important;
+  opacity: 0 !important;
+  will-change: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hp-pulse-shell,
+  .hp-pulse-preview {
+    transition: none;
+  }
+  .hp-pulse-ring,
+  .hp-pulse-selection-accent {
+    animation: none !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+  .hp-pulse-ring {
+    opacity: var(--hp-ring-opacity);
+  }
+}
+
+@keyframes hp-pulse-breathe {
+  0%,
+  100% {
+    opacity: 0.08;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: var(--hp-ring-opacity);
+    transform: scale(1.2);
+  }
+}
+@keyframes hp-pulse-radiate {
+  0%,
+  65%,
+  100% {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+  12% {
+    opacity: var(--hp-ring-opacity);
+    transform: scale(0.92);
+  }
+  55% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+@keyframes hp-pulse-fade {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  18% {
+    opacity: var(--hp-ring-opacity);
+    transform: scale(1);
+  }
+  75% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+@keyframes hp-pulse-select {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}

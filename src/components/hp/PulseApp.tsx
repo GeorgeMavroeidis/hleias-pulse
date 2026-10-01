@@ -145,6 +145,12 @@ import { IdentitySegments, SectionHeader, fieldClass } from "./blend-ui";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { buildPulseActivitySnapshot, type PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
 import {
+  buildMarkerPulseInput,
+  deriveMarkerPulseSnapshot,
+  EMPTY_MARKER_PULSE_INPUT,
+} from "@/lib/hp/marker-pulse";
+import { MARKER_MOTION_STORAGE_KEY } from "@/lib/hp/marker-motion";
+import {
   deriveAreaIntelligenceSnapshot,
   type AreaState,
   type AreaIntelligenceSnapshot,
@@ -180,7 +186,7 @@ import {
   type NavTab,
   type MeetSubTab,
   type ComposerMode,
-  type MarkerAnimationTheme,
+  type MarkerMotion,
   type CreateStoryInput,
   type PostingIdentity,
   AREA_STATE_LABEL,
@@ -192,9 +198,7 @@ import {
   DISCOVERY_LENS_LABEL,
   TAB_ITEMS,
   HP_TRANSITION,
-  MARKER_ANIMATION_THEME_STORAGE_KEY,
-  MARKER_ANIMATION_THEMES,
-  initialMarkerAnimationTheme,
+  initialMarkerMotion,
   type ShareTarget,
   type MapViewSnapshot,
   openStreetMapUrl,
@@ -309,6 +313,12 @@ export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
   const [activitySnapshot, setActivitySnapshot] = useState<PulseActivitySnapshot>({});
+  const [markerPulseInput, setMarkerPulseInput] = useState(EMPTY_MARKER_PULSE_INPUT);
+  const [markerPulseNow, setMarkerPulseNow] = useState(Date.now);
+  const markerPulseSnapshot = useMemo(
+    () => deriveMarkerPulseSnapshot(markerPulseInput, markerPulseNow),
+    [markerPulseInput, markerPulseNow],
+  );
   const [areaIntelligence, setAreaIntelligence] = useState<AreaIntelligenceSnapshot>({});
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
@@ -327,9 +337,7 @@ export function PulseApp() {
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const [markerAnimationTheme, setMarkerAnimationTheme] = useState<MarkerAnimationTheme>(
-    initialMarkerAnimationTheme,
-  );
+  const [markerMotion, setMarkerMotion] = useState<MarkerMotion>(initialMarkerMotion);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [visitedPlaceIds, setVisitedPlaceIds] = useState<string[]>([]);
@@ -718,14 +726,14 @@ export function PulseApp() {
     }
   };
 
-  const updateMarkerAnimationTheme = (next: MarkerAnimationTheme) => {
-    setMarkerAnimationTheme(next);
+  const updateMarkerMotion = (next: MarkerMotion) => setMarkerMotion(next);
+  useEffect(() => {
     try {
-      window.localStorage.setItem(MARKER_ANIMATION_THEME_STORAGE_KEY, next);
+      window.localStorage.setItem(MARKER_MOTION_STORAGE_KEY, markerMotion);
     } catch (error) {
-      console.warn("Could not save marker animation preference.", error);
+      console.warn("Could not save marker motion preference.", error);
     }
-  };
+  }, [markerMotion]);
 
   useEffect(() => {
     setAppearanceOpen(false);
@@ -807,6 +815,9 @@ export function PulseApp() {
       const data = await loadPulseData();
       setPulseData(data);
       setActivitySnapshot(buildPulseActivitySnapshot(data));
+      const observedAt = Date.now();
+      setMarkerPulseInput(buildMarkerPulseInput(data, observedAt));
+      setMarkerPulseNow(observedAt);
       setAreaIntelligence(deriveAreaIntelligenceSnapshot(data));
       lastActivityRefreshAtRef.current = Date.now();
       setPlaceComments(data.placeComments);
@@ -827,6 +838,7 @@ export function PulseApp() {
       setDataStatus("ready");
     } catch (error) {
       console.warn("Could not load Supabase pulse data.", error);
+      setMarkerPulseInput((current) => ({ ...current, available: false }));
       setPulseData(emptyPulseData);
       setDataStatus("error");
     }
@@ -849,10 +861,14 @@ export function PulseApp() {
     try {
       const data = await loadPulseData();
       setActivitySnapshot(buildPulseActivitySnapshot(data));
+      const observedAt = Date.now();
+      setMarkerPulseInput(buildMarkerPulseInput(data, observedAt));
+      setMarkerPulseNow(observedAt);
       setAreaIntelligence(deriveAreaIntelligenceSnapshot(data));
       lastActivityRefreshAtRef.current = Date.now();
     } catch (error) {
       console.warn("Could not refresh the map activity snapshot.", error);
+      setMarkerPulseInput((current) => ({ ...current, available: false }));
     } finally {
       activityRefreshInFlightRef.current = false;
     }
@@ -862,7 +878,10 @@ export function PulseApp() {
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
     const refreshIfStale = () => {
-      if (document.hidden || Date.now() - lastActivityRefreshAtRef.current < 60_000) return;
+      if (document.hidden) return;
+      const now = Date.now();
+      setMarkerPulseNow(now);
+      if (now - lastActivityRefreshAtRef.current < 60_000) return;
       void refreshActivitySnapshot();
     };
     const interval = window.setInterval(refreshIfStale, 60_000);
@@ -2086,6 +2105,7 @@ export function PulseApp() {
             clusters={mapClusters}
             events={events}
             activitySnapshot={activitySnapshot}
+            markerPulseSnapshot={markerPulseSnapshot}
             selectedAreaId={selectedAreaId}
             selectedPlaceId={sel?.id ?? null}
             activeFilterLabel={activeLens ? t(DISCOVERY_LENS_LABEL[activeLens]) : null}
@@ -2317,7 +2337,7 @@ export function PulseApp() {
     <MotionConfig reducedMotion="user">
       <div
         className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10"
-        data-marker-animation-theme={markerAnimationTheme}
+        data-marker-motion={markerMotion}
       >
         <div
           className="flex min-h-0 flex-1 flex-col"
@@ -2328,8 +2348,8 @@ export function PulseApp() {
             query={query}
             setQuery={setQuery}
             onSetLanguage={setAppLanguage}
-            animationTheme={markerAnimationTheme}
-            onSetAnimationTheme={updateMarkerAnimationTheme}
+            markerMotion={markerMotion}
+            onSetMarkerMotion={updateMarkerMotion}
             appearanceOpen={appearanceOpen}
             setAppearanceOpen={setAppearanceOpen}
             showSearch={showSearch}
