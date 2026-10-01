@@ -108,55 +108,62 @@ export function buildMarkerPulseInput(data: PulseData, fetchedAt: number): Marke
   return { fetchedAt, available: true, placeIds, evidence };
 }
 
-export function deriveMarkerPulseSnapshot(
-  input: MarkerPulseInput,
-  now: number,
-): MarkerPulseSnapshot {
-  const fresh =
+/** Shared evidence-to-state rule for places and regions. */
+export function pulseInputIsFresh(input: MarkerPulseInput, now: number) {
+  return (
     input.available &&
     input.fetchedAt !== null &&
     Number.isFinite(now) &&
     now >= input.fetchedAt &&
-    now - input.fetchedAt <= MARKER_PULSE_MAX_SNAPSHOT_AGE_MS;
+    now - input.fetchedAt <= MARKER_PULSE_MAX_SNAPSHOT_AGE_MS
+  );
+}
+
+export function deriveEvidencePulseSignal(
+  evidence: readonly MarkerEvidence[],
+  now: number,
+): MarkerPulseSignal {
+  const signal = deriveAreaIntelligence(
+    {
+      areaId: "community-content",
+      legacyRawScore: 0,
+      evidence: evidence.filter((item) => item.expiresAt === null || item.expiresAt > now),
+      observedAt: now,
+    },
+    MARKER_EVIDENCE_CONFIG,
+  );
+  if (signal.signalQuality === "uncertain") return NEUTRAL_MARKER_PULSE;
+  const level: PulseLevel =
+    signal.signalQuality === "fading" || signal.state === "cooling"
+      ? "fading"
+      : signal.state === "hot"
+        ? signal.signalQuality === "confirmed" && signal.evidence.contributorCount >= 2
+          ? "lively"
+          : "active"
+        : signal.emerging || signal.state === "rising"
+          ? "emerging"
+          : signal.state === "active"
+            ? "active"
+            : "quiet";
+  return {
+    level,
+    quality: signal.signalQuality,
+    lastSignalAt: signal.lastSignalAt,
+    score: signal.activityScore,
+    contributorCount: signal.evidence.contributorCount,
+  };
+}
+
+export function deriveMarkerPulseSnapshot(
+  input: MarkerPulseInput,
+  now: number,
+): MarkerPulseSnapshot {
+  const fresh = pulseInputIsFresh(input, now);
   return Object.fromEntries(
-    input.placeIds.map((placeId) => {
-      if (!fresh) return [placeId, NEUTRAL_MARKER_PULSE];
-      const evidence = (input.evidence[placeId] ?? []).filter(
-        (item) => item.expiresAt === null || item.expiresAt > now,
-      );
-      const signal = deriveAreaIntelligence(
-        {
-          areaId: placeId,
-          legacyRawScore: 0,
-          evidence,
-          observedAt: now,
-        },
-        MARKER_EVIDENCE_CONFIG,
-      );
-      if (signal.signalQuality === "uncertain") return [placeId, NEUTRAL_MARKER_PULSE];
-      const level: PulseLevel =
-        signal.signalQuality === "fading" || signal.state === "cooling"
-          ? "fading"
-          : signal.state === "hot"
-            ? signal.signalQuality === "confirmed" && signal.evidence.contributorCount >= 2
-              ? "lively"
-              : "active"
-            : signal.emerging || signal.state === "rising"
-              ? "emerging"
-              : signal.state === "active"
-                ? "active"
-                : "quiet";
-      return [
-        placeId,
-        {
-          level,
-          quality: signal.signalQuality,
-          lastSignalAt: signal.lastSignalAt,
-          score: signal.activityScore,
-          contributorCount: signal.evidence.contributorCount,
-        },
-      ];
-    }),
+    input.placeIds.map((placeId) => [
+      placeId,
+      fresh ? deriveEvidencePulseSignal(input.evidence[placeId] ?? [], now) : NEUTRAL_MARKER_PULSE,
+    ]),
   );
 }
 

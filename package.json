@@ -33,12 +33,13 @@
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
-    "test:map-visuals": "tsx scripts/check-map-visuals.ts && npm run test:markers && npm run test:map-cartography",
+    "test:map-visuals": "tsx scripts/check-map-visuals.ts && npm run test:markers && npm run test:map-cartography && npm run test:regional-discovery",
     "test:map-cartography": "tsx --test scripts/check-map-cartography.test.ts",
     "test:routing": "tsx --test scripts/check-route-preview.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",
     "build:ionian-land": "tsx scripts/build-ionian-land.ts",
-    "test:markers": "tsx --test src/lib/hp/marker-pulse.test.ts"
+    "test:markers": "tsx --test src/lib/hp/marker-pulse.test.ts",
+    "test:regional-discovery": "tsx --test src/lib/hp/regional-discovery.test.ts"
   },
   "dependencies": {
     "@capacitor/app-launcher": "^8.0.1",

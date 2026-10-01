@@ -1,3 +1,4 @@
+import { MAP_POLICY } from "./map-policy";
 import type { PulseLevel } from "./marker-pulse";
 
 export const PLACE_MARKER_CORE_SIZE = 14;
@@ -5,7 +6,7 @@ export const LIVELY_MARKER_CORE_SIZE = 16;
 export const MAX_ANIMATED_MARKERS = 24;
 export const MARKER_LABEL_WIDTH = 128;
 export const MARKER_LABEL_HEIGHT = 22;
-export const MARKER_LABEL_ZOOM = 15.5;
+export const MARKER_LABEL_ZOOM = MAP_POLICY.labelZoom;
 
 export function childMarkerSize(level: PulseLevel | null) {
   return level === "lively" ? LIVELY_MARKER_CORE_SIZE : PLACE_MARKER_CORE_SIZE;

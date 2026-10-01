@@ -2,13 +2,36 @@ import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, Crosshair, MapPinned, Minus, Plus } from "lucide-react";
-import Supercluster from "supercluster";
+import {
+  MAP_POLICY,
+  mapDisclosure,
+  topologyBlend,
+  paddedBounds,
+  type MapBounds,
+} from "@/lib/hp/map-policy";
+import { createMapTopology, topologyKey, blendTopologies } from "@/lib/hp/map-topology";
+import {
+  discoveryViewport,
+  visibleScreenMembers,
+  viewportSignature,
+  type RegionalDiscovery,
+  type MapDiscoveryViewport,
+} from "@/lib/hp/regional-discovery";
+import {
+  installRegionalLayer,
+  regionalGeoJson,
+  regionalDescription,
+  REGION_LAYER_ID,
+  REGION_SOURCE_ID,
+} from "@/lib/hp/map-region-layer";
+export type { MapDiscoveryViewport } from "@/lib/hp/regional-discovery";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type {
   ErrorEvent as MapLibreErrorEvent,
   Map as MapLibreMap,
   Marker as MapLibreMarker,
   StyleSpecification,
+  GeoJSONSource,
 } from "maplibre-gl";
 import { type EventItem, type Place } from "@/lib/hp-model";
 import { createIliaMapStyle } from "@/lib/hp/map-cartography";
@@ -72,37 +95,16 @@ type MarkerRuntimeState = {
   prominenceBand: MarkerProminence["band"];
 };
 
-const ILIA_CENTER: LatLngTuple = [37.68, 21.52];
-// Generous pan bounds: maxBounds only keeps users roughly around Ilia. It must
-// never wall in a zoomed region (South Coast ~37.41 used to hit the south edge
-// at 37.3 and feel "locked"). Low viscosity so panning always feels free.
-const MAP_PAN_BOUNDS: [LatLngTuple, LatLngTuple] = [
-  [36.2, 19.4],
-  [38.9, 23.5],
-];
-const MIN_ZOOM = 8;
-const MAX_ZOOM = 18;
-const OVERVIEW_ZOOM = 9.25;
-const SPLIT_ZOOM = 12.5;
-const DETAIL_CLUSTER_MAX_ZOOM = 13;
-const PLACE_FOCUS_ZOOM = 14.25;
-const RICH_VISUAL_ZOOM = 13.25;
-// Progressive disclosure bands. Area summaries lead the overview, individual
-// places emerge through the middle zooms, and rich metadata finishes revealing
-// at the same zoom used when a place is focused.
-const PLACE_REVEAL_START = 9.75;
-const PLACE_REVEAL_END = 12.75;
-const AREA_FADE_START = 10.25;
-const AREA_FADE_END = 12.75;
-const ACTIVITY_CLUSTER_START = 11.5;
-const ACTIVITY_CLUSTER_FULL = 12.5;
-// Highest zoom an area click will fly to. Tight clusters (e.g. Ancient Olympia,
-// whose pins sit within ~800m) need ~z16 to separate; spread areas stay lower.
-const AREA_FOCUS_MAX_ZOOM = 16.25;
-const ILIA_DETAIL_BBOX: [number, number, number, number] = [19.9, 36.35, 23.25, 39.15];
+const ILIA_CENTER: LatLngTuple = [MAP_POLICY.center[1], MAP_POLICY.center[0]];
+const MIN_ZOOM = MAP_POLICY.minZoom;
+const MAX_ZOOM = MAP_POLICY.maxZoom;
+const OVERVIEW_ZOOM = MAP_POLICY.overviewZoom;
+const SPLIT_ZOOM = MAP_POLICY.regionFadeEnd;
+const PLACE_FOCUS_ZOOM = MAP_POLICY.placeFocusZoom;
+const RICH_VISUAL_ZOOM = MAP_POLICY.regionFocusMaxZoom;
 const MAP_PAN_DURATION = 0.28;
 const MAP_OVERVIEW_DURATION = 0.34;
-const MAP_FOCUS_DURATION = 0.38;
+const MAP_FOCUS_DURATION = MAP_POLICY.focusDurationMs / 1000;
 const MIN_UTILITY_RAIL_HEIGHT = 248;
 const MIN_MAP_CHROME_HEIGHT = 188;
 const SAFE_MARKER_RADIUS = 48;
@@ -149,17 +151,6 @@ function pointIsInSafeRect(point: { x: number; y: number }, rect: SafeMapRect) {
   );
 }
 
-type ClusterRenderNode = {
-  id: string;
-  kind: "cluster";
-  cluster: MapAreaCluster;
-  latLng: LatLngTuple;
-  opacity: number;
-  selected: boolean;
-  tier: PulseTier;
-  prominence: MarkerProminence;
-};
-
 type ChildRenderNode = {
   id: string;
   kind: "child";
@@ -193,24 +184,7 @@ type ActivityClusterRenderNode = {
   prominence: MarkerProminence;
 };
 
-type RenderNode = ClusterRenderNode | ActivityClusterRenderNode | ChildRenderNode;
-
-type PlacePointProperties = {
-  placeId: string;
-  areaId: string;
-  eventCount: number;
-  postCount: number;
-  commentCount: number;
-  hotness: number;
-  tone: AreaTone;
-};
-
-type ActivityClusterProperties = {
-  eventCount: number;
-  postCount: number;
-  commentCount: number;
-  hotness: number;
-};
+type RenderNode = ActivityClusterRenderNode | ChildRenderNode;
 
 function clusterIdForPlace(place: Place) {
   return areaIdForPlace(place);
@@ -220,13 +194,9 @@ export function getMapAreaIdForPlace(place: Place) {
   return clusterIdForPlace(place);
 }
 
-function scorePlace(place: Place, activitySnapshot: PulseActivitySnapshot, fallbackEventCount = 0) {
-  return pulseMetricForPlace(place, activitySnapshot, fallbackEventCount).score;
-}
-
 function createPulseIcon(kind: RenderNode["kind"]) {
   const element = document.createElement("div");
-  element.className = `${kind === "child" ? "hp-child-marker" : kind === "cluster" ? "hp-area-marker" : "hp-activity-cluster"} hp-pulse-marker`;
+  element.className = `${kind === "child" ? "hp-child-marker" : "hp-activity-cluster"} hp-pulse-marker`;
   element.dataset.markerKind = kind;
   const shell = document.createElement("div");
   shell.className = `${kind === "child" ? "hp-child-marker__shell" : "hp-area-marker__shell"} hp-pulse-shell`;
@@ -263,12 +233,7 @@ function updatePulseIcon(
     if (signal) shell.dataset.signalQuality = signal.quality;
     else delete shell.dataset.signalQuality;
   }
-  const count =
-    node.kind === "cluster"
-      ? node.cluster.places.length
-      : node.kind === "activity-cluster"
-        ? node.pointCount
-        : 0;
+  const count = node.kind === "activity-cluster" ? node.pointCount : 0;
   const size =
     node.kind === "child" ? childMarkerSize(signal?.level ?? null) : clusterMarkerSize(count);
   const cssSize = `${size}px`;
@@ -279,12 +244,7 @@ function updatePulseIcon(
   const hasEvents = node.kind === "child" && node.eventCount > 0;
   shell.classList.toggle("has-events", hasEvents);
   shell.classList.toggle("has-stories", hasStory);
-  const name =
-    node.kind === "child"
-      ? node.place.name
-      : node.kind === "cluster"
-        ? node.cluster.name
-        : node.dominantCluster.name;
+  const name = node.kind === "child" ? node.place.name : node.dominantCluster.name;
   const setText = (selector: string, value: string) => {
     const part = shell.querySelector<HTMLElement>(selector);
     if (part && part.textContent !== value) part.textContent = value;
@@ -316,100 +276,21 @@ function updatePulseIcon(
   if (element.title !== label) element.title = label;
 }
 
-function superclusterZoom(zoom: number) {
-  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.floor(zoom)));
-}
-
-function clamp01(value: number) {
-  return value < 0 ? 0 : value > 1 ? 1 : value;
-}
-
-function smoothstep(start: number, end: number, value: number) {
-  const t = clamp01((value - start) / (end - start));
-  return t * t * (3 - 2 * t);
-}
-
 function applyMarkerZoomProfile(node: HTMLElement | null, zoom: number) {
-  node?.classList.toggle("hp-map-motion-far", zoom < ACTIVITY_CLUSTER_START);
+  node?.classList.toggle("hp-map-motion-far", zoom < MAP_POLICY.motionZoom);
 }
 
 // Include the selected label footprint, while the geographic core stays fixed.
 function markerCoreRadius(node: RenderNode, _zoom: number) {
   if (node.selected) return MARKER_LABEL_WIDTH / 2 + 6;
   const size =
-    node.kind === "child"
-      ? childMarkerSize(node.pulse.level)
-      : clusterMarkerSize(node.kind === "cluster" ? node.cluster.places.length : node.pointCount);
+    node.kind === "child" ? childMarkerSize(node.pulse.level) : clusterMarkerSize(node.pointCount);
   return size / 2 + 6;
-}
-
-function centroidOfPlaces(places: Place[], fallback: LatLngTuple): LatLngTuple {
-  if (places.length === 0) return fallback;
-  let lat = 0;
-  let lng = 0;
-  for (const place of places) {
-    lat += place.lat;
-    lng += place.lng;
-  }
-  return [lat / places.length, lng / places.length];
-}
-
-// Pins are always on the map at their real coordinates. Opacity ramps with zoom
-// so the overview stays calm and detail emerges smoothly instead of popping.
-function placeOpacityForZoom(zoom: number) {
-  return smoothstep(PLACE_REVEAL_START, PLACE_REVEAL_END, zoom);
-}
-
-// Area clusters are helpers only: they dissolve as the real pins take over.
-function areaClusterOpacityForZoom(zoom: number) {
-  if (zoom <= AREA_FADE_START) return 1;
-  return 1 - smoothstep(AREA_FADE_START, AREA_FADE_END, zoom);
-}
-
-// An activity bubble fades out as you approach the zoom where its members
-// separate, so the split into real pins reads as one continuous motion.
-function activityClusterOpacityForZoom(zoom: number, expansionZoom: number) {
-  const distance = expansionZoom - zoom;
-  if (distance <= 0) return 0;
-  const reveal = smoothstep(ACTIVITY_CLUSTER_START, ACTIVITY_CLUSTER_FULL, zoom);
-  return reveal * clamp01(distance / 0.9);
-}
-
-function isActivityClusterFeature(
-  feature:
-    | Supercluster.ClusterFeature<ActivityClusterProperties>
-    | Supercluster.PointFeature<PlacePointProperties>,
-): feature is Supercluster.ClusterFeature<ActivityClusterProperties> {
-  return Boolean((feature.properties as Supercluster.ClusterProperties).cluster);
-}
-
-function createPlaceFeature(
-  place: Place,
-  cluster: MapAreaCluster,
-  eventCount: number,
-  activitySnapshot: PulseActivitySnapshot,
-): Supercluster.PointFeature<PlacePointProperties> {
-  const activity = pulseMetricForPlace(place, activitySnapshot, eventCount);
-  return {
-    type: "Feature",
-    geometry: {
-      type: "Point",
-      coordinates: [place.lng, place.lat],
-    },
-    properties: {
-      placeId: place.id,
-      areaId: cluster.id,
-      eventCount: activity.eventCount,
-      postCount: activity.postCount,
-      commentCount: activity.commentCount,
-      hotness: activity.hotness,
-      tone: cluster.tone,
-    },
-  };
 }
 
 interface Props {
   clusters: MapAreaCluster[];
+  regions: RegionalDiscovery[];
   events: EventItem[];
   activitySnapshot: PulseActivitySnapshot;
   markerPulseSnapshot: MarkerPulseSnapshot;
@@ -436,11 +317,6 @@ interface Props {
   onMapLongPress?: (lat: number, lng: number) => void;
 }
 
-export type MapDiscoveryViewport = {
-  center: { lat: number; lng: number };
-  visibleAreaIds: string[];
-};
-
 const NEUTRAL_PROMINENCE: MarkerProminence = {
   score: 1,
   band: "high",
@@ -451,6 +327,7 @@ const NEUTRAL_PROMINENCE: MarkerProminence = {
 
 export function SocialMap({
   clusters,
+  regions,
   events,
   activitySnapshot,
   markerPulseSnapshot,
@@ -490,6 +367,14 @@ export function SocialMap({
   const onDiscoveryViewportChangeRef = useRef(onDiscoveryViewportChange);
   onDiscoveryViewportChangeRef.current = onDiscoveryViewportChange;
   const lastDiscoveryViewportRef = useRef("");
+  const regionsRef = useRef(regions);
+  regionsRef.current = regions;
+  const selectRegionRef = useRef<(id: string) => void>(() => {});
+  const userNavigatedRef = useRef(false);
+  const explicitBackRef = useRef(false);
+  const [settledBounds, setSettledBounds] = useState<MapBounds>(MAP_POLICY.panBounds);
+  const [visibleRegionSymbolIds, setVisibleRegionSymbolIds] = useState<string[]>([]);
+  const [settledViewport, setSettledViewport] = useState<MapDiscoveryViewport | null>(null);
   const bottomOverlayHeightRef = useRef(bottomOverlayHeight);
   bottomOverlayHeightRef.current = bottomOverlayHeight;
   const availableMapHeightRef = useRef(availableMapHeight);
@@ -504,10 +389,10 @@ export function SocialMap({
   const selectionMotionUntilRef = useRef(0);
   const cameraHandledSelectionRef = useRef<string | null>(null);
   const ignoreBackgroundClickUntilRef = useRef(0);
-  const lastZoomRef = useRef(OVERVIEW_ZOOM);
+  const lastZoomRef = useRef<number>(OVERVIEW_ZOOM);
   const [mapReady, setMapReady] = useState(false);
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(OVERVIEW_ZOOM);
+  const [zoom, setZoom] = useState<number>(OVERVIEW_ZOOM);
   const [attributionExpanded, setAttributionExpanded] = useState(true);
   const selectionKey = `${selectedAreaId ?? ""}|${selectedPlaceId ?? ""}`;
   const selectionKeyRef = useRef(selectionKey);
@@ -535,252 +420,178 @@ export function SocialMap({
   }, [placeById, selectedPlaceId]);
   const isSplitZoom = zoom >= SPLIT_ZOOM;
 
-  const placeClusterIndex = useMemo(() => {
-    const index = new Supercluster<PlacePointProperties, ActivityClusterProperties>({
-      maxZoom: DETAIL_CLUSTER_MAX_ZOOM,
-      minPoints: 2,
-      radius: 58,
-      map: (props) => ({
-        eventCount: props.eventCount,
-        postCount: props.postCount,
-        commentCount: props.commentCount,
-        hotness: props.hotness,
-      }),
-      reduce: (accumulated, props) => {
-        accumulated.eventCount += props.eventCount;
-        accumulated.postCount += props.postCount;
-        accumulated.commentCount += props.commentCount;
-        accumulated.hotness = Math.max(accumulated.hotness, props.hotness);
-      },
-    });
-
-    index.load(
-      clusters.flatMap((cluster) =>
-        cluster.childPlaces.map((place) =>
-          createPlaceFeature(place, cluster, eventCounts.get(place.id) ?? 0, activitySnapshot),
-        ),
-      ),
+  const coordinateKey = useMemo(
+    () => topologyKey([...placeById.values()].map((n) => n.place)),
+    [placeById],
+  );
+  const placeTopology = useMemo(() => createMapTopology(coordinateKey), [coordinateKey]);
+  const placeTopologyRef = useRef(placeTopology);
+  placeTopologyRef.current = placeTopology;
+  const { lower: lowerZoom, upper: upperZoom } = topologyBlend(zoom);
+  const topologyBounds = useMemo(() => paddedBounds(settledBounds), [settledBounds]);
+  const topologyPair = useMemo(
+    () => ({
+      lower: placeTopology.query(lowerZoom, topologyBounds),
+      upper: placeTopology.query(upperZoom, topologyBounds),
+    }),
+    [placeTopology, lowerZoom, upperZoom, topologyBounds],
+  );
+  const baseNodes = useMemo(() => {
+    const nodes = new Map<string, RenderNode>();
+    const topologyNodes = new Map(
+      [...topologyPair.lower, ...topologyPair.upper].map((n) => [n.id, n]),
     );
-    return index;
-  }, [activitySnapshot, clusters, eventCounts]);
-
+    topologyNodes.forEach((node) => {
+      if (node.clusterId === undefined) {
+        const entry = placeById.get(node.placeIds[0]);
+        if (!entry) return;
+        const activity = pulseMetricForPlace(
+          entry.place,
+          activitySnapshot,
+          eventCounts.get(entry.place.id) ?? 0,
+        );
+        nodes.set(node.id, {
+          id: node.id,
+          kind: "child",
+          cluster: entry.cluster,
+          place: entry.place,
+          eventCount: activity.eventCount,
+          latLng: [entry.place.lat, entry.place.lng],
+          opacity: 1,
+          selected: false,
+          solo: entry.cluster.places.length === 1,
+          tier: activity.tier,
+          pulse: markerPulseForPlace(entry.place.id, markerPulseSnapshot),
+          prominence: NEUTRAL_PROMINENCE,
+        });
+        return;
+      }
+      const leaves = node.placeIds.flatMap((id) => {
+        const entry = placeById.get(id);
+        return entry ? [entry.place] : [];
+      });
+      const membership = new Map<string, number>();
+      leaves.forEach((p) =>
+        membership.set(clusterIdForPlace(p), (membership.get(clusterIdForPlace(p)) ?? 0) + 1),
+      );
+      const dominantId = [...membership].sort(
+        ([a, x], [b, y]) => y - x || a.localeCompare(b),
+      )[0]?.[0];
+      const dominantCluster = clusterById.get(dominantId);
+      if (!dominantCluster) return;
+      const activity = aggregatePulseMetrics(leaves, activitySnapshot, eventCounts);
+      nodes.set(node.id, {
+        id: node.id,
+        kind: "activity-cluster",
+        clusterId: node.clusterId,
+        dominantCluster,
+        leaves,
+        latLng: [node.lat, node.lng],
+        opacity: 1,
+        pointCount: leaves.length,
+        eventCount: activity.eventCount,
+        postCount: activity.postCount,
+        hotness: activity.hotness,
+        selected: false,
+        tone: dominantCluster.tone,
+        tier: activity.tier,
+        prominence: NEUTRAL_PROMINENCE,
+      });
+    });
+    return nodes;
+  }, [topologyPair, placeById, clusterById, activitySnapshot, eventCounts, markerPulseSnapshot]);
   const renderNodes = useMemo<RenderNode[]>(() => {
-    const nodes: RenderNode[] = [];
-    const placeOpacity = placeOpacityForZoom(zoom);
-
-    // 1) Every place is ALWAYS on the map at its true coordinate. Selection only
-    //    flags the active pin; nothing ever shoves a pin off its real location,
-    //    so zoom/pan never makes locations "change place".
-    clusters.forEach((cluster) => {
-      cluster.places.forEach((place) => {
-        const selected = place.id === selectedPlaceId;
-        const solo = cluster.places.length === 1;
+    const nodes = blendTopologies(topologyPair.lower, topologyPair.upper, zoom).flatMap((node) => {
+      const base = baseNodes.get(node.id);
+      return base ? [{ ...base, opacity: node.opacity }] : [];
+    });
+    if (selectedPlaceNode) {
+      const id = `place-${selectedPlaceNode.place.id}`;
+      let node = nodes.find((n) => n.id === id);
+      if (!node) {
+        const { place, cluster } = selectedPlaceNode;
         const activity = pulseMetricForPlace(
           place,
           activitySnapshot,
           eventCounts.get(place.id) ?? 0,
         );
-        nodes.push({
-          id: `child-${cluster.id}-${place.id}`,
+        node = {
+          id,
           kind: "child",
-          cluster,
           place,
+          cluster,
           eventCount: activity.eventCount,
           latLng: [place.lat, place.lng],
-          opacity: selected ? 1 : solo ? Math.max(0.72, placeOpacity) : placeOpacity,
-          selected,
-          solo,
+          opacity: 1,
+          selected: true,
+          solo: cluster.places.length === 1,
           tier: activity.tier,
           pulse: markerPulseForPlace(place.id, markerPulseSnapshot),
           prominence: NEUTRAL_PROMINENCE,
-        });
-      });
-    });
-
-    // 2) Area clusters ride on top as helpers and fade out as pins emerge.
-    //    Standalone single-pin areas skip the bubble (they're just a pin).
-    if (zoom < AREA_FADE_END) {
-      const areaOpacity = areaClusterOpacityForZoom(zoom);
-      if (areaOpacity > 0.001) {
-        clusters.forEach((cluster) => {
-          if (cluster.places.length < 2) return;
-          const selected = Boolean(
-            selectedAreaId &&
-            !selectedPlaceId &&
-            zoom < ACTIVITY_CLUSTER_FULL &&
-            cluster.id === selectedAreaId,
-          );
-          nodes.push({
-            id: `cluster-${cluster.id}`,
-            kind: "cluster",
-            cluster,
-            latLng: [cluster.lat, cluster.lng],
-            opacity: selected ? 1 : areaOpacity,
-            selected,
-            tier: cluster.status,
-            prominence: NEUTRAL_PROMINENCE,
-          });
-        });
+        };
+        nodes.push(node);
       }
-    }
-
-    // 3) At detail zoom, activity bubbles group dense spots. Each one is placed
-    //    at the centroid of its members and fades into the already-rendered pins
-    //    as you zoom toward its expansion zoom -> clean split, no relocation.
-    if (zoom >= ACTIVITY_CLUSTER_START) {
-      const features = placeClusterIndex.getClusters(ILIA_DETAIL_BBOX, superclusterZoom(zoom));
-      features.forEach((feature) => {
-        if (!isActivityClusterFeature(feature)) return;
-
-        const leaves = placeClusterIndex
-          .getLeaves(feature.properties.cluster_id, Infinity)
-          .map((leaf) => placeById.get(leaf.properties.placeId)?.place)
-          .filter((place): place is Place => Boolean(place));
-        if (leaves.length === 0) return;
-
-        const expansionZoom = placeClusterIndex.getClusterExpansionZoom(
-          feature.properties.cluster_id,
-        );
-        const opacity = activityClusterOpacityForZoom(zoom, expansionZoom);
-        if (opacity <= 0.001) return;
-
-        const areaScores = new Map<string, number>();
-        leaves.forEach((place) => {
-          const areaId = clusterIdForPlace(place);
-          areaScores.set(
-            areaId,
-            (areaScores.get(areaId) ?? 0) + scorePlace(place, activitySnapshot),
-          );
-        });
-        const dominantAreaId = [...areaScores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-        const dominantCluster =
-          (dominantAreaId ? clusterById.get(dominantAreaId) : null) ??
-          placeById.get(leaves[0].id)?.cluster;
-        if (!dominantCluster) return;
-
-        const [lng, lat] = feature.geometry.coordinates;
-        const centroid = centroidOfPlaces(leaves, [lat, lng]);
-        const activity = aggregatePulseMetrics(leaves, activitySnapshot, eventCounts);
-
-        nodes.push({
-          id: `activity-${feature.properties.cluster_id}`,
-          kind: "activity-cluster",
-          clusterId: feature.properties.cluster_id,
-          dominantCluster,
-          leaves,
-          latLng: centroid,
-          opacity,
-          pointCount: feature.properties.point_count,
-          eventCount: activity.eventCount,
-          postCount: activity.postCount,
-          hotness: activity.hotness,
-          selected: false,
-          tone: dominantCluster.tone,
-          tier: activity.tier,
-          prominence: NEUTRAL_PROMINENCE,
-        });
-      });
-    }
-
-    if (selectedAreaId && !selectedPlaceId && zoom >= ACTIVITY_CLUSTER_FULL) {
-      const selectedArea = clusterById.get(selectedAreaId);
-      const candidates = nodes.filter(
-        (node): node is ActivityClusterRenderNode =>
-          node.kind === "activity-cluster" &&
-          node.leaves.some((place) => clusterIdForPlace(place) === selectedAreaId),
+      node.selected = true;
+      node.opacity = 1;
+    } else if (selectedAreaId && zoom >= MAP_POLICY.regionFadeEnd) {
+      const region = regions.find((row) => row.region.id === selectedAreaId)?.region;
+      const matches = nodes.filter((n) =>
+        n.kind === "child"
+          ? n.cluster.id === selectedAreaId
+          : n.kind === "activity-cluster" &&
+            n.leaves.some((p) => clusterIdForPlace(p) === selectedAreaId),
       );
-      candidates.sort((first, second) => {
-        if (!selectedArea) return second.hotness - first.hotness;
-        const firstDistance =
-          (first.latLng[0] - selectedArea.lat) ** 2 + (first.latLng[1] - selectedArea.lng) ** 2;
-        const secondDistance =
-          (second.latLng[0] - selectedArea.lat) ** 2 + (second.latLng[1] - selectedArea.lng) ** 2;
-        return firstDistance - secondDistance || second.hotness - first.hotness;
-      });
-      if (candidates[0]) {
-        candidates[0].selected = true;
-        candidates[0].opacity = 1;
-      }
-
-      // Dense activity bubbles disappear once their children fully separate.
-      // Keep one area representative selected at those close zooms so the
-      // current area never loses its visual anchor while the sheet is open.
-      if (selectedArea && !candidates[0]) {
-        const existingAreaNode = nodes.find(
-          (node): node is ClusterRenderNode =>
-            node.kind === "cluster" && node.cluster.id === selectedArea.id,
-        );
-        if (existingAreaNode) {
-          existingAreaNode.opacity = 1;
-          existingAreaNode.selected = true;
-        } else {
-          nodes.push({
-            id: `cluster-${selectedArea.id}`,
-            kind: "cluster",
-            cluster: selectedArea,
-            latLng: [selectedArea.lat, selectedArea.lng],
-            opacity: 1,
-            selected: true,
-            tier: selectedArea.status,
-            prominence: NEUTRAL_PROMINENCE,
-          });
-        }
-      }
+      const distance = (n: RenderNode) =>
+        region
+          ? (n.latLng[0] - region.anchor.lat) ** 2 + (n.latLng[1] - region.anchor.lng) ** 2
+          : 0;
+      matches.sort((a, b) => distance(a) - distance(b) || a.id.localeCompare(b.id));
+      if (matches[0]) matches[0].selected = true;
     }
-
     const hasSelection = Boolean(selectedAreaId || selectedPlaceId);
     nodes.forEach((node) => {
-      if (node.kind === "cluster") {
-        node.prominence = deriveMarkerProminence(
-          discoverySnapshot.areas[node.cluster.id],
-          node.cluster.intelligence,
-          activeLens,
-          { selected: node.selected, hasSelection },
-        );
-        return;
-      }
-      if (node.kind === "child") {
+      if (node.kind === "child")
         node.prominence = deriveMarkerProminence(
           discoverySnapshot.places[node.place.id],
           node.cluster.intelligence,
           activeLens,
           { selected: node.selected, hasSelection },
         );
-        return;
-      }
-      node.prominence = aggregateClusterProminence(
-        node.leaves.map((place) => {
-          const memberCluster = placeById.get(place.id)?.cluster;
-          return deriveMarkerProminence(
-            discoverySnapshot.places[place.id],
-            memberCluster?.intelligence,
-            activeLens,
-            { hasSelection },
-          );
-        }),
-        { selected: node.selected, hasSelection },
-      );
+      else if (node.kind === "activity-cluster")
+        node.prominence = aggregateClusterProminence(
+          node.leaves.map((place) =>
+            deriveMarkerProminence(
+              discoverySnapshot.places[place.id],
+              placeById.get(place.id)?.cluster.intelligence,
+              activeLens,
+              { hasSelection },
+            ),
+          ),
+          { selected: node.selected, hasSelection },
+        );
     });
-
     return nodes;
   }, [
-    activeLens,
-    activitySnapshot,
-    markerPulseSnapshot,
-    clusterById,
-    clusters,
-    discoverySnapshot,
-    eventCounts,
-    placeById,
-    placeClusterIndex,
+    zoom,
+    topologyPair,
+    baseNodes,
+    selectedPlaceNode,
     selectedAreaId,
     selectedPlaceId,
-    zoom,
+    regions,
+    activitySnapshot,
+    eventCounts,
+    markerPulseSnapshot,
+    activeLens,
+    discoverySnapshot,
+    placeById,
   ]);
 
   renderNodesRef.current = new Map(renderNodes.map((node) => [node.id, node]));
   const primarySelectedNode = renderNodes.find((node) => node.selected) ?? null;
   const hasPrimaryMarkerSelection = Boolean(primarySelectedNode);
+  const primarySelectedNodeRef = useRef(primarySelectedNode);
+  primarySelectedNodeRef.current = primarySelectedNode;
 
   const summaryText = useMemo(() => {
     if (selectedPlaceNode) return selectedPlaceNode.place.name;
@@ -793,101 +604,72 @@ export function SocialMap({
   }, [activeFilterLabel, clusters, isSplitZoom, selectedAreaCluster, selectedPlaceNode, t]);
 
   const discoveryChipClusters = useMemo(() => {
-    const candidates = clusters.filter((cluster) => cluster.places.length > 1);
-    if (!activeLens) return candidates.slice(0, 6);
-
-    const ordered = [...candidates].sort((left, right) => {
-      const leftProminence = deriveMarkerProminence(
-        discoverySnapshot.areas[left.id],
-        left.intelligence,
-        activeLens,
-      );
-      const rightProminence = deriveMarkerProminence(
-        discoverySnapshot.areas[right.id],
-        right.intelligence,
-        activeLens,
-      );
-      return (
-        rightProminence.score - leftProminence.score ||
-        right.activityScore - left.activityScore ||
-        left.id.localeCompare(right.id)
-      );
-    });
-    const visible = ordered.slice(0, 6);
-    const selected = selectedAreaId
-      ? candidates.find((cluster) => cluster.id === selectedAreaId)
-      : undefined;
-    if (selected && !visible.some((cluster) => cluster.id === selected.id)) {
-      visible.splice(visible.length - 1, 1, selected);
-    }
-    return visible;
-  }, [activeLens, clusters, discoverySnapshot.areas, selectedAreaId]);
+    const visible = new Set(
+      settledViewport?.hierarchyLevel === "region" ||
+        settledViewport?.hierarchyLevel === "transition"
+        ? visibleRegionSymbolIds
+        : (settledViewport?.visibleAreaIds ?? []),
+    );
+    return regions
+      .filter(
+        (row) =>
+          row.searchedPlaceIds.length &&
+          (visible.has(row.region.id) || row.region.id === selectedAreaId),
+      )
+      .sort(
+        (a, b) =>
+          Number(b.region.id === selectedAreaId) - Number(a.region.id === selectedAreaId) ||
+          b.contextualPlaceIds.length - a.contextualPlaceIds.length ||
+          a.region.id.localeCompare(b.region.id),
+      )
+      .slice(0, 24)
+      .flatMap((row) => {
+        const cluster = clusterById.get(row.region.id);
+        return cluster ? [{ cluster, row }] : [];
+      });
+  }, [regions, selectedAreaId, settledViewport, visibleRegionSymbolIds, clusterById]);
 
   const zoomIntoCluster = useCallback((cluster: MapAreaCluster) => {
     const map = mapRef.current;
     const container = mapNodeRef.current;
-    if (!map || !container) return;
-
-    const places = cluster.childPlaces;
-    const overlayHeight = bottomOverlayHeightRef.current;
-    const viewport = safeMapRect(container, overlayHeight, availableMapHeightRef.current);
-    const childrenAlreadySafe =
-      map.getZoom() >= SPLIT_ZOOM &&
-      places.length > 0 &&
-      places.every((place) => pointIsInSafeRect(map.project([place.lng, place.lat]), viewport));
-    if (childrenAlreadySafe) return;
-
-    const visibleMapHeight = Math.max(80, container.clientHeight - overlayHeight);
-    const topPadding = Math.min(96, Math.max(52, Math.round(visibleMapHeight * 0.35)));
-    const maximumBottomPadding = Math.max(96, container.clientHeight - topPadding - 72);
-    const bottomPadding = Math.min(maximumBottomPadding, Math.max(96, overlayHeight + 24));
+    const region = regionsRef.current.find((row) => row.region.id === cluster.id)?.region;
+    if (!map || !container || !region) return;
+    userNavigatedRef.current = false;
+    const viewport = safeMapRect(
+      container,
+      bottomOverlayHeightRef.current,
+      availableMapHeightRef.current,
+      24,
+    );
+    const padding = {
+      left: viewport.left,
+      right: container.clientWidth - viewport.right,
+      top: viewport.top,
+      bottom: container.clientHeight - viewport.bottom,
+    };
     const reduceMotion = prefersReducedMapMotion();
     map.stop();
-    selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
-
-    if (places.length <= 1) {
-      const focus: LatLngTuple = places[0]
-        ? [places[0].lat, places[0].lng]
-        : [cluster.lat, cluster.lng];
-      const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(SPLIT_ZOOM, map.getZoom() + 0.5));
-      if (reduceMotion) {
-        map.easeTo({
-          center: [focus[1], focus[0]],
-          zoom: targetZoom,
-          offset: [0, -bottomPadding * 0.21],
-          duration: 0,
-        });
-      } else {
-        map.flyTo({
-          center: [focus[1], focus[0]],
-          zoom: targetZoom,
-          offset: [0, -bottomPadding * 0.21],
-          duration: MAP_FOCUS_DURATION * 1000,
-          essential: true,
-        });
-      }
-      return;
-    }
-
-    // Frame EVERY pin above the bottom sheet. The high maxZoom is the key:
-    // a tight cluster like Ancient Olympia (pins within ~800m) now flies in to
-    // ~z15, where the pins clearly separate and the supercluster bubble
-    // (which stops clustering above z13) can no longer swallow them.
-    const bounds: [[number, number], [number, number]] = [
-      [
-        Math.min(...places.map((place) => place.lng)),
-        Math.min(...places.map((place) => place.lat)),
-      ],
-      [
-        Math.max(...places.map((place) => place.lng)),
-        Math.max(...places.map((place) => place.lat)),
-      ],
-    ];
-    map.fitBounds(bounds, {
-      duration: reduceMotion ? 0 : MAP_FOCUS_DURATION * 1000,
-      maxZoom: AREA_FOCUS_MAX_ZOOM,
-      padding: { left: 48, top: topPadding, right: 48, bottom: bottomPadding },
-    });
+    selectionMotionUntilRef.current =
+      Date.now() + (reduceMotion ? 0 : MAP_POLICY.focusDurationMs + 40);
+    if (
+      region.bounds[0][0] === region.bounds[1][0] &&
+      region.bounds[0][1] === region.bounds[1][1]
+    ) {
+      map.easeTo({
+        center: [region.anchor.lng, region.anchor.lat],
+        zoom: MAP_POLICY.regionFocusMaxZoom,
+        offset: [
+          (viewport.left + viewport.right - container.clientWidth) / 2,
+          (viewport.top + viewport.bottom - container.clientHeight) / 2,
+        ],
+        duration: reduceMotion ? 0 : MAP_POLICY.focusDurationMs,
+      });
+    } else
+      map.fitBounds(region.bounds, {
+        duration: reduceMotion ? 0 : MAP_POLICY.focusDurationMs,
+        maxZoom: MAP_POLICY.regionFocusMaxZoom,
+        padding,
+      });
   }, []);
 
   const zoomIntoActivityCluster = useCallback(
@@ -896,7 +678,7 @@ export function SocialMap({
       const container = mapNodeRef.current;
       if (!map || !container) return;
 
-      const expansionZoom = placeClusterIndex.getClusterExpansionZoom(node.clusterId);
+      const expansionZoom = placeTopology.index.getClusterExpansionZoom(node.clusterId);
       const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(map.getZoom() + 0.75, expansionZoom));
       const viewport = safeMapRect(
         container,
@@ -913,6 +695,7 @@ export function SocialMap({
         desiredPoint.y - container.clientHeight / 2,
       ];
       const reduceMotion = prefersReducedMapMotion();
+      userNavigatedRef.current = false;
       map.stop();
       selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
       if (reduceMotion) {
@@ -932,12 +715,13 @@ export function SocialMap({
         });
       }
     },
-    [placeClusterIndex],
+    [placeTopology],
   );
 
   const flyToOverview = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
+    userNavigatedRef.current = false;
     map.stop();
     if (prefersReducedMapMotion()) {
       map.jumpTo({ center: [ILIA_CENTER[1], ILIA_CENTER[0]], zoom: OVERVIEW_ZOOM });
@@ -960,14 +744,7 @@ export function SocialMap({
     if (previousActivation?.id === id && now - previousActivation.at < 420) return;
     lastMarkerActivationRef.current = { id, at: now };
 
-    if (node.kind === "cluster") {
-      const nextSelectionKey = `${node.cluster.id}|`;
-      if (selectionKeyRef.current !== nextSelectionKey) {
-        cameraHandledSelectionRef.current = nextSelectionKey;
-      }
-      onSelectArea(node.cluster);
-      zoomIntoCluster(node.cluster);
-    } else if (node.kind === "activity-cluster") {
+    if (node.kind === "activity-cluster") {
       const nextSelectionKey = `${node.dominantCluster.id}|`;
       if (selectionKeyRef.current !== nextSelectionKey) {
         cameraHandledSelectionRef.current = nextSelectionKey;
@@ -979,29 +756,40 @@ export function SocialMap({
     }
   };
 
+  selectRegionRef.current = (id) => {
+    const cluster = clusterById.get(id);
+    if (!cluster) return;
+    cameraHandledSelectionRef.current = `${id}|`;
+    onSelectArea(cluster);
+    zoomIntoCluster(cluster);
+  };
+
   useEffect(() => {
+    if (!mapReady) return;
     const previous = previousSelectionRef.current;
     const next = { areaId: selectedAreaId, placeId: selectedPlaceId ?? null };
+    // Preserve pending restoration until its actual place/area data is ready.
+    if (next.areaId && !next.placeId && !clusterById.has(next.areaId)) return;
     previousSelectionRef.current = next;
-
-    if (!mapReady) return;
-
-    const nextSelectionKey = `${next.areaId ?? ""}|${next.placeId ?? ""}`;
-    if (cameraHandledSelectionRef.current === nextSelectionKey) {
+    const key = `${next.areaId ?? ""}|${next.placeId ?? ""}`;
+    if (cameraHandledSelectionRef.current === key) {
       cameraHandledSelectionRef.current = null;
       return;
     }
-
-    if (previous.placeId && !next.placeId && next.areaId) {
-      const cluster = clusters.find((item) => item.id === next.areaId);
+    if (next.areaId && !next.placeId && (next.areaId !== previous.areaId || previous.placeId)) {
+      const cluster = clusterById.get(next.areaId);
       if (cluster) zoomIntoCluster(cluster);
-      return;
     }
-
-    if ((previous.areaId || previous.placeId) && !next.areaId && !next.placeId) {
+    if (
+      explicitBackRef.current &&
+      !next.areaId &&
+      !next.placeId &&
+      (previous.areaId || previous.placeId)
+    )
       flyToOverview();
-    }
-  }, [clusters, flyToOverview, mapReady, selectedAreaId, selectedPlaceId, zoomIntoCluster]);
+    explicitBackRef.current = false;
+    // Filter-pruned selection does not move the user's viewport.
+  }, [clusterById, flyToOverview, mapReady, selectedAreaId, selectedPlaceId, zoomIntoCluster]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1027,10 +815,8 @@ export function SocialMap({
           attributionControl: false,
           center: [ILIA_CENTER[1], ILIA_CENTER[0]],
           doubleClickZoom: true,
-          maxBounds: [
-            [MAP_PAN_BOUNDS[0][1], MAP_PAN_BOUNDS[0][0]],
-            [MAP_PAN_BOUNDS[1][1], MAP_PAN_BOUNDS[1][0]],
-          ],
+          maxBounds: MAP_POLICY.panBounds,
+          crossSourceCollisions: true,
           maxZoom: MAX_ZOOM,
           minZoom: MIN_ZOOM,
           zoom: OVERVIEW_ZOOM,
@@ -1045,8 +831,28 @@ export function SocialMap({
         map.on("error", onBasemapError);
         cleanupFns.push(() => map?.off("error", onBasemapError));
 
-        const onMapClick = (event: { originalEvent: MouseEvent }) => {
+        const onMapClick = (event: {
+          originalEvent: MouseEvent;
+          point: { x: number; y: number };
+        }) => {
           if (Date.now() < ignoreBackgroundClickUntilRef.current) return;
+          if (
+            map &&
+            mapDisclosure(map.getZoom()).regionOpacity > 0.08 &&
+            map.getLayer(REGION_LAYER_ID)
+          ) {
+            const [hit] = map.queryRenderedFeatures(
+              [
+                [event.point.x - 14, event.point.y - 14],
+                [event.point.x + 14, event.point.y + 14],
+              ],
+              { layers: [REGION_LAYER_ID] },
+            );
+            if (hit?.properties?.regionId) {
+              selectRegionRef.current(String(hit.properties.regionId));
+              return;
+            }
+          }
           const target = event.originalEvent?.target as Element | null;
           if (target?.closest(".maplibregl-marker, .maplibregl-control-container, button, a"))
             return;
@@ -1163,8 +969,24 @@ export function SocialMap({
           map?.off("moveend", onMoveEnd);
           map?.off("zoomend", onZoomEnd);
         });
+        const interruptCamera = () => {
+          userNavigatedRef.current = true;
+          didInitialFitRef.current = true;
+          selectionMotionUntilRef.current = 0;
+          map?.stop();
+        };
+        const gestureSurface = map.getCanvasContainer();
+        gestureSurface.addEventListener("pointerdown", interruptCamera, true);
+        gestureSurface.addEventListener("wheel", interruptCamera, { passive: true, capture: true });
+        gestureSurface.addEventListener("keydown", interruptCamera, true);
+        cleanupFns.push(() => {
+          gestureSurface.removeEventListener("pointerdown", interruptCamera, true);
+          gestureSurface.removeEventListener("wheel", interruptCamera, true);
+          gestureSurface.removeEventListener("keydown", interruptCamera, true);
+        });
         map.once("load", () => {
           if (cancelled || !map) return;
+          installRegionalLayer(map);
           const readyZoom = map.getZoom();
           lastZoomRef.current = readyZoom;
           applyMarkerZoomProfile(mapNodeRef.current, readyZoom);
@@ -1234,9 +1056,7 @@ export function SocialMap({
               node.kind === "child"
                 ? node.place.name
                 : node.selected
-                  ? node.kind === "cluster"
-                    ? node.cluster.name
-                    : node.dominantCluster.name
+                  ? node.dominantCluster.name
                   : undefined,
             prominence: node.prominence.score,
             labelOffset: node.kind === "child" ? 17 : 27,
@@ -1254,24 +1074,61 @@ export function SocialMap({
           shell.classList.toggle("is-motion-suppressed", density.suppressed.has(id));
           shell.classList.toggle("has-visible-label", shownLabels.has(id));
         });
-        const visibleAreaIds = new Set<string>();
-        density.visible.forEach((id) => {
-          const node = renderNodesRef.current.get(id);
-          if (!node) return;
-          if (node.kind === "cluster" || node.kind === "child") {
-            visibleAreaIds.add(node.cluster.id);
-          } else {
-            node.leaves.forEach((place) => visibleAreaIds.add(clusterIdForPlace(place)));
-          }
-        });
         const center = map.getCenter();
-        const viewport: MapDiscoveryViewport = {
-          center: { lat: center.lat, lng: center.lng },
-          visibleAreaIds: [...visibleAreaIds].sort(),
-        };
-        const viewportSignature = `${center.lat.toFixed(5)}:${center.lng.toFixed(5)}:${viewport.visibleAreaIds.join(",")}`;
-        if (viewportSignature !== lastDiscoveryViewportRef.current) {
-          lastDiscoveryViewportRef.current = viewportSignature;
+        const rawBounds = map.getBounds();
+        const bounds: MapBounds = [
+          [rawBounds.getWest(), rawBounds.getSouth()],
+          [rawBounds.getEast(), rawBounds.getNorth()],
+        ];
+        const container = mapNodeRef.current;
+        if (!container) return;
+        const rect = safeMapRect(
+          container,
+          bottomOverlayHeightRef.current,
+          availableMapHeightRef.current,
+          0,
+        );
+        const symbolIds =
+          map.getZoom() < MAP_POLICY.regionFadeEnd && map.getLayer(REGION_LAYER_ID)
+            ? [
+                ...new Set(
+                  map
+                    .queryRenderedFeatures(
+                      [
+                        [rect.left, rect.top],
+                        [rect.right, rect.bottom],
+                      ],
+                      { layers: [REGION_LAYER_ID] },
+                    )
+                    .map((feature) => String(feature.properties.regionId)),
+                ),
+              ].sort()
+            : [];
+        setVisibleRegionSymbolIds((previous) =>
+          previous.join("|") === symbolIds.join("|") ? previous : symbolIds,
+        );
+        const { bounds: usableBounds, places: visiblePlaces } = visibleScreenMembers(
+          rect,
+          { unproject: (point) => map.unproject(point), project: (point) => map.project(point) },
+          (bounds) =>
+            availableMapHeightRef.current > 0 ? placeTopologyRef.current.visiblePlaces(bounds) : [],
+        );
+        const contextualIds = new Set(regionsRef.current.flatMap((row) => row.contextualPlaceIds));
+        const viewport = discoveryViewport(
+          { lat: center.lat, lng: center.lng },
+          map.getZoom(),
+          bounds,
+          usableBounds,
+          visiblePlaces,
+          contextualIds,
+        );
+        const signature = viewportSignature(viewport);
+        if (signature !== lastDiscoveryViewportRef.current) {
+          lastDiscoveryViewportRef.current = signature;
+          setSettledBounds((previous) =>
+            JSON.stringify(previous) === JSON.stringify(bounds) ? previous : bounds,
+          );
+          setSettledViewport(viewport);
           onDiscoveryViewportChangeRef.current?.(viewport);
         }
       });
@@ -1285,6 +1142,7 @@ export function SocialMap({
     map.on("moveend", schedule);
     map.on("zoomend", schedule);
     map.on("resize", schedule);
+    map.on("idle", schedule);
     document.addEventListener("visibilitychange", onVisibilityChange);
     schedule();
     return () => {
@@ -1292,13 +1150,22 @@ export function SocialMap({
       map.off("moveend", schedule);
       map.off("zoomend", schedule);
       map.off("resize", schedule);
+      map.off("idle", schedule);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [mapReady]);
 
   useEffect(() => {
     scheduleMarkerViewportSyncRef.current();
-  }, [bottomOverlayHeight, availableMapHeight, activitySnapshot]);
+  }, [bottomOverlayHeight, availableMapHeight, regions, placeTopology, activitySnapshot]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    (map.getSource(REGION_SOURCE_ID) as GeoJSONSource).setData(
+      regionalGeoJson(regions, selectedAreaId, activeFilterLabel, t),
+    );
+  }, [mapReady, regions, selectedAreaId, activeFilterLabel, t]);
 
   useEffect(() => {
     const maplibre = maplibreModuleRef.current;
@@ -1318,9 +1185,7 @@ export function SocialMap({
         ? 2400
         : node.kind === "child"
           ? 1400 + node.prominence.zIndexBoost
-          : node.kind === "activity-cluster"
-            ? 900 + Math.round(node.hotness * 10) + node.prominence.zIndexBoost
-            : 700 + Math.round(node.cluster.hotness * 10) + node.prominence.zIndexBoost;
+          : 900 + Math.round(node.hotness * 10) + node.prominence.zIndexBoost;
 
       const hasStory = node.kind === "child" && (storyPlaceIds?.has(node.place.id) ?? false);
       let marker = markersRef.current.get(node.id);
@@ -1333,10 +1198,8 @@ export function SocialMap({
       }
       const previousRuntime = markerRuntimeRef.current.get(node.id);
       updatePulseIcon(marker.getElement(), node, hasStory, t);
-      const isPassiveAreaAnchor =
-        node.kind !== "child" && node.selected && placeOpacityForZoom(zoom) > 0.08;
       const visuallyVisible = node.opacity > 0.08;
-      const visibleForInteraction = visuallyVisible && !isPassiveAreaAnchor;
+      const visibleForInteraction = visuallyVisible;
       if (
         !previousRuntime ||
         previousRuntime.lat !== node.latLng[0] ||
@@ -1381,7 +1244,6 @@ export function SocialMap({
           markerElement.setAttribute("aria-hidden", visuallyVisible ? "false" : "true");
           markerElement.setAttribute("aria-pressed", node.selected ? "true" : "false");
           markerElement.tabIndex = visibleForInteraction ? 0 : -1;
-          markerElement.classList.toggle("is-selection-anchor", isPassiveAreaAnchor);
           markerShell?.classList.toggle("is-selected", node.selected);
         }
 
@@ -1442,6 +1304,7 @@ export function SocialMap({
     if (!selectedPlaceNode) return;
 
     lastFocusedPlaceIdRef.current = selectedPlaceId;
+    userNavigatedRef.current = false;
 
     const latLng: LatLngTuple = [selectedPlaceNode.place.lat, selectedPlaceNode.place.lng];
     const viewport = safeMapRect(
@@ -1501,7 +1364,8 @@ export function SocialMap({
   useEffect(() => {
     const map = mapRef.current;
     const container = mapNodeRef.current;
-    if (!map || !container || !mapReady || !primarySelectedNode || bottomOverlayHeight <= 0) {
+    const selectedNode = primarySelectedNodeRef.current;
+    if (!map || !container || !mapReady || !selectedNode || bottomOverlayHeight <= 0) {
       return;
     }
 
@@ -1509,6 +1373,7 @@ export function SocialMap({
     let timer: number | null = null;
     let correctionCount = 0;
     const keepSelectionVisible = () => {
+      if (userNavigatedRef.current) return;
       const remainingMotion = selectionMotionUntilRef.current - Date.now();
       if (remainingMotion > 0) {
         timer = window.setTimeout(() => {
@@ -1517,12 +1382,12 @@ export function SocialMap({
         return;
       }
 
-      const point = map.project([primarySelectedNode.latLng[1], primarySelectedNode.latLng[0]]);
+      const point = map.project([selectedNode.latLng[1], selectedNode.latLng[0]]);
       const viewport = safeMapRect(
         container,
         bottomOverlayHeight,
         availableMapHeight,
-        markerCoreRadius(primarySelectedNode, map.getZoom()),
+        markerCoreRadius(selectedNode, map.getZoom()),
       );
       const delta = panDeltaIntoSafeRect(point, viewport);
       if (delta.x !== 0 || delta.y !== 0) {
@@ -1539,32 +1404,33 @@ export function SocialMap({
       if (frame !== null) window.cancelAnimationFrame(frame);
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [availableMapHeight, bottomOverlayHeight, mapReady, primarySelectedNode]);
+  }, [availableMapHeight, bottomOverlayHeight, mapReady, selectionKey]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady || isSplitZoom || clusters.length === 0) return;
     if (selectedAreaId || selectedPlaceId) return;
     // Only auto-fit once per mount so live data refreshes never yank the map.
-    if (didInitialFitRef.current) return;
+    if (didInitialFitRef.current || userNavigatedRef.current || routePreview) return;
     didInitialFitRef.current = true;
 
-    const bounds: [[number, number], [number, number]] = [
+    const bounds: MapBounds = [
       [
-        Math.min(...clusters.map((cluster) => cluster.lng)),
-        Math.min(...clusters.map((cluster) => cluster.lat)),
+        Math.min(...regions.map((row) => row.region.bounds[0][0])),
+        Math.min(...regions.map((row) => row.region.bounds[0][1])),
       ],
       [
-        Math.max(...clusters.map((cluster) => cluster.lng)),
-        Math.max(...clusters.map((cluster) => cluster.lat)),
+        Math.max(...regions.map((row) => row.region.bounds[1][0])),
+        Math.max(...regions.map((row) => row.region.bounds[1][1])),
       ],
     ];
+    if (!regions.length) return;
     map.fitBounds(bounds, {
       duration: prefersReducedMapMotion() ? 0 : MAP_OVERVIEW_DURATION * 1000,
       maxZoom: OVERVIEW_ZOOM,
       padding: { left: 52, top: 108, right: 52, bottom: 210 },
     });
-  }, [clusters, isSplitZoom, mapReady, selectedAreaId, selectedPlaceId]);
+  }, [clusters, regions, isSplitZoom, mapReady, selectedAreaId, selectedPlaceId, routePreview]);
 
   useEffect(() => {
     const maplibre = maplibreModuleRef.current;
@@ -1738,6 +1604,7 @@ export function SocialMap({
     <div
       className={`hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""} ${activeLens ? "has-discovery-lens" : ""} ${mapChromeHidden ? "is-map-compressed" : ""}`}
       data-discovery-lens={activeLens ?? undefined}
+      data-map-hierarchy={mapDisclosure(zoom).level}
       data-attribution-position={
         availableMapHeight < MIN_UTILITY_RAIL_HEIGHT + 64 ? "left" : undefined
       }
@@ -1807,7 +1674,10 @@ export function SocialMap({
           variant="hpGhost"
           size="hpIcon"
           type="button"
-          onClick={onBack}
+          onClick={() => {
+            explicitBackRef.current = true;
+            onBack();
+          }}
           className="hp-control-surface hp-map-back absolute"
           aria-label={t("Back to previous map view")}
         >
@@ -1825,9 +1695,9 @@ export function SocialMap({
           className={`hp-map-chip-rail hp-no-scrollbar ${canGoBack ? "has-back" : ""} ${selectedAreaId ? "has-selection" : ""}`}
           inert={mapChromeHidden ? true : undefined}
           aria-hidden={mapChromeHidden ? true : undefined}
-          aria-label={t("Top map areas")}
+          aria-label={t("Visible map areas")}
         >
-          {discoveryChipClusters.map((cluster) => {
+          {discoveryChipClusters.map(({ cluster, row }) => {
             const selected = cluster.id === selectedAreaId;
             return (
               <button
@@ -1835,13 +1705,14 @@ export function SocialMap({
                 type="button"
                 onClick={() => selectDiscoveryCluster(cluster)}
                 aria-pressed={selected}
+                aria-label={`${t(cluster.name)}. ${regionalDescription(row, activeFilterLabel, t)}. ${row.signal.level ? "" : t("Community activity unavailable")}`}
                 tabIndex={mapChromeHidden ? -1 : undefined}
                 className={`hp-map-chip ${selected ? "is-active" : ""}`}
               >
                 <span className="hp-map-chip__face">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
-                  {cluster.name}
-                  <span className="hp-map-chip__count">{cluster.places.length}</span>
+                  {t(cluster.name)}
+                  <span className="hp-map-chip__count">{row.contextualPlaceIds.length}</span>
                 </span>
               </button>
             );
