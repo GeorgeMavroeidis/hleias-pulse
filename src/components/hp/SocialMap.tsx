@@ -11,9 +11,8 @@ import type {
   StyleSpecification,
 } from "maplibre-gl";
 import { type EventItem, type Place } from "@/lib/hp-model";
-import { removeAdministrativeBoundaries } from "@/lib/hp/map-core";
+import { createIliaMapStyle } from "@/lib/hp/map-cartography";
 import { useImageUrls } from "@/lib/hp/image-cache";
-import { SEA_SHIMMER_LATLNGS, SEA_SHIMMER_MAX_ZOOM } from "@/lib/hp/sea-shimmer";
 import {
   areaDefinitionForId,
   areaIdForPlace,
@@ -52,12 +51,12 @@ import {
 
 const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
 
-async function loadBoundaryFreeBasemap(signal: AbortSignal): Promise<StyleSpecification> {
+async function loadIliaBasemap(signal: AbortSignal): Promise<StyleSpecification> {
   const response = await fetch(OPENFREEMAP_STYLE_URL, { signal });
   if (!response.ok) {
     throw new Error(`Basemap style request failed (${response.status}).`);
   }
-  return removeAdministrativeBoundaries((await response.json()) as StyleSpecification);
+  return createIliaMapStyle((await response.json()) as StyleSpecification);
 }
 
 type LatLngTuple = [number, number];
@@ -1425,7 +1424,7 @@ export function SocialMap({
     const markerSigs = markerSigRef.current;
     const markerRuntimes = markerRuntimeRef.current;
 
-    Promise.all([import("maplibre-gl"), loadBoundaryFreeBasemap(basemapAbortController.signal)])
+    Promise.all([import("maplibre-gl"), loadIliaBasemap(basemapAbortController.signal)])
       .then(([maplibre, basemapStyle]) => {
         if (cancelled || !mapNodeRef.current) return;
 
@@ -2049,70 +2048,6 @@ export function SocialMap({
   }, [clusters, isSplitZoom, mapReady, selectedAreaId, selectedPlaceId]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapReady) return;
-    const sourceId = "hp-sea-shimmer-source";
-    const layerId = "hp-sea-shimmer";
-    if (!map.getSource(sourceId)) {
-      map.addSource(sourceId, {
-        type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: {
-            type: "MultiPolygon",
-            coordinates: SEA_SHIMMER_LATLNGS.map((polygon) =>
-              polygon.map((ring) => ring.map(([lat, lng]) => [lng, lat])),
-            ),
-          },
-        },
-      });
-    }
-    if (!map.hasImage("hp-waves")) {
-      const canvas = document.createElement("canvas");
-      canvas.width = 28;
-      canvas.height = 20;
-      const context = canvas.getContext("2d");
-      if (context) {
-        context.fillStyle = "rgba(119,190,213,.11)";
-        context.fillRect(0, 0, 28, 20);
-        context.strokeStyle = "rgba(72,147,175,.24)";
-        context.lineWidth = 1;
-        for (const y of [7, 14]) {
-          context.beginPath();
-          context.moveTo(-7, y);
-          context.quadraticCurveTo(0, y - 5, 7, y);
-          context.quadraticCurveTo(14, y + 5, 21, y);
-          context.quadraticCurveTo(28, y - 5, 35, y);
-          context.stroke();
-        }
-        map.addImage("hp-waves", context.getImageData(0, 0, 28, 20));
-      }
-    }
-    if (!map.getLayer(layerId)) {
-      const beforeId = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
-      map.addLayer(
-        {
-          id: layerId,
-          type: "fill",
-          source: sourceId,
-          paint: {
-            "fill-pattern": "hp-waves",
-            "fill-opacity": 0.85,
-            "fill-opacity-transition": { duration: 360 },
-          },
-        },
-        beforeId,
-      );
-    }
-    map.setLayoutProperty(
-      layerId,
-      "visibility",
-      zoom <= SEA_SHIMMER_MAX_ZOOM && !selectedPlaceId ? "visible" : "none",
-    );
-  }, [mapReady, zoom, selectedPlaceId]);
-
-  useEffect(() => {
     const maplibre = maplibreModuleRef.current;
     const map = mapRef.current;
     routeStopMarkersRef.current.forEach((marker) => marker.remove());
@@ -2312,7 +2247,10 @@ export function SocialMap({
         <div className="hp-map-attribution" data-expanded={attributionExpanded ? "true" : "false"}>
           {attributionExpanded && (
             <div className="hp-map-attribution__credits" role="note">
-              ©{" "}
+              <a href="https://openfreemap.org" target="_blank" rel="noreferrer">
+                OpenFreeMap
+              </a>
+              {" · "}©{" "}
               <a href="https://www.openmaptiles.org" target="_blank" rel="noreferrer">
                 OpenMapTiles
               </a>

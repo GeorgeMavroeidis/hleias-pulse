@@ -6,12 +6,12 @@
   z-index: 0;
   height: 100%;
   width: 100%;
-  background: #f2efe9;
+  background: var(--hp-bg);
   font-family: var(--hp-font-body);
 }
 
 .hp-real-map .maplibregl-canvas {
-  filter: saturate(0.82) brightness(1.03) sepia(0.06) hue-rotate(-6deg);
+  filter: none;
   opacity: 1;
 }
 
