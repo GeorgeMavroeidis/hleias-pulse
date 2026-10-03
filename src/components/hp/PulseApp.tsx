@@ -158,7 +158,9 @@ import {
   buildMarkerPulseInput,
   deriveMarkerPulseSnapshot,
   EMPTY_MARKER_PULSE_INPUT,
+  excludeHiddenPulseContributors,
 } from "@/lib/hp/marker-pulse";
+import { useTemporalAtmosphere } from "./use-temporal-atmosphere";
 import { MARKER_MOTION_STORAGE_KEY } from "@/lib/hp/marker-motion";
 import {
   deriveAreaIntelligenceSnapshot,
@@ -320,13 +322,10 @@ export function PulseApp() {
   const [activitySnapshot, setActivitySnapshot] = useState<PulseActivitySnapshot>({});
   const [markerPulseInput, setMarkerPulseInput] = useState(EMPTY_MARKER_PULSE_INPUT);
   const [markerPulseNow, setMarkerPulseNow] = useState(Date.now);
-  const markerPulseSnapshot = useMemo(
-    () => deriveMarkerPulseSnapshot(markerPulseInput, markerPulseNow),
-    [markerPulseInput, markerPulseNow],
-  );
   const [areaIntelligence, setAreaIntelligence] = useState<AreaIntelligenceSnapshot>({});
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setActiveTab] = useState<Tab>("map");
+  const temporalAtmosphere = useTemporalAtmosphere(tab === "map", markerPulseNow);
   const activeTabRef = useRef(tab);
   activeTabRef.current = tab;
   const [discoveryState, discoveryDispatch] = useReducer(
@@ -358,6 +357,18 @@ export function PulseApp() {
   const sheetGeometry = useMemo(() => createSheetGeometry(), []);
   const [meetFocusEventId, setMeetFocusEventId] = useState<string | null>(null);
   const moderation = useModeration();
+  const hiddenDiscoveryUsers = useMemo(
+    () => new Set([...moderation.blockedIds, ...moderation.mutedIds]),
+    [moderation.blockedIds, moderation.mutedIds],
+  );
+  const visibleMarkerPulseInput = useMemo(
+    () => excludeHiddenPulseContributors(markerPulseInput, hiddenDiscoveryUsers),
+    [markerPulseInput, hiddenDiscoveryUsers],
+  );
+  const markerPulseSnapshot = useMemo(
+    () => deriveMarkerPulseSnapshot(visibleMarkerPulseInput, markerPulseNow),
+    [visibleMarkerPulseInput, markerPulseNow],
+  );
   const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
   const [openPlace, setOpenPlace] = useState<Place | null>(null);
   const [openPost, setOpenPost] = useState<Post | null>(null);
@@ -1921,10 +1932,10 @@ export function PulseApp() {
         new Set(mapPlaces.map((place) => place.id)),
         activeLens,
         discoverySnapshot,
-        markerPulseInput,
+        visibleMarkerPulseInput,
         markerPulseNow,
       ),
-    [mapRegions, mapPlaces, activeLens, discoverySnapshot, markerPulseInput, markerPulseNow],
+    [mapRegions, mapPlaces, activeLens, discoverySnapshot, visibleMarkerPulseInput, markerPulseNow],
   );
   const mapClusters = useMemo(
     () => buildAreaClusters(mapPlaces, events, activitySnapshot, areaIntelligence),
@@ -1934,10 +1945,6 @@ export function PulseApp() {
   const mapAreaIdSet = useMemo(
     () => new Set(mapClusters.map((cluster) => cluster.id)),
     [mapClusters],
-  );
-  const hiddenDiscoveryUsers = useMemo(
-    () => new Set([...moderation.blockedIds, ...moderation.mutedIds]),
-    [moderation.blockedIds, moderation.mutedIds],
   );
   const discoveryContent = useMemo(
     () =>
@@ -2057,8 +2064,10 @@ export function PulseApp() {
           ref={observeMapBody}
           className="hp-map-stage relative h-full w-full"
           data-utility-rail-hidden={utilityRailHidden ? "true" : "false"}
+          data-atmosphere={temporalAtmosphere.period ?? "unavailable"}
         >
           <SocialMap
+            atmospherePalette={temporalAtmosphere.paletteKey}
             clusters={mapClusters}
             regions={regionalDiscovery}
             events={events}
@@ -2111,6 +2120,7 @@ export function PulseApp() {
             )}
           </AnimatePresence>
           <MapBottomSheet
+            atmosphere={temporalAtmosphere}
             state={discoveryState}
             content={discoveryContent}
             selectedPlace={sel}

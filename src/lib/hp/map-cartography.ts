@@ -1,5 +1,12 @@
-import type { FilterSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
+import type {
+  ExpressionSpecification,
+  FilterSpecification,
+  LayerSpecification,
+  Map as MapLibreMap,
+  StyleSpecification,
+} from "maplibre-gl";
 import { removeAdministrativeBoundaries } from "./map-core";
+import type { AtmospherePaletteKey } from "./temporal-atmosphere";
 
 /** Paint tokens are independent of density rules for Phase 6 atmosphere variants.
  * Keep glyphs/sprites/sources stable: a full style swap would remove app overlays. */
@@ -30,7 +37,7 @@ export const DAY_MAP_PALETTE: Readonly<MapCartographyPalette> = Object.freeze({
   waterLine: "#7eabb9",
   primaryText: "#302e2a",
   secondaryText: "#68645b",
-  waterText: "#425c68",
+  waterText: "#304d59",
   nature: "#d9dfcd",
   olive: "#879570",
   sand: "#ebe2cf",
@@ -44,6 +51,131 @@ export const DAY_MAP_PALETTE: Readonly<MapCartographyPalette> = Object.freeze({
   majorRoad: "#e3c69f",
   majorCasing: "#b99c7b",
 });
+
+export const ATMOSPHERE_MAP_PALETTES: Readonly<
+  Record<AtmospherePaletteKey, Readonly<MapCartographyPalette>>
+> = {
+  day: DAY_MAP_PALETTE,
+  "golden-hour": Object.freeze({
+    ...DAY_MAP_PALETTE,
+    land: "#f3e5d0",
+    water: "#a3bfca",
+    waterLine: "#749ba9",
+    nature: "#d8dbc6",
+    olive: "#87916a",
+    sand: "#ebdbbc",
+    urban: "#e8d8c2",
+    building: "#e4d3bb",
+    buildingOutline: "#cabb9f",
+    minorRoad: "#fff5e5",
+    minorCasing: "#d1c2aa",
+    secondaryRoad: "#eddbb9",
+    secondaryCasing: "#c9b28e",
+    majorRoad: "#e5bf90",
+    majorCasing: "#b7946d",
+  }),
+  evening: Object.freeze({
+    ...DAY_MAP_PALETTE,
+    land: "#e8e1d6",
+    water: "#8eacba",
+    waterLine: "#668d9f",
+    secondaryText: "#5b584f",
+    waterText: "#24404d",
+    nature: "#ccd3c0",
+    olive: "#7c896b",
+    sand: "#dfd4bf",
+    urban: "#d9d2c5",
+    building: "#d3cbbb",
+    buildingOutline: "#beb6a7",
+    minorRoad: "#f7f1e5",
+    minorCasing: "#bfb8ac",
+    secondaryRoad: "#dcd0b5",
+    secondaryCasing: "#b1a58d",
+    majorRoad: "#cfb18e",
+    majorCasing: "#a18b6d",
+  }),
+  "late-night": Object.freeze({
+    ...DAY_MAP_PALETTE,
+    land: "#d3cec4",
+    water: "#7695a3",
+    waterLine: "#52798e",
+    secondaryText: "#55564f",
+    waterText: "#142c36",
+    nature: "#bac6b0",
+    olive: "#738363",
+    sand: "#d0c4ac",
+    urban: "#c4beb2",
+    building: "#beb7a9",
+    buildingOutline: "#a59f94",
+    minorRoad: "#e8e3d9",
+    minorCasing: "#a4a095",
+    secondaryRoad: "#cfc0a4",
+    secondaryCasing: "#978d79",
+    majorRoad: "#bf9e7b",
+    majorCasing: "#8b725c",
+  }),
+};
+
+type MapColourProperty =
+  | "background-color"
+  | "fill-color"
+  | "fill-outline-color"
+  | "line-color"
+  | "text-color"
+  | "text-halo-color";
+export type MapColourUpdate = {
+  layerId: string;
+  property: MapColourProperty;
+  value: string | ExpressionSpecification;
+};
+const COLOUR_PROPERTIES = new Set<MapColourProperty>([
+  "background-color",
+  "fill-color",
+  "fill-outline-color",
+  "line-color",
+  "text-color",
+  "text-halo-color",
+]);
+
+/** Same ID/type-aware rules as initial cartography; runtime changes are colors only. */
+export function mapPaletteUpdates(
+  layers: LayerSpecification[],
+  palette: Readonly<MapCartographyPalette>,
+): MapColourUpdate[] {
+  return layers.flatMap((layer) => {
+    const styled = styleLayer(layer, palette);
+    if (styled === layer) return [];
+    return Object.entries(styled.paint ?? {}).flatMap(([property, value]) =>
+      COLOUR_PROPERTIES.has(property as MapColourProperty)
+        ? [
+            {
+              layerId: layer.id,
+              property: property as MapColourProperty,
+              value: value as MapColourUpdate["value"],
+            },
+          ]
+        : [],
+    );
+  });
+}
+export function applyMapColourUpdates(
+  map: Pick<MapLibreMap, "getLayer" | "setPaintProperty">,
+  updates: MapColourUpdate[],
+  duration: number,
+) {
+  for (const update of updates) {
+    if (!map.getLayer(update.layerId)) continue;
+    map.setPaintProperty(update.layerId, `${update.property}-transition`, { duration, delay: 0 });
+    map.setPaintProperty(update.layerId, update.property, update.value);
+  }
+}
+export function applyMapPalette(
+  map: MapLibreMap,
+  palette: Readonly<MapCartographyPalette>,
+  duration: number,
+) {
+  applyMapColourUpdates(map, mapPaletteUpdates(map.getStyle().layers, palette), duration);
+}
 
 // These are the actual Bright IDs inspected on 2026-10-01. Match IDs AND
 // types; do not recolor an upstream layer merely because its name looks similar.

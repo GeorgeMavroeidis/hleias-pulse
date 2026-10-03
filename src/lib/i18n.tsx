@@ -14,6 +14,16 @@ export type TranslationParams = Record<string, string | number>;
 const STORAGE_KEY = "ilia-pulse-language";
 
 const EL: Record<string, string> = {
+  "Morning in Ilia": "Πρωί στην Ηλεία",
+  "Afternoon in Ilia": "Απόγευμα στην Ηλεία",
+  "Golden hour": "Χρυσή ώρα",
+  "Late night": "Αργά τη νύχτα",
+  "Explore Ilia": "Εξερεύνησε την Ηλεία",
+  Coast: "Ακτή",
+  Harbour: "Λιμάνι",
+  Heritage: "Κληρονομιά",
+  Forest: "Δάσος",
+  "Local places": "Τοπικά σημεία",
   "Explore what is happening around Ilia": "Ανακάλυψε όσα συμβαίνουν στην Ηλεία",
   "{count} scheduled event": "{count} προγραμματισμένη εκδήλωση",
   "{count} scheduled events": "{count} προγραμματισμένες εκδηλώσεις",

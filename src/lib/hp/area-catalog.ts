@@ -1,4 +1,5 @@
 import type { Place } from "@/lib/hp-model";
+import type { RegionIdentityMetadata } from "./region-identity";
 
 export type AreaTone = "beach" | "culture" | "local" | "music" | "nature" | "village";
 
@@ -7,6 +8,8 @@ export type AreaDefinition = {
   name: string;
   title: string;
   tone: AreaTone;
+  /** Static geography, independent of content/activity tone and time of day. */
+  identity?: RegionIdentityMetadata;
   /** Explicit, geographically-tight membership based on the real map coordinates. */
   placeIds: string[];
 };
@@ -17,6 +20,7 @@ export type AreaDefinition = {
 export const AREA_DEFINITIONS: AreaDefinition[] = [
   {
     id: "olympia",
+    identity: { primary: "heritage" },
     name: "Ancient Olympia",
     title: "Olympia pulse",
     tone: "culture",
@@ -31,6 +35,7 @@ export const AREA_DEFINITIONS: AreaDefinition[] = [
   },
   {
     id: "katakolo",
+    identity: { primary: "harbour", secondary: "coastal" },
     name: "Katakolo",
     title: "Katakolo sunset",
     tone: "beach",
@@ -51,6 +56,7 @@ export const AREA_DEFINITIONS: AreaDefinition[] = [
   },
   {
     id: "kourouta",
+    identity: { primary: "coastal" },
     name: "Kourouta",
     title: "Kourouta tonight",
     tone: "music",
@@ -58,6 +64,7 @@ export const AREA_DEFINITIONS: AreaDefinition[] = [
   },
   {
     id: "kyllini",
+    identity: { primary: "harbour", secondary: "coastal" },
     name: "Kyllini",
     title: "Kyllini harbor",
     tone: "beach",
@@ -72,6 +79,7 @@ export const AREA_DEFINITIONS: AreaDefinition[] = [
   },
   {
     id: "pyrgos",
+    identity: { primary: "urban" },
     name: "Pyrgos",
     title: "Pyrgos is moving",
     tone: "local",
@@ -86,6 +94,7 @@ export const AREA_DEFINITIONS: AreaDefinition[] = [
   },
   {
     id: "zacharo",
+    identity: { primary: "coastal", secondary: "nature" },
     name: "Zacharo",
     title: "Zacharo sunset",
     tone: "beach",
@@ -107,6 +116,7 @@ export const AREA_DEFINITIONS: AreaDefinition[] = [
   },
   {
     id: "foloi",
+    identity: { primary: "forest", secondary: "nature" },
     name: "Foloi Forest",
     title: "Foloi tips",
     tone: "nature",

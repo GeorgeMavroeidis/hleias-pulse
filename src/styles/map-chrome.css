@@ -364,6 +364,25 @@
 .hp-discovery-sheet {
   contain: layout style;
 }
+/* Static regional identity is confined to one short mark and a faint sheet edge. */
+.hp-discovery-sheet[data-region-identity] {
+  border-top-color: color-mix(in srgb, var(--hp-region-accent) 14%, var(--hp-paper));
+}
+.hp-discovery-sheet[data-region-identity] .hp-discovery-sheet__summary {
+  position: relative;
+}
+.hp-discovery-sheet[data-region-identity] .hp-discovery-sheet__summary::after {
+  content: "";
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 28px;
+  height: 2px;
+  border-radius: 50% 50% 2px 2px;
+  background: var(--hp-region-accent);
+  opacity: 0.7;
+  pointer-events: none;
+}
 .hp-discovery-sheet__header {
   flex: none;
   padding: 8px var(--hp-safe-right) 6px var(--hp-safe-left);
