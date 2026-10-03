@@ -12,7 +12,14 @@ import {
   viewportSignature,
 } from "./regional-discovery";
 import { createMapTopology, topologyKey, blendTopologies } from "./map-topology";
-import { regionalGeoJson, regionalSymbolLayer, REGION_SOURCE_ID } from "./map-region-layer";
+import {
+  regionalGeoJson,
+  regionalSymbolLayer,
+  REGION_SOURCE_ID,
+  applyRegionalMapPalette,
+} from "./map-region-layer";
+import { ATMOSPHERE_MAP_PALETTES } from "./map-cartography";
+import type { Map as MapLibreMap } from "maplibre-gl";
 import {
   EMPTY_MARKER_PULSE_INPUT,
   deriveMarkerPulseSnapshot,
@@ -31,6 +38,27 @@ const world: MapBounds = [
 const t = (key: string, params?: Record<string, string | number>) =>
   key.replace(/\{(\w+)\}/g, (_, k) => String(params?.[k] ?? k));
 const olympia = regions.find((r) => r.id === "olympia")!;
+
+test("regional labels follow each atmosphere while symbol geometry, source and disclosure stay fixed", () => {
+  const layer = regionalSymbolLayer();
+  const originalLayout = structuredClone(layer.layout);
+  const map = {
+    getLayer: (id: string) => (id === layer.id ? layer : undefined),
+    setPaintProperty: (id: string, property: string, value: unknown) => {
+      assert.equal(id, layer.id);
+      (layer.paint as Record<string, unknown>)[property] = value;
+    },
+  } as unknown as MapLibreMap;
+  for (const duration of [800, 0])
+    for (const palette of Object.values(ATMOSPHERE_MAP_PALETTES)) {
+      applyRegionalMapPalette(map, palette, duration);
+      assert.equal(layer.paint!["text-color"], palette.primaryText);
+      assert.equal(layer.paint!["text-halo-color"], palette.land);
+      assert.deepEqual(layer.paint!["text-color-transition"], { duration, delay: 0 });
+      assert.deepEqual(layer.layout, originalLayout);
+      assert.equal(layer.source, REGION_SOURCE_ID);
+    }
+});
 function input(): MarkerPulseInput {
   return { available: true, fetchedAt: now, placeIds: PLACES.map((p) => p.id), evidence: {} };
 }

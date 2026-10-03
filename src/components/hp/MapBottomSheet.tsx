@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import {
   Bookmark,
@@ -15,7 +21,10 @@ import {
 } from "lucide-react";
 import type { Place } from "@/lib/hp-model";
 import { useI18n } from "@/lib/i18n";
-import { PULSE_NAMES, regionalDescription } from "@/lib/hp/map-region-layer";
+import { regionalDescription } from "@/lib/hp/map-region-layer";
+import { communityActivityCopy, temporalHeadline } from "@/lib/hp/context-copy";
+import { regionalDescriptorKeys, REGION_IDENTITIES } from "@/lib/hp/region-identity";
+import type { TemporalPresentation } from "@/lib/hp/temporal-atmosphere";
 import { markerPulseForPlace, type MarkerPulseSnapshot } from "@/lib/hp/marker-pulse";
 import {
   releaseSheetSnap,
@@ -35,6 +44,7 @@ import { ImageBox } from "./ImageBox";
 import { DISCOVERY_LENS_LABEL, HP_TRANSITION, openStreetMapUrl } from "./pulse-shared";
 
 type Props = {
+  atmosphere: TemporalPresentation;
   state: MapDiscoveryState;
   content: MapDiscoveryContent;
   selectedPlace: Place | null;
@@ -91,7 +101,9 @@ export function MapBottomSheet(props: Props) {
   const row =
     state.selection.kind !== "idle" ? content.regions.get(state.selection.regionId) : null;
   const lensLabel = state.activeLens ? t(DISCOVERY_LENS_LABEL[state.activeLens]) : null;
-  const title = selectedPlace?.name ?? (row ? t(row.discovery.region.name) : t("Tonight's pulse"));
+  const temporalCopy = temporalHeadline(props.atmosphere);
+  const title = selectedPlace?.name ?? (row ? t(row.discovery.region.name) : t(temporalCopy.key));
+  const identity = row && !selectedPlace ? row.discovery.region.identity : null;
   const count = selectedPlace
     ? content.events.filter((event) => event.placeId === selectedPlace.id).length
     : (row?.places.length ?? content.matchingVisiblePlaceCount);
@@ -188,13 +200,19 @@ export function MapBottomSheet(props: Props) {
 
   return (
     <motion.section
-      style={{ height }}
+      style={{
+        height,
+        ...({
+          ...(identity ? { "--hp-region-accent": REGION_IDENTITIES[identity.primary].accent } : {}),
+        } as CSSProperties),
+      }}
       className="hp-map-sheet hp-discovery-sheet absolute inset-x-0 bottom-0 z-30 flex min-h-0 flex-col overflow-hidden"
       role="region"
       aria-labelledby="hp-discovery-title"
       data-selection={state.selection.kind}
       data-snap={state.snap}
       data-dragging={dragging ? "true" : "false"}
+      data-region-identity={identity?.primary}
     >
       <div
         ref={headerRef}
@@ -244,7 +262,12 @@ export function MapBottomSheet(props: Props) {
               )}`}
               onClick={() => onSnap(nextSnap)}
             >
-              <span id="hp-discovery-title">{title}</span>
+              <span
+                id="hp-discovery-title"
+                data-copy-source={selectedPlace || row ? "regional-metadata" : temporalCopy.source}
+              >
+                {title}
+              </span>
               <span className="hp-discovery-sheet__subtitle">{summary}</span>
             </button>
           </h2>
@@ -331,22 +354,30 @@ export function MapBottomSheet(props: Props) {
                               ? ` · ${t(region.visibleEventCount === 1 ? "{count} scheduled event" : "{count} scheduled events", { count: region.visibleEventCount })}`
                               : ""}
                           </span>
-                          <span>
-                            {region.discovery.signal.level
-                              ? regionalDescription(
-                                  {
-                                    ...region.discovery,
-                                    contextualPlaceIds: region.places
-                                      .filter((place) =>
-                                        state.viewport?.visiblePlaceIds.includes(place.id),
-                                      )
-                                      .map((place) => place.id),
-                                  },
-                                  lensLabel,
-                                  t,
-                                )
-                              : region.categories.map((category) => t(category)).join(" · ")}
+                          <span data-copy-source="regional-metadata">
+                            {regionalDescriptorKeys(
+                              region.discovery.region.identity,
+                              region.categories,
+                            )
+                              .map((key) => t(key))
+                              .join(" · ")}
                           </span>
+                          {communityActivityCopy(region.discovery.signal) && (
+                            <span data-copy-source="community-activity">
+                              {regionalDescription(
+                                {
+                                  ...region.discovery,
+                                  contextualPlaceIds: region.places
+                                    .filter((place) =>
+                                      state.viewport?.visiblePlaceIds.includes(place.id),
+                                    )
+                                    .map((place) => place.id),
+                                },
+                                lensLabel,
+                                t,
+                              )}
+                            </span>
+                          )}
                         </span>
                         <ChevronUp size={16} className="rotate-90" aria-hidden="true" />
                       </button>
@@ -398,14 +429,19 @@ function RegionDiscoveryContent(
   const { row } = props;
   return (
     <>
-      <p className="hp-discovery-sheet__context">
+      <p
+        className="hp-discovery-sheet__context"
+        data-copy-source={
+          communityActivityCopy(row.discovery.signal) ? "community-activity" : "fallback"
+        }
+      >
         {regionalDescription(row.discovery, props.lensLabel, t)}
       </p>
-      {row.categories.length > 0 && (
-        <p className="hp-discovery-sheet__description">
-          {row.categories.map((category) => t(category)).join(" · ")}
-        </p>
-      )}
+      <p className="hp-discovery-sheet__description" data-copy-source="regional-metadata">
+        {regionalDescriptorKeys(row.discovery.region.identity, row.categories)
+          .map((key) => t(key))
+          .join(" · ")}
+      </p>
       <div className="hp-discovery-sheet__section-heading">
         <h3>{t("Places")}</h3>
         <button type="button" onClick={() => props.onSnap("expanded")}>
@@ -499,6 +535,7 @@ function PlaceDiscoveryContent(props: Props & { place: Place }) {
   const saved = props.savedPlaceIds.includes(place.id);
   const story = props.storyGroups.find((group) => group.placeId === place.id);
   const signal = markerPulseForPlace(place.id, props.markerPulseSnapshot);
+  const activityCopy = communityActivityCopy(signal);
   return (
     <>
       {place.imageUrl ? (
@@ -527,9 +564,9 @@ function PlaceDiscoveryContent(props: Props & { place: Place }) {
           </span>
         )}
       </div>
-      {signal.level && (
-        <p className="hp-discovery-sheet__context">
-          {t("Recent community activity: {level}", { level: t(PULSE_NAMES[signal.level]) })}
+      {activityCopy && (
+        <p className="hp-discovery-sheet__context" data-copy-source={activityCopy.source}>
+          {t(activityCopy.key, { level: t(String(activityCopy.params!.level)) })}
         </p>
       )}
       <p className="hp-discovery-sheet__description">{place.short}</p>

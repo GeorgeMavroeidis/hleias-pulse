@@ -39,6 +39,23 @@ export const NEUTRAL_MARKER_PULSE: MarkerPulseSignal = {
   score: 0,
   contributorCount: 0,
 };
+
+/** Re-project cached public evidence on moderation changes without refetching or changing age. */
+export function excludeHiddenPulseContributors(
+  input: MarkerPulseInput,
+  hiddenIds: ReadonlySet<string>,
+): MarkerPulseInput {
+  if (!hiddenIds.size) return input;
+  return {
+    ...input,
+    evidence: Object.fromEntries(
+      Object.entries(input.evidence).map(([placeId, evidence]) => [
+        placeId,
+        evidence.filter((item) => !item.contributorId || !hiddenIds.has(item.contributorId)),
+      ]),
+    ),
+  };
+}
 const MARKER_EVIDENCE_CONFIG = {
   ...AREA_INTELLIGENCE_CONFIG,
   legacyActivityShare: 0,

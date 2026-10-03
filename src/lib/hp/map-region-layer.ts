@@ -3,20 +3,19 @@ import type {
   Map as MapLibreMap,
   SymbolLayerSpecification,
 } from "maplibre-gl";
-import { DAY_MAP_PALETTE } from "./map-cartography";
+import {
+  applyMapColourUpdates,
+  DAY_MAP_PALETTE,
+  type MapCartographyPalette,
+} from "./map-cartography";
+import { communityActivityCopy } from "./context-copy";
 import { MAP_POLICY, mapDisclosure } from "./map-policy";
 import type { RegionalDiscovery } from "./regional-discovery";
 import type { TranslationParams } from "../i18n";
 
 export const REGION_SOURCE_ID = "hp-regional-discovery";
 export const REGION_LAYER_ID = "hp-regional-signals";
-export const PULSE_NAMES = {
-  quiet: "Quiet",
-  emerging: "Emerging",
-  active: "Active",
-  lively: "Lively",
-  fading: "Fading",
-};
+export { PULSE_NAMES } from "./context-copy";
 type Translate = (key: string, params?: TranslationParams) => string;
 
 export function regionalDescription(
@@ -32,8 +31,9 @@ export function regionalDescription(
       })
     : t(count === 1 ? "{count} place" : "{count} places", { count });
   if (!count) return t("No matching places");
-  return row.signal.level
-    ? `${t("Recent community activity: {level}", { level: t(PULSE_NAMES[row.signal.level]) })} · ${places}`
+  const activity = communityActivityCopy(row.signal);
+  return activity
+    ? `${t(activity.key, { level: t(String(activity.params!.level)) })} · ${places}`
     : t("Explore · {places}", { places });
 }
 
@@ -82,7 +82,9 @@ export function regionalGeoJson(
   };
 }
 
-export function regionalSymbolLayer(): SymbolLayerSpecification {
+export function regionalSymbolLayer(
+  palette: Readonly<MapCartographyPalette> = DAY_MAP_PALETTE,
+): SymbolLayerSpecification {
   const stops: unknown[] = [];
   for (let step = 0; step <= 10; step++) {
     const zoom = MAP_POLICY.regionFadeStart + step / 10;
@@ -124,8 +126,8 @@ export function regionalSymbolLayer(): SymbolLayerSpecification {
     paint: {
       "icon-opacity": opacity,
       "text-opacity": opacity,
-      "text-color": DAY_MAP_PALETTE.primaryText,
-      "text-halo-color": DAY_MAP_PALETTE.land,
+      "text-color": palette.primaryText,
+      "text-halo-color": palette.land,
       "text-halo-width": 2,
       "text-halo-blur": 0.5,
     },
@@ -133,7 +135,10 @@ export function regionalSymbolLayer(): SymbolLayerSpecification {
 }
 
 /** One code-drawn sprite, matching existing Pulse geometry. No remote assets. */
-export function installRegionalLayer(map: MapLibreMap) {
+export function installRegionalLayer(
+  map: MapLibreMap,
+  palette: Readonly<MapCartographyPalette> = DAY_MAP_PALETTE,
+) {
   if (map.getSource(REGION_SOURCE_ID)) return;
   const sunset =
     getComputedStyle(map.getContainer()).getPropertyValue("--hp-sunset").trim() || "#ed7948";
@@ -168,5 +173,20 @@ export function installRegionalLayer(map: MapLibreMap) {
     data: { type: "FeatureCollection", features: [] },
   });
   // Last symbol layer places first in MapLibre's reverse-order collision pass.
-  map.addLayer(regionalSymbolLayer());
+  map.addLayer(regionalSymbolLayer(palette));
+}
+
+export function applyRegionalMapPalette(
+  map: MapLibreMap,
+  palette: Readonly<MapCartographyPalette>,
+  duration: number,
+) {
+  applyMapColourUpdates(
+    map,
+    [
+      { layerId: REGION_LAYER_ID, property: "text-color", value: palette.primaryText },
+      { layerId: REGION_LAYER_ID, property: "text-halo-color", value: palette.land },
+    ],
+    duration,
+  );
 }

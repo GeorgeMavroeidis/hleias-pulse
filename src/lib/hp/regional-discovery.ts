@@ -1,5 +1,10 @@
 import type { Place } from "../hp-model";
 import {
+  identityForPlaceCategory,
+  identityForTone,
+  type RegionIdentityMetadata,
+} from "./region-identity";
+import {
   areaDefinitionForId,
   areaIdForPlaceId,
   groupPlacesByArea,
@@ -22,6 +27,7 @@ export type MapRegion = {
   id: string;
   name: string;
   tone: AreaTone;
+  identity: RegionIdentityMetadata;
   placeIds: string[];
   anchor: { lng: number; lat: number };
   bounds: MapBounds;
@@ -89,6 +95,9 @@ export function buildMapRegions(places: Place[]): MapRegion[] {
         id,
         name: def?.name ?? members[0].name,
         tone: def?.tone ?? toneForPlace(members[0]),
+        identity: def
+          ? (def.identity ?? identityForTone(def.tone))
+          : identityForPlaceCategory(members[0].type),
         placeIds: members.map((p) => p.id).sort(),
         bounds,
         standalone: !def,

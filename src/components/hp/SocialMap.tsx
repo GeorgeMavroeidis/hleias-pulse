@@ -34,6 +34,7 @@ import {
 } from "@/lib/hp/regional-discovery";
 import {
   installRegionalLayer,
+  applyRegionalMapPalette,
   regionalGeoJson,
   regionalDescription,
   REGION_LAYER_ID,
@@ -49,7 +50,12 @@ import type {
   GeoJSONSource,
 } from "maplibre-gl";
 import { type EventItem, type Place } from "@/lib/hp-model";
-import { createIliaMapStyle } from "@/lib/hp/map-cartography";
+import {
+  applyMapPalette,
+  ATMOSPHERE_MAP_PALETTES,
+  createIliaMapStyle,
+} from "@/lib/hp/map-cartography";
+import { ATMOSPHERE_TRANSITION_MS, type AtmospherePaletteKey } from "@/lib/hp/temporal-atmosphere";
 import { areaIdForPlace, type AreaTone } from "@/lib/hp/area-catalog";
 import { eventCountForPlace, type MapAreaCluster } from "@/lib/hp/map-clusters";
 export { buildAreaClusters, type MapAreaCluster } from "@/lib/hp/map-clusters";
@@ -89,7 +95,7 @@ async function loadIliaBasemap(signal: AbortSignal): Promise<StyleSpecification>
   if (!response.ok) {
     throw new Error(`Basemap style request failed (${response.status}).`);
   }
-  return createIliaMapStyle((await response.json()) as StyleSpecification);
+  return (await response.json()) as StyleSpecification;
 }
 
 type LatLngTuple = [number, number];
@@ -279,6 +285,7 @@ function markerCoreRadius(node: RenderNode, _zoom: number) {
 }
 
 interface Props {
+  atmospherePalette?: AtmospherePaletteKey;
   clusters: MapAreaCluster[];
   regions: RegionalDiscovery[];
   events: EventItem[];
@@ -320,6 +327,7 @@ const NEUTRAL_PROMINENCE: MarkerProminence = {
 };
 
 export function SocialMap({
+  atmospherePalette = "day",
   clusters,
   regions,
   events,
@@ -348,6 +356,8 @@ export function SocialMap({
   onMapLongPress,
 }: Props) {
   const { t } = useI18n();
+  const atmospherePaletteRef = useRef(atmospherePalette);
+  atmospherePaletteRef.current = atmospherePalette;
   const selectedAreaId = selection.kind === "idle" ? null : selection.regionId;
   const selectedPlaceId = selection.kind === "placeSelected" ? selection.placeId : null;
   const initialCameraRef = useRef(initialCamera);
@@ -823,7 +833,10 @@ export function SocialMap({
         maplibreModuleRef.current = maplibre;
         map = new maplibre.Map({
           container: mapNodeRef.current,
-          style: basemapStyle,
+          style: createIliaMapStyle(
+            basemapStyle,
+            ATMOSPHERE_MAP_PALETTES[atmospherePaletteRef.current],
+          ),
           attributionControl: false,
           center: [ILIA_CENTER[1], ILIA_CENTER[0]],
           doubleClickZoom: true,
@@ -1003,7 +1016,9 @@ export function SocialMap({
         });
         map.once("load", () => {
           if (cancelled || !map) return;
-          installRegionalLayer(map);
+          const palette = ATMOSPHERE_MAP_PALETTES[atmospherePaletteRef.current];
+          applyMapPalette(map, palette, 0);
+          installRegionalLayer(map, palette);
           const readyZoom = map.getZoom();
           lastZoomRef.current = readyZoom;
           applyMarkerZoomProfile(mapNodeRef.current, readyZoom);
@@ -1043,6 +1058,21 @@ export function SocialMap({
       userMarkerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => {
+      const palette = ATMOSPHERE_MAP_PALETTES[atmospherePalette];
+      const duration = preference.matches ? 0 : ATMOSPHERE_TRANSITION_MS;
+      applyMapPalette(map, palette, duration);
+      applyRegionalMapPalette(map, palette, duration);
+    };
+    apply();
+    preference.addEventListener("change", apply);
+    return () => preference.removeEventListener("change", apply);
+  }, [atmospherePalette, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1688,6 +1718,7 @@ export function SocialMap({
   const mapChromeHidden = availableMapHeight < MIN_MAP_CHROME_HEIGHT;
   const mapStyle = {
     "--hp-map-bottom-overlay-height": `${Math.max(0, bottomOverlayHeight)}px`,
+    "--hp-map-land": ATMOSPHERE_MAP_PALETTES[atmospherePalette].land,
   } as CSSProperties;
 
   return (
@@ -1695,6 +1726,7 @@ export function SocialMap({
       ref={mapRootRef}
       className={`hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""} ${activeLens ? "has-discovery-lens" : ""} ${mapChromeHidden ? "is-map-compressed" : ""}`}
       data-discovery-lens={activeLens ?? undefined}
+      data-atmosphere-palette={atmospherePalette}
       data-map-hierarchy={mapDisclosure(zoom).level}
       data-attribution-position={
         availableMapHeight < MIN_UTILITY_RAIL_HEIGHT + 64 ? "left" : undefined

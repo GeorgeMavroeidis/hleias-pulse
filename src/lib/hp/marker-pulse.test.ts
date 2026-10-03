@@ -7,6 +7,7 @@ import {
   deriveMarkerPulseSnapshot,
   markerPulseForPlace,
   MARKER_PULSE_MAX_SNAPSHOT_AGE_MS,
+  excludeHiddenPulseContributors,
 } from "./marker-pulse";
 import {
   readMarkerMotionPreference,
@@ -136,6 +137,40 @@ test("legacy hotness, statuses, counters, events and RSVP metadata never imply a
   assert.equal(level(input).level, null);
   assert.equal(markerPulseForPlace("missing", {}).level, null);
   assert.equal(input.places[0].imageUrl, "photo.jpg");
+});
+
+test("blocked/muted contributors are excluded from cached activity without resetting freshness", () => {
+  const source = data();
+  source.posts = [post("visible", 10, "visible-user"), post("blocked", 10, "blocked-user")];
+  source.stories = [story("muted", 10, "muted-user")];
+  const original = buildMarkerPulseInput(source, NOW);
+  const before = JSON.stringify(original);
+  const filtered = excludeHiddenPulseContributors(
+    original,
+    new Set(["blocked-user", "muted-user"]),
+  );
+  assert.deepEqual(
+    filtered.evidence[place.id].map((e) => e.contributorId),
+    ["visible-user"],
+  );
+  assert.equal(filtered.fetchedAt, original.fetchedAt);
+  assert.equal(deriveMarkerPulseSnapshot(filtered, NOW)[place.id].level, "quiet");
+  assert.equal(
+    deriveMarkerPulseSnapshot(filtered, NOW + MARKER_PULSE_MAX_SNAPSHOT_AGE_MS + 1)[place.id].level,
+    null,
+  );
+  assert.equal(
+    deriveMarkerPulseSnapshot(
+      excludeHiddenPulseContributors(
+        original,
+        new Set(["visible-user", "blocked-user", "muted-user"]),
+      ),
+      NOW,
+    )[place.id].level,
+    null,
+  );
+  assert.equal(JSON.stringify(original), before);
+  assert.equal(excludeHiddenPulseContributors(original, new Set()), original);
 });
 test("unattributed seed content and invalid, future or unknown-place content are excluded", () => {
   const input = data();
