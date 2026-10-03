@@ -5,6 +5,7 @@ interface Props extends React.ImgHTMLAttributes<HTMLImageElement> {
   alt: string;
   rounded?: string;
   gradientFallback?: string;
+  failedContent?: React.ReactNode;
 }
 
 export function ImageBox({
@@ -13,6 +14,7 @@ export function ImageBox({
   className = "",
   rounded = "rounded-2xl",
   gradientFallback,
+  failedContent,
   width = 800,
   height = 600,
   ...rest
@@ -41,6 +43,11 @@ export function ImageBox({
       )}
       {!loaded && !failed && (
         <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-black/10 to-black/20" />
+      )}
+      {failed && failedContent && (
+        <div className="absolute inset-0 grid place-items-center bg-hp-paper text-xs text-hp-muted">
+          {failedContent}
+        </div>
       )}
     </div>
   );

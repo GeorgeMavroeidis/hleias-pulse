@@ -37,6 +37,8 @@ export type MapDiscoveryViewport = {
   center: { lat: number; lng: number };
   visibleAreaIds: string[];
   zoom: number;
+  bearing: number;
+  pitch: number;
   hierarchyLevel: MapHierarchyLevel;
   bounds: MapBounds;
   usableBounds: MapBounds;
@@ -134,6 +136,7 @@ export function discoveryViewport(
   usableBounds: MapBounds,
   places: Pick<Place, "id" | "lat" | "lng">[],
   contextualIds: ReadonlySet<string>,
+  orientation = { bearing: 0, pitch: 0 },
 ): MapDiscoveryViewport {
   const visible = places.filter((p) => pointInBounds(p.lng, p.lat, usableBounds));
   const areaIds = [...new Set(visible.map((p) => areaIdForPlaceId(p.id)))].sort();
@@ -157,6 +160,7 @@ export function discoveryViewport(
   return {
     center,
     zoom,
+    ...orientation,
     hierarchyLevel: mapDisclosure(zoom).level,
     bounds,
     usableBounds,

@@ -109,10 +109,6 @@ export type ShareTarget = {
   label: string;
   text?: string;
 };
-export type MapViewSnapshot = {
-  areaId: string | null;
-  placeId: string | null;
-};
 
 export const openStreetMapUrl = ({ lat, lng }: Pick<Place, "lat" | "lng">) =>
   `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`;

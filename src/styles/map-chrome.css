@@ -359,3 +359,240 @@
 .hp-map-chip:focus-visible {
   outline-offset: -3px !important;
 }
+
+/* Phase 5: the discovery sheet stays above the existing safe-area navigation. */
+.hp-discovery-sheet {
+  contain: layout style;
+}
+.hp-discovery-sheet__header {
+  flex: none;
+  padding: 8px var(--hp-safe-right) 6px var(--hp-safe-left);
+  cursor: grab;
+}
+.hp-discovery-sheet__header:active {
+  cursor: grabbing;
+}
+.hp-discovery-sheet__summary-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+}
+.hp-discovery-sheet__summary {
+  display: flex;
+  min-height: 56px;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: left;
+  gap: 3px;
+  padding: 2px 0;
+}
+.hp-discovery-sheet__summary > span:first-child {
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.hp-discovery-sheet__subtitle {
+  color: var(--hp-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.hp-discovery-sheet__icon {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  flex: none;
+  border-radius: 50%;
+}
+.hp-discovery-sheet button:focus-visible,
+.hp-discovery-sheet a:focus-visible {
+  outline: 2px solid var(--hp-sunset);
+  outline-offset: -2px;
+}
+.hp-discovery-sheet__content {
+  padding-bottom: 16px;
+  touch-action: pan-y;
+}
+.hp-discovery-sheet__section-title,
+.hp-discovery-sheet__section-heading {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.hp-discovery-sheet__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hp-discovery-sheet__section-heading button {
+  min-height: 44px;
+  color: var(--hp-text-accent);
+  font-size: 11px;
+}
+.hp-discovery-sheet__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hp-discovery-sheet__row {
+  display: flex;
+  width: 100%;
+  min-height: 64px;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hp-border);
+}
+.hp-discovery-sheet__row strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.hp-discovery-sheet__row span span {
+  display: block;
+  margin-top: 3px;
+  color: var(--hp-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.hp-discovery-sheet__context {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--hp-text-accent);
+}
+.hp-discovery-sheet__description {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--hp-text-secondary);
+}
+.hp-discovery-sheet__photo {
+  width: 100%;
+  height: 96px;
+  flex: none;
+}
+.hp-discovery-sheet__photo.is-expanded {
+  height: 140px;
+}
+.hp-discovery-sheet__photo-fallback {
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--hp-bg);
+  color: var(--hp-text-secondary);
+  font-size: 12px;
+}
+.hp-discovery-sheet__place-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 11px;
+  color: var(--hp-text-secondary);
+}
+.hp-discovery-sheet__place-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.hp-discovery-sheet__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: sticky;
+  bottom: -1px;
+  padding: 8px 0;
+  background: var(--hp-paper);
+  z-index: 1;
+}
+.hp-discovery-sheet__actions button,
+.hp-discovery-sheet__actions a {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  gap: 5px;
+  border: 1px solid var(--hp-border);
+  border-radius: 24px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.hp-discovery-sheet__actions button:nth-child(-n + 2) {
+  flex: 1;
+}
+.hp-discovery-sheet__actions .is-primary {
+  background: var(--hp-ink);
+  color: var(--hp-paper);
+}
+.hp-discovery-sheet__empty {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  font-size: 12px;
+  color: var(--hp-text-secondary);
+}
+.hp-discovery-sheet__empty button,
+.hp-discovery-sheet__story {
+  min-height: 44px;
+  text-align: left;
+  color: var(--hp-text-accent);
+  font-size: 12px;
+}
+.hp-discovery-sheet__notice {
+  font-size: 12px;
+  padding: 8px;
+  background: var(--hp-bg);
+  border-radius: 12px;
+}
+.hp-discovery-sheet__notice button {
+  min-height: 44px;
+  font-weight: 600;
+  color: var(--hp-text-accent);
+}
+.hp-discovery-sheet__tags {
+  font-size: 11px;
+  color: var(--hp-text-secondary);
+  margin: 10px 0;
+}
+
+/* Keep both discovery and map access in short landscape viewports. */
+@media (max-height: 440px) {
+  .hp-app-shell {
+    margin-block: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+  .hp-topbar-row {
+    padding-top: 0;
+    min-height: 44px;
+  }
+  .hp-topbar-subtitle {
+    display: none;
+  }
+  .hp-discovery-lens-rail {
+    padding-block: 0;
+  }
+  .hp-bottom-nav {
+    padding-top: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .hp-bottom-nav-item {
+    min-height: 44px;
+    padding-block: 4px;
+    gap: 2px;
+  }
+  .hp-discovery-sheet__summary {
+    min-height: 44px;
+  }
+}

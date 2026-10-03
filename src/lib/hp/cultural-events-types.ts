@@ -44,10 +44,10 @@ export interface CulturalEvent {
  * only becomes past from the next day onwards — a 21:00 show today is still
  * upcoming at 22:00 today.
  */
-export const isEventPast = (event: Pick<CulturalEvent, "eventDate">): boolean => {
+export const isEventPast = (event: Pick<CulturalEvent, "eventDate">, now = Date.now()): boolean => {
   const endOfEventDay = new Date(event.eventDate);
   endOfEventDay.setHours(23, 59, 59, 999);
-  return endOfEventDay.getTime() < Date.now();
+  return endOfEventDay.getTime() < now;
 };
 
 export interface CreateCulturalEventInput {

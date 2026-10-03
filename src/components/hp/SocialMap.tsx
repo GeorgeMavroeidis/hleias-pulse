@@ -1,6 +1,21 @@
+import type { MapSelection, MapCameraSnapshot } from "@/lib/hp/map-discovery-state";
+import type { SheetGeometry } from "@/lib/hp/sheet-geometry";
+import {
+  discoverySafeMapRect,
+  panDeltaIntoSafeRect,
+  pointIsInSafeRect,
+} from "@/lib/hp/map-sheet-camera";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { Button } from "@/components/ui/button";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
 import { ChevronLeft, Crosshair, MapPinned, Minus, Plus } from "lucide-react";
 import {
   MAP_POLICY,
@@ -109,45 +124,20 @@ const MIN_UTILITY_RAIL_HEIGHT = 248;
 const MIN_MAP_CHROME_HEIGHT = 188;
 const SAFE_MARKER_RADIUS = 48;
 
-type SafeMapRect = { left: number; right: number; top: number; bottom: number };
-
 const prefersReducedMapMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function safeMapRect(
   container: HTMLElement,
   bottomOverlayHeight: number,
-  availableMapHeight: number,
+  _availableMapHeight: number,
   markerRadius = SAFE_MARKER_RADIUS,
-): SafeMapRect {
-  const railVisible = availableMapHeight >= MIN_UTILITY_RAIL_HEIGHT;
-  const chromeVisible = availableMapHeight >= MIN_MAP_CHROME_HEIGHT;
-  const edgeInset = 20 + markerRadius;
-  const rawBottom = Math.max(
-    edgeInset + 32,
-    container.clientHeight - bottomOverlayHeight - 20 - markerRadius,
-  );
-  const desiredTop = (chromeVisible ? 108 : 20) + markerRadius;
-  const top = Math.max(edgeInset, Math.min(desiredTop, rawBottom - 32));
-  return {
-    left: edgeInset,
-    right: Math.max(edgeInset + 32, container.clientWidth - (railVisible ? 64 : 20) - markerRadius),
-    top,
-    bottom: Math.max(top + 32, rawBottom),
-  };
-}
-
-function panDeltaIntoSafeRect(point: { x: number; y: number }, rect: SafeMapRect) {
-  const x =
-    point.x < rect.left ? point.x - rect.left : point.x > rect.right ? point.x - rect.right : 0;
-  const y =
-    point.y < rect.top ? point.y - rect.top : point.y > rect.bottom ? point.y - rect.bottom : 0;
-  return { x, y };
-}
-
-function pointIsInSafeRect(point: { x: number; y: number }, rect: SafeMapRect) {
-  return (
-    point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
+) {
+  return discoverySafeMapRect(
+    container.clientWidth,
+    container.clientHeight,
+    bottomOverlayHeight,
+    markerRadius,
   );
 }
 
@@ -294,8 +284,12 @@ interface Props {
   events: EventItem[];
   activitySnapshot: PulseActivitySnapshot;
   markerPulseSnapshot: MarkerPulseSnapshot;
-  selectedAreaId: string | null;
-  selectedPlaceId?: string | null;
+  selection: MapSelection;
+  sheetGeometry: SheetGeometry;
+  initialCamera?: MapCameraSnapshot | null;
+  routeFrameRevision?: number;
+  cameraCaptureRef?: RefObject<(() => MapCameraSnapshot | null) | null>;
+  focusSheetHeights: { region: number; place: number };
   activeFilterLabel?: string | null;
   activeLens?: DiscoveryLens | null;
   discoverySnapshot?: DiscoverySnapshot;
@@ -331,8 +325,12 @@ export function SocialMap({
   events,
   activitySnapshot,
   markerPulseSnapshot,
-  selectedAreaId,
-  selectedPlaceId,
+  selection,
+  sheetGeometry,
+  initialCamera = null,
+  routeFrameRevision = 0,
+  cameraCaptureRef,
+  focusSheetHeights,
   activeFilterLabel,
   activeLens = null,
   discoverySnapshot = { places: {}, areas: {} },
@@ -350,6 +348,14 @@ export function SocialMap({
   onMapLongPress,
 }: Props) {
   const { t } = useI18n();
+  const selectedAreaId = selection.kind === "idle" ? null : selection.regionId;
+  const selectedPlaceId = selection.kind === "placeSelected" ? selection.placeId : null;
+  const initialCameraRef = useRef(initialCamera);
+  const framedRouteRevisionRef = useRef(initialCamera?.framedRouteRevision ?? null);
+  const focusSheetHeightsRef = useRef(focusSheetHeights);
+  focusSheetHeightsRef.current = focusSheetHeights;
+  const sheetMotionRef = useRef(sheetGeometry.get().moving);
+  const mapRootRef = useRef<HTMLDivElement>(null);
   const mapNodeRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const maplibreModuleRef = useRef<typeof import("maplibre-gl") | null>(null);
@@ -371,15 +377,16 @@ export function SocialMap({
   regionsRef.current = regions;
   const selectRegionRef = useRef<(id: string) => void>(() => {});
   const userNavigatedRef = useRef(false);
-  const explicitBackRef = useRef(false);
   const [settledBounds, setSettledBounds] = useState<MapBounds>(MAP_POLICY.panBounds);
   const [visibleRegionSymbolIds, setVisibleRegionSymbolIds] = useState<string[]>([]);
   const [settledViewport, setSettledViewport] = useState<MapDiscoveryViewport | null>(null);
-  const bottomOverlayHeightRef = useRef(bottomOverlayHeight);
-  bottomOverlayHeightRef.current = bottomOverlayHeight;
+  const bottomOverlayHeightRef = useRef(sheetGeometry.get().height);
+  bottomOverlayHeightRef.current = sheetGeometry.get().height;
   const availableMapHeightRef = useRef(availableMapHeight);
-  availableMapHeightRef.current = availableMapHeight;
-  const didInitialFitRef = useRef(false);
+  availableMapHeightRef.current =
+    (mapNodeRef.current?.clientHeight ?? bottomOverlayHeight + availableMapHeight) -
+    sheetGeometry.get().height;
+  const didInitialFitRef = useRef(Boolean(initialCamera));
   const lastMarkerActivationRef = useRef<{ id: string; at: number } | null>(null);
   const previousSelectionRef = useRef<{ areaId: string | null; placeId: string | null }>({
     areaId: null,
@@ -570,6 +577,17 @@ export function SocialMap({
           { selected: node.selected, hasSelection },
         );
     });
+    if (hasSelection)
+      nodes.forEach((node) => {
+        const relevant =
+          node.kind === "child"
+            ? node.cluster.id === selectedAreaId
+            : node.leaves.some((place) => clusterIdForPlace(place) === selectedAreaId);
+        const opacityFactor = node.selected
+          ? 1
+          : Math.max(0.62, node.prominence.opacityFactor * (relevant ? 0.94 : 0.76));
+        node.prominence = { ...node.prominence, opacityFactor };
+      });
     return nodes;
   }, [
     zoom,
@@ -637,8 +655,8 @@ export function SocialMap({
     userNavigatedRef.current = false;
     const viewport = safeMapRect(
       container,
-      bottomOverlayHeightRef.current,
-      availableMapHeightRef.current,
+      focusSheetHeightsRef.current.region,
+      container.clientHeight - focusSheetHeightsRef.current.region,
       24,
     );
     const padding = {
@@ -664,12 +682,14 @@ export function SocialMap({
         ],
         duration: reduceMotion ? 0 : MAP_POLICY.focusDurationMs,
       });
-    } else
-      map.fitBounds(region.bounds, {
-        duration: reduceMotion ? 0 : MAP_POLICY.focusDurationMs,
+    } else {
+      const camera = map.cameraForBounds(region.bounds, {
         maxZoom: MAP_POLICY.regionFocusMaxZoom,
         padding,
       });
+      if (camera)
+        map.easeTo({ ...camera, duration: reduceMotion ? 0 : MAP_POLICY.focusDurationMs });
+    }
   }, []);
 
   const zoomIntoActivityCluster = useCallback(
@@ -682,8 +702,8 @@ export function SocialMap({
       const targetZoom = Math.min(PLACE_FOCUS_ZOOM, Math.max(map.getZoom() + 0.75, expansionZoom));
       const viewport = safeMapRect(
         container,
-        bottomOverlayHeightRef.current,
-        availableMapHeightRef.current,
+        focusSheetHeightsRef.current.region,
+        container.clientHeight - focusSheetHeightsRef.current.region,
         markerCoreRadius({ ...node, selected: true }, targetZoom),
       );
       const desiredPoint = {
@@ -780,14 +800,6 @@ export function SocialMap({
       const cluster = clusterById.get(next.areaId);
       if (cluster) zoomIntoCluster(cluster);
     }
-    if (
-      explicitBackRef.current &&
-      !next.areaId &&
-      !next.placeId &&
-      (previous.areaId || previous.placeId)
-    )
-      flyToOverview();
-    explicitBackRef.current = false;
     // Filter-pruned selection does not move the user's viewport.
   }, [clusterById, flyToOverview, mapReady, selectedAreaId, selectedPlaceId, zoomIntoCluster]);
 
@@ -819,7 +831,14 @@ export function SocialMap({
           crossSourceCollisions: true,
           maxZoom: MAX_ZOOM,
           minZoom: MIN_ZOOM,
-          zoom: OVERVIEW_ZOOM,
+          zoom: initialCameraRef.current?.zoom ?? OVERVIEW_ZOOM,
+          ...(initialCameraRef.current
+            ? {
+                center: initialCameraRef.current.center,
+                bearing: initialCameraRef.current.bearing,
+                pitch: initialCameraRef.current.pitch,
+              }
+            : {}),
           maplibreLogo: false,
           renderWorldCopies: false,
         });
@@ -856,8 +875,6 @@ export function SocialMap({
           const target = event.originalEvent?.target as Element | null;
           if (target?.closest(".maplibregl-marker, .maplibregl-control-container, button, a"))
             return;
-          if (selectionKeyRef.current === "|") return;
-
           cameraHandledSelectionRef.current = "|";
           onClearSelectionRef.current();
         };
@@ -1074,6 +1091,7 @@ export function SocialMap({
           shell.classList.toggle("is-motion-suppressed", density.suppressed.has(id));
           shell.classList.toggle("has-visible-label", shownLabels.has(id));
         });
+        if (sheetMotionRef.current) return;
         const center = map.getCenter();
         const rawBounds = map.getBounds();
         const bounds: MapBounds = [
@@ -1121,6 +1139,7 @@ export function SocialMap({
           usableBounds,
           visiblePlaces,
           contextualIds,
+          { bearing: map.getBearing(), pitch: map.getPitch() },
         );
         const signature = viewportSignature(viewport);
         if (signature !== lastDiscoveryViewportRef.current) {
@@ -1334,20 +1353,22 @@ export function SocialMap({
     }
 
     selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
-    const bottomPadding = Math.min(460, Math.max(180, bottomOverlayHeight + 40));
-    const focusOffset = Math.min(270, Math.max(128, bottomPadding * 0.44));
+    const focusOffset: [number, number] = [
+      (viewport.left + viewport.right - container.clientWidth) / 2,
+      (viewport.top + viewport.bottom - container.clientHeight) / 2,
+    ];
     if (reduceMotion) {
       map.easeTo({
         center: [latLng[1], latLng[0]],
         zoom: PLACE_FOCUS_ZOOM,
-        offset: [0, -focusOffset],
+        offset: focusOffset,
         duration: 0,
       });
     } else {
       map.flyTo({
         center: [latLng[1], latLng[0]],
         zoom: PLACE_FOCUS_ZOOM,
-        offset: [0, -focusOffset],
+        offset: focusOffset,
         duration: MAP_FOCUS_DURATION * 1000,
         essential: true,
       });
@@ -1362,49 +1383,111 @@ export function SocialMap({
   ]);
 
   useEffect(() => {
+    if (!mapReady) return;
     const map = mapRef.current;
     const container = mapNodeRef.current;
-    const selectedNode = primarySelectedNodeRef.current;
-    if (!map || !container || !mapReady || !selectedNode || bottomOverlayHeight <= 0) {
-      return;
-    }
-
+    if (!map || !container) return;
     let frame: number | null = null;
     let timer: number | null = null;
-    let correctionCount = 0;
-    const keepSelectionVisible = () => {
+    let previousHeight = sheetGeometry.get().height;
+    let previousMoving = sheetGeometry.get().moving;
+    let corrections = 0;
+    const correct = () => {
+      frame = null;
       if (userNavigatedRef.current) return;
-      const remainingMotion = selectionMotionUntilRef.current - Date.now();
-      if (remainingMotion > 0) {
-        timer = window.setTimeout(() => {
-          frame = window.requestAnimationFrame(keepSelectionVisible);
-        }, remainingMotion + 16);
+      const remaining = selectionMotionUntilRef.current - Date.now();
+      if (remaining > 0) {
+        if (timer !== null) window.clearTimeout(timer);
+        timer = window.setTimeout(correct, remaining + 16);
         return;
       }
-
-      const point = map.project([selectedNode.latLng[1], selectedNode.latLng[0]]);
-      const viewport = safeMapRect(
+      const node = primarySelectedNodeRef.current;
+      const region = regionsRef.current.find(
+        (row) => row.region.id === selectionKeyRef.current.split("|")[0],
+      )?.region;
+      const coordinate = node
+        ? ([node.latLng[1], node.latLng[0]] as [number, number])
+        : region
+          ? ([region.anchor.lng, region.anchor.lat] as [number, number])
+          : null;
+      if (!coordinate) return;
+      const rect = safeMapRect(
         container,
-        bottomOverlayHeight,
-        availableMapHeight,
-        markerCoreRadius(selectedNode, map.getZoom()),
+        bottomOverlayHeightRef.current,
+        availableMapHeightRef.current,
+        node ? markerCoreRadius(node, map.getZoom()) : 24,
       );
-      const delta = panDeltaIntoSafeRect(point, viewport);
-      if (delta.x !== 0 || delta.y !== 0) {
+      const delta = panDeltaIntoSafeRect(map.project(coordinate), rect);
+      if (Math.hypot(delta.x, delta.y) > 0.5) {
         map.panBy([delta.x, delta.y], { duration: 0 });
-        correctionCount += 1;
-        if (correctionCount < 3) {
-          frame = window.requestAnimationFrame(keepSelectionVisible);
-        }
+        corrections++;
+        // Perspective may require a second small correction after settling.
+        if (!sheetMotionRef.current && corrections < 3 && frame === null)
+          frame = requestAnimationFrame(correct);
       }
     };
-
-    frame = window.requestAnimationFrame(keepSelectionVisible);
-    return () => {
-      if (frame !== null) window.cancelAnimationFrame(frame);
-      if (timer !== null) window.clearTimeout(timer);
+    const sync = (geometry: ReturnType<SheetGeometry["get"]>) => {
+      if (Math.abs(geometry.height - previousHeight) > 0.1) corrections = 0;
+      // A sheet gesture may protect a pin still in view after a manual pan.
+      // A deliberately offscreen selection stays offscreen until selected again.
+      if (geometry.moving && !previousMoving && userNavigatedRef.current) {
+        const node = primarySelectedNodeRef.current;
+        if (
+          node &&
+          pointIsInSafeRect(
+            map.project([node.latLng[1], node.latLng[0]]),
+            safeMapRect(
+              container,
+              previousHeight,
+              container.clientHeight - previousHeight,
+              markerCoreRadius(node, map.getZoom()),
+            ),
+          )
+        )
+          userNavigatedRef.current = false;
+      }
+      bottomOverlayHeightRef.current = geometry.height;
+      availableMapHeightRef.current = container.clientHeight - geometry.height;
+      sheetMotionRef.current = geometry.moving;
+      mapRootRef.current?.style.setProperty(
+        "--hp-map-bottom-overlay-height",
+        `${geometry.height}px`,
+      );
+      if (geometry.height > previousHeight + 0.1 || !geometry.moving) {
+        if (frame === null) frame = requestAnimationFrame(correct);
+      }
+      previousHeight = geometry.height;
+      previousMoving = geometry.moving;
+      if (!geometry.moving) scheduleMarkerViewportSyncRef.current();
     };
-  }, [availableMapHeight, bottomOverlayHeight, mapReady, selectionKey]);
+    sync(sheetGeometry.get());
+    const unsubscribe = sheetGeometry.subscribe(sync);
+    return () => {
+      unsubscribe();
+      if (frame !== null) cancelAnimationFrame(frame);
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [mapReady, sheetGeometry]);
+
+  useEffect(() => {
+    if (!cameraCaptureRef) return;
+    cameraCaptureRef.current = () => {
+      const map = mapRef.current;
+      if (!map) return null;
+      map.stop();
+      const center = map.getCenter();
+      return {
+        center: [center.lng, center.lat],
+        zoom: map.getZoom(),
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+        framedRouteRevision: framedRouteRevisionRef.current,
+      };
+    };
+    return () => {
+      cameraCaptureRef.current = null;
+    };
+  }, [cameraCaptureRef]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1504,32 +1587,37 @@ export function SocialMap({
         .setLngLat([stop.lng, stop.lat])
         .addTo(map);
     });
-    const reduceMotion = prefersReducedMapMotion();
-    const routeBottomPadding = Math.max(188, bottomOverlayHeightRef.current + 40);
-    map.stop();
-    map.fitBounds(
-      [
+    // Recreate route layers on remount, but only an explicit route-opening intent
+    // can replace a restored camera or a manually navigated view.
+    if (framedRouteRevisionRef.current !== routeFrameRevision) {
+      framedRouteRevisionRef.current = routeFrameRevision;
+      const reduceMotion = prefersReducedMapMotion();
+      const routeBottomPadding = Math.max(188, bottomOverlayHeightRef.current + 40);
+      map.stop();
+      const camera = map.cameraForBounds(
         [
-          Math.min(...coordinates.map(([lng]) => lng)),
-          Math.min(...coordinates.map(([, lat]) => lat)),
+          [
+            Math.min(...coordinates.map(([lng]) => lng)),
+            Math.min(...coordinates.map(([, lat]) => lat)),
+          ],
+          [
+            Math.max(...coordinates.map(([lng]) => lng)),
+            Math.max(...coordinates.map(([, lat]) => lat)),
+          ],
         ],
-        [
-          Math.max(...coordinates.map(([lng]) => lng)),
-          Math.max(...coordinates.map(([, lat]) => lat)),
-        ],
-      ],
-      {
-        duration: reduceMotion ? 0 : MAP_FOCUS_DURATION * 1000,
-        maxZoom: PLACE_FOCUS_ZOOM,
-        padding: { left: 48, top: 116, right: 48, bottom: routeBottomPadding },
-      },
-    );
+        {
+          maxZoom: PLACE_FOCUS_ZOOM,
+          padding: { left: 48, top: 116, right: 48, bottom: routeBottomPadding },
+        },
+      );
+      if (camera) map.easeTo({ ...camera, duration: reduceMotion ? 0 : MAP_FOCUS_DURATION * 1000 });
+    }
 
     return () => {
       routeStopMarkersRef.current.forEach((marker) => marker.remove());
       routeStopMarkersRef.current = [];
     };
-  }, [mapReady, routePreview]);
+  }, [mapReady, routePreview, routeFrameRevision]);
 
   const resetToOverview = () => {
     if (selectionKeyRef.current !== "|") cameraHandledSelectionRef.current = "|";
@@ -1547,7 +1635,9 @@ export function SocialMap({
   };
 
   const zoomOut = () => {
-    mapRef.current?.zoomOut();
+    userNavigatedRef.current = true;
+    selectionMotionUntilRef.current = 0;
+    mapRef.current?.stop().zoomOut();
   };
 
   const locateUser = () => {
@@ -1602,6 +1692,7 @@ export function SocialMap({
 
   return (
     <div
+      ref={mapRootRef}
       className={`hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""} ${activeLens ? "has-discovery-lens" : ""} ${mapChromeHidden ? "is-map-compressed" : ""}`}
       data-discovery-lens={activeLens ?? undefined}
       data-map-hierarchy={mapDisclosure(zoom).level}
@@ -1674,10 +1765,7 @@ export function SocialMap({
           variant="hpGhost"
           size="hpIcon"
           type="button"
-          onClick={() => {
-            explicitBackRef.current = true;
-            onBack();
-          }}
+          onClick={onBack}
           className="hp-control-surface hp-map-back absolute"
           aria-label={t("Back to previous map view")}
         >

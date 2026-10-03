@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarHeart,
@@ -38,6 +38,7 @@ const CATEGORY_ICONS: Record<MeetCategory, LucideIcon> = {
 };
 
 interface Props {
+  focusEventId?: string | null;
   events: MeetEvent[];
   rsvp: Record<string, RsvpStatus>;
   findPlace: (id: string) => Place | undefined;
@@ -47,6 +48,7 @@ interface Props {
 }
 
 export function MeetScreen({
+  focusEventId,
   events,
   rsvp,
   findPlace,
@@ -57,6 +59,12 @@ export function MeetScreen({
   const { t } = useI18n();
   const moderation = useModeration();
   const [filter, setFilter] = useState<Filter>("all");
+  const focusedEventRef = useRef<HTMLDivElement>(null);
+  const focusedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    focusedIdRef.current = null;
+    if (focusEventId) setFilter("all");
+  }, [focusEventId]);
 
   const filtered = useMemo(() => {
     const now = Date.now();
@@ -73,6 +81,20 @@ export function MeetScreen({
         .sort((a, b) => +new Date(a.happensAt) - +new Date(b.happensAt))
     );
   }, [events, filter, moderation, rsvp]);
+
+  useEffect(() => {
+    if (!focusEventId || filter !== "all" || focusedIdRef.current === focusEventId) return;
+    // Wait for the filter/data commit that actually mounts the target card.
+    if (!focusedEventRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      const target = focusedEventRef.current;
+      if (!target || target.dataset.discoveryEvent !== focusEventId) return;
+      target.scrollIntoView({ block: "center", behavior: "instant" });
+      target.focus({ preventScroll: true });
+      focusedIdRef.current = focusEventId;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusEventId, filter, filtered]);
 
   const mineCount = events.filter((e) => rsvp[e.id]).length;
 
@@ -143,14 +165,25 @@ export function MeetScreen({
           <div className="flex flex-col gap-3.5">
             <AnimatePresence initial={false}>
               {filtered.map((event) => (
-                <EventCard
+                <div
                   key={event.id}
-                  event={event}
-                  placeName={findPlace(event.placeId)?.name ?? "Ilia"}
-                  status={rsvp[event.id] ?? null}
-                  onToggle={onToggleRsvp}
-                  onOpenPlace={onOpenPlace}
-                />
+                  ref={event.id === focusEventId ? focusedEventRef : undefined}
+                  tabIndex={event.id === focusEventId ? -1 : undefined}
+                  data-discovery-event={event.id}
+                  className={
+                    event.id === focusEventId
+                      ? "rounded-2xl focus:outline-2 focus:outline-hp-sunset"
+                      : undefined
+                  }
+                >
+                  <EventCard
+                    event={event}
+                    placeName={findPlace(event.placeId)?.name ?? "Ilia"}
+                    status={rsvp[event.id] ?? null}
+                    onToggle={onToggleRsvp}
+                    onOpenPlace={onOpenPlace}
+                  />
+                </div>
               ))}
             </AnimatePresence>
           </div>
