@@ -2378,7 +2378,7 @@ export function PulseApp() {
                 initial={{ opacity: 0, y: 10, scale: 0.996, filter: "blur(2px)" }}
                 animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
                 exit={{ opacity: 0, y: -8, scale: 0.996, filter: "blur(2px)" }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                transition={HP_TRANSITION.tab}
                 className="absolute inset-0 overflow-hidden bg-hp-bg"
                 style={{
                   backfaceVisibility: "hidden",

@@ -1,3 +1,5 @@
+import { HP_MOTION } from "./motion";
+
 /** One policy for geography, disclosure, clustering and camera limits. */
 export const MAP_POLICY = {
   center: [21.52, 37.68] as [number, number],
@@ -18,7 +20,7 @@ export const MAP_POLICY = {
   placeFocusZoom: 14.25,
   labelZoom: 15.5,
   motionZoom: 11.5,
-  focusDurationMs: 380,
+  focusDurationMs: HP_MOTION.focus,
 } as const;
 
 export type MapHierarchyLevel = "region" | "transition" | "activity" | "place";

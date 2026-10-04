@@ -463,6 +463,8 @@ function RegionDiscoveryContent(
                   alt=""
                   className="h-12 w-12 shrink-0"
                   rounded="rounded-xl"
+                  gradientFallback="var(--hp-paper)"
+                  failedContent={<MapPin size={16} aria-hidden="true" />}
                 />
                 <span className="min-w-0 flex-1">
                   <strong>{place.name}</strong>
@@ -544,6 +546,7 @@ function PlaceDiscoveryContent(props: Props & { place: Place }) {
           src={place.imageUrl}
           alt={t("Photo of {place}", { place: place.name })}
           failedContent={t("No photo available")}
+          gradientFallback="var(--hp-paper)"
           className={`hp-discovery-sheet__photo ${state.snap === "expanded" ? "is-expanded" : ""}`}
         />
       ) : (

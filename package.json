@@ -33,7 +33,7 @@
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
-    "test:map-visuals": "tsx scripts/check-map-visuals.ts && npm run test:markers && npm run test:map-cartography && npm run test:regional-discovery && npm run test:map-discovery && npm run test:temporal-atmosphere && npm run test:region-identity",
+    "test:map-visuals": "tsx scripts/check-map-visuals.ts && npm run test:markers && npm run test:map-cartography && npm run test:regional-discovery && npm run test:map-discovery && npm run test:temporal-atmosphere && npm run test:region-identity && npm run test:motion",
     "test:map-cartography": "tsx --test scripts/check-map-cartography.test.ts",
     "test:routing": "tsx --test scripts/check-route-preview.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",
@@ -42,7 +42,8 @@
     "test:regional-discovery": "tsx --test src/lib/hp/regional-discovery.test.ts",
     "test:map-discovery": "tsx --test src/lib/hp/map-discovery.test.ts",
     "test:temporal-atmosphere": "tsx --test src/lib/hp/temporal-atmosphere.test.ts",
-    "test:region-identity": "tsx --test src/lib/hp/region-identity.test.tsx"
+    "test:region-identity": "tsx --test src/lib/hp/region-identity.test.tsx",
+    "test:motion": "tsx --test src/lib/hp/motion.test.ts"
   },
   "dependencies": {
     "@capacitor/app-launcher": "^8.0.1",

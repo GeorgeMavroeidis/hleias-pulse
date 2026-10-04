@@ -14,6 +14,14 @@ export type TranslationParams = Record<string, string | number>;
 const STORAGE_KEY = "ilia-pulse-language";
 
 const EL: Record<string, string> = {
+  "Finding your location…": "Αναζήτηση τοποθεσίας…",
+  "Location found": "Η τοποθεσία βρέθηκε",
+  "Location access is off. Allow it in your browser settings, then try again.":
+    "Η πρόσβαση στην τοποθεσία είναι κλειστή. Ενεργοποίησέ την στις ρυθμίσεις του προγράμματος περιήγησης και δοκίμασε ξανά.",
+  "Location took too long. Try again.": "Η αναζήτηση τοποθεσίας άργησε. Δοκίμασε ξανά.",
+  "Location is unavailable. You can still explore the map.":
+    "Η τοποθεσία δεν είναι διαθέσιμη. Μπορείς να συνεχίσεις την εξερεύνηση του χάρτη.",
+  "The map could not be loaded. Try again.": "Ο χάρτης δεν φορτώθηκε. Δοκίμασε ξανά.",
   "Morning in Ilia": "Πρωί στην Ηλεία",
   "Afternoon in Ilia": "Απόγευμα στην Ηλεία",
   "Golden hour": "Χρυσή ώρα",

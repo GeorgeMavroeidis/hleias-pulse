@@ -367,17 +367,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hp-live-ping,
-  .hp-marker-glow,
-  .hp-area-marker__shell.is-live .hp-area-marker__ring,
-  .hp-area-marker__shell.is-pulsing .hp-area-marker__ring,
   .hp-user-dot::after,
   .hp-real-map .hp-route-line,
-  .hp-sea-shimmer__waves,
   .hp-pin-target,
   .hp-shimmer::after {
     animation: none;
-  }
-  .hp-marker-ripple {
-    display: none;
   }
 }
