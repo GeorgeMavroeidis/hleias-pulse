@@ -77,17 +77,7 @@ export const TAB_ITEMS: { id: NavTab; label: string; Icon: LucideIcon }[] = [
   { id: "routes", label: "Routes", Icon: RouteIcon },
   { id: "meet", label: "Meet", Icon: CalendarHeart },
 ];
-export const HP_EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
-export const HP_EASE_STANDARD: [number, number, number, number] = [0.2, 0.8, 0.2, 1];
-export const HP_TRANSITION = {
-  press: { duration: 0.08, ease: HP_EASE_STANDARD },
-  micro: { duration: 0.12, ease: HP_EASE_STANDARD },
-  state: { duration: 0.16, ease: HP_EASE_STANDARD },
-  panel: { duration: 0.24, ease: HP_EASE_OUT },
-  spatial: { duration: 0.32, ease: HP_EASE_OUT },
-  tab: { duration: 0.18, ease: HP_EASE_OUT },
-  sheetContent: { duration: 0.19, ease: HP_EASE_OUT },
-} as const;
+export { HP_EASE_OUT, HP_EASE_STANDARD, HP_TRANSITION } from "@/lib/hp/motion";
 export const MARKER_MOTION_OPTIONS: { id: MarkerMotion; label: string; description: string }[] = [
   { id: "pulse", label: "Pulse", description: "Restrained rings for recent community activity." },
   { id: "calm", label: "Calm", description: "The same Pulse identity, with slower motion." },

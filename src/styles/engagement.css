@@ -23,41 +23,6 @@
   }
 }
 
-/* Map: hotness heat glow rendered under live/hot clusters */
-.hp-marker-glow {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 0;
-  border-radius: 9999px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--glow-color, var(--hp-sunset)) 55%, transparent) 0%,
-    color-mix(in srgb, var(--glow-color, var(--hp-sunset)) 18%, transparent) 38%,
-    transparent 68%
-  );
-  animation: hp-glow-breathe 3.6s ease-in-out infinite;
-}
-@keyframes hp-glow-breathe {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  50% {
-    opacity: 0.9;
-    transform: translate(-50%, -50%) scale(1.12);
-  }
-}
-
-/* Tier A: a softer, slower breath than the tier B/C glow. */
-.hp-marker-glow--soft {
-  animation-duration: 5.4s;
-  opacity: 0.7;
-}
-
 /* Map: "you are here" pulsing dot */
 .hp-user-dot {
   position: relative;
@@ -97,37 +62,6 @@
 @keyframes hp-dash {
   to {
     stroke-dashoffset: -24;
-  }
-}
-
-/* Map: decorative animated sea shimmer (purely aesthetic — NOT real sea state).
-   The polygon is filled with an SVG <pattern> of drifting wavy lines. */
-.hp-real-map .hp-sea-shimmer {
-  fill: url(#hp-waves);
-  fill-opacity: 1;
-}
-.hp-sea-shimmer__tint {
-  fill: var(--hp-sea);
-  fill-opacity: 0.12;
-}
-.hp-sea-shimmer__waves {
-  stroke: var(--hp-sea);
-  animation: hp-sea-drift 7s linear infinite;
-}
-.hp-sea-shimmer__wave-a {
-  stroke-width: 1.4;
-  stroke-opacity: 0.5;
-}
-.hp-sea-shimmer__wave-b {
-  stroke-width: 1.1;
-  stroke-opacity: 0.3;
-}
-@keyframes hp-sea-drift {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-28px);
   }
 }
 

@@ -44,3 +44,10 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+.hp-image-reveal {
+  transition: opacity var(--hp-motion-content) var(--hp-ease-out);
+}
+.hp-image-loading {
+  background: color-mix(in srgb, var(--hp-ink) 6%, transparent);
+}

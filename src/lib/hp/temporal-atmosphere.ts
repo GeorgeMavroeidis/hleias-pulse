@@ -1,8 +1,9 @@
+import { HP_MOTION } from "./motion";
 import { getTimes } from "suncalc";
 import { MAP_POLICY } from "./map-policy";
 
 export const ILIA_TIME_ZONE = "Europe/Athens";
-export const ATMOSPHERE_TRANSITION_MS = 800;
+export const ATMOSPHERE_TRANSITION_MS = HP_MOTION.atmosphere;
 export type TemporalPeriod = "morning" | "afternoon" | "golden-hour" | "evening" | "late-night";
 export type AtmospherePaletteKey = "day" | "golden-hour" | "evening" | "late-night";
 export type TemporalAtmosphere = {

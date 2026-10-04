@@ -216,7 +216,8 @@ assert.ok(mapSource.includes("markerElement.tabIndex = visibleForInteraction ? 0
 assert.ok(mapSource.includes('keyEvent.key !== "Enter" && keyEvent.key !== " "'));
 assert.ok(mapSource.includes('"--hp-marker-lens-opacity-target"'));
 assert.ok(mapSource.includes('"--hp-marker-lens-scale-target"'));
-assert.ok(mapSource.includes("frame = requestAnimationFrame(() =>"));
+assert.ok(mapSource.includes("const viewportFrame = createMapFrame(() =>"));
+assert.ok(mapSource.includes("viewportFrame.dispose()"));
 assert.ok(mapSource.includes('map.on("moveend", schedule)'));
 assert.doesNotMatch(mapSource, /moving tonight|Hot around the coast/);
 assert.match(pulseCss, /@media \(prefers-reduced-motion: reduce\)/);

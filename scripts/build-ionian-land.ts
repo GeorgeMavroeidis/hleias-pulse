@@ -1,6 +1,6 @@
 /**
- * Regenerates `src/lib/hp/ionian-land.ts` — the baked land geometry the
- * decorative sea-shimmer punches out of the sea (see `src/lib/hp/sea-shimmer.ts`).
+ * Regenerates `src/lib/hp/ionian-land.ts` — the retained offline coastline dataset.
+ * The current MapLibre renderer uses provider geometry; this tool is not bundled.
  *
  *   download → clip → drop-islets → simplify → clean → round → bake
  *

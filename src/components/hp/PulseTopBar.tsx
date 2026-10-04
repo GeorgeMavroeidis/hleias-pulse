@@ -1,5 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Search, Check, Gift, Palette } from "lucide-react";
 import { type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
@@ -65,6 +65,7 @@ export function TopBar({
   onOpenDeals,
 }: TopBarProps) {
   const { language, t } = useI18n();
+  const reducedMotion = useReducedMotion();
   const searchActive = showSearch || query.trim().length > 0;
   const activeMarkerMotion =
     MARKER_MOTION_OPTIONS.find((theme) => theme.id === markerMotion) ?? MARKER_MOTION_OPTIONS[0];
@@ -174,7 +175,7 @@ export function TopBar({
             initial={{ opacity: 0, y: -4, scale: 0.99 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -3, scale: 0.99 }}
-            transition={HP_TRANSITION.state}
+            transition={reducedMotion ? { duration: 0 } : HP_TRANSITION.state}
             className="hp-appearance-menu"
           >
             <div className="hp-appearance-section">
@@ -247,7 +248,7 @@ export function TopBar({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={HP_TRANSITION.state}
+            transition={reducedMotion ? { duration: 0 } : HP_TRANSITION.state}
             className="hp-safe-px overflow-hidden"
           >
             <div className="hp-search-field mb-2 flex items-center gap-2 px-3 py-2">

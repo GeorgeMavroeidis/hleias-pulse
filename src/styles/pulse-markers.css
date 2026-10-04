@@ -34,7 +34,7 @@
   transform: scale(var(--hp-marker-lens-scale-target, 1));
   transform-origin: center;
   pointer-events: inherit;
-  transition: opacity 160ms ease-out;
+  transition: opacity var(--hp-motion-state) var(--hp-ease-standard);
 }
 .hp-pulse-shell > *,
 .hp-pulse-preview > * {
@@ -151,7 +151,7 @@
     [data-pulse-level="fading"]
   )
   .hp-pulse-selection-accent {
-  animation: hp-pulse-select 650ms ease-out 1;
+  animation: hp-pulse-select var(--hp-motion-selection) var(--hp-ease-out) 1;
 }
 @media (hover: hover) and (pointer: fine) {
   .hp-pulse-marker:not([aria-pressed="true"]):hover .hp-pulse-selection-ring {
@@ -317,5 +317,32 @@
   100% {
     opacity: 0;
     transform: scale(1.5);
+  }
+}
+
+/* Exiting markers remain only as a brief visual trace, never as controls. */
+.hp-pulse-marker.is-exiting {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity var(--hp-motion-state) var(--hp-ease-standard);
+}
+.hp-pulse-marker.is-exiting :is(.hp-pulse-ring, .hp-pulse-selection-accent) {
+  animation: none;
+  will-change: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hp-pulse-shell[data-pulse-level="emerging"] .hp-pulse-ring {
+    border-style: dashed;
+  }
+  .hp-pulse-shell[data-pulse-level="active"] .hp-pulse-ring {
+    border-width: 1.5px;
+  }
+  .hp-pulse-shell[data-pulse-level="lively"] .hp-pulse-ring {
+    border-style: double;
+    border-width: 3px;
+  }
+  .hp-pulse-shell[data-pulse-level="fading"] .hp-pulse-ring {
+    border-style: dotted;
   }
 }

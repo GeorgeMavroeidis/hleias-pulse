@@ -615,3 +615,34 @@
     min-height: 44px;
   }
 }
+
+.hp-map-location-status {
+  position: absolute;
+  left: 16px;
+  right: 76px;
+  bottom: calc(var(--hp-map-bottom-overlay-height) + 32px);
+  z-index: 20;
+  padding: 6px 8px;
+  border-radius: var(--hp-radius-sm, 8px);
+  background: var(--hp-paper);
+  color: var(--hp-ink);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.hp-bottom-nav-label {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  text-align: center;
+}
+@container (max-width: 18rem) {
+  .hp-bottom-nav {
+    padding-left: max(8px, env(safe-area-inset-left, 0px));
+    padding-right: max(8px, env(safe-area-inset-right, 0px));
+  }
+  .hp-bottom-nav-item {
+    padding-inline: 2px;
+  }
+}

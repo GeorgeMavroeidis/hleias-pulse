@@ -1,3 +1,11 @@
+import { createMapFrame } from "@/lib/hp/map-frame";
+import { HP_MOTION, HP_MAP_EASE } from "@/lib/hp/motion";
+import { createMarkerExits } from "@/lib/hp/marker-exit";
+import {
+  createMapLocationRequest,
+  LOCATION_MESSAGE,
+  type MapLocationStatus,
+} from "@/lib/hp/map-location";
 import type { MapSelection, MapCameraSnapshot } from "@/lib/hp/map-discovery-state";
 import type { SheetGeometry } from "@/lib/hp/sheet-geometry";
 import {
@@ -123,8 +131,8 @@ const OVERVIEW_ZOOM = MAP_POLICY.overviewZoom;
 const SPLIT_ZOOM = MAP_POLICY.regionFadeEnd;
 const PLACE_FOCUS_ZOOM = MAP_POLICY.placeFocusZoom;
 const RICH_VISUAL_ZOOM = MAP_POLICY.regionFocusMaxZoom;
-const MAP_PAN_DURATION = 0.28;
-const MAP_OVERVIEW_DURATION = 0.34;
+const MAP_PAN_DURATION = HP_MOTION.pan / 1000;
+const MAP_OVERVIEW_DURATION = HP_MOTION.overview / 1000;
 const MAP_FOCUS_DURATION = MAP_POLICY.focusDurationMs / 1000;
 const MIN_UTILITY_RAIL_HEIGHT = 248;
 const MIN_MAP_CHROME_HEIGHT = 188;
@@ -370,6 +378,7 @@ export function SocialMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const maplibreModuleRef = useRef<typeof import("maplibre-gl") | null>(null);
   const markersRef = useRef<Map<string, MapLibreMarker>>(new Map());
+  const markerExits = useMemo(() => createMarkerExits(), []);
   const markerRuntimeRef = useRef<Map<string, MarkerRuntimeState>>(new Map());
   const renderNodesRef = useRef<Map<string, RenderNode>>(new Map());
   const scheduleMarkerViewportSyncRef = useRef<() => void>(() => {});
@@ -408,6 +417,7 @@ export function SocialMap({
   const ignoreBackgroundClickUntilRef = useRef(0);
   const lastZoomRef = useRef<number>(OVERVIEW_ZOOM);
   const [mapReady, setMapReady] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<MapLocationStatus>("idle");
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number>(OVERVIEW_ZOOM);
   const [attributionExpanded, setAttributionExpanded] = useState(true);
@@ -684,6 +694,7 @@ export function SocialMap({
       region.bounds[0][1] === region.bounds[1][1]
     ) {
       map.easeTo({
+        easing: HP_MAP_EASE,
         center: [region.anchor.lng, region.anchor.lat],
         zoom: MAP_POLICY.regionFocusMaxZoom,
         offset: [
@@ -695,10 +706,17 @@ export function SocialMap({
     } else {
       const camera = map.cameraForBounds(region.bounds, {
         maxZoom: MAP_POLICY.regionFocusMaxZoom,
+        bearing: map.getBearing(),
         padding,
       });
       if (camera)
-        map.easeTo({ ...camera, duration: reduceMotion ? 0 : MAP_POLICY.focusDurationMs });
+        map.easeTo({
+          easing: HP_MAP_EASE,
+          ...camera,
+          bearing: map.getBearing(),
+          pitch: map.getPitch(),
+          duration: reduceMotion ? 0 : MAP_POLICY.focusDurationMs,
+        });
     }
   }, []);
 
@@ -727,9 +745,10 @@ export function SocialMap({
       const reduceMotion = prefersReducedMapMotion();
       userNavigatedRef.current = false;
       map.stop();
-      selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
+      selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : HP_MOTION.focus + 40);
       if (reduceMotion) {
         map.easeTo({
+          easing: HP_MAP_EASE,
           center: [node.latLng[1], node.latLng[0]],
           zoom: targetZoom,
           offset,
@@ -737,6 +756,7 @@ export function SocialMap({
         });
       } else {
         map.flyTo({
+          easing: HP_MAP_EASE,
           center: [node.latLng[1], node.latLng[0]],
           zoom: targetZoom,
           offset,
@@ -757,6 +777,7 @@ export function SocialMap({
       map.jumpTo({ center: [ILIA_CENTER[1], ILIA_CENTER[0]], zoom: OVERVIEW_ZOOM });
     } else {
       map.flyTo({
+        easing: HP_MAP_EASE,
         center: [ILIA_CENTER[1], ILIA_CENTER[0]],
         zoom: OVERVIEW_ZOOM,
         duration: MAP_OVERVIEW_DURATION * 1000,
@@ -818,6 +839,7 @@ export function SocialMap({
     let map: MapLibreMap | null = null;
     let zoomFrame: number | null = null;
     let effectsResumeFrame: number | null = null;
+    let resizeTimer: number | undefined;
     const basemapAbortController = new AbortController();
     const activeMapMotion = new Set<"move" | "zoom">();
     const cleanupFns: Array<() => void> = [];
@@ -1025,7 +1047,9 @@ export function SocialMap({
           setZoom(readyZoom);
           setMapReady(true);
           setMapLoadError(null);
-          window.setTimeout(() => map?.resize(), 0);
+          resizeTimer = window.setTimeout(() => {
+            if (!cancelled) map?.resize();
+          }, 0);
         });
       })
       .catch((error: unknown) => {
@@ -1038,6 +1062,8 @@ export function SocialMap({
     return () => {
       cancelled = true;
       basemapAbortController.abort();
+      window.clearTimeout(resizeTimer);
+      markerExits.flush();
       if (zoomFrame !== null) {
         window.cancelAnimationFrame(zoomFrame);
       }
@@ -1057,7 +1083,7 @@ export function SocialMap({
       maplibreModuleRef.current = null;
       userMarkerRef.current = null;
     };
-  }, []);
+  }, [markerExits]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1066,122 +1092,122 @@ export function SocialMap({
     const apply = () => {
       const palette = ATMOSPHERE_MAP_PALETTES[atmospherePalette];
       const duration = preference.matches ? 0 : ATMOSPHERE_TRANSITION_MS;
+      if (preference.matches) {
+        map.stop();
+        markerExits.flush();
+      }
       applyMapPalette(map, palette, duration);
       applyRegionalMapPalette(map, palette, duration);
     };
     apply();
     preference.addEventListener("change", apply);
     return () => preference.removeEventListener("change", apply);
-  }, [atmospherePalette, mapReady]);
+  }, [atmospherePalette, mapReady, markerExits]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!mapReady || !map) return;
-    let frame: number | null = null;
-    const schedule = () => {
-      if (frame !== null) return;
-      frame = requestAnimationFrame(() => {
-        frame = null;
-        // The settle event schedules a fresh pass; do not re-grid each zoom frame.
-        if (mapNodeRef.current?.classList.contains("hp-map-is-moving")) return;
-        const size = { x: map.getCanvas().clientWidth, y: map.getCanvas().clientHeight };
-        const height = Math.max(
-          0,
-          Math.min(size.y - bottomOverlayHeightRef.current, availableMapHeightRef.current),
-        );
-        const nodes = [...renderNodesRef.current.values()].map((node) => {
-          const point = map.project([node.latLng[1], node.latLng[0]]);
-          return {
-            id: node.id,
-            x: point.x,
-            y: point.y,
-            opacity: node.opacity,
-            level: node.kind === "child" ? node.pulse.level : null,
-            score: node.kind === "child" ? node.pulse.score : 0,
-            selected: node.selected,
-            label:
-              node.kind === "child"
-                ? node.place.name
-                : node.selected
-                  ? node.dominantCluster.name
-                  : undefined,
-            prominence: node.prominence.score,
-            labelOffset: node.kind === "child" ? 17 : 27,
-            labelScale: node.prominence.scaleFactor,
-          };
-        });
-        const density = markerViewportDensity(nodes, size.x, height);
-        const shownLabels = markerLabelVisibility(nodes, size.x, height, map.getZoom());
-        mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
-        markersRef.current.forEach((marker, id) => {
-          const shell = marker.getElement()?.firstElementChild as HTMLElement | null;
-          if (!shell) return;
-          shell.classList.toggle("is-viewport-paused", document.hidden || !density.visible.has(id));
-          shell.classList.toggle("is-marker-dense", density.dense.has(id));
-          shell.classList.toggle("is-motion-suppressed", density.suppressed.has(id));
-          shell.classList.toggle("has-visible-label", shownLabels.has(id));
-        });
-        if (sheetMotionRef.current) return;
-        const center = map.getCenter();
-        const rawBounds = map.getBounds();
-        const bounds: MapBounds = [
-          [rawBounds.getWest(), rawBounds.getSouth()],
-          [rawBounds.getEast(), rawBounds.getNorth()],
-        ];
-        const container = mapNodeRef.current;
-        if (!container) return;
-        const rect = safeMapRect(
-          container,
-          bottomOverlayHeightRef.current,
-          availableMapHeightRef.current,
-          0,
-        );
-        const symbolIds =
-          map.getZoom() < MAP_POLICY.regionFadeEnd && map.getLayer(REGION_LAYER_ID)
-            ? [
-                ...new Set(
-                  map
-                    .queryRenderedFeatures(
-                      [
-                        [rect.left, rect.top],
-                        [rect.right, rect.bottom],
-                      ],
-                      { layers: [REGION_LAYER_ID] },
-                    )
-                    .map((feature) => String(feature.properties.regionId)),
-                ),
-              ].sort()
-            : [];
-        setVisibleRegionSymbolIds((previous) =>
-          previous.join("|") === symbolIds.join("|") ? previous : symbolIds,
-        );
-        const { bounds: usableBounds, places: visiblePlaces } = visibleScreenMembers(
-          rect,
-          { unproject: (point) => map.unproject(point), project: (point) => map.project(point) },
-          (bounds) =>
-            availableMapHeightRef.current > 0 ? placeTopologyRef.current.visiblePlaces(bounds) : [],
-        );
-        const contextualIds = new Set(regionsRef.current.flatMap((row) => row.contextualPlaceIds));
-        const viewport = discoveryViewport(
-          { lat: center.lat, lng: center.lng },
-          map.getZoom(),
-          bounds,
-          usableBounds,
-          visiblePlaces,
-          contextualIds,
-          { bearing: map.getBearing(), pitch: map.getPitch() },
-        );
-        const signature = viewportSignature(viewport);
-        if (signature !== lastDiscoveryViewportRef.current) {
-          lastDiscoveryViewportRef.current = signature;
-          setSettledBounds((previous) =>
-            JSON.stringify(previous) === JSON.stringify(bounds) ? previous : bounds,
-          );
-          setSettledViewport(viewport);
-          onDiscoveryViewportChangeRef.current?.(viewport);
-        }
+    const viewportFrame = createMapFrame(() => {
+      // The settle event schedules a fresh pass; do not re-grid each zoom frame.
+      if (mapNodeRef.current?.classList.contains("hp-map-is-moving")) return;
+      const size = { x: map.getCanvas().clientWidth, y: map.getCanvas().clientHeight };
+      const height = Math.max(
+        0,
+        Math.min(size.y - bottomOverlayHeightRef.current, availableMapHeightRef.current),
+      );
+      const nodes = [...renderNodesRef.current.values()].map((node) => {
+        const point = map.project([node.latLng[1], node.latLng[0]]);
+        return {
+          id: node.id,
+          x: point.x,
+          y: point.y,
+          opacity: node.opacity,
+          level: node.kind === "child" ? node.pulse.level : null,
+          score: node.kind === "child" ? node.pulse.score : 0,
+          selected: node.selected,
+          label:
+            node.kind === "child"
+              ? node.place.name
+              : node.selected
+                ? node.dominantCluster.name
+                : undefined,
+          prominence: node.prominence.score,
+          labelOffset: node.kind === "child" ? 17 : 27,
+          labelScale: node.prominence.scaleFactor,
+        };
       });
-    };
+      const density = markerViewportDensity(nodes, size.x, height);
+      const shownLabels = markerLabelVisibility(nodes, size.x, height, map.getZoom());
+      mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
+      markersRef.current.forEach((marker, id) => {
+        const shell = marker.getElement()?.firstElementChild as HTMLElement | null;
+        if (!shell) return;
+        shell.classList.toggle("is-viewport-paused", document.hidden || !density.visible.has(id));
+        shell.classList.toggle("is-marker-dense", density.dense.has(id));
+        shell.classList.toggle("is-motion-suppressed", density.suppressed.has(id));
+        shell.classList.toggle("has-visible-label", shownLabels.has(id));
+      });
+      if (sheetMotionRef.current) return;
+      const center = map.getCenter();
+      const rawBounds = map.getBounds();
+      const bounds: MapBounds = [
+        [rawBounds.getWest(), rawBounds.getSouth()],
+        [rawBounds.getEast(), rawBounds.getNorth()],
+      ];
+      const container = mapNodeRef.current;
+      if (!container) return;
+      const rect = safeMapRect(
+        container,
+        bottomOverlayHeightRef.current,
+        availableMapHeightRef.current,
+        0,
+      );
+      const symbolIds =
+        map.getZoom() < MAP_POLICY.regionFadeEnd && map.getLayer(REGION_LAYER_ID)
+          ? [
+              ...new Set(
+                map
+                  .queryRenderedFeatures(
+                    [
+                      [rect.left, rect.top],
+                      [rect.right, rect.bottom],
+                    ],
+                    { layers: [REGION_LAYER_ID] },
+                  )
+                  .map((feature) => String(feature.properties.regionId)),
+              ),
+            ].sort()
+          : [];
+      setVisibleRegionSymbolIds((previous) =>
+        previous.join("|") === symbolIds.join("|") ? previous : symbolIds,
+      );
+      const { bounds: usableBounds, places: visiblePlaces } = visibleScreenMembers(
+        rect,
+        { unproject: (point) => map.unproject(point), project: (point) => map.project(point) },
+        (bounds) =>
+          availableMapHeightRef.current > 0 ? placeTopologyRef.current.visiblePlaces(bounds) : [],
+      );
+      const contextualIds = new Set(regionsRef.current.flatMap((row) => row.contextualPlaceIds));
+      const viewport = discoveryViewport(
+        { lat: center.lat, lng: center.lng },
+        map.getZoom(),
+        bounds,
+        usableBounds,
+        visiblePlaces,
+        contextualIds,
+        { bearing: map.getBearing(), pitch: map.getPitch() },
+      );
+      const signature = viewportSignature(viewport);
+      if (signature !== lastDiscoveryViewportRef.current) {
+        lastDiscoveryViewportRef.current = signature;
+        setSettledBounds((previous) =>
+          JSON.stringify(previous) === JSON.stringify(bounds) ? previous : bounds,
+        );
+        setSettledViewport(viewport);
+        onDiscoveryViewportChangeRef.current?.(viewport);
+      }
+    });
+    const schedule = viewportFrame.schedule;
     const onVisibilityChange = () => {
       // A hidden document may suspend rAF, so pause its animations immediately.
       mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
@@ -1196,6 +1222,7 @@ export function SocialMap({
     schedule();
     return () => {
       scheduleMarkerViewportSyncRef.current = () => {};
+      viewportFrame.dispose();
       map.off("moveend", schedule);
       map.off("zoomend", schedule);
       map.off("resize", schedule);
@@ -1224,9 +1251,24 @@ export function SocialMap({
     const nodeIds = new Set(renderNodes.map((node) => node.id));
     markersRef.current.forEach((marker, id) => {
       if (nodeIds.has(id)) return;
-      marker.remove();
-      markersRef.current.delete(id);
-      markerRuntimeRef.current.delete(id);
+      const remove = () => {
+        marker.remove();
+        markersRef.current.delete(id);
+        markerRuntimeRef.current.delete(id);
+      };
+      const element = marker.getElement();
+      if (element.contains(document.activeElement)) map.getCanvas().focus({ preventScroll: true });
+      if (prefersReducedMapMotion() || document.hidden) {
+        markerExits.cancel(id);
+        remove();
+        return;
+      }
+      if (markerExits.has(id)) return;
+      element.inert = true;
+      element.tabIndex = -1;
+      element.setAttribute("aria-hidden", "true");
+      element.classList.add("is-exiting");
+      markerExits.start(id, remove);
     });
 
     renderNodes.forEach((node) => {
@@ -1245,7 +1287,12 @@ export function SocialMap({
           .addTo(map);
         markersRef.current.set(node.id, marker);
       }
-      const previousRuntime = markerRuntimeRef.current.get(node.id);
+      const reappeared = markerExits.cancel(node.id);
+      if (reappeared) {
+        marker.getElement().classList.remove("is-exiting");
+        marker.getElement().inert = false;
+      }
+      const previousRuntime = reappeared ? undefined : markerRuntimeRef.current.get(node.id);
       updatePulseIcon(marker.getElement(), node, hasStory, t);
       const visuallyVisible = node.opacity > 0.08;
       const visibleForInteraction = visuallyVisible;
@@ -1338,7 +1385,7 @@ export function SocialMap({
       });
     });
     scheduleMarkerViewportSyncRef.current();
-  }, [mapReady, renderNodes, storyPlaceIds, zoom, t]);
+  }, [mapReady, renderNodes, storyPlaceIds, zoom, t, markerExits]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1375,20 +1422,22 @@ export function SocialMap({
     if (currentZoom >= RICH_VISUAL_ZOOM) {
       const delta = panDeltaIntoSafeRect(currentPoint, viewport);
       if (delta.x === 0 && delta.y === 0) return;
-      selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 320);
+      selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : HP_MOTION.pan + 40);
       map.panBy([delta.x, delta.y], {
+        easing: HP_MAP_EASE,
         duration: reduceMotion ? 0 : MAP_PAN_DURATION * 1000,
       });
       return;
     }
 
-    selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : 420);
+    selectionMotionUntilRef.current = Date.now() + (reduceMotion ? 0 : HP_MOTION.focus + 40);
     const focusOffset: [number, number] = [
       (viewport.left + viewport.right - container.clientWidth) / 2,
       (viewport.top + viewport.bottom - container.clientHeight) / 2,
     ];
     if (reduceMotion) {
       map.easeTo({
+        easing: HP_MAP_EASE,
         center: [latLng[1], latLng[0]],
         zoom: PLACE_FOCUS_ZOOM,
         offset: focusOffset,
@@ -1396,6 +1445,7 @@ export function SocialMap({
       });
     } else {
       map.flyTo({
+        easing: HP_MAP_EASE,
         center: [latLng[1], latLng[0]],
         zoom: PLACE_FOCUS_ZOOM,
         offset: focusOffset,
@@ -1539,6 +1589,7 @@ export function SocialMap({
     ];
     if (!regions.length) return;
     map.fitBounds(bounds, {
+      easing: HP_MAP_EASE,
       duration: prefersReducedMapMotion() ? 0 : MAP_OVERVIEW_DURATION * 1000,
       maxZoom: OVERVIEW_ZOOM,
       padding: { left: 52, top: 108, right: 52, bottom: 210 },
@@ -1640,7 +1691,12 @@ export function SocialMap({
           padding: { left: 48, top: 116, right: 48, bottom: routeBottomPadding },
         },
       );
-      if (camera) map.easeTo({ ...camera, duration: reduceMotion ? 0 : MAP_FOCUS_DURATION * 1000 });
+      if (camera)
+        map.easeTo({
+          easing: HP_MAP_EASE,
+          ...camera,
+          duration: reduceMotion ? 0 : MAP_FOCUS_DURATION * 1000,
+        });
     }
 
     return () => {
@@ -1667,15 +1723,17 @@ export function SocialMap({
   const zoomOut = () => {
     userNavigatedRef.current = true;
     selectionMotionUntilRef.current = 0;
-    mapRef.current?.stop().zoomOut();
+    mapRef.current
+      ?.stop()
+      .zoomOut({ easing: HP_MAP_EASE, duration: prefersReducedMapMotion() ? 0 : HP_MOTION.pan });
   };
 
-  const locateUser = () => {
-    const map = mapRef.current;
-    const maplibre = maplibreModuleRef.current;
-    if (!map || !maplibre || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
+  const locationRequest = useMemo(
+    () =>
+      createMapLocationRequest(setLocationStatus, ({ coords }) => {
+        const map = mapRef.current;
+        const maplibre = maplibreModuleRef.current;
+        if (!map || !maplibre) return;
         const lngLat: [number, number] = [coords.longitude, coords.latitude];
         if (userMarkerRef.current) userMarkerRef.current.setLngLat(lngLat);
         else {
@@ -1687,16 +1745,20 @@ export function SocialMap({
             .setLngLat(lngLat)
             .addTo(map);
         }
-        map.flyTo({
+        userNavigatedRef.current = true;
+        selectionMotionUntilRef.current = 0;
+        map.stop().easeTo({
+          easing: HP_MAP_EASE,
           center: lngLat,
           zoom: Math.max(map.getZoom(), 15),
-          duration: 650,
-          essential: true,
+          duration: prefersReducedMapMotion() ? 0 : HP_MOTION.focus,
         });
-      },
-      (error) => console.warn("Could not locate the device.", error),
-      { enableHighAccuracy: true, maximumAge: 30000, timeout: 12000 },
-    );
+      }),
+    [],
+  );
+  useEffect(() => () => locationRequest.cancel(), [locationRequest]);
+  const locateUser = () => {
+    if (mapReady) locationRequest.start(navigator.geolocation);
   };
 
   useEffect(() => {
@@ -1741,7 +1803,7 @@ export function SocialMap({
           className="absolute inset-0 z-40 grid place-items-center bg-hp-paper/94 p-6 text-center text-sm text-hp-ink/70"
         >
           <div>
-            <p>{mapLoadError}</p>
+            <p>{t("The map could not be loaded. Try again.")}</p>
             <button
               type="button"
               className="mt-3 rounded-full bg-hp-ink px-4 py-2 font-bold text-hp-paper"
@@ -1758,6 +1820,20 @@ export function SocialMap({
           </div>
         </div>
       ) : null}
+
+      <div
+        id="hp-map-location-status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={
+          locationStatus === "idle" || locationStatus === "found"
+            ? "sr-only"
+            : "hp-map-location-status"
+        }
+      >
+        {locationStatus !== "idle" ? t(LOCATION_MESSAGE[locationStatus]) : ""}
+      </div>
 
       {mapReady && (
         <div className="hp-map-attribution" data-expanded={attributionExpanded ? "true" : "false"}>
@@ -1850,7 +1926,14 @@ export function SocialMap({
             variant="hpMap"
             size="hpIcon"
             type="button"
-            onClick={() => mapRef.current?.zoomIn()}
+            onClick={() => {
+              userNavigatedRef.current = true;
+              selectionMotionUntilRef.current = 0;
+              mapRef.current?.stop().zoomIn({
+                easing: HP_MAP_EASE,
+                duration: prefersReducedMapMotion() ? 0 : HP_MOTION.pan,
+              });
+            }}
             disabled={!mapReady || zoom >= MAX_ZOOM}
             tabIndex={utilityRailHidden ? -1 : undefined}
             aria-label={t("Zoom in map")}
@@ -1875,7 +1958,9 @@ export function SocialMap({
             size="hpIcon"
             type="button"
             onClick={locateUser}
-            disabled={!mapReady}
+            disabled={!mapReady || locationStatus === "pending"}
+            aria-busy={locationStatus === "pending"}
+            aria-describedby={locationStatus !== "idle" ? "hp-map-location-status" : undefined}
             tabIndex={utilityRailHidden ? -1 : undefined}
             aria-label={t("Find my location")}
           >

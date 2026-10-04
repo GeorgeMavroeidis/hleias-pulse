@@ -127,3 +127,18 @@
     font-size: var(--hp-type-meta);
   }
 }
+
+/* At enlarged text sizes, reserve space for the map instead of the tagline.
+   The text-relative query leaves ordinary 320px layouts unchanged. */
+@container (max-width: 18rem) {
+  .hp-topbar-subtitle {
+    display: none;
+  }
+  .hp-topbar-row {
+    gap: 4px;
+    padding-top: 4px;
+  }
+  .hp-topbar-actions {
+    gap: 0;
+  }
+}
