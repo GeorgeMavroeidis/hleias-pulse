@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { typeColor, type Place } from "@/lib/hp-model";
 import { type PulseData } from "@/lib/hp-api";
+import type { PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
 import { type MapAreaCluster } from "./SocialMap";
@@ -61,6 +62,8 @@ export function MapBottomSheet({
   onOpenDiscoverySuggestion,
   onClearLens,
   onClearSearch,
+  previewMode = false,
+  previewActivitySnapshot,
 }: {
   cluster: MapAreaCluster | null;
   selectedPlace: Place | null;
@@ -86,6 +89,8 @@ export function MapBottomSheet({
   onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
   onClearLens: () => void;
   onClearSearch: () => void;
+  previewMode?: boolean;
+  previewActivitySnapshot?: PulseActivitySnapshot;
 }) {
   const { t } = useI18n();
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
@@ -273,6 +278,8 @@ export function MapBottomSheet({
                 onOpenDiscoverySuggestion={onOpenDiscoverySuggestion}
                 activeLens={activeLens}
                 onClearLens={onClearLens}
+                previewMode={previewMode}
+                previewActivitySnapshot={previewActivitySnapshot}
               />
             ) : (
               <TonightPulseContent
@@ -416,6 +423,8 @@ function AreaSheetContent({
   onOpenDiscoverySuggestion,
   activeLens,
   onClearLens,
+  previewMode,
+  previewActivitySnapshot,
 }: {
   cluster: MapAreaCluster;
   selectedPlace: Place | null;
@@ -434,6 +443,8 @@ function AreaSheetContent({
   onOpenDiscoverySuggestion: (cluster: MapAreaCluster) => void;
   activeLens: DiscoveryLens | null;
   onClearLens: () => void;
+  previewMode: boolean;
+  previewActivitySnapshot?: PulseActivitySnapshot;
 }) {
   const { language, t } = useI18n();
   const placeIds = new Set(cluster.places.map((place) => place.id));
@@ -502,7 +513,14 @@ function AreaSheetContent({
               </span>
               <span className="inline-flex items-center gap-0.5">
                 <Clock size={11} />
-                {cluster.eventCount} {language === "GR" ? "εκδηλώσεις" : "events"}
+                {cluster.eventCount}{" "}
+                {previewMode
+                  ? language === "GR"
+                    ? "συναντήσεις"
+                    : "Meet"
+                  : language === "GR"
+                    ? "εκδηλώσεις"
+                    : "events"}
               </span>
             </div>
           </div>
@@ -624,11 +642,22 @@ function AreaSheetContent({
           <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
             <span className="inline-flex items-center gap-0.5">
               <Radio size={11} />
-              {focusPlace.recentPostCount} {language === "GR" ? "δημοσιεύσεις" : "posts"}
+              {previewActivitySnapshot?.[focusPlace.id]?.postCount ??
+                focusPlace.recentPostCount}{" "}
+              {language === "GR" ? "δημοσιεύσεις" : "posts"}
             </span>
             <span className="inline-flex items-center gap-0.5">
               <Clock size={11} />
-              {placeEvents.length} {language === "GR" ? "εκδηλώσεις" : "events"}
+              {previewMode
+                ? (previewActivitySnapshot?.[focusPlace.id]?.eventCount ?? placeEvents.length)
+                : placeEvents.length}{" "}
+              {previewMode
+                ? language === "GR"
+                  ? "συναντήσεις"
+                  : "Meet"
+                : language === "GR"
+                  ? "εκδηλώσεις"
+                  : "events"}
             </span>
           </div>
         </div>
@@ -668,23 +697,27 @@ function AreaSheetContent({
         >
           {language === "GR" ? "Λεπτομέρειες" : "Details"}
         </button>
-        <a
-          href={openStreetMapUrl(focusPlace)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t("Open {place} in OpenStreetMap", { place: focusPlace.name })}
-          className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-        >
-          <ExternalLink size={13} />
-        </a>
-        <button
-          type="button"
-          onClick={() => onSharePlace(focusPlace)}
-          aria-label={t("Share {place}", { place: focusPlace.name })}
-          className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-        >
-          <Share2 size={13} />
-        </button>
+        {!previewMode && (
+          <>
+            <a
+              href={openStreetMapUrl(focusPlace)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t("Open {place} in OpenStreetMap", { place: focusPlace.name })}
+              className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+            >
+              <ExternalLink size={13} />
+            </a>
+            <button
+              type="button"
+              onClick={() => onSharePlace(focusPlace)}
+              aria-label={t("Share {place}", { place: focusPlace.name })}
+              className="grid h-9 w-9 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+            >
+              <Share2 size={13} />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

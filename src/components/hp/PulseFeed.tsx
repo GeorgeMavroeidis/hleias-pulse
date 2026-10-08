@@ -49,6 +49,7 @@ export function PulseFeed({
   findPlace,
   findAuthor,
   findPostAuthor,
+  previewMode = false,
 }: {
   posts: Post[];
   storyGroups: PlaceStoryGroup[];
@@ -68,11 +69,15 @@ export function PulseFeed({
   findPlace: (id: string) => Place | undefined;
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
+  /** Keep moderation and external sharing actions out of the local simulation. */
+  previewMode?: boolean;
 }) {
   const { t } = useI18n();
   const moderation = useModeration();
-  const [filter, setFilter] = useState("Now");
-  const filters = ["Now", "Tonight", "Weekend", "Local tips"];
+  const [filter, setFilter] = useState(previewMode ? "All" : "Now");
+  const filters = previewMode
+    ? ["All", "Now", "Tonight", "Weekend", "Local tips"]
+    : ["Now", "Tonight", "Weekend", "Local tips"];
   const visiblePosts = posts.filter((post) => {
     const place = findPlace(post.placeId);
     const author = findPostAuthor(post);
@@ -133,6 +138,7 @@ export function PulseFeed({
           index={0}
           onOpen={(place) => onOpenMap(place.id)}
           onGoing={onTrendingGoing}
+          previewMode={previewMode}
         />
       )}
 
@@ -194,16 +200,18 @@ export function PulseFeed({
                 >
                   <Bookmark size={16} fill={sv ? "currentColor" : "none"} />
                 </button>
-                <ContentMenu
-                  target={{
-                    type: "post",
-                    id: post.id,
-                    authorUserId: post.userId,
-                    authorName: a.name,
-                    authorAvatarUrl: a.avatarUrl,
-                    summary: post.text,
-                  }}
-                />
+                {!previewMode && (
+                  <ContentMenu
+                    target={{
+                      type: "post",
+                      id: post.id,
+                      authorUserId: post.userId,
+                      authorName: a.name,
+                      authorAvatarUrl: a.avatarUrl,
+                      summary: post.text,
+                    }}
+                  />
+                )}
               </div>
 
               <button
@@ -260,14 +268,16 @@ export function PulseFeed({
                           })
                       : commentCount}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onShare(post)}
-                    aria-label={t("Share post")}
-                    className="inline-flex items-center"
-                  >
-                    <Share2 size={15} className="text-hp-ink/50" />
-                  </button>
+                  {!previewMode && (
+                    <button
+                      type="button"
+                      onClick={() => onShare(post)}
+                      aria-label={t("Share post")}
+                      className="inline-flex items-center"
+                    >
+                      <Share2 size={15} className="text-hp-ink/50" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => onOpenMap(p.id)}

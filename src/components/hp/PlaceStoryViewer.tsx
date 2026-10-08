@@ -33,6 +33,7 @@ interface Props {
   onShare: (story: PlaceStory, group: PlaceStoryGroup) => void;
   onToggleSave?: (placeId: string) => void;
   savedPlaceIds?: string[];
+  previewMode?: boolean;
 }
 
 const HOLD_TO_PAUSE_MS = 320;
@@ -239,6 +240,7 @@ export function PlaceStoryViewer({
   onShare,
   onToggleSave,
   savedPlaceIds = [],
+  previewMode = false,
 }: Props) {
   const { language, t } = useI18n();
   const reducedMotion = useReducedMotion();
@@ -638,28 +640,32 @@ export function PlaceStoryViewer({
                       <Bookmark size={15} fill={saved ? "currentColor" : "none"} />
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => onShare(story, group)}
-                    aria-label={language === "GR" ? "Κοινοποίηση story" : "Share story"}
-                    className="grid h-10 w-10 place-items-center rounded-full border border-white/30 text-white backdrop-blur-sm"
-                  >
-                    <Share2 size={15} />
-                  </button>
-                  <ContentMenu
-                    tone="light"
-                    placement="above"
-                    onOpenChange={setMenuOpen}
-                    className="[&>button]:h-10 [&>button]:w-10"
-                    target={{
-                      type: "story",
-                      id: story.id,
-                      authorUserId: story.userId,
-                      authorName: story.authorName,
-                      authorAvatarUrl: story.authorAvatarUrl,
-                      summary: story.caption || group.placeName,
-                    }}
-                  />
+                  {!previewMode && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onShare(story, group)}
+                        aria-label={language === "GR" ? "Κοινοποίηση story" : "Share story"}
+                        className="grid h-10 w-10 place-items-center rounded-full border border-white/30 text-white backdrop-blur-sm"
+                      >
+                        <Share2 size={15} />
+                      </button>
+                      <ContentMenu
+                        tone="light"
+                        placement="above"
+                        onOpenChange={setMenuOpen}
+                        className="[&>button]:h-10 [&>button]:w-10"
+                        target={{
+                          type: "story",
+                          id: story.id,
+                          authorUserId: story.userId,
+                          authorName: story.authorName,
+                          authorAvatarUrl: story.authorAvatarUrl,
+                          summary: story.caption || group.placeName,
+                        }}
+                      />
+                    </>
+                  )}
                 </div>
                 <p className="mt-2 text-center text-[9px] font-medium text-white/40">
                   {language === "GR"
