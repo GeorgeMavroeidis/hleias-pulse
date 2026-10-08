@@ -16,6 +16,7 @@ import {
 } from "@/lib/hp/map-core";
 import { useImageUrls } from "@/lib/hp/image-cache";
 import { SEA_SHIMMER_LATLNGS, SEA_SHIMMER_MAX_ZOOM } from "@/lib/hp/sea-shimmer";
+import { IONIAN_LAND_POLYGONS } from "@/lib/hp/ionian-land";
 import {
   areaDefinitionForId,
   areaIdForPlace,
@@ -62,6 +63,87 @@ async function loadBoundaryFreeBasemap(signal: AbortSignal): Promise<StyleSpecif
   return removeAdministrativeBoundaries((await response.json()) as StyleSpecification);
 }
 
+/** A source-free style avoids worker-backed tile/GeoJSON loading in the local preview. */
+function localPreviewBasemapStyle(): StyleSpecification {
+  return {
+    version: 8,
+    name: "Ilia local preview",
+    sources: {},
+    layers: [
+      {
+        id: "hp-preview-sea",
+        type: "background",
+        paint: { "background-color": "#b9dce4" },
+      },
+    ],
+  };
+}
+
+/**
+ * Project the bundled Natural Earth coast into an SVG above the preview canvas.
+ * MapLibre's GeoJSON worker is unavailable in some embedded browsers, but its
+ * map projection and DOM markers still work there. This layer uses neither a
+ * worker nor a network request and stays aligned during pan and zoom.
+ */
+function attachLocalPreviewLand(map: MapLibreMap): () => void {
+  const namespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("aria-hidden", "true");
+  svg.style.position = "absolute";
+  svg.style.inset = "0";
+  svg.style.width = "100%";
+  svg.style.height = "100%";
+  svg.style.zIndex = "1";
+  svg.style.pointerEvents = "none";
+  const paths = IONIAN_LAND_POLYGONS.map(() => {
+    const path = document.createElementNS(namespace, "path");
+    path.setAttribute("fill", "#eee7d8");
+    path.setAttribute("stroke", "#b6b89c");
+    path.setAttribute("stroke-width", "1.2");
+    path.setAttribute("stroke-linejoin", "round");
+    path.setAttribute("fill-rule", "evenodd");
+    svg.append(path);
+    return path;
+  });
+  map.getCanvasContainer().append(svg);
+
+  let frame: number | null = null;
+  const draw = () => {
+    frame = null;
+    const width = map.getContainer().clientWidth;
+    const height = map.getContainer().clientHeight;
+    if (width <= 0 || height <= 0) return;
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    IONIAN_LAND_POLYGONS.forEach((polygon, index) => {
+      const d = polygon
+        .map(
+          (ring) =>
+            ring
+              .map(([lng, lat], pointIndex) => {
+                const point = map.project([lng, lat]);
+                return `${pointIndex === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+              })
+              .join(" ") + " Z",
+        )
+        .join(" ");
+      paths[index].setAttribute("d", d);
+    });
+  };
+  const scheduleDraw = () => {
+    if (frame !== null) return;
+    frame = window.requestAnimationFrame(draw);
+  };
+  map.on("move", scheduleDraw);
+  map.on("resize", scheduleDraw);
+  scheduleDraw();
+  return () => {
+    map.off("move", scheduleDraw);
+    map.off("resize", scheduleDraw);
+    if (frame !== null) window.cancelAnimationFrame(frame);
+    svg.remove();
+  };
+}
+
 type LatLngTuple = [number, number];
 type InteractiveMarkerElement = HTMLElement & {
   __hpClickHandler?: EventListener;
@@ -81,6 +163,8 @@ type MarkerRuntimeState = {
 };
 
 const ILIA_CENTER: LatLngTuple = [37.68, 21.52];
+const PREVIEW_CENTER: LatLngTuple = [37.72, 21.38];
+const PREVIEW_OVERVIEW_ZOOM = 8.6;
 // Generous pan bounds: maxBounds only keeps users roughly around Ilia. It must
 // never wall in a zoomed region (South Coast ~37.41 used to hit the south edge
 // at 37.3 and feel "locked"). Low viscosity so panning always feels free.
@@ -824,6 +908,8 @@ interface Props {
   } | null;
   /** Fired on map long-press so the shell can open the composer pre-filled. */
   onMapLongPress?: (lat: number, lng: number) => void;
+  /** Hides device-only controls while rendering the isolated local traffic preview. */
+  previewMode?: boolean;
 }
 
 export type MapDiscoveryViewport = {
@@ -860,6 +946,7 @@ export function SocialMap({
   availableMapHeight,
   routePreview = null,
   onMapLongPress,
+  previewMode = false,
 }: Props) {
   const { t } = useI18n();
   const mapNodeRef = useRef<HTMLDivElement>(null);
@@ -1198,11 +1285,24 @@ export function SocialMap({
     if (selectedAreaCluster) return `${selectedAreaCluster.name} places`;
     if (isSplitZoom) return "Tap a place or cluster";
     if (activeFilterLabel) return `${activeFilterLabel} areas`;
+    if (previewMode) {
+      const coast = clusters.find((cluster) => cluster.tone === "beach");
+      if (coast?.status === "hot" || coast?.status === "live") return "Hot around the coast";
+      if (coast?.status === "moving") return "Activity around the coast";
+      return `${clusters.length} area${clusters.length === 1 ? "" : "s"} on map`;
+    }
     if (clusters.some((cluster) => cluster.tone === "beach" && cluster.status !== "quiet")) {
       return "Hot around the coast";
     }
     return `${clusters.length} area${clusters.length === 1 ? "" : "s"} moving tonight`;
-  }, [activeFilterLabel, clusters, isSplitZoom, selectedAreaCluster, selectedPlaceNode]);
+  }, [
+    activeFilterLabel,
+    clusters,
+    isSplitZoom,
+    previewMode,
+    selectedAreaCluster,
+    selectedPlaceNode,
+  ]);
 
   const discoveryChipClusters = useMemo(() => {
     const candidates = clusters.filter((cluster) => cluster.places.length > 1);
@@ -1341,18 +1441,20 @@ export function SocialMap({
   const flyToOverview = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
+    const center = previewMode ? PREVIEW_CENTER : ILIA_CENTER;
+    const overviewZoom = previewMode ? PREVIEW_OVERVIEW_ZOOM : OVERVIEW_ZOOM;
     map.stop();
     if (prefersReducedMapMotion()) {
-      map.jumpTo({ center: [ILIA_CENTER[1], ILIA_CENTER[0]], zoom: OVERVIEW_ZOOM });
+      map.jumpTo({ center: [center[1], center[0]], zoom: overviewZoom });
     } else {
       map.flyTo({
-        center: [ILIA_CENTER[1], ILIA_CENTER[0]],
-        zoom: OVERVIEW_ZOOM,
+        center: [center[1], center[0]],
+        zoom: overviewZoom,
         duration: MAP_OVERVIEW_DURATION * 1000,
         essential: true,
       });
     }
-  }, []);
+  }, [previewMode]);
 
   activateMarkerByIdRef.current = (id: string) => {
     const node = renderNodesRef.current.get(id);
@@ -1419,7 +1521,12 @@ export function SocialMap({
     const markerSigs = markerSigRef.current;
     const markerRuntimes = markerRuntimeRef.current;
 
-    Promise.all([import("maplibre-gl"), loadBoundaryFreeBasemap(basemapAbortController.signal)])
+    Promise.all([
+      import("maplibre-gl"),
+      previewMode
+        ? Promise.resolve(localPreviewBasemapStyle())
+        : loadBoundaryFreeBasemap(basemapAbortController.signal),
+    ])
       .then(([maplibre, basemapStyle]) => {
         if (cancelled || !mapNodeRef.current) return;
 
@@ -1428,7 +1535,9 @@ export function SocialMap({
           container: mapNodeRef.current,
           style: basemapStyle,
           attributionControl: false,
-          center: [ILIA_CENTER[1], ILIA_CENTER[0]],
+          center: previewMode
+            ? [PREVIEW_CENTER[1], PREVIEW_CENTER[0]]
+            : [ILIA_CENTER[1], ILIA_CENTER[0]],
           doubleClickZoom: true,
           maxBounds: [
             [MAP_PAN_BOUNDS[0][1], MAP_PAN_BOUNDS[0][0]],
@@ -1436,11 +1545,12 @@ export function SocialMap({
           ],
           maxZoom: MAX_ZOOM,
           minZoom: MIN_ZOOM,
-          zoom: OVERVIEW_ZOOM,
+          zoom: previewMode ? PREVIEW_OVERVIEW_ZOOM : OVERVIEW_ZOOM,
           maplibreLogo: false,
           renderWorldCopies: false,
         });
         mapRef.current = map;
+        if (previewMode) cleanupFns.push(attachLocalPreviewLand(map));
         const onBasemapError = (event: MapLibreErrorEvent) => {
           console.error("Basemap rendering error", event.error ?? event);
           const sourceId = "sourceId" in event ? event.sourceId : undefined;
@@ -1569,7 +1679,7 @@ export function SocialMap({
           map?.off("moveend", onMoveEnd);
           map?.off("zoomend", onZoomEnd);
         });
-        map.once("load", () => {
+        const onMapReady = () => {
           if (cancelled || !map) return;
           mapHasLoaded = true;
           const readyZoom = map.getZoom();
@@ -1579,7 +1689,8 @@ export function SocialMap({
           setMapReady(true);
           setMapLoadError(null);
           window.setTimeout(() => map?.resize(), 0);
-        });
+        };
+        map.once(previewMode ? "style.load" : "load", onMapReady);
       })
       .catch((error: unknown) => {
         if (cancelled || (error instanceof DOMException && error.name === "AbortError")) return;
@@ -1611,7 +1722,7 @@ export function SocialMap({
       maplibreModuleRef.current = null;
       userMarkerRef.current = null;
     };
-  }, []);
+  }, [previewMode]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2021,7 +2132,7 @@ export function SocialMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || isSplitZoom || clusters.length === 0) return;
+    if (!map || !mapReady || isSplitZoom || clusters.length === 0 || previewMode) return;
     if (selectedAreaId || selectedPlaceId) return;
     // Only auto-fit once per mount so live data refreshes never yank the map.
     if (didInitialFitRef.current) return;
@@ -2033,11 +2144,11 @@ export function SocialMap({
       maxZoom: OVERVIEW_ZOOM,
       padding: { left: 52, top: 108, right: 52, bottom: 210 },
     });
-  }, [clusters, isSplitZoom, mapReady, selectedAreaId, selectedPlaceId]);
+  }, [clusters, isSplitZoom, mapReady, previewMode, selectedAreaId, selectedPlaceId]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady) return;
+    if (!map || !mapReady || previewMode) return;
     const sourceId = "hp-sea-shimmer-source";
     const layerId = "hp-sea-shimmer";
     if (!map.getSource(sourceId)) {
@@ -2097,7 +2208,7 @@ export function SocialMap({
       "visibility",
       zoom <= SEA_SHIMMER_MAX_ZOOM && !selectedPlaceId ? "visible" : "none",
     );
-  }, [mapReady, zoom, selectedPlaceId]);
+  }, [mapReady, previewMode, zoom, selectedPlaceId]);
 
   useEffect(() => {
     const maplibre = maplibreModuleRef.current;
@@ -2218,6 +2329,7 @@ export function SocialMap({
   };
 
   const locateUser = () => {
+    if (previewMode) return;
     const map = mapRef.current;
     const maplibre = maplibreModuleRef.current;
     if (!map || !maplibre || !navigator.geolocation) return;
@@ -2303,18 +2415,28 @@ export function SocialMap({
         <div className="hp-map-attribution" data-expanded={attributionExpanded ? "true" : "false"}>
           {attributionExpanded && (
             <div className="hp-map-attribution__credits" role="note">
-              ©{" "}
-              <a href="https://www.openmaptiles.org" target="_blank" rel="noreferrer">
-                OpenMapTiles
-              </a>
-              {" · "}©{" "}
-              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
-                OpenStreetMap
-              </a>
-              {" · "}
-              <a href="https://openrouteservice.org" target="_blank" rel="noreferrer">
-                openrouteservice / HeiGIT
-              </a>
+              {previewMode ? (
+                <>Coastline: Natural Earth · simulated markers</>
+              ) : (
+                <>
+                  ©{" "}
+                  <a href="https://www.openmaptiles.org" target="_blank" rel="noreferrer">
+                    OpenMapTiles
+                  </a>
+                  {" · "}©{" "}
+                  <a
+                    href="https://www.openstreetmap.org/copyright"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    OpenStreetMap
+                  </a>
+                  {" · "}
+                  <a href="https://openrouteservice.org" target="_blank" rel="noreferrer">
+                    openrouteservice / HeiGIT
+                  </a>
+                </>
+              )}
             </div>
           )}
           <button
@@ -2402,16 +2524,18 @@ export function SocialMap({
           </button>
         </div>
         <div className="hp-map-control-group" role="group" aria-label={t("Map view controls")}>
-          <button
-            type="button"
-            onClick={locateUser}
-            disabled={!mapReady}
-            tabIndex={utilityRailHidden ? -1 : undefined}
-            className="hp-icon-button hp-map-icon-button"
-            aria-label={t("Find my location")}
-          >
-            <Crosshair size={17} strokeWidth={2.2} />
-          </button>
+          {!previewMode && (
+            <button
+              type="button"
+              onClick={locateUser}
+              disabled={!mapReady}
+              tabIndex={utilityRailHidden ? -1 : undefined}
+              className="hp-icon-button hp-map-icon-button"
+              aria-label={t("Find my location")}
+            >
+              <Crosshair size={17} strokeWidth={2.2} />
+            </button>
+          )}
           <button
             type="button"
             onClick={resetToOverview}

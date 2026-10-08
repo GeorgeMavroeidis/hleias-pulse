@@ -9,6 +9,7 @@ interface Props {
   index: number;
   onOpen: (place: Place) => void;
   onGoing: (place: Place) => void;
+  previewMode?: boolean;
 }
 
 const STATUS_LABEL: Record<Place["status"], string> = {
@@ -23,7 +24,7 @@ const STATUS_LABEL: Record<Place["status"], string> = {
  * the card opens the place; "I'm going" writes an RSVP. The crowd gauge + stacked
  * avatars are the social-proof engine.
  */
-export function TrendingHero({ place, index, onOpen, onGoing }: Props) {
+export function TrendingHero({ place, index, onOpen, onGoing, previewMode = false }: Props) {
   const { t } = useI18n();
   const isHot = place.status === "busy" || place.status === "popular";
   const gauge = Math.min(1, place.hotness / 10);
@@ -111,16 +112,18 @@ export function TrendingHero({ place, index, onOpen, onGoing }: Props) {
           <span className={`h-1.5 w-1.5 rounded-full ${isHot ? "bg-hp-sunset" : "bg-hp-olive"}`} />
           {place.hotness.toFixed(1)} pulse
         </span>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onGoing(place);
-          }}
-          className="ml-auto inline-flex items-center gap-1 rounded-full bg-hp-ink px-3.5 py-2 text-[12px] font-bold text-hp-paper transition active:scale-95 max-[360px]:mr-12"
-        >
-          {t("I'm going")}
-        </button>
+        {!previewMode && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onGoing(place);
+            }}
+            className="ml-auto inline-flex items-center gap-1 rounded-full bg-hp-ink px-3.5 py-2 text-[12px] font-bold text-hp-paper transition active:scale-95 max-[360px]:mr-12"
+          >
+            {t("I'm going")}
+          </button>
+        )}
       </div>
     </motion.article>
   );

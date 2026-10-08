@@ -33,6 +33,7 @@ export function PostDetailModal({
   findPlace,
   findAuthor,
   findPostAuthor,
+  previewMode = false,
 }: {
   post: Post | null;
   onClose: () => void;
@@ -48,6 +49,7 @@ export function PostDetailModal({
   findPlace: (id: string) => Place | undefined;
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
+  previewMode?: boolean;
 }) {
   const [text, setText] = useState("");
   const { language, t } = useI18n();
@@ -123,16 +125,18 @@ export function PostDetailModal({
                         {p.name} · {displayPostTime(post)}
                       </div>
                     </div>
-                    <ContentMenu
-                      target={{
-                        type: "post",
-                        id: post.id,
-                        authorUserId: post.userId,
-                        authorName: a.name,
-                        authorAvatarUrl: a.avatarUrl,
-                        summary: post.text,
-                      }}
-                    />
+                    {!previewMode && (
+                      <ContentMenu
+                        target={{
+                          type: "post",
+                          id: post.id,
+                          authorUserId: post.userId,
+                          authorName: a.name,
+                          authorAvatarUrl: a.avatarUrl,
+                          summary: post.text,
+                        }}
+                      />
+                    )}
                   </div>
                   <p className="mt-3 text-[14px] leading-snug text-hp-ink">{post.text}</p>
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -229,15 +233,17 @@ export function PostDetailModal({
                     >
                       <MapIcon size={13} className="mr-1 inline" /> Open on map
                     </button>
-                    <a
-                      href={openStreetMapUrl(p)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={t("Open {place} in OpenStreetMap", { place: p.name })}
-                      className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                    >
-                      <ExternalLink size={14} />
-                    </a>
+                    {!previewMode && (
+                      <a
+                        href={openStreetMapUrl(p)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={t("Open {place} in OpenStreetMap", { place: p.name })}
+                        className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+                      >
+                        <ExternalLink size={14} />
+                      </a>
+                    )}
                     <button
                       type="button"
                       onClick={onSave}
@@ -246,14 +252,16 @@ export function PostDetailModal({
                     >
                       <Bookmark size={14} fill={saved ? "currentColor" : "none"} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onShare(post)}
-                      className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                      aria-label={t("Share post")}
-                    >
-                      <Share2 size={14} />
-                    </button>
+                    {!previewMode && (
+                      <button
+                        type="button"
+                        onClick={() => onShare(post)}
+                        className="grid h-10 w-10 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+                        aria-label={t("Share post")}
+                      >
+                        <Share2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>
