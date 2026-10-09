@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 cloudflare-static-dist
+local-test-dist
 .env
 .env.*
 !.env.example
