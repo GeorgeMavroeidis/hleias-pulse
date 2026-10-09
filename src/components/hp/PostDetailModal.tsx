@@ -34,6 +34,7 @@ export function PostDetailModal({
   findAuthor,
   findPostAuthor,
   previewMode = false,
+  nowMs = Date.now(),
 }: {
   post: Post | null;
   onClose: () => void;
@@ -50,6 +51,7 @@ export function PostDetailModal({
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
   previewMode?: boolean;
+  nowMs?: number;
 }) {
   const [text, setText] = useState("");
   const { language, t } = useI18n();
@@ -122,7 +124,7 @@ export function PostDetailModal({
                       </div>
                       <div className="text-[10px] text-hp-muted">
                         <MapPin size={9} className="mr-0.5 inline" />
-                        {p.name} · {displayPostTime(post)}
+                        {p.name} · {displayPostTime(post, nowMs)}
                       </div>
                     </div>
                     {!previewMode && (

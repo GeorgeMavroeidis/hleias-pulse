@@ -49,16 +49,16 @@ function configWith(updates: Partial<AreaIntelligenceConfig>): AreaIntelligenceC
 test("derives calm, rising, active and hot without conflating signal quality", () => {
   const calm = deriveAreaIntelligence(observation(0));
   const rising = deriveAreaIntelligence(
-    observation(40, [evidence("post", 10, "one", 1.6), evidence("post", 120, "one", 1.5)]),
+    observation(40, [evidence("post", 10, "one", 1.6), evidence("post", 240, "one", 0.5)]),
   );
   const active = deriveAreaIntelligence(
-    observation(95, [evidence("post", 20, "one", 1.5), evidence("post", 120, "one", 4.5)]),
+    observation(95, [evidence("post", 20, "one", 2.8), evidence("post", 240, "one", 2.8)]),
   );
   const hot = deriveAreaIntelligence(
     observation(105, [
-      evidence("post", 10, "one", 2),
-      evidence("story", 15, "two", 2),
-      evidence("post", 120, "one", 6),
+      evidence("post", 10, "one", 3),
+      evidence("story", 15, "two", 3),
+      evidence("post", 240, "one", 6),
     ]),
   );
 
@@ -73,13 +73,13 @@ test("derives calm, rising, active and hot without conflating signal quality", (
 test("moves from hot to cooling when the recent rate falls below its baseline", () => {
   const hot = deriveAreaIntelligence(
     observation(105, [
-      evidence("post", 10, "one", 2),
-      evidence("story", 15, "two", 2),
-      evidence("post", 120, "one", 6),
+      evidence("post", 10, "one", 3),
+      evidence("story", 15, "two", 3),
+      evidence("post", 240, "one", 6),
     ]),
   );
   const cooling = deriveAreaIntelligence(
-    observation(105, [evidence("post", 120, "one", 4.5), evidence("story", 150, "two", 4.5)]),
+    observation(105, [evidence("post", 240, "one", 4.5), evidence("story", 270, "two", 4.5)]),
   );
 
   assert.equal(hot.state, "hot");
@@ -103,8 +103,8 @@ test("emerging requires meaningful absolute support and disappears when growth s
     observation(95, [
       evidence("post", 10, "one", 1.5),
       evidence("story", 20, "two", 1.5),
-      evidence("post", 120, "one", 4.5),
-      evidence("story", 150, "two", 4.5),
+      evidence("post", 240, "one", 1.5),
+      evidence("story", 270, "two", 1.5),
     ]),
   );
   const tinyDoubling = deriveAreaIntelligence(observation(20, [evidence("post", 10, "one", 2)]));
@@ -121,7 +121,7 @@ test("signal freshness decays from confirmed to fading to uncertain", () => {
     observation(60, [evidence("post", 10, "one", 1.5), evidence("story", 15, "two", 1.5)]),
   );
   const fading = deriveAreaIntelligence(
-    observation(60, [evidence("post", 50, "one", 1.5), evidence("story", 55, "two", 1.5)]),
+    observation(60, [evidence("post", 70, "one", 1.5), evidence("story", 75, "two", 1.5)]),
   );
   const uncertain = deriveAreaIntelligence(
     observation(60, [
@@ -153,7 +153,8 @@ test("missing, invalid and future timestamps remain uncertain", () => {
     ]),
   );
 
-  assert.equal(result.state, "active");
+  assert.equal(result.state, "calm");
+  assert.equal(result.activityScore, 0);
   assert.equal(result.momentum, 0);
   assert.equal(result.emerging, false);
   assert.equal(result.signalQuality, "uncertain");
@@ -161,10 +162,25 @@ test("missing, invalid and future timestamps remain uncertain", () => {
 });
 
 test("active threshold is inclusive and centrally configurable", () => {
-  const thresholdConfig = configWith({ legacyActivityShare: 1 });
-  const below = deriveAreaIntelligence(observation(47.24), thresholdConfig);
-  const boundary = deriveAreaIntelligence(observation(47.25), thresholdConfig);
-  const above = deriveAreaIntelligence(observation(47.26), thresholdConfig);
+  const weightAtThreshold = 2.4;
+  const thresholdConfig = configWith({
+    thresholds: {
+      ...AREA_INTELLIGENCE_CONFIG.thresholds,
+      active: 100 * (1 - Math.exp(-weightAtThreshold / 4)),
+    },
+  });
+  const below = deriveAreaIntelligence(
+    observation(999, [evidence("post", 10, "one", weightAtThreshold - 0.0001)]),
+    thresholdConfig,
+  );
+  const boundary = deriveAreaIntelligence(
+    observation(0, [evidence("post", 10, "one", weightAtThreshold)]),
+    thresholdConfig,
+  );
+  const above = deriveAreaIntelligence(
+    observation(0, [evidence("post", 10, "one", weightAtThreshold + 0.0001)]),
+    thresholdConfig,
+  );
 
   assert.equal(below.activityScore, 45);
   assert.equal(boundary.activityScore, 45);

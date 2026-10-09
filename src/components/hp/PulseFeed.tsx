@@ -50,6 +50,7 @@ export function PulseFeed({
   findAuthor,
   findPostAuthor,
   previewMode = false,
+  nowMs = Date.now(),
 }: {
   posts: Post[];
   storyGroups: PlaceStoryGroup[];
@@ -71,6 +72,7 @@ export function PulseFeed({
   findPostAuthor: (post: Post) => Author;
   /** Keep moderation and external sharing actions out of the local simulation. */
   previewMode?: boolean;
+  nowMs?: number;
 }) {
   const { t } = useI18n();
   const moderation = useModeration();
@@ -89,7 +91,7 @@ export function PulseFeed({
         place.status === "busy" ||
         place.status === "popular" ||
         post.kind === "event" ||
-        isRecentlyPosted(post) ||
+        isRecentlyPosted(post, nowMs) ||
         post.tags.some((tag) => ["live", "now", "packed", "busy"].includes(tag))
       );
     }
@@ -189,7 +191,7 @@ export function PulseFeed({
                     )}
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-hp-muted">
-                    <MapPin size={9} /> {p.name} · {displayPostTime(post)}
+                    <MapPin size={9} /> {p.name} · {displayPostTime(post, nowMs)}
                   </div>
                 </div>
                 <button

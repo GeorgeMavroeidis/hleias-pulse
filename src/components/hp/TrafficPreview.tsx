@@ -18,6 +18,7 @@ import { initialsAvatarDataUri } from "@/lib/hp/avatar";
 import type { ActivityTick } from "@/lib/hp/activity-data";
 import { deriveAreaIntelligenceSnapshot } from "@/lib/hp/area-intelligence";
 import { buildPulseActivitySnapshot } from "@/lib/hp/pulse-activity";
+import { evaluateFreshness } from "@/lib/hp/freshness";
 import { buildTrafficPreviewScene, TRAFFIC_SCENES } from "@/lib/hp/traffic-preview";
 import { buildPlaceStoryGroups, storyPlaceIdSet } from "@/lib/hp/place-stories";
 import type { RsvpStatus } from "@/lib/hp/meet-types";
@@ -44,10 +45,8 @@ const PLAY_DELAY_MS = 1800;
 const LAST_SCENE_INDEX = TRAFFIC_SCENES.length - 1;
 
 function minutesAgo(iso: string | null | undefined, now: number): number | null {
-  if (!iso) return null;
-  const time = Date.parse(iso);
-  if (!Number.isFinite(time)) return null;
-  return Math.max(0, Math.round((now - time) / 60_000));
+  const freshness = evaluateFreshness({ observedAt: iso, nowMs: now });
+  return freshness.isCurrent ? Math.floor((freshness.ageMs ?? 0) / 60_000) : null;
 }
 
 /** The production ticker assigns stock portraits; the preview uses fictional initials only. */
@@ -61,7 +60,7 @@ function buildPreviewTicks(
 ): ActivityTick[] {
   const postTicks: ActivityTick[] = posts.flatMap((post) => {
     const ago = minutesAgo(post.createdAt, now);
-    if (ago === null || ago > 60) return [];
+    if (ago === null) return [];
     const author = authors.get(post.authorId) ?? fallbackAuthor;
     return [
       {
@@ -77,7 +76,7 @@ function buildPreviewTicks(
   });
   const meetTicks: ActivityTick[] = meetEvents.flatMap((event) => {
     const ago = minutesAgo(event.createdAt, now);
-    if (ago === null || ago > 60) return [];
+    if (ago === null) return [];
     return [
       {
         id: `meet-${event.id}`,
@@ -92,7 +91,7 @@ function buildPreviewTicks(
   });
   const storyTicks: ActivityTick[] = stories.flatMap((story) => {
     const ago = minutesAgo(story.createdAt, now);
-    if (ago === null || ago > 60) return [];
+    if (ago === null) return [];
     return [
       {
         id: `story-${story.id}`,
@@ -296,15 +295,15 @@ export function TrafficPreview() {
     () =>
       data === sceneSnapshot.data
         ? sceneSnapshot.activitySnapshot
-        : buildPulseActivitySnapshot(data),
+        : buildPulseActivitySnapshot(data, sceneSnapshot.nowMs),
     [data, sceneSnapshot],
   );
   const areaIntelligence = useMemo(
     () =>
       data === sceneSnapshot.data
         ? sceneSnapshot.areaIntelligence
-        : deriveAreaIntelligenceSnapshot(data, anchor),
-    [data, sceneSnapshot, anchor],
+        : deriveAreaIntelligenceSnapshot(data, sceneSnapshot.nowMs),
+    [data, sceneSnapshot],
   );
   const placeById = useMemo(
     () => new Map(data.places.map((place) => [place.id, place])),
@@ -325,8 +324,8 @@ export function TrafficPreview() {
     [data.places, data.events, activitySnapshot, areaIntelligence],
   );
   const storyGroups = useMemo(
-    () => buildPlaceStoryGroups(data.places, seenStories, data.stories),
-    [data.places, data.stories, seenStories],
+    () => buildPlaceStoryGroups(data.places, seenStories, data.stories, sceneSnapshot.nowMs),
+    [data.places, data.stories, seenStories, sceneSnapshot.nowMs],
   );
   const storyPlaceIds = useMemo(() => storyPlaceIdSet(storyGroups), [storyGroups]);
   const activityTicks = useMemo(
@@ -337,9 +336,9 @@ export function TrafficPreview() {
         data.stories,
         placeById,
         authorById,
-        anchor.getTime(),
+        sceneSnapshot.nowMs,
       ),
-    [data.posts, data.meetEvents, data.stories, placeById, authorById, anchor],
+    [data.posts, data.meetEvents, data.stories, placeById, authorById, sceneSnapshot.nowMs],
   );
   const focusCluster = clusters.find((cluster) => cluster.id === sceneSnapshot.focusAreaId) ?? null;
   const selectedCluster = clusters.find((cluster) => cluster.id === selectedAreaId) ?? null;
@@ -599,6 +598,7 @@ export function TrafficPreview() {
                     findPlace={findPlace}
                     findAuthor={findAuthor}
                     findPostAuthor={findPostAuthor}
+                    nowMs={sceneSnapshot.nowMs}
                     previewMode
                   />
                 </div>
@@ -622,6 +622,7 @@ export function TrafficPreview() {
                   }
                   onOpenPlace={jumpToMap}
                   onCreate={() => undefined}
+                  nowMs={sceneSnapshot.nowMs}
                   previewMode
                 />
               )}
@@ -679,7 +680,11 @@ export function TrafficPreview() {
                   ...old,
                   [currentPost.id]: [
                     ...(old[currentPost.id] ?? []),
-                    { author: "You (preview)", text, createdAt: anchor.toISOString() },
+                    {
+                      author: "You (preview)",
+                      text,
+                      createdAt: new Date(sceneSnapshot.nowMs).toISOString(),
+                    },
                   ],
                 }))
               }
@@ -692,6 +697,7 @@ export function TrafficPreview() {
               findPlace={findPlace}
               findAuthor={findAuthor}
               findPostAuthor={findPostAuthor}
+              nowMs={sceneSnapshot.nowMs}
               previewMode
             />
             {storyPlaceId && (
@@ -708,6 +714,7 @@ export function TrafficPreview() {
                 onShare={() => undefined}
                 onToggleSave={(id) => setSavedPlaces((old) => ({ ...old, [id]: !old[id] }))}
                 savedPlaceIds={Object.keys(savedPlaces).filter((id) => savedPlaces[id])}
+                nowMs={sceneSnapshot.nowMs}
                 previewMode
               />
             )}

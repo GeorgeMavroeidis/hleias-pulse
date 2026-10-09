@@ -52,6 +52,9 @@ jobs:
       - name: Test — area intelligence
         run: npm run test:intelligence
 
+      - name: Test — freshness and traffic preview
+        run: npm run test:freshness
+
       - name: Test — discovery
         run: npm run test:discovery
 
