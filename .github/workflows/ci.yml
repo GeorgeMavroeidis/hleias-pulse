@@ -55,6 +55,9 @@ jobs:
       - name: Test — freshness and traffic preview
         run: npm run test:freshness
 
+      - name: Test — creation and Athens Meet times
+        run: npm run test:creation
+
       - name: Test — discovery
         run: npm run test:discovery
 

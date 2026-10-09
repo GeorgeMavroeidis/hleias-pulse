@@ -54,7 +54,9 @@
     "test:db-safety": "tsx --test scripts/local-database-safety.test.ts",
     "test:seed-comments": "node --import tsx --test scripts/seed-comments.test.ts",
     "check:migration-versions": "tsx scripts/check-migration-versions.ts",
-    "test:freshness": "node --import tsx --test src/lib/hp/freshness.test.ts src/lib/hp/pulse-activity.test.ts src/lib/hp/post-time.test.ts src/lib/hp/traffic-preview.test.ts"
+    "test:freshness": "node --import tsx --test src/lib/hp/freshness.test.ts src/lib/hp/pulse-activity.test.ts src/lib/hp/post-time.test.ts src/lib/hp/traffic-preview.test.ts",
+    "test:creation": "node --import tsx --test src/lib/hp/meet-time.test.ts src/components/hp/CreateComposerModal.test.tsx scripts/hp-meet-validation.test.ts",
+    "smoke:meet-time": "node --import tsx scripts/smoke-meet-time.ts"
   },
   "dependencies": {
     "@capacitor/app-launcher": "^8.0.1",

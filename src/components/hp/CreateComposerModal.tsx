@@ -15,6 +15,12 @@ import {
 } from "lucide-react";
 import { typeColor, type Place, type Post } from "@/lib/hp-model";
 import { type CreatePulsePlaceInput } from "@/lib/hp-api";
+import {
+  defaultMeetDateTime,
+  MeetTimeError,
+  parseMeetDateTimeInput,
+  requireFutureMeetStart,
+} from "@/lib/hp/meet-time";
 import { profileAvatarUrl, profileDisplayName, type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
@@ -61,12 +67,6 @@ const PLACE_TYPE_LABEL_KEYS: Record<Place["type"], string> = {
 
 const STORY_CONDITION_OPTIONS = ["clean", "windy", "busy", "quiet", "event"] as const;
 
-function defaultMeetDateTime() {
-  const d = new Date(Date.now() + 3 * 60 * 60 * 1000);
-  d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15, 0, 0);
-  return d.toISOString().slice(0, 16);
-}
-
 function tagList(value: string) {
   return value
     .split(",")
@@ -89,15 +89,13 @@ function SearchablePlacePicker({
   setQuery: (query: string) => void;
 }) {
   const { language } = useI18n();
-  const selected = places.find((place) => place.id === value) ?? places[0];
+  const selected = places.find((place) => place.id === value);
   const results = useMemo(() => {
     const matches = query.trim()
       ? places.filter((place) => matchesPlaceQuery(place, query))
       : places;
     return matches.slice(0, 7);
   }, [places, query]);
-
-  if (!selected) return null;
 
   return (
     <div className="rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
@@ -122,7 +120,15 @@ function SearchablePlacePicker({
           {language === "GR" ? "Επιλεγμένο" : "Selected"}
         </div>
         <div className="truncate text-[13px] font-bold text-hp-ink">
-          {selected.name} <span className="font-semibold text-hp-muted">· {selected.area}</span>
+          {selected ? (
+            <>
+              {selected.name} <span className="font-semibold text-hp-muted">· {selected.area}</span>
+            </>
+          ) : language === "GR" ? (
+            "Επίλεξε τοποθεσία για αυτή τη δημοσίευση."
+          ) : (
+            "Choose a place for this contribution."
+          )}
         </div>
       </div>
       <div
@@ -131,7 +137,7 @@ function SearchablePlacePicker({
         aria-label={language === "GR" ? "Τοποθεσίες" : "Locations"}
       >
         {results.map((placeOption) => {
-          const selectedOption = placeOption.id === selected.id;
+          const selectedOption = placeOption.id === selected?.id;
           return (
             <button
               key={placeOption.id}
@@ -184,6 +190,7 @@ function SearchablePlacePicker({
 export function CreateComposerModal({
   open,
   initialMode = "post",
+  initialPlaceId,
   prefillPlace,
   places,
   vibeChips,
@@ -198,6 +205,8 @@ export function CreateComposerModal({
 }: {
   open: boolean;
   initialMode?: ComposerMode;
+  /** Only contextual creation actions may supply a place. */
+  initialPlaceId?: string;
   prefillPlace?: { lat: number; lng: number } | null;
   places: Place[];
   vibeChips: string[];
@@ -220,9 +229,9 @@ export function CreateComposerModal({
   }) => Promise<void>;
 }) {
   const { language, t } = useI18n();
-  const [mode, setMode] = useState<ComposerMode>("post");
+  const [mode, setMode] = useState<ComposerMode>(initialMode);
   const [text, setText] = useState("");
-  const [place, setPlace] = useState(places[0]?.id ?? "");
+  const [place, setPlace] = useState(initialPlaceId ?? "");
   const [placeQuery, setPlaceQuery] = useState("");
   const [identity, setIdentity] = useState<PostingIdentity>("LOCAL");
   const [vibes, setVibes] = useState<string[]>([]);
@@ -253,7 +262,7 @@ export function CreateComposerModal({
   const [eventTags, setEventTags] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const selectedPlace = places.find((p) => p.id === place) ?? places[0];
+  const selectedPlace = places.find((p) => p.id === place);
   const profile = readyProfile(account);
   const accountCanContribute = Boolean(profile);
 
@@ -269,9 +278,11 @@ export function CreateComposerModal({
   }, [account, initialMode, open, prefillPlace]);
 
   useEffect(() => {
-    if (places.length > 0 && !places.some((p) => p.id === place)) {
-      setPlace(places[0].id);
-    }
+    if (open) setPlace(initialPlaceId ?? "");
+  }, [open, initialPlaceId]);
+
+  useEffect(() => {
+    if (place && !places.some((p) => p.id === place)) setPlace("");
   }, [place, places]);
 
   useEffect(() => {
@@ -306,7 +317,7 @@ export function CreateComposerModal({
   const handlePostSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!requireComposerAccount()) return;
-    if (!text.trim() || !place) return;
+    if (!text.trim() || !selectedPlace) return;
     setSaving(true);
     setError(null);
     try {
@@ -329,7 +340,7 @@ export function CreateComposerModal({
   const handleQuestionSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!requireComposerAccount()) return;
-    if (!text.trim() || !place) return;
+    if (!text.trim() || !selectedPlace) return;
     setSaving(true);
     setError(null);
     try {
@@ -412,7 +423,7 @@ export function CreateComposerModal({
   const handleStorySubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!requireComposerAccount()) return;
-    if (!place || !storyCaption.trim()) return;
+    if (!selectedPlace || !storyCaption.trim()) return;
     setSaving(true);
     setError(null);
     try {
@@ -454,9 +465,9 @@ export function CreateComposerModal({
   const handleEventSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!requireComposerAccount()) return;
-    const happensAt = new Date(eventWhen);
+    let happensAt: string;
     const capacity = eventCapacity.trim() ? Number(eventCapacity) : undefined;
-    if (!eventTitle.trim() || !eventDescription.trim() || !place) {
+    if (!eventTitle.trim() || !eventDescription.trim() || !selectedPlace) {
       setError(
         language === "GR"
           ? "Πρόσθεσε τίτλο, σημείο και σύντομη περιγραφή."
@@ -464,10 +475,29 @@ export function CreateComposerModal({
       );
       return;
     }
-    if (!Number.isFinite(happensAt.getTime())) {
-      setError(
-        language === "GR" ? "Επίλεξε έγκυρη ημερομηνία και ώρα." : "Choose a valid date and time.",
-      );
+    try {
+      happensAt = requireFutureMeetStart(parseMeetDateTimeInput(eventWhen));
+    } catch (timeError) {
+      const code = timeError instanceof MeetTimeError ? timeError.code : "invalid";
+      const messages = {
+        past:
+          language === "GR"
+            ? "Η έναρξη πρέπει να είναι στο μέλλον."
+            : "The start must be in the future.",
+        ambiguous:
+          language === "GR"
+            ? "Αυτή η ώρα επαναλαμβάνεται λόγω αλλαγής ώρας. Επίλεξε άλλη ώρα."
+            : "This time occurs twice when clocks change. Choose another time.",
+        nonexistent:
+          language === "GR"
+            ? "Αυτή η ώρα δεν υπάρχει λόγω αλλαγής ώρας. Επίλεξε άλλη ώρα."
+            : "This time does not exist when clocks change. Choose another time.",
+        invalid:
+          language === "GR"
+            ? "Επίλεξε έγκυρη ημερομηνία και ώρα."
+            : "Choose a valid date and time.",
+      };
+      setError(messages[code]);
       return;
     }
     if (capacity !== undefined && (!Number.isFinite(capacity) || capacity < 2)) {
@@ -485,7 +515,7 @@ export function CreateComposerModal({
       await onEvent({
         title: eventTitle.trim(),
         placeId: place,
-        happensAt: happensAt.toISOString(),
+        happensAt,
         category: eventCategory,
         vibe: eventVibe.trim() || MEET_CATEGORY_META[eventCategory].label,
         price: eventPrice.trim() || "Free",
@@ -509,7 +539,6 @@ export function CreateComposerModal({
     }
   };
 
-  if (!selectedPlace) return null;
   return (
     <AnimatePresence>
       {open && (
@@ -632,19 +661,25 @@ export function CreateComposerModal({
                 onSubmit={handlePostSubmit}
                 className="hp-stagger space-y-3"
               >
-                <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                  <ImageBox
-                    src={selectedPlace.imageUrl}
-                    alt={selectedPlace.name}
-                    className="h-full w-full"
-                    rounded="rounded-2xl"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
-                  <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
-                    <ImagePlus size={12} />
-                    {t("Using {place} image", { place: selectedPlace.name })}
-                  </span>
-                </div>
+                {selectedPlace ? (
+                  <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+                    <ImageBox
+                      src={selectedPlace.imageUrl}
+                      alt={selectedPlace.name}
+                      className="h-full w-full"
+                      rounded="rounded-2xl"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
+                    <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
+                      <ImagePlus size={12} />
+                      {t("Using {place} image", { place: selectedPlace.name })}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-hp-ink/15 px-3 py-6 text-center text-[13px] text-hp-muted">
+                    {language === "GR" ? "Επίλεξε τοποθεσία παρακάτω." : "Choose a place below."}
+                  </div>
+                )}
                 <label htmlFor="create-post-text" className="sr-only">
                   Post text
                 </label>
@@ -716,11 +751,15 @@ export function CreateComposerModal({
                     })}
                   </div>
                 </div>
-                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                {error && (
+                  <p role="alert" className="text-[12px] font-semibold text-hp-sunset">
+                    {error}
+                  </p>
+                )}
                 <button
                   type="submit"
                   data-testid="composer-post-submit"
-                  disabled={!text.trim() || saving}
+                  disabled={!text.trim() || !selectedPlace || saving}
                   className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {saving ? t("Saving…") : t("Post")}
@@ -732,19 +771,25 @@ export function CreateComposerModal({
                 onSubmit={handleQuestionSubmit}
                 className="hp-stagger space-y-3"
               >
-                <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                  <ImageBox
-                    src={selectedPlace.imageUrl}
-                    alt={selectedPlace.name}
-                    className="h-full w-full"
-                    rounded="rounded-2xl"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
-                  <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
-                    <ImagePlus size={12} />
-                    {t("Using {place} image", { place: selectedPlace.name })}
-                  </span>
-                </div>
+                {selectedPlace ? (
+                  <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+                    <ImageBox
+                      src={selectedPlace.imageUrl}
+                      alt={selectedPlace.name}
+                      className="h-full w-full"
+                      rounded="rounded-2xl"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
+                    <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
+                      <ImagePlus size={12} />
+                      {t("Using {place} image", { place: selectedPlace.name })}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-hp-ink/15 px-3 py-6 text-center text-[13px] text-hp-muted">
+                    {language === "GR" ? "Επίλεξε τοποθεσία παρακάτω." : "Choose a place below."}
+                  </div>
+                )}
                 <label htmlFor="create-question-text" className="sr-only">
                   Question text
                 </label>
@@ -783,11 +828,15 @@ export function CreateComposerModal({
                     setQuery={setPlaceQuery}
                   />
                 </div>
-                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                {error && (
+                  <p role="alert" className="text-[12px] font-semibold text-hp-sunset">
+                    {error}
+                  </p>
+                )}
                 <button
                   type="submit"
                   data-testid="composer-question-submit"
-                  disabled={!text.trim() || saving}
+                  disabled={!text.trim() || !selectedPlace || saving}
                   className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {saving ? t("Saving…") : t("Ask")}
@@ -1017,7 +1066,11 @@ export function CreateComposerModal({
                   </div>
                 </section>
 
-                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                {error && (
+                  <p role="alert" className="text-[12px] font-semibold text-hp-sunset">
+                    {error}
+                  </p>
+                )}
                 <button
                   type="submit"
                   data-testid="composer-place-submit"
@@ -1035,19 +1088,25 @@ export function CreateComposerModal({
               >
                 <section>
                   <SectionHeader icon={Camera} label={t("Photo & caption")} tone="sunset" />
-                  <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                    <ImageBox
-                      src={selectedPlace.imageUrl}
-                      alt={selectedPlace.name}
-                      className="h-full w-full"
-                      rounded="rounded-2xl"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
-                    <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
-                      <ImagePlus size={12} />
-                      {t("Story photo · using {place} image", { place: selectedPlace.name })}
-                    </span>
-                  </div>
+                  {selectedPlace ? (
+                    <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+                      <ImageBox
+                        src={selectedPlace.imageUrl}
+                        alt={selectedPlace.name}
+                        className="h-full w-full"
+                        rounded="rounded-2xl"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
+                      <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
+                        <ImagePlus size={12} />
+                        {t("Story photo · using {place} image", { place: selectedPlace.name })}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-hp-ink/15 px-3 py-6 text-center text-[13px] text-hp-muted">
+                      {language === "GR" ? "Επίλεξε τοποθεσία παρακάτω." : "Choose a place below."}
+                    </div>
+                  )}
                   <p className="mt-2 text-[11px] text-hp-muted">
                     {t(
                       "Shows full-screen, 9:16. Swap in your own photo later — this previews with the place image.",
@@ -1221,11 +1280,15 @@ export function CreateComposerModal({
                   </div>
                 </section>
 
-                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                {error && (
+                  <p role="alert" className="text-[12px] font-semibold text-hp-sunset">
+                    {error}
+                  </p>
+                )}
                 <button
                   type="submit"
                   data-testid="composer-story-submit"
-                  disabled={!storyCaption.trim()}
+                  disabled={!storyCaption.trim() || !selectedPlace || saving}
                   className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {t("Post story")}
@@ -1239,21 +1302,27 @@ export function CreateComposerModal({
               >
                 <section>
                   <SectionHeader icon={Store} label={t("What & where")} tone="sunset" />
-                  <div className="hp-card-lift relative h-36 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                    <ImageBox
-                      src={selectedPlace.imageUrl}
-                      alt={selectedPlace.name}
-                      className="h-full w-full"
-                      rounded="rounded-2xl"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-                    <div className="absolute bottom-3 left-3 right-3 text-hp-paper">
-                      <div className="text-[10px] font-bold uppercase">{t("Hosting at")}</div>
-                      <div className="text-[15px] font-black leading-tight">
-                        {selectedPlace.name}
+                  {selectedPlace ? (
+                    <div className="hp-card-lift relative h-36 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
+                      <ImageBox
+                        src={selectedPlace.imageUrl}
+                        alt={selectedPlace.name}
+                        className="h-full w-full"
+                        rounded="rounded-2xl"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                      <div className="absolute bottom-3 left-3 right-3 text-hp-paper">
+                        <div className="text-[10px] font-bold uppercase">{t("Hosting at")}</div>
+                        <div className="text-[15px] font-black leading-tight">
+                          {selectedPlace.name}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-hp-ink/15 px-3 py-6 text-center text-[13px] text-hp-muted">
+                      {language === "GR" ? "Επίλεξε τοποθεσία παρακάτω." : "Choose a place below."}
+                    </div>
+                  )}
 
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="col-span-2">
@@ -1296,16 +1365,22 @@ export function CreateComposerModal({
                         htmlFor="create-event-when"
                         className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-hp-muted"
                       >
-                        {t("When")}
+                        {t("When")} · Europe/Athens
                       </label>
                       <input
                         id="create-event-when"
                         name="create-event-when"
                         type="datetime-local"
+                        aria-describedby="create-event-timezone"
                         value={eventWhen}
                         onChange={(e) => setEventWhen(e.target.value)}
                         className={`${fieldClass()} text-[12px]`}
                       />
+                      <p id="create-event-timezone" className="mt-1 text-[11px] text-hp-muted">
+                        {language === "GR"
+                          ? "Τοπική ώρα Ηλείας (Ελλάδα)."
+                          : "Local time in Ilia, Greece."}
+                      </p>
                     </div>
                     <div>
                       <label
@@ -1416,11 +1491,17 @@ export function CreateComposerModal({
                   </div>
                 </section>
 
-                {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
+                {error && (
+                  <p role="alert" className="text-[12px] font-semibold text-hp-sunset">
+                    {error}
+                  </p>
+                )}
                 <button
                   type="submit"
                   data-testid="composer-event-submit"
-                  disabled={!eventTitle.trim() || !eventDescription.trim() || saving}
+                  disabled={
+                    !eventTitle.trim() || !eventDescription.trim() || !selectedPlace || saving
+                  }
                   className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
                 >
                   {saving ? t("Hosting…") : t("Host gathering")}
