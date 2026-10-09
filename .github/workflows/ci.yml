@@ -73,6 +73,9 @@ jobs:
       - name: Test — secret scanning rules
         run: npm run test:secrets
 
+      - name: Test — synthetic comment removal
+        run: npm run test:seed-comments
+
       - name: Build
         run: npm run build
 
