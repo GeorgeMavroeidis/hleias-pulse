@@ -37,6 +37,7 @@
     "smoke:routes": "tsx scripts/smoke-routes.ts",
     "smoke:route-preview": "tsx scripts/smoke-route-preview.ts",
     "smoke:saved-items": "tsx scripts/smoke-saved-items.ts",
+    "smoke:seed-comments": "tsx scripts/smoke-seed-comments.ts",
     "smoke:verification-guards": "tsx scripts/smoke-verification-guards.ts",
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
@@ -51,6 +52,7 @@
     "db:verify": "tsx scripts/verify-database.ts",
     "db:contract": "tsx scripts/check-db-contract.ts",
     "test:db-safety": "tsx --test scripts/local-database-safety.test.ts",
+    "test:seed-comments": "node --import tsx --test scripts/seed-comments.test.ts",
     "check:migration-versions": "tsx scripts/check-migration-versions.ts",
     "test:freshness": "node --import tsx --test src/lib/hp/freshness.test.ts src/lib/hp/pulse-activity.test.ts src/lib/hp/post-time.test.ts src/lib/hp/traffic-preview.test.ts"
   },

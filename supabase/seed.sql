@@ -241,42 +241,6 @@ on conflict (id) do update set
     sort_order = excluded.sort_order,
     moderation_status = excluded.moderation_status;
 
-delete from public.comments where id in ('cd325a83-3669-4823-a33e-5e46cef562c9', '27dbbc79-7aab-47fc-abca-7f1c9938da1f', 'e2c8d4a5-a035-4b36-9ef6-f2e8c188dab0', 'ef0e19f2-d414-400f-8a75-82c8f24aa3c8', '542d19ca-a605-474a-be05-12d858a8fdab', '9ff896f4-2c55-4e55-ac3a-f9eeaee18650', 'e7961ccf-70f1-4448-89e1-97f0701403c4', 'db440b55-6794-47e2-9ce4-ba5c94134e53', 'ac6a7e8c-0359-41f8-a14c-f04ebcf82ab6', 'f7b6d22d-0f3c-4647-899e-2b20251d154a', 'fdd422c2-f431-46c0-a9b0-d0f51029a6bf', 'e2ad7111-92c1-44af-91e1-e6c45f1bf95d', '2b918237-43e4-4468-bcec-28366222fedb', 'b42a81f3-2f34-4629-9f21-aeb56ce020d3', '16ecd7bd-09ab-4e06-b90a-47108a443e0f', '77b6591e-9091-475d-aaa5-f93588e4fba1', '18eb1189-9ca3-4f25-a329-476199366533', '7f33e7df-b73a-4e2f-ac6e-5c90fd7dced1', 'd37cada1-83f7-483e-a5f5-d2649f46cceb', '69070050-93ac-4ea8-a289-652727f3381b', '52a3f469-97ff-4da0-a288-0118babd0105', 'b2d8fbfe-c31e-48f3-8653-dbbe0a94638e', 'fd8c6ce8-c3a1-4620-9a77-456af0f26990');
-
-insert into public.comments (id, target_type, post_id, author_id, author_name, text, sort_order, moderation_status)
-values
-  ('cd325a83-3669-4823-a33e-5e46cef562c9', 'post', 'post-1', 'nikos', 'Nikos', 'parking is chaos after 21:00', 0, 'published'),
-  ('27dbbc79-7aab-47fc-abca-7f1c9938da1f', 'post', 'post-1', 'maria', 'Maria', 'worth it tho', 1, 'published'),
-  ('e2c8d4a5-a035-4b36-9ef6-f2e8c188dab0', 'post', 'post-1', 'eleni', 'Eleni', 'go before sunset, way calmer', 2, 'published'),
-  ('ef0e19f2-d414-400f-8a75-82c8f24aa3c8', 'post', 'post-2', 'nikos', 'Nikos', 'parking is chaos after 21:00', 0, 'published'),
-  ('542d19ca-a605-474a-be05-12d858a8fdab', 'post', 'post-2', 'maria', 'Maria', 'worth it tho', 1, 'published'),
-  ('9ff896f4-2c55-4e55-ac3a-f9eeaee18650', 'post', 'post-2', 'eleni', 'Eleni', 'go before sunset, way calmer', 2, 'published'),
-  ('e7961ccf-70f1-4448-89e1-97f0701403c4', 'post', 'post-3', 'nikos', 'Nikos', 'parking is chaos after 21:00', 0, 'published'),
-  ('db440b55-6794-47e2-9ce4-ba5c94134e53', 'post', 'post-3', 'maria', 'Maria', 'worth it tho', 1, 'published'),
-  ('ac6a7e8c-0359-41f8-a14c-f04ebcf82ab6', 'post', 'post-3', 'eleni', 'Eleni', 'go before sunset, way calmer', 2, 'published'),
-  ('f7b6d22d-0f3c-4647-899e-2b20251d154a', 'post', 'post-4', 'nikos', 'Nikos', 'parking is chaos after 21:00', 0, 'published'),
-  ('fdd422c2-f431-46c0-a9b0-d0f51029a6bf', 'post', 'post-4', 'maria', 'Maria', 'worth it tho', 1, 'published'),
-  ('e2ad7111-92c1-44af-91e1-e6c45f1bf95d', 'post', 'post-4', 'eleni', 'Eleni', 'go before sunset, way calmer', 2, 'published'),
-  ('2b918237-43e4-4468-bcec-28366222fedb', 'post', 'post-5', 'nikos', 'Nikos', 'parking is chaos after 21:00', 0, 'published'),
-  ('b42a81f3-2f34-4629-9f21-aeb56ce020d3', 'post', 'post-5', 'maria', 'Maria', 'worth it tho', 1, 'published'),
-  ('16ecd7bd-09ab-4e06-b90a-47108a443e0f', 'post', 'post-5', 'eleni', 'Eleni', 'go before sunset, way calmer', 2, 'published'),
-  ('77b6591e-9091-475d-aaa5-f93588e4fba1', 'post', 'post-6', 'nikos', 'Nikos', 'parking is chaos after 21:00', 0, 'published'),
-  ('18eb1189-9ca3-4f25-a329-476199366533', 'post', 'post-6', 'maria', 'Maria', 'worth it tho', 1, 'published'),
-  ('7f33e7df-b73a-4e2f-ac6e-5c90fd7dced1', 'post', 'post-7', 'nikos', 'Nikos', 'parking is chaos after 21:00', 0, 'published'),
-  ('d37cada1-83f7-483e-a5f5-d2649f46cceb', 'post', 'post-7', 'maria', 'Maria', 'worth it tho', 1, 'published'),
-  ('69070050-93ac-4ea8-a289-652727f3381b', 'post', 'post-7', 'eleni', 'Eleni', 'go before sunset, way calmer', 2, 'published'),
-  ('52a3f469-97ff-4da0-a288-0118babd0105', 'post', 'post-8', 'nikos', 'Nikos', 'parking is chaos after 21:00', 0, 'published'),
-  ('b2d8fbfe-c31e-48f3-8653-dbbe0a94638e', 'post', 'post-8', 'maria', 'Maria', 'worth it tho', 1, 'published'),
-  ('fd8c6ce8-c3a1-4620-9a77-456af0f26990', 'post', 'post-8', 'eleni', 'Eleni', 'go before sunset, way calmer', 2, 'published')
-on conflict (id) do update set
-    target_type = excluded.target_type,
-    post_id = excluded.post_id,
-    author_id = excluded.author_id,
-    author_name = excluded.author_name,
-    text = excluded.text,
-    sort_order = excluded.sort_order,
-    moderation_status = excluded.moderation_status;
-
 insert into public.events (id, title, place_id, display_time, price, vibe, tags, sort_order)
 values
   ('event-1', 'Beach set at Kourouta', 'kourouta-sunset', 'Tonight · 22:30', 'free entry', 'beach → after', array['dj', 'beach', 'after']::text[], 0),
