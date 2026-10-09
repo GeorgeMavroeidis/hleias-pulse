@@ -1,11 +1,30 @@
 import assert from "node:assert/strict";
+import { env } from "node:process";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "@/lib/i18n";
 import type { Place } from "@/lib/hp-model";
 import type { ComposerMode } from "./pulse-shared";
-import { CreateComposerModal } from "./CreateComposerModal";
+
+async function loadComposer() {
+  const originalUrl = env.SUPABASE_URL;
+  const originalKey = env.SUPABASE_PUBLISHABLE_KEY;
+  env.SUPABASE_URL = "http://127.0.0.1:54321";
+  env.SUPABASE_PUBLISHABLE_KEY = "local-test-public-key";
+  try {
+    // The component transitively imports the real client; never let this test
+    // initialize it with the hosted defaults, even when no request is made.
+    return await import("./CreateComposerModal");
+  } finally {
+    if (originalUrl === undefined) delete env.SUPABASE_URL;
+    else env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) delete env.SUPABASE_PUBLISHABLE_KEY;
+    else env.SUPABASE_PUBLISHABLE_KEY = originalKey;
+  }
+}
+
+const { CreateComposerModal } = await loadComposer();
 
 const places = [
   {
