@@ -34,6 +34,7 @@ interface Props {
   onToggleSave?: (placeId: string) => void;
   savedPlaceIds?: string[];
   previewMode?: boolean;
+  nowMs?: number;
 }
 
 const HOLD_TO_PAUSE_MS = 320;
@@ -108,7 +109,7 @@ function StoryProgressBar({
 }
 
 /* ---------- author chip ---------- */
-function AuthorChip({ story }: { story: PlaceStory }) {
+function AuthorChip({ story, nowMs }: { story: PlaceStory; nowMs: number }) {
   const { language, t } = useI18n();
   const color = STORY_AUTHOR_COLOR[story.authorType];
   return (
@@ -132,7 +133,7 @@ function AuthorChip({ story }: { story: PlaceStory }) {
           </span>
         </div>
         <div className="text-[10px] font-semibold text-white/70">
-          {formatStoryTime(story.minutesAgo, story.createdAt, language)} ·{" "}
+          {formatStoryTime(story.minutesAgo, story.createdAt, language, nowMs)} ·{" "}
           {t(STORY_KIND_LABEL[story.kind])}
         </div>
       </div>
@@ -241,6 +242,7 @@ export function PlaceStoryViewer({
   onToggleSave,
   savedPlaceIds = [],
   previewMode = false,
+  nowMs = Date.now(),
 }: Props) {
   const { language, t } = useI18n();
   const reducedMotion = useReducedMotion();
@@ -597,7 +599,7 @@ export function PlaceStoryViewer({
             {!atEnd && (
               <div className="absolute inset-x-0 bottom-0 z-[7] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10">
                 <div className="mb-3">
-                  <AuthorChip story={story} />
+                  <AuthorChip story={story} nowMs={nowMs} />
                 </div>
                 {story.caption && (
                   <p className="mb-2.5 text-[14px] font-medium leading-snug text-white">

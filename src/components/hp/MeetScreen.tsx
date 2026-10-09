@@ -45,6 +45,7 @@ interface Props {
   onOpenPlace: (placeId: string) => void;
   onCreate: () => void;
   previewMode?: boolean;
+  nowMs?: number;
 }
 
 export function MeetScreen({
@@ -55,16 +56,16 @@ export function MeetScreen({
   onOpenPlace,
   onCreate,
   previewMode = false,
+  nowMs = Date.now(),
 }: Props) {
   const { t } = useI18n();
   const moderation = useModeration();
   const [filter, setFilter] = useState<Filter>("all");
 
   const filtered = useMemo(() => {
-    const now = Date.now();
     return (
       events
-        .filter((e) => +new Date(e.happensAt) >= now - 60 * 60 * 1000) // hide long-past
+        .filter((e) => +new Date(e.happensAt) >= nowMs - 60 * 60 * 1000) // hide long-past
         // Blocked hosts are filtered server-side; muted ones are hidden here.
         .filter((e) => !moderation.isHidden(e.userId))
         .filter((e) => {
@@ -74,7 +75,7 @@ export function MeetScreen({
         })
         .sort((a, b) => +new Date(a.happensAt) - +new Date(b.happensAt))
     );
-  }, [events, filter, moderation, rsvp]);
+  }, [events, filter, moderation, rsvp, nowMs]);
 
   const mineCount = events.filter((e) => rsvp[e.id]).length;
 
@@ -153,6 +154,7 @@ export function MeetScreen({
                   onToggle={onToggleRsvp}
                   onOpenPlace={onOpenPlace}
                   previewMode={previewMode}
+                  nowMs={nowMs}
                 />
               ))}
             </AnimatePresence>

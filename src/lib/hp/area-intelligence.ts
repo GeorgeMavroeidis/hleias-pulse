@@ -1,11 +1,18 @@
 import type { PulseData } from "@/lib/hp-api";
-import type { Comment, Place } from "@/lib/hp-model";
+import type { Place } from "@/lib/hp-model";
 import { areaIdForPlaceId, groupPlacesByArea } from "@/lib/hp/area-catalog";
-import { aggregatePulseMetrics, buildPulseActivitySnapshot } from "@/lib/hp/pulse-activity";
+import {
+  ACTIVITY_EVIDENCE_WEIGHTS,
+  buildPlaceEvidence,
+  evidenceScore,
+  type ActivityEvidence,
+  type ActivityEvidenceKind,
+} from "@/lib/hp/activity-evidence";
+import { evaluateFreshness, FRESHNESS_LIMITS } from "@/lib/hp/freshness";
+export type { ActivityEvidence, ActivityEvidenceKind } from "@/lib/hp/activity-evidence";
 
 export type AreaState = "calm" | "rising" | "active" | "hot" | "cooling";
 export type SignalQuality = "confirmed" | "stable" | "fading" | "uncertain";
-export type ActivityEvidenceKind = "story" | "post" | "meetEvent" | "event" | "comment";
 
 export type AreaIntelligenceEvidence = {
   recentWeight: number;
@@ -42,8 +49,6 @@ export type AreaIntelligenceConfig = {
   fadingFreshMs: number;
   futureToleranceMs: number;
   evidenceSaturationWeight: number;
-  legacyFullScore: number;
-  legacyActivityShare: number;
   thresholds: {
     active: number;
     hot: number;
@@ -71,23 +76,15 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 
 export const AREA_INTELLIGENCE_CONFIG: AreaIntelligenceConfig = {
-  evidenceWeights: {
-    story: 1.25,
-    post: 1,
-    meetEvent: 1,
-    event: 0.6,
-    comment: 0.35,
-  },
-  recentWindowMs: 90 * MINUTE,
-  baselineWindowMs: 6 * HOUR,
+  evidenceWeights: ACTIVITY_EVIDENCE_WEIGHTS,
+  recentWindowMs: FRESHNESS_LIMITS.recentMs,
+  baselineWindowMs: FRESHNESS_LIMITS.historicalMs,
   consistencyBucketMs: 30 * MINUTE,
-  confirmedFreshMs: 45 * MINUTE,
-  stableFreshMs: 3 * HOUR,
+  confirmedFreshMs: FRESHNESS_LIMITS.currentMs,
+  stableFreshMs: FRESHNESS_LIMITS.recentMs,
   fadingFreshMs: 8 * HOUR,
-  futureToleranceMs: 5 * MINUTE,
+  futureToleranceMs: FRESHNESS_LIMITS.futureToleranceMs,
   evidenceSaturationWeight: 4,
-  legacyFullScore: 105,
-  legacyActivityShare: 0.5,
   thresholds: {
     active: 45,
     hot: 75,
@@ -111,16 +108,10 @@ export const AREA_INTELLIGENCE_CONFIG: AreaIntelligenceConfig = {
   },
 };
 
-export type ActivityEvidence = {
-  kind: ActivityEvidenceKind;
-  timestamp: number | null;
-  contributorId: string | null;
-  weight: number;
-};
-
 export type AreaObservation = {
   areaId: string;
-  legacyRawScore: number;
+  /** Old payloads may contain this field; it never establishes current activity. */
+  legacyRawScore?: number;
   evidence: ActivityEvidence[];
   observedAt: number;
 };
@@ -138,115 +129,21 @@ const round = (value: number, digits = 0) => {
   return Math.round(value * multiplier) / multiplier;
 };
 
-function parseEvidenceTimestamp(value: string | null | undefined, now: number, tolerance: number) {
-  if (!value) return null;
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp) || timestamp > now + tolerance) return null;
-  return timestamp;
-}
-
-function contributorId(value: {
-  profileId?: string | null;
-  userId?: string | null;
-  author?: string;
-}) {
-  return value.profileId ?? value.userId ?? value.author ?? null;
-}
-
-function evidenceScore(weight: number, saturationWeight: number) {
-  return 100 * (1 - Math.exp(-Math.max(0, weight) / saturationWeight));
-}
-
-function pushEvidence(
-  target: Map<string, ActivityEvidence[]>,
-  placeId: string,
-  kind: ActivityEvidenceKind,
-  createdAt: string | null | undefined,
-  contributor: string | null,
-  now: number,
-  config: AreaIntelligenceConfig,
-) {
-  const areaId = areaIdForPlaceId(placeId);
-  const item: ActivityEvidence = {
-    kind,
-    timestamp: parseEvidenceTimestamp(createdAt, now, config.futureToleranceMs),
-    contributorId: contributor,
-    weight: config.evidenceWeights[kind],
-  };
-  const current = target.get(areaId);
-  if (current) current.push(item);
-  else target.set(areaId, [item]);
-}
-
-function addCommentEvidence(
-  target: Map<string, ActivityEvidence[]>,
-  placeId: string,
-  comment: Comment,
-  now: number,
-  config: AreaIntelligenceConfig,
-) {
-  pushEvidence(target, placeId, "comment", comment.createdAt, contributorId(comment), now, config);
-}
-
 export function buildAreaObservations(
   data: PulseData,
   observedAt: number,
   config: AreaIntelligenceConfig = AREA_INTELLIGENCE_CONFIG,
 ): AreaObservation[] {
-  const evidenceByArea = new Map<string, ActivityEvidence[]>();
-
-  data.posts.forEach((post) => {
-    pushEvidence(
-      evidenceByArea,
-      post.placeId,
-      "post",
-      post.createdAt,
-      contributorId(post),
-      observedAt,
-      config,
-    );
-    post.comments.forEach((comment) =>
-      addCommentEvidence(evidenceByArea, post.placeId, comment, observedAt, config),
-    );
-  });
-  Object.entries(data.placeComments).forEach(([placeId, comments]) => {
-    comments.forEach((comment) =>
-      addCommentEvidence(evidenceByArea, placeId, comment, observedAt, config),
-    );
-  });
-  data.events.forEach((event) =>
-    pushEvidence(evidenceByArea, event.placeId, "event", event.createdAt, null, observedAt, config),
-  );
-  data.meetEvents.forEach((event) =>
-    pushEvidence(
-      evidenceByArea,
-      event.placeId,
-      "meetEvent",
-      event.createdAt,
-      contributorId(event),
-      observedAt,
-      config,
-    ),
-  );
-  data.stories.forEach((story) =>
-    pushEvidence(
-      evidenceByArea,
-      story.placeId,
-      "story",
-      story.createdAt,
-      contributorId(story),
-      observedAt,
-      config,
-    ),
-  );
-
-  const activitySnapshot = buildPulseActivitySnapshot(data);
+  const evidenceByPlace = buildPlaceEvidence(data, observedAt, config.evidenceWeights);
   return [...groupPlacesByArea(data.places).entries()].map(([areaId, places]) => ({
     areaId,
-    legacyRawScore: aggregatePulseMetrics(places, activitySnapshot).score,
-    evidence: evidenceByArea.get(areaId) ?? [],
+    evidence: places.flatMap((place) => evidenceByPlace.get(place.id) ?? []),
     observedAt,
   }));
+}
+
+function freshnessForEvidence(item: ActivityEvidence, nowMs: number) {
+  return evaluateFreshness({ observedAt: item.timestamp, expiresAt: item.expiresAt, nowMs });
 }
 
 function summarizeBuckets(
@@ -256,16 +153,19 @@ function summarizeBuckets(
 ) {
   const buckets = new Map<number, BucketSummary>();
   evidence.forEach((item) => {
-    if (item.timestamp === null || item.timestamp > observedAt + config.futureToleranceMs) return;
-    const age = Math.max(0, observedAt - item.timestamp);
-    if (age > config.fadingFreshMs) return;
-    const bucketId = Math.floor(item.timestamp / config.consistencyBucketMs);
+    const freshness = freshnessForEvidence(item, observedAt);
+    if (freshness.observedAtMs === null || freshness.ageMs === null) return;
+    if (item.expiresAt != null && observedAt >= item.expiresAt) return;
+    const age = freshness.ageMs;
+    if (age >= config.fadingFreshMs) return;
+    const timestamp = freshness.observedAtMs;
+    const bucketId = Math.floor(timestamp / config.consistencyBucketMs);
     const bucket = buckets.get(bucketId) ?? {
-      latestTimestamp: item.timestamp,
+      latestTimestamp: timestamp,
       weight: 0,
       kinds: new Set<ActivityEvidenceKind>(),
     };
-    bucket.latestTimestamp = Math.max(bucket.latestTimestamp, item.timestamp);
+    bucket.latestTimestamp = Math.max(bucket.latestTimestamp, timestamp);
     bucket.weight += item.weight;
     bucket.kinds.add(item.kind);
     buckets.set(bucketId, bucket);
@@ -278,21 +178,26 @@ export function deriveAreaIntelligence(
   config: AreaIntelligenceConfig = AREA_INTELLIGENCE_CONFIG,
 ): AreaIntelligence {
   const { evidence, observedAt } = observation;
-  const recent = evidence.filter(
-    (item) =>
-      item.timestamp !== null &&
-      item.timestamp <= observedAt + config.futureToleranceMs &&
-      observedAt - item.timestamp <= config.recentWindowMs,
-  );
-  const baseline = evidence.filter((item) => {
-    if (item.timestamp === null || item.timestamp > observedAt + config.futureToleranceMs)
-      return false;
-    const age = observedAt - item.timestamp;
-    return age > config.recentWindowMs && age <= config.baselineWindowMs;
+  const validEvidence = evidence.filter((item) => {
+    const freshness = freshnessForEvidence(item, observedAt);
+    return (
+      freshness.observedAtMs !== null && !(item.expiresAt != null && observedAt >= item.expiresAt)
+    );
   });
-  const validEvidence = evidence.filter(
-    (item) => item.timestamp !== null && item.timestamp <= observedAt + config.futureToleranceMs,
+  const current = validEvidence.filter(
+    (item) =>
+      freshnessForEvidence(item, observedAt).isCurrent &&
+      Math.max(0, observedAt - (item.timestamp as number)) < config.confirmedFreshMs,
   );
+  const recent = validEvidence.filter(
+    (item) =>
+      freshnessForEvidence(item, observedAt).isRecent &&
+      Math.max(0, observedAt - (item.timestamp as number)) < config.recentWindowMs,
+  );
+  const baseline = validEvidence.filter((item) => {
+    const age = Math.max(0, observedAt - (item.timestamp as number));
+    return age >= config.recentWindowMs && age < config.baselineWindowMs;
+  });
   const recentWeight = recent.reduce((sum, item) => sum + item.weight, 0);
   const baselineWeight = baseline.reduce((sum, item) => sum + item.weight, 0);
   const baselineDuration = config.baselineWindowMs - config.recentWindowMs;
@@ -303,14 +208,11 @@ export function deriveAreaIntelligence(
     baselineEquivalentWeight,
     config.evidenceSaturationWeight,
   );
-  const legacyScore = clamp((observation.legacyRawScore / config.legacyFullScore) * 100, 0, 100);
-  const rawActivityScore =
-    config.legacyActivityShare * legacyScore +
-    (1 - config.legacyActivityShare) * recentEvidenceScore;
+  const rawActivityScore = recentEvidenceScore;
   const activityScore = round(rawActivityScore);
-  const baselineActivityScore =
-    config.legacyActivityShare * legacyScore +
-    (1 - config.legacyActivityShare) * baselineEvidenceScore;
+  const baselineActivityScore = baselineEvidenceScore;
+  const currentWeight = current.reduce((sum, item) => sum + item.weight, 0);
+  const currentKinds = new Set(current.map((item) => item.kind));
   const recentKinds = new Set(recent.map((item) => item.kind));
   const recentContributors = new Set(
     recent.flatMap((item) => (item.contributorId ? [item.contributorId] : [])),
@@ -346,11 +248,11 @@ export function deriveAreaIntelligence(
       ? Math.max(...confirmedBuckets.map((bucket) => bucket.latestTimestamp))
       : null;
   const occupiedRecentBuckets = buckets.filter(
-    (bucket) => observedAt - bucket.latestTimestamp <= config.stableFreshMs,
+    (bucket) => observedAt - bucket.latestTimestamp < config.stableFreshMs,
   ).length;
   const timestampCoverage = evidence.length === 0 ? 0 : validEvidence.length / evidence.length;
   const recencyFactor =
-    latestSignalAge <= config.confirmedFreshMs
+    latestSignalAge < config.confirmedFreshMs
       ? 1
       : clamp(
           1 -
@@ -373,19 +275,19 @@ export function deriveAreaIntelligence(
 
   const currentlyConfirmed =
     confidenceScore >= config.thresholds.confirmedConfidence &&
-    latestSignalAge <= config.confirmedFreshMs &&
-    recentWeight >= config.thresholds.confirmedMinimumWeight &&
-    recentKinds.size >= config.thresholds.confirmedMinimumSources;
+    latestSignalAge < config.confirmedFreshMs &&
+    currentWeight >= config.thresholds.confirmedMinimumWeight &&
+    currentKinds.size >= config.thresholds.confirmedMinimumSources;
   const fading =
     !currentlyConfirmed &&
-    latestSignalAge <= config.fadingFreshMs &&
+    latestSignalAge < config.fadingFreshMs &&
     ((lastConfirmedTimestamp !== null &&
-      observedAt - lastConfirmedTimestamp > config.confirmedFreshMs) ||
-      (latestSignalAge > config.stableFreshMs && buckets.some((bucket) => bucket.weight >= 1.5)));
+      observedAt - lastConfirmedTimestamp >= config.confirmedFreshMs) ||
+      (latestSignalAge >= config.stableFreshMs && buckets.some((bucket) => bucket.weight >= 1.5)));
   const stable =
     !currentlyConfirmed &&
     !fading &&
-    latestSignalAge <= config.stableFreshMs &&
+    latestSignalAge < config.stableFreshMs &&
     confidenceScore >= config.thresholds.stableConfidence &&
     (recentWeight >= 1 || occupiedRecentBuckets >= 2);
   const signalQuality: SignalQuality = currentlyConfirmed
