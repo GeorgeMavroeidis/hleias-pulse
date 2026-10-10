@@ -44,6 +44,14 @@ import {
 } from "@/lib/hp/pulse-activity";
 import { useI18n } from "@/lib/i18n";
 import {
+  createMapViewportSync,
+  localMapFault,
+  loadMapStyleForAcceptance,
+  startMapInitialization,
+  uniqueMapPlaces,
+  type MapAttemptState,
+} from "@/lib/hp/map-initialization";
+import {
   childMarkerSize,
   markerPresenceScale,
   markerMotionPhase,
@@ -895,6 +903,13 @@ interface Props {
   storyPlaceIds?: ReadonlySet<string>;
   onSelectArea: (cluster: MapAreaCluster) => void;
   onSelectPlace: (place: Place, cluster: MapAreaCluster) => void;
+  /** Opens details directly, including when no map instance is available. */
+  onOpenPlace: (place: Place) => void;
+  totalPlaceCount: number;
+  searchQuery?: string;
+  onClearSearch?: () => void;
+  onRefreshPlaces?: () => void;
+  onAvailabilityChange?: (available: boolean) => void;
   onResetView: () => void;
   onClearSelection: () => void;
   onDiscoveryViewportChange?: (viewport: MapDiscoveryViewport) => void;
@@ -937,6 +952,12 @@ export function SocialMap({
   storyPlaceIds,
   onSelectArea,
   onSelectPlace,
+  onOpenPlace,
+  totalPlaceCount,
+  searchQuery = "",
+  onClearSearch,
+  onRefreshPlaces,
+  onAvailabilityChange,
   onResetView,
   onClearSelection,
   onDiscoveryViewportChange,
@@ -975,6 +996,7 @@ export function SocialMap({
   availableMapHeightRef.current = availableMapHeight;
   const didInitialFitRef = useRef(false);
   const lastMarkerActivationRef = useRef<{ id: string; at: number } | null>(null);
+  const previousMapReadyRef = useRef(false);
   const previousSelectionRef = useRef<{ areaId: string | null; placeId: string | null }>({
     areaId: null,
     placeId: null,
@@ -984,8 +1006,23 @@ export function SocialMap({
   const cameraHandledSelectionRef = useRef<string | null>(null);
   const ignoreBackgroundClickUntilRef = useRef(0);
   const lastZoomRef = useRef(OVERVIEW_ZOOM);
-  const [mapReady, setMapReady] = useState(false);
-  const [mapLoadError, setMapLoadError] = useState<string | null>(null);
+  const [mapAttemptNumber, setMapAttemptNumber] = useState(0);
+  const [mapAttemptState, setMapAttemptState] = useState<MapAttemptState>({
+    attempt: 0,
+    status: "loading",
+  });
+  const mapReady = mapAttemptState.status === "ready";
+  const recoveryTitleRef = useRef<HTMLHeadingElement>(null);
+  const onAvailabilityChangeRef = useRef(onAvailabilityChange);
+  onAvailabilityChangeRef.current = onAvailabilityChange;
+  useEffect(() => {
+    onAvailabilityChangeRef.current?.(mapReady);
+  }, [mapReady]);
+  const restoreMapFocusRef = useRef(false);
+  const fallbackPlaces = useMemo(
+    () => uniqueMapPlaces(clusters.map((cluster) => cluster.places)),
+    [clusters],
+  );
   const [zoom, setZoom] = useState(OVERVIEW_ZOOM);
   const [attributionExpanded, setAttributionExpanded] = useState(true);
   const selectionKey = `${selectedAreaId ?? ""}|${selectedPlaceId ?? ""}`;
@@ -1488,8 +1525,14 @@ export function SocialMap({
     const previous = previousSelectionRef.current;
     const next = { areaId: selectedAreaId, placeId: selectedPlaceId ?? null };
     previousSelectionRef.current = next;
-
+    const wasReady = previousMapReadyRef.current;
+    previousMapReadyRef.current = mapReady;
     if (!mapReady) return;
+    if (!wasReady && next.areaId && !next.placeId) {
+      const cluster = clusters.find((item) => item.id === next.areaId);
+      if (cluster) zoomIntoCluster(cluster);
+      return;
+    }
 
     const nextSelectionKey = `${next.areaId ?? ""}|${next.placeId ?? ""}`;
     if (cameraHandledSelectionRef.current === nextSelectionKey) {
@@ -1509,30 +1552,43 @@ export function SocialMap({
   }, [clusters, flyToOverview, mapReady, selectedAreaId, selectedPlaceId, zoomIntoCluster]);
 
   useEffect(() => {
-    let cancelled = false;
     let map: MapLibreMap | null = null;
     let mapHasLoaded = false;
     let zoomFrame: number | null = null;
     let effectsResumeFrame: number | null = null;
-    const basemapAbortController = new AbortController();
+    let resizeFrame: number | null = null;
     const activeMapMotion = new Set<"move" | "zoom">();
-    const cleanupFns: Array<() => void> = [];
     const markers = markersRef.current;
     const markerSigs = markerSigRef.current;
     const markerRuntimes = markerRuntimeRef.current;
-
-    Promise.all([
-      import("maplibre-gl"),
-      previewMode
-        ? Promise.resolve(localPreviewBasemapStyle())
-        : loadBoundaryFreeBasemap(basemapAbortController.signal),
-    ])
-      .then(([maplibre, basemapStyle]) => {
-        if (cancelled || !mapNodeRef.current) return;
-
+    const container = mapNodeRef.current;
+    const attempt = startMapInitialization({
+      attempt: mapAttemptNumber,
+      onStateChange: setMapAttemptState,
+      loadLibrary: () => import("maplibre-gl"),
+      loadStyle: (signal) =>
+        loadMapStyleForAcceptance(
+          localMapFault(
+            {
+              DEV: import.meta.env.DEV,
+              MODE: import.meta.env.MODE,
+              VITE_HLEIAS_LOCAL_ONLY: import.meta.env.VITE_HLEIAS_LOCAL_ONLY,
+            },
+            window.location.hostname,
+            window.location.search,
+            mapAttemptNumber,
+          ),
+          signal,
+          () =>
+            previewMode
+              ? Promise.resolve(localPreviewBasemapStyle())
+              : loadBoundaryFreeBasemap(signal),
+        ),
+      createMap: (maplibre, basemapStyle) => {
+        if (!container) throw new Error("Map container unavailable");
         maplibreModuleRef.current = maplibre;
-        map = new maplibre.Map({
-          container: mapNodeRef.current,
+        return new maplibre.Map({
+          container,
           style: basemapStyle,
           attributionControl: false,
           center: previewMode
@@ -1549,20 +1605,24 @@ export function SocialMap({
           maplibreLogo: false,
           renderWorldCopies: false,
         });
+      },
+      removeMap: (instance) => instance.remove(),
+      prepareMap: (instance, maplibre, attempt) => {
+        map = instance;
         mapRef.current = map;
-        if (previewMode) cleanupFns.push(attachLocalPreviewLand(map));
+        if (previewMode) attempt.addCleanup(attachLocalPreviewLand(map));
         const onBasemapError = (event: MapLibreErrorEvent) => {
-          console.error("Basemap rendering error", event.error ?? event);
+          if (!attempt.isActive()) return;
           const sourceId = "sourceId" in event ? event.sourceId : undefined;
           if (isFatalBasemapError(mapHasLoaded, sourceId)) {
-            setMapLoadError("The basemap could not be loaded.");
+            attempt.fail();
           }
         };
         map.on("error", onBasemapError);
-        cleanupFns.push(() => map?.off("error", onBasemapError));
+        attempt.addCleanup(() => map?.off("error", onBasemapError));
 
         const onMapClick = (event: { originalEvent: MouseEvent }) => {
-          if (Date.now() < ignoreBackgroundClickUntilRef.current) return;
+          if (!attempt.isActive() || Date.now() < ignoreBackgroundClickUntilRef.current) return;
           const target = event.originalEvent?.target as Element | null;
           if (target?.closest(".maplibregl-marker, .maplibregl-control-container, button, a"))
             return;
@@ -1572,15 +1632,15 @@ export function SocialMap({
           onClearSelectionRef.current();
         };
         map.on("click", onMapClick);
-        cleanupFns.push(() => map?.off("click", onMapClick));
+        attempt.addCleanup(() => map?.off("click", onMapClick));
 
         if (mapNodeRef.current) {
           const mapContainer = mapNodeRef.current;
           const resizeObserver = new ResizeObserver(() => {
-            map?.resize();
+            if (attempt.isActive()) map?.resize();
           });
           resizeObserver.observe(mapContainer);
-          cleanupFns.push(() => resizeObserver.disconnect());
+          attempt.addCleanup(() => resizeObserver.disconnect());
         }
 
         // Long-press -> drop-pin (open composer pre-filled)
@@ -1594,13 +1654,13 @@ export function SocialMap({
             pressPoint = null;
           };
           const onDown = (ev: PointerEvent) => {
-            if (ev.button !== 0) return;
+            if (!attempt.isActive() || ev.button !== 0) return;
             const target = ev.target as HTMLElement | null;
             if (target?.closest(".maplibregl-marker, .maplibregl-control-container, button, a"))
               return;
             pressPoint = { x: ev.clientX, y: ev.clientY };
             pressTimer = window.setTimeout(() => {
-              if (!map || !pressPoint) return;
+              if (!attempt.isActive() || !map || !pressPoint) return;
               const rect = container.getBoundingClientRect();
               const ll = map.unproject([pressPoint.x - rect.left, pressPoint.y - rect.top]);
               ignoreBackgroundClickUntilRef.current = Date.now() + 700;
@@ -1622,7 +1682,7 @@ export function SocialMap({
           container.addEventListener("pointerup", clearPress);
           container.addEventListener("pointercancel", clearPress);
           container.addEventListener("pointerleave", clearPress);
-          cleanupFns.push(() => {
+          attempt.addCleanup(() => {
             clearPress();
             container.removeEventListener("pointerdown", onDown);
             container.removeEventListener("pointermove", onMove);
@@ -1633,11 +1693,11 @@ export function SocialMap({
         }
 
         const syncZoom = () => {
-          if (!map) return;
+          if (!attempt.isActive() || !map) return;
           if (zoomFrame !== null) return;
           zoomFrame = window.requestAnimationFrame(() => {
             zoomFrame = null;
-            if (!map) return;
+            if (!attempt.isActive() || !map) return;
             const nextZoom = map.getZoom();
             lastZoomRef.current = nextZoom;
             applyMarkerZoomProfile(mapNodeRef.current, nextZoom);
@@ -1646,7 +1706,12 @@ export function SocialMap({
         };
         map.on("zoom", syncZoom);
         map.on("zoomend", syncZoom);
+        attempt.addCleanup(() => {
+          map?.off("zoom", syncZoom);
+          map?.off("zoomend", syncZoom);
+        });
         const pauseMarkerEffects = (kind: "move" | "zoom") => {
+          if (!attempt.isActive()) return;
           activeMapMotion.add(kind);
           if (effectsResumeFrame !== null) {
             window.cancelAnimationFrame(effectsResumeFrame);
@@ -1655,10 +1720,12 @@ export function SocialMap({
           mapNodeRef.current?.classList.add("hp-map-is-moving");
         };
         const resumeMarkerEffects = (kind: "move" | "zoom") => {
+          if (!attempt.isActive()) return;
           activeMapMotion.delete(kind);
           if (activeMapMotion.size > 0) return;
           effectsResumeFrame = window.requestAnimationFrame(() => {
             effectsResumeFrame = null;
+            if (!attempt.isActive()) return;
             mapNodeRef.current?.classList.remove("hp-map-is-moving");
             scheduleMarkerViewportSyncRef.current();
           });
@@ -1673,67 +1740,102 @@ export function SocialMap({
         map.on("zoomstart", onZoomStart);
         map.on("moveend", onMoveEnd);
         map.on("zoomend", onZoomEnd);
-        cleanupFns.push(() => {
+        attempt.addCleanup(() => {
           map?.off("movestart", onMoveStart);
           map?.off("zoomstart", onZoomStart);
           map?.off("moveend", onMoveEnd);
           map?.off("zoomend", onZoomEnd);
         });
         const onMapReady = () => {
-          if (cancelled || !map) return;
+          if (!attempt.isActive() || !map) return;
           mapHasLoaded = true;
           const readyZoom = map.getZoom();
           lastZoomRef.current = readyZoom;
           applyMarkerZoomProfile(mapNodeRef.current, readyZoom);
           setZoom(readyZoom);
-          setMapReady(true);
-          setMapLoadError(null);
-          window.setTimeout(() => map?.resize(), 0);
+          attempt.ready();
+          resizeFrame = window.requestAnimationFrame(() => {
+            resizeFrame = null;
+            if (attempt.isActive()) map?.resize();
+          });
         };
-        map.once(previewMode ? "style.load" : "load", onMapReady);
-      })
-      .catch((error: unknown) => {
-        if (cancelled || (error instanceof DOMException && error.name === "AbortError")) return;
-        const message = error instanceof Error ? error.message : "The basemap could not be loaded.";
-        console.error(message);
-        setMapLoadError(message);
-      });
-
-    return () => {
-      cancelled = true;
-      basemapAbortController.abort();
-      if (zoomFrame !== null) {
-        window.cancelAnimationFrame(zoomFrame);
-      }
-      if (effectsResumeFrame !== null) {
-        window.cancelAnimationFrame(effectsResumeFrame);
-      }
-      cleanupFns.forEach((cleanup) => cleanup());
-      setMapReady(false);
+        const readyEvent = previewMode ? "style.load" : "load";
+        map.once(readyEvent, onMapReady);
+        attempt.addCleanup(() => map?.off(readyEvent, onMapReady));
+      },
+    });
+    // Registered before the async import/fetch can settle, including constructor
+    // failure paths where MapLibre has appended DOM but returned no map object.
+    attempt.addCleanup(() => {
+      if (zoomFrame !== null) window.cancelAnimationFrame(zoomFrame);
+      if (effectsResumeFrame !== null) window.cancelAnimationFrame(effectsResumeFrame);
+      if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       markers.forEach((marker) => marker.remove());
       markers.clear();
       markerSigs.clear();
       markerRuntimes.clear();
+      renderNodesRef.current.clear();
       routeStopMarkersRef.current.forEach((marker) => marker.remove());
       routeStopMarkersRef.current = [];
       userMarkerRef.current?.remove();
-      map?.remove();
+      userMarkerRef.current = null;
       mapRef.current = null;
       maplibreModuleRef.current = null;
-      userMarkerRef.current = null;
-    };
-  }, [previewMode]);
+      map = null;
+      container?.replaceChildren();
+      container?.classList.remove("hp-map-is-moving");
+      didInitialFitRef.current = false;
+      lastFocusedPlaceIdRef.current = null;
+      cameraHandledSelectionRef.current = null;
+      lastDiscoveryViewportRef.current = "";
+      scheduleMarkerViewportSyncRef.current = () => {};
+    });
+    return () => attempt.dispose();
+  }, [previewMode, mapAttemptNumber]);
+
+  useEffect(() => {
+    const focused = document.activeElement;
+    const focusOnRecovery =
+      !focused || focused === document.body || focused === recoveryTitleRef.current;
+    if (restoreMapFocusRef.current) {
+      // A user who moved into search or opened details during the retry keeps
+      // their focus there when the asynchronous attempt settles.
+      if (!focusOnRecovery) {
+        restoreMapFocusRef.current = false;
+        return;
+      }
+      if (mapAttemptState.status === "ready") {
+        mapNodeRef.current?.focus({ preventScroll: true });
+        restoreMapFocusRef.current = false;
+      } else {
+        recoveryTitleRef.current?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    if (mapAttemptState.status !== "error") return;
+    if (focusOnRecovery || mapNodeRef.current?.contains(focused)) {
+      recoveryTitleRef.current?.focus({ preventScroll: true });
+    }
+  }, [mapAttemptState]);
+
+  const retryMap = () => {
+    restoreMapFocusRef.current = true;
+    recoveryTitleRef.current?.focus({ preventScroll: true });
+    setMapAttemptState({ attempt: mapAttemptNumber + 1, status: "loading" });
+    setMapAttemptNumber((value) => value + 1);
+  };
 
   useEffect(() => {
     const map = mapRef.current;
     if (!mapReady || !map) return;
-    let frame: number | null = null;
-    const schedule = () => {
-      if (frame !== null) return;
-      frame = requestAnimationFrame(() => {
-        frame = null;
+    const viewportSync = createMapViewportSync({
+      map,
+      getCurrentMap: () => mapRef.current,
+      requestFrame: (callback) => window.requestAnimationFrame(callback),
+      cancelFrame: (frame) => window.cancelAnimationFrame(frame),
+      readViewport: () => {
         // The settle event schedules a fresh pass; do not re-grid each zoom frame.
-        if (mapNodeRef.current?.classList.contains("hp-map-is-moving")) return;
+        if (mapNodeRef.current?.classList.contains("hp-map-is-moving")) return null;
         const size = { x: map.getCanvas().clientWidth, y: map.getCanvas().clientHeight };
         const height = Math.max(
           0,
@@ -1784,14 +1886,19 @@ export function SocialMap({
           center: { lat: center.lat, lng: center.lng },
           visibleAreaIds: [...visibleAreaIds].sort(),
         };
-        const viewportSignature = `${center.lat.toFixed(5)}:${center.lng.toFixed(5)}:${viewport.visibleAreaIds.join(",")}`;
+        return viewport;
+      },
+      publishViewport: (viewport) => {
+        const viewportSignature = `${viewport.center.lat.toFixed(5)}:${viewport.center.lng.toFixed(5)}:${viewport.visibleAreaIds.join(",")}`;
         if (viewportSignature !== lastDiscoveryViewportRef.current) {
           lastDiscoveryViewportRef.current = viewportSignature;
           onDiscoveryViewportChangeRef.current?.(viewport);
         }
-      });
-    };
+      },
+    });
+    const schedule = viewportSync.schedule;
     const onVisibilityChange = () => {
+      if (!viewportSync.isCurrent()) return;
       // A hidden document may suspend rAF, so pause its animations immediately.
       mapNodeRef.current?.classList.toggle("hp-pulse-paused", document.hidden);
       schedule();
@@ -1803,7 +1910,10 @@ export function SocialMap({
     document.addEventListener("visibilitychange", onVisibilityChange);
     schedule();
     return () => {
-      scheduleMarkerViewportSyncRef.current = () => {};
+      viewportSync.dispose();
+      if (scheduleMarkerViewportSyncRef.current === schedule) {
+        scheduleMarkerViewportSyncRef.current = () => {};
+      }
       map.off("moveend", schedule);
       map.off("zoomend", schedule);
       map.off("resize", schedule);
@@ -2335,6 +2445,7 @@ export function SocialMap({
     if (!map || !maplibre || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
+        if (mapRef.current !== map || maplibreModuleRef.current !== maplibre) return;
         const lngLat: [number, number] = [coords.longitude, coords.latitude];
         if (userMarkerRef.current) userMarkerRef.current.setLngLat(lngLat);
         else {
@@ -2381,35 +2492,91 @@ export function SocialMap({
 
   return (
     <div
-      className={`hp-real-map relative z-0 h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""} ${activeLens ? "has-discovery-lens" : ""} ${mapChromeHidden ? "is-map-compressed" : ""}`}
+      className={`hp-real-map relative ${mapReady ? "z-0" : "z-40"} h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""} ${activeLens ? "has-discovery-lens" : ""} ${mapChromeHidden ? "is-map-compressed" : ""}`}
+      data-map-state={mapAttemptState.status}
+      data-map-attempt={mapAttemptState.attempt}
       data-discovery-lens={activeLens ?? undefined}
       style={mapStyle}
     >
-      <div ref={mapNodeRef} className="h-full w-full" aria-label={t("Interactive map of Ilia")} />
+      <div
+        ref={mapNodeRef}
+        className="h-full w-full"
+        tabIndex={mapReady ? 0 : -1}
+        role="region"
+        aria-busy={!mapReady}
+        inert={!mapReady}
+        aria-hidden={!mapReady}
+        aria-label={t("Interactive map of Ilia")}
+      />
 
-      {mapLoadError ? (
-        <div
-          role="alert"
-          className="absolute inset-0 z-40 grid place-items-center bg-hp-paper/94 p-6 text-center text-sm text-hp-ink/70"
-        >
-          <div>
-            <p>{mapLoadError}</p>
-            <button
-              type="button"
-              className="mt-3 rounded-full bg-hp-ink px-4 py-2 font-bold text-hp-paper"
-              onClick={() => window.location.reload()}
-            >
-              {t("Retry map")}
-            </button>
+      {!mapReady && (
+        <section className="hp-map-recovery" aria-label={t("Map recovery")}>
+          <div className="hp-map-recovery__status">
+            <h2 ref={recoveryTitleRef} tabIndex={-1} className="hp-map-recovery__title">
+              {t(mapAttemptState.status === "error" ? "Map unavailable" : "Loading map")}
+            </h2>
+            <p role={mapAttemptState.status === "error" ? "alert" : "status"}>
+              {t(
+                mapAttemptState.status === "error"
+                  ? mapAttemptState.failure === "timeout"
+                    ? "The map is taking too long to load."
+                    : "The map could not be loaded."
+                  : "You can browse places while the map loads.",
+              )}
+            </p>
+            {mapAttemptState.status === "error" && (
+              <button type="button" className="hp-map-recovery__action" onClick={retryMap}>
+                {t("Retry map")}
+              </button>
+            )}
           </div>
-        </div>
-      ) : !mapReady ? (
-        <div className="pointer-events-none absolute inset-0 grid place-items-center bg-hp-paper/70">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-hp-ink/15 border-t-hp-sunset">
-            <span className="sr-only">{t("Loading map")}</span>
+          <div className="hp-map-recovery__places">
+            <h3>{t("Browse places")}</h3>
+            {searchQuery.trim() && <p>{t("Results for {query}", { query: searchQuery.trim() })}</p>}
+            {fallbackPlaces.length > 0 ? (
+              <ul
+                className="hp-map-recovery__list"
+                aria-label={t("Places matching the map filters")}
+              >
+                {fallbackPlaces.map((place) => (
+                  <li key={place.id}>
+                    <button type="button" onClick={() => onOpenPlace(place)}>
+                      <span>{place.name}</span>
+                      <span>{place.area}</span>
+                      <span className="sr-only">{t("Open place details")}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="hp-map-recovery__empty">
+                <p>
+                  {t(
+                    totalPlaceCount === 0
+                      ? "No places available right now."
+                      : "No places match this search.",
+                  )}
+                </p>
+                {totalPlaceCount > 0 && searchQuery.trim() && onClearSearch ? (
+                  <button type="button" className="hp-map-recovery__action" onClick={onClearSearch}>
+                    {t("Clear search")}
+                  </button>
+                ) : onRefreshPlaces ? (
+                  <button
+                    type="button"
+                    className="hp-map-recovery__action"
+                    onClick={onRefreshPlaces}
+                  >
+                    {t("Refresh places")}
+                  </button>
+                ) : (
+                  <p>{t("Try again when your connection is available.")}</p>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      ) : null}
+        </section>
+      )}
 
       {mapReady && (
         <div className="hp-map-attribution" data-expanded={attributionExpanded ? "true" : "false"}>
@@ -2451,7 +2618,7 @@ export function SocialMap({
         </div>
       )}
 
-      {canGoBack && onBack && (
+      {mapReady && canGoBack && onBack && (
         <button
           type="button"
           onClick={onBack}
@@ -2462,12 +2629,14 @@ export function SocialMap({
         </button>
       )}
 
-      <div className="hp-map-summary pointer-events-none">
-        <span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-hp-sunset" />
-        <span className="hp-map-summary__text">{summaryText}</span>
-      </div>
+      {mapReady && (
+        <div className="hp-map-summary pointer-events-none">
+          <span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-hp-sunset" />
+          <span className="hp-map-summary__text">{summaryText}</span>
+        </div>
+      )}
 
-      {discoveryChipClusters.length > 0 && (
+      {mapReady && discoveryChipClusters.length > 0 && (
         <div
           className={`hp-map-chip-rail hp-no-scrollbar ${canGoBack ? "has-back" : ""} ${selectedAreaId ? "has-selection" : ""}`}
           inert={mapChromeHidden ? true : undefined}
@@ -2496,58 +2665,60 @@ export function SocialMap({
         </div>
       )}
 
-      <div
-        className={`hp-map-utility-rail ${utilityRailHidden ? "is-hidden" : ""}`}
-        inert={utilityRailHidden ? true : undefined}
-        aria-hidden={utilityRailHidden ? true : undefined}
-      >
-        <div className="hp-map-control-group" role="group" aria-label={t("Map zoom controls")}>
-          <button
-            type="button"
-            onClick={() => mapRef.current?.zoomIn()}
-            disabled={!mapReady || zoom >= MAX_ZOOM}
-            tabIndex={utilityRailHidden ? -1 : undefined}
-            className="hp-icon-button hp-map-icon-button"
-            aria-label={t("Zoom in map")}
-          >
-            <Plus size={17} strokeWidth={2.5} />
-          </button>
-          <button
-            type="button"
-            onClick={zoomOut}
-            disabled={!mapReady || zoom <= MIN_ZOOM}
-            tabIndex={utilityRailHidden ? -1 : undefined}
-            className="hp-icon-button hp-map-icon-button"
-            aria-label={t("Zoom out map")}
-          >
-            <Minus size={17} strokeWidth={2.5} />
-          </button>
-        </div>
-        <div className="hp-map-control-group" role="group" aria-label={t("Map view controls")}>
-          {!previewMode && (
+      {mapReady && (
+        <div
+          className={`hp-map-utility-rail ${utilityRailHidden ? "is-hidden" : ""}`}
+          inert={utilityRailHidden ? true : undefined}
+          aria-hidden={utilityRailHidden ? true : undefined}
+        >
+          <div className="hp-map-control-group" role="group" aria-label={t("Map zoom controls")}>
             <button
               type="button"
-              onClick={locateUser}
+              onClick={() => mapRef.current?.zoomIn()}
+              disabled={!mapReady || zoom >= MAX_ZOOM}
+              tabIndex={utilityRailHidden ? -1 : undefined}
+              className="hp-icon-button hp-map-icon-button"
+              aria-label={t("Zoom in map")}
+            >
+              <Plus size={17} strokeWidth={2.5} />
+            </button>
+            <button
+              type="button"
+              onClick={zoomOut}
+              disabled={!mapReady || zoom <= MIN_ZOOM}
+              tabIndex={utilityRailHidden ? -1 : undefined}
+              className="hp-icon-button hp-map-icon-button"
+              aria-label={t("Zoom out map")}
+            >
+              <Minus size={17} strokeWidth={2.5} />
+            </button>
+          </div>
+          <div className="hp-map-control-group" role="group" aria-label={t("Map view controls")}>
+            {!previewMode && (
+              <button
+                type="button"
+                onClick={locateUser}
+                disabled={!mapReady}
+                tabIndex={utilityRailHidden ? -1 : undefined}
+                className="hp-icon-button hp-map-icon-button"
+                aria-label={t("Find my location")}
+              >
+                <Crosshair size={17} strokeWidth={2.2} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={resetToOverview}
               disabled={!mapReady}
               tabIndex={utilityRailHidden ? -1 : undefined}
               className="hp-icon-button hp-map-icon-button"
-              aria-label={t("Find my location")}
+              aria-label={t("Show Ilia overview")}
             >
-              <Crosshair size={17} strokeWidth={2.2} />
+              <MapPinned size={17} strokeWidth={2.2} />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={resetToOverview}
-            disabled={!mapReady}
-            tabIndex={utilityRailHidden ? -1 : undefined}
-            className="hp-icon-button hp-map-icon-button"
-            aria-label={t("Show Ilia overview")}
-          >
-            <MapPinned size={17} strokeWidth={2.2} />
-          </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

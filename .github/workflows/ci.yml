@@ -73,6 +73,9 @@ jobs:
       - name: Test — push security
         run: npm run test:push-security
 
+      - name: Test — map recovery
+        run: npm run test:map-recovery
+
       - name: Test — map visuals
         run: npm run test:map-visuals
 
