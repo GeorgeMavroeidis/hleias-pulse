@@ -334,6 +334,7 @@ export function PulseApp() {
     null,
   );
   const [query, setQuery] = useState("");
+  const [mapAvailable, setMapAvailable] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [markerAnimationTheme, setMarkerAnimationTheme] = useState<MarkerAnimationTheme>(
@@ -2049,6 +2050,12 @@ export function PulseApp() {
         >
           <SocialMap
             clusters={mapClusters}
+            totalPlaceCount={places.length}
+            onAvailabilityChange={setMapAvailable}
+            searchQuery={query}
+            onClearSearch={() => setQuery("")}
+            onRefreshPlaces={() => void refreshPulseData()}
+            onOpenPlace={setOpenPlace}
             events={events}
             activitySnapshot={activitySnapshot}
             selectedAreaId={selectedAreaId}
@@ -2072,47 +2079,49 @@ export function PulseApp() {
               showToast(t("Drop a new spot"));
             }}
           />
-          <AnimatePresence>
-            {activeRoute && (
-              <Suspense fallback={null}>
-                <ActiveRouteGuide
-                  route={activeRoute}
-                  stopIndex={activeRouteStopIndex}
-                  findPlace={findPlace}
-                  onOpenStop={centerRouteStop}
-                  onNext={nextRouteStop}
-                  onNavigate={(placeId, provider) => void navigateRouteStop(placeId, provider)}
-                  onClose={() => setActiveRouteId(null)}
-                />
-              </Suspense>
-            )}
-          </AnimatePresence>
-          <MapBottomSheet
-            cluster={selectedCluster}
-            selectedPlace={sel}
-            events={events}
-            storyGroups={placeStoryGroups}
-            onOpenStory={(placeId) => setStoryViewer({ placeId })}
-            height={sheetH}
-            peek={peek}
-            half={half}
-            full={full}
-            onSetSnap={setSheetH}
-            onIdleHeightMeasured={setIdlePeek}
-            onOpenDetails={(p) => setOpenPlace(p)}
-            onSavePlace={toggleSave}
-            onSharePlace={sharePlace}
-            savedPlaceIds={savedIds}
-            claimedPlaceIds={pulseData.claimedPlaceIds}
-            dealPlaceIds={pulseData.dealPlaceIds}
-            activeLens={activeLens}
-            searchQuery={mapClusters.length === 0 ? query : ""}
-            showDiscoveryEmptyState={showDiscoveryEmptyState}
-            discoverySuggestion={discoverySuggestion}
-            onOpenDiscoverySuggestion={selectAreaPreview}
-            onClearLens={() => setActiveLens(null)}
-            onClearSearch={() => setQuery("")}
-          />
+          <div className="contents" inert={!mapAvailable} aria-hidden={!mapAvailable}>
+            <AnimatePresence>
+              {activeRoute && (
+                <Suspense fallback={null}>
+                  <ActiveRouteGuide
+                    route={activeRoute}
+                    stopIndex={activeRouteStopIndex}
+                    findPlace={findPlace}
+                    onOpenStop={centerRouteStop}
+                    onNext={nextRouteStop}
+                    onNavigate={(placeId, provider) => void navigateRouteStop(placeId, provider)}
+                    onClose={() => setActiveRouteId(null)}
+                  />
+                </Suspense>
+              )}
+            </AnimatePresence>
+            <MapBottomSheet
+              cluster={selectedCluster}
+              selectedPlace={sel}
+              events={events}
+              storyGroups={placeStoryGroups}
+              onOpenStory={(placeId) => setStoryViewer({ placeId })}
+              height={sheetH}
+              peek={peek}
+              half={half}
+              full={full}
+              onSetSnap={setSheetH}
+              onIdleHeightMeasured={setIdlePeek}
+              onOpenDetails={(p) => setOpenPlace(p)}
+              onSavePlace={toggleSave}
+              onSharePlace={sharePlace}
+              savedPlaceIds={savedIds}
+              claimedPlaceIds={pulseData.claimedPlaceIds}
+              dealPlaceIds={pulseData.dealPlaceIds}
+              activeLens={activeLens}
+              searchQuery={mapClusters.length === 0 ? query : ""}
+              showDiscoveryEmptyState={showDiscoveryEmptyState}
+              discoverySuggestion={discoverySuggestion}
+              onOpenDiscoverySuggestion={selectAreaPreview}
+              onClearLens={() => setActiveLens(null)}
+              onClearSearch={() => setQuery("")}
+            />
+          </div>
         </div>
       );
     }

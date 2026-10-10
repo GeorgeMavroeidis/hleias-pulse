@@ -224,6 +224,7 @@ export function TrafficPreview() {
   const [storyPlaceId, setStoryPlaceId] = useState<string | null>(null);
   const [openPost, setOpenPost] = useState<Post | null>(null);
   const [openPlace, setOpenPlace] = useState<Place | null>(null);
+  const [mapAvailable, setMapAvailable] = useState(false);
   const [mapHeight, setMapHeight] = useState(560);
   const [idlePeek, setIdlePeek] = useState(72);
   const mapStageRef = useRef<HTMLDivElement>(null);
@@ -510,6 +511,9 @@ export function TrafficPreview() {
                 >
                   <SocialMap
                     clusters={clusters}
+                    totalPlaceCount={data.places.length}
+                    onAvailabilityChange={setMapAvailable}
+                    onOpenPlace={setOpenPlace}
                     events={data.events}
                     activitySnapshot={activitySnapshot}
                     selectedAreaId={selectedAreaId}
@@ -549,34 +553,36 @@ export function TrafficPreview() {
                     availableMapHeight={Math.max(0, mapHeight - sheetHeight)}
                     previewMode
                   />
-                  <MapBottomSheet
-                    cluster={selectedCluster}
-                    selectedPlace={selectedPlace}
-                    events={data.events}
-                    storyGroups={storyGroups}
-                    onOpenStory={setStoryPlaceId}
-                    height={sheetHeight}
-                    peek={peek}
-                    half={half}
-                    full={full}
-                    onSetSnap={setSheetHeight}
-                    onIdleHeightMeasured={setIdlePeek}
-                    onOpenDetails={setOpenPlace}
-                    onSavePlace={(id) => setSavedPlaces((old) => ({ ...old, [id]: !old[id] }))}
-                    onSharePlace={() => undefined}
-                    savedPlaceIds={Object.keys(savedPlaces).filter((id) => savedPlaces[id])}
-                    claimedPlaceIds={[]}
-                    dealPlaceIds={[]}
-                    activeLens={null}
-                    searchQuery=""
-                    showDiscoveryEmptyState={false}
-                    discoverySuggestion={null}
-                    onOpenDiscoverySuggestion={() => undefined}
-                    onClearLens={() => undefined}
-                    onClearSearch={() => undefined}
-                    previewMode
-                    previewActivitySnapshot={activitySnapshot}
-                  />
+                  <div className="contents" inert={!mapAvailable} aria-hidden={!mapAvailable}>
+                    <MapBottomSheet
+                      cluster={selectedCluster}
+                      selectedPlace={selectedPlace}
+                      events={data.events}
+                      storyGroups={storyGroups}
+                      onOpenStory={setStoryPlaceId}
+                      height={sheetHeight}
+                      peek={peek}
+                      half={half}
+                      full={full}
+                      onSetSnap={setSheetHeight}
+                      onIdleHeightMeasured={setIdlePeek}
+                      onOpenDetails={setOpenPlace}
+                      onSavePlace={(id) => setSavedPlaces((old) => ({ ...old, [id]: !old[id] }))}
+                      onSharePlace={() => undefined}
+                      savedPlaceIds={Object.keys(savedPlaces).filter((id) => savedPlaces[id])}
+                      claimedPlaceIds={[]}
+                      dealPlaceIds={[]}
+                      activeLens={null}
+                      searchQuery=""
+                      showDiscoveryEmptyState={false}
+                      discoverySuggestion={null}
+                      onOpenDiscoverySuggestion={() => undefined}
+                      onClearLens={() => undefined}
+                      onClearSearch={() => undefined}
+                      previewMode
+                      previewActivitySnapshot={activitySnapshot}
+                    />
+                  </div>
                 </div>
               )}
               {tab === "pulse" && (

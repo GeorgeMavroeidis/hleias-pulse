@@ -45,6 +45,7 @@
     "test:push-security": "tsx --test scripts/push-security.test.ts",
     "test:function-privileges": "tsx scripts/test-function-privileges.ts",
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
+    "test:map-recovery": "tsx --test src/lib/hp/map-initialization.test.ts",
     "test:map-visuals": "tsx scripts/check-map-visuals.ts",
     "test:routing": "tsx --test scripts/check-route-preview.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",
