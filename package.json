@@ -41,6 +41,7 @@
     "smoke:verification-guards": "tsx scripts/smoke-verification-guards.ts",
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
+    "test:recovery": "node --import tsx --test src/lib/hp/saved-items.test.ts src/components/hp/recovery-screens.test.tsx scripts/saved-items-api.test.ts",
     "test:push-security": "tsx --test scripts/push-security.test.ts",
     "test:function-privileges": "tsx scripts/test-function-privileges.ts",
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
