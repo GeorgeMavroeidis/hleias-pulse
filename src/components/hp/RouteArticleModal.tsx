@@ -1,4 +1,5 @@
-import { useState } from "react";
+import type { CommentDraftBinding } from "@/lib/hp/comment-drafts";
+import { CommentComposer, CommentReviewStatus } from "./CommentComposer";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Map as MapIcon,
@@ -32,7 +33,7 @@ export function RouteArticleModal({
   comments,
   onSave,
   onShare,
-  onComment,
+  commentDraft,
   findPlace,
   findAuthor,
 }: {
@@ -44,11 +45,10 @@ export function RouteArticleModal({
   comments: Comment[];
   onSave: () => void;
   onShare: () => void;
-  onComment: (text: string) => void;
+  commentDraft?: CommentDraftBinding;
   findPlace: (id: string) => Place | undefined;
   findAuthor: (id: string) => Author;
 }) {
-  const [text, setText] = useState("");
   const { language, t } = useI18n();
   return (
     <AnimatePresence>
@@ -205,9 +205,13 @@ export function RouteArticleModal({
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
-                        <div key={i} className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]">
+                        <div
+                          key={c.id ?? i}
+                          className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]"
+                        >
                           <span className="font-bold text-hp-ink">{c.author}</span>{" "}
                           <span className="text-hp-ink/80">{c.text}</span>
+                          <CommentReviewStatus comment={c} />
                         </div>
                       ))}
                       {comments.length === 0 && (
@@ -218,40 +222,18 @@ export function RouteArticleModal({
                         </div>
                       )}
                     </div>
-                    <div className="mt-3 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
-                      <input
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        name={`route-comment-${route.id}`}
-                        aria-label={t("Quick comment on route")}
-                        autoComplete="off"
+                    <div className="mt-3">
+                      <CommentComposer
+                        binding={commentDraft}
+                        inputId={`route-comment-${route.id}`}
+                        label={t("Quick comment on route")}
                         placeholder={
                           language === "GR"
                             ? "Πρόσθεσε σημείωση για τη διαδρομή…"
                             : "Add a route note…"
                         }
-                        className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && text.trim()) {
-                            onComment(text.trim());
-                            setText("");
-                          }
-                        }}
+                        submitLabel={t("Post route comment")}
                       />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (text.trim()) {
-                            onComment(text.trim());
-                            setText("");
-                          }
-                        }}
-                        className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
-                        disabled={!text.trim()}
-                        aria-label={t("Post route comment")}
-                      >
-                        <Send size={12} />
-                      </button>
                     </div>
                   </div>
                 </div>

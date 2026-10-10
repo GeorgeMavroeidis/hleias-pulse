@@ -20,6 +20,8 @@ export interface Author {
 }
 
 export interface Comment {
+  id?: string;
+  moderationStatus?: string;
   author: string;
   text: string;
   createdAt?: string | null;

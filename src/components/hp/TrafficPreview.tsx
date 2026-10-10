@@ -1,3 +1,4 @@
+import { useCommentDrafts } from "./use-comment-drafts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
@@ -218,6 +219,7 @@ export function TrafficPreview() {
   const [savedPlaces, setSavedPlaces] = useState<Record<string, boolean>>({});
   const [rsvp, setRsvp] = useState<Record<string, RsvpStatus>>({});
   const [localComments, setLocalComments] = useState<Record<string, Comment[]>>({});
+  const bindCommentDraft = useCommentDrafts("local-preview");
   const [seenStories, setSeenStories] = useState<Set<string>>(() => new Set());
   const [storyPlaceId, setStoryPlaceId] = useState<string | null>(null);
   const [openPost, setOpenPost] = useState<Post | null>(null);
@@ -674,20 +676,22 @@ export function TrafficPreview() {
               liked={Boolean(currentPost && likes[currentPost.id])}
               likeCount={currentPost ? currentPost.likes + (likes[currentPost.id] ? 1 : 0) : 0}
               comments={currentPost?.comments ?? []}
-              onComment={(text) =>
-                currentPost &&
-                setLocalComments((old) => ({
-                  ...old,
-                  [currentPost.id]: [
-                    ...(old[currentPost.id] ?? []),
-                    {
-                      author: "You (preview)",
-                      text,
-                      createdAt: new Date(sceneSnapshot.nowMs).toISOString(),
-                    },
-                  ],
-                }))
-              }
+              commentDraft={bindCommentDraft(
+                currentPost ? { type: "post", id: currentPost.id } : null,
+                async (target, text) => {
+                  const comment: Comment = {
+                    id: `preview-comment-${crypto.randomUUID()}`,
+                    author: "You (preview)",
+                    text,
+                    createdAt: new Date(sceneSnapshot.nowMs).toISOString(),
+                  };
+                  setLocalComments((old) => ({
+                    ...old,
+                    [target.id]: [...(old[target.id] ?? []), comment],
+                  }));
+                  return { status: "submitted", comment };
+                },
+              )}
               saved={Boolean(currentPost && savedPosts[currentPost.id])}
               onSave={() =>
                 currentPost &&

@@ -7,6 +7,7 @@ import {
   type RouteItem,
   type StoryItem,
 } from "./hp-model";
+import type { CommentTarget } from "./hp/comment-drafts";
 import type { CreateMeetInput, MeetEvent, RsvpStatus } from "./hp/meet-types";
 import { requireFutureMeetStart } from "./hp/meet-time";
 import type { StreakState } from "./hp/meet-store";
@@ -39,6 +40,8 @@ type TableRow<TableName extends keyof Database["public"]["Tables"]> =
 type AuthorRow = Pick<TableRow<"authors">, "id" | "name" | "type" | "avatar_url">;
 type CommentRow = Pick<
   TableRow<"comments">,
+  | "id"
+  | "moderation_status"
   | "author_name"
   | "text"
   | "place_id"
@@ -264,7 +267,7 @@ interface PulseDealRow {
 }
 
 const COMMENT_RETURN_COLUMNS =
-  "author_name,text,place_id,post_id,route_id,cultural_event_id,user_id,profile_id,posting_identity,author_kind,created_at";
+  "id,moderation_status,author_name,text,place_id,post_id,route_id,cultural_event_id,user_id,profile_id,posting_identity,author_kind,created_at";
 const PLACE_RETURN_COLUMNS =
   "id,name,greek_name,type,area,x,y,lat,lng,pulse,mood,crowd,budget,best_time,tags,short,image_url,hotness,comment_count,recent_post_count,status,user_id,profile_id,created_by_identity,moderation_status";
 const POST_RETURN_COLUMNS =
@@ -285,8 +288,6 @@ type SavedTarget =
   | { type: "place"; id: string }
   | { type: "post"; id: string }
   | { type: "route"; id: string };
-
-type CommentTarget = SavedTarget | { type: "cultural_event"; id: string };
 
 export interface PulseData {
   authors: Author[];
@@ -559,6 +560,8 @@ function meetHostType(value: string | null | undefined): MeetEvent["hostType"] {
 
 function mapComment(row: CommentRow): Comment {
   return {
+    id: row.id,
+    moderationStatus: row.moderation_status,
     author: row.author_name,
     text: row.text,
     createdAt: row.created_at ?? null,
@@ -910,6 +913,25 @@ function mapPointFromLatLng(lat: number, lng: number) {
   };
 }
 
+async function fetchPublishedCommentRows(): Promise<CommentRow[]> {
+  const rowsById = new Map<string, CommentRow>();
+  const batchSize = 1000;
+  for (let offset = 0; ; offset += batchSize) {
+    const result = await assertSupabase()
+      .from("comments")
+      .select(COMMENT_RETURN_COLUMNS)
+      .eq("moderation_status", "published")
+      .order("sort_order")
+      .order("id")
+      .range(offset, offset + batchSize - 1);
+    if (result.error) throw result.error;
+    // Publication between offset pages can repeat a row. Keep the later observation
+    // authoritative before grouping comments into the initial public snapshot.
+    for (const row of result.data ?? []) rowsById.set(row.id, row);
+    if ((result.data?.length ?? 0) < batchSize) return [...rowsById.values()];
+  }
+}
+
 async function fetchPulseData(): Promise<PulseData> {
   const client = assertSupabase();
 
@@ -922,13 +944,14 @@ async function fetchPulseData(): Promise<PulseData> {
     console.warn("Could not refresh generic stories.", refreshResult.error);
   }
 
-  const [result, routePreviewResult] = await Promise.all([
+  const [result, routePreviewResult, commentRows] = await Promise.all([
     client.rpc("get_pulse_bootstrap"),
     client
       .from("routes")
       .select(
         "id,routing_profile,route_geometry,route_distance_m,route_duration_s,route_input_hash,route_generated_at",
       ),
+    fetchPublishedCommentRows(),
   ]);
   if (result.error) throw result.error;
   // Deploys remain readable during the brief migration/code rollout window.
@@ -957,7 +980,8 @@ async function fetchPulseData(): Promise<PulseData> {
     deals: [],
   }) as unknown as PulseBootstrapPayload;
 
-  const commentRows = data.comments ?? [];
+  // Bootstrap historically omits row IDs and moderation state. Read the RLS-protected
+  // published rows explicitly so private acknowledgements can reconcile by ID.
   const comments = commentRows.map(mapComment);
   const commentsByPost = groupBy(comments, (_, index) => commentRows[index]?.post_id ?? null);
   const commentsByPlace = groupBy(comments, (_, index) => commentRows[index]?.place_id ?? null);
@@ -1911,17 +1935,47 @@ export async function recordPulseActivityDay(): Promise<StreakState> {
   return computeStreak(days);
 }
 
+function isCommentAuthenticationFailure(error: unknown): boolean {
+  if (isAuthRequiredError(error)) return true;
+  if (!error || typeof error !== "object") return false;
+  const failure = error as { name?: string; code?: string; status?: number };
+  return (
+    failure.status === 401 ||
+    failure.name === "AuthSessionMissingError" ||
+    [
+      "PGRST301",
+      "PGRST303",
+      "bad_jwt",
+      "refresh_token_not_found",
+      "refresh_token_already_used",
+      "session_not_found",
+    ].includes(failure.code ?? "")
+  );
+}
+
 export async function addPulseComment(
   target: CommentTarget,
   text: string,
   options: {
+    expectedUserId?: string;
     profileId?: string | null;
     authorName?: string;
     identity?: Author["type"];
   } = {},
 ): Promise<Comment> {
   const client = assertSupabase();
-  const userId = await ensurePulseUserId();
+  let userId: string;
+  try {
+    userId = await ensurePulseUserId();
+  } catch (error) {
+    if (isCommentAuthenticationFailure(error)) throw new AuthRequiredError();
+    throw error;
+  }
+  if (options.expectedUserId && options.expectedUserId !== userId) {
+    throw new AuthRequiredError("Your account changed. Review your draft before sending again.");
+  }
+  const normalizedText = text.trim();
+  if (!normalizedText) throw new Error("Comment text is required.");
   const identity = authorType(options.identity);
 
   const result = await client
@@ -1935,14 +1989,17 @@ export async function addPulseComment(
       profile_id: options.profileId ?? null,
       posting_identity: identity,
       author_kind: "user",
-      text,
+      text: normalizedText,
       moderation_status: "pending",
       sort_order: Math.floor(Date.now() / 1000),
     })
     .select(COMMENT_RETURN_COLUMNS)
     .single();
 
-  if (result.error) throw result.error;
+  if (result.error) {
+    if (isCommentAuthenticationFailure(result.error)) throw new AuthRequiredError();
+    throw result.error;
+  }
   return mapComment(result.data);
 }
 
