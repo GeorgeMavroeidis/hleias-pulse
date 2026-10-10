@@ -1,4 +1,5 @@
-import { useState } from "react";
+import type { CommentDraftBinding } from "@/lib/hp/comment-drafts";
+import { CommentComposer, CommentReviewStatus } from "./CommentComposer";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Map as MapIcon,
@@ -26,7 +27,7 @@ export function PostDetailModal({
   liked,
   likeCount,
   comments,
-  onComment,
+  commentDraft,
   saved,
   onSave,
   onShare,
@@ -43,7 +44,7 @@ export function PostDetailModal({
   liked: boolean;
   likeCount: number;
   comments: Comment[];
-  onComment: (t: string) => void;
+  commentDraft?: CommentDraftBinding;
   saved: boolean;
   onSave: () => void;
   onShare: (post: Post) => void;
@@ -53,7 +54,6 @@ export function PostDetailModal({
   previewMode?: boolean;
   nowMs?: number;
 }) {
-  const [text, setText] = useState("");
   const { language, t } = useI18n();
   return (
     <AnimatePresence>
@@ -167,9 +167,13 @@ export function PostDetailModal({
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
-                        <div key={i} className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]">
+                        <div
+                          key={c.id ?? i}
+                          className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]"
+                        >
                           <span className="font-bold text-hp-ink">{c.author}</span>{" "}
                           <span className="text-hp-ink/80">{c.text}</span>
+                          <CommentReviewStatus comment={c} />
                         </div>
                       ))}
                       {comments.length === 0 && (
@@ -187,42 +191,20 @@ export function PostDetailModal({
                   </div>
                 </div>
                 <div className="absolute inset-x-0 bottom-0 border-t border-hp-ink/10 bg-hp-paper/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
-                  <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
-                    <input
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                      name={`post-comment-${post.id}`}
-                      aria-label={
+                  <div className="mb-2">
+                    <CommentComposer
+                      binding={commentDraft}
+                      inputId={`post-comment-${post.id}`}
+                      label={
                         post.kind === "question"
                           ? t("Write your answer")
                           : t("Quick comment on post")
                       }
-                      autoComplete="off"
                       placeholder={
                         post.kind === "question" ? t("Write your answer…") : t("Quick comment…")
                       }
-                      className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && text.trim()) {
-                          onComment(text.trim());
-                          setText("");
-                        }
-                      }}
+                      submitLabel={t("Post comment")}
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (text.trim()) {
-                          onComment(text.trim());
-                          setText("");
-                        }
-                      }}
-                      className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
-                      disabled={!text.trim()}
-                      aria-label={t("Post comment")}
-                    >
-                      <Send size={12} />
-                    </button>
                   </div>
                   <div className="flex gap-2">
                     <button

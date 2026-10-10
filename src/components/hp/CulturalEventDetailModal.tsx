@@ -1,4 +1,5 @@
-import { useState, type KeyboardEvent } from "react";
+import type { CommentDraftBinding } from "@/lib/hp/comment-drafts";
+import { CommentComposer, CommentReviewStatus } from "./CommentComposer";
 import { AnimatePresence, motion } from "framer-motion";
 import { format, isToday, isTomorrow } from "date-fns";
 import {
@@ -54,7 +55,7 @@ interface Props {
   liked: boolean;
   likeCount: number;
   comments: Comment[];
-  onComment: (text: string) => void;
+  commentDraft?: CommentDraftBinding;
 }
 
 export function CulturalEventDetailModal({
@@ -66,9 +67,8 @@ export function CulturalEventDetailModal({
   liked,
   likeCount,
   comments,
-  onComment,
+  commentDraft,
 }: Props) {
-  const [text, setText] = useState("");
   const s = CULTURAL_EVENTS_STRINGS;
 
   return (
@@ -180,9 +180,13 @@ export function CulturalEventDetailModal({
                     </h4>
                     <div className="flex flex-col gap-2">
                       {comments.map((c, i) => (
-                        <div key={i} className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]">
+                        <div
+                          key={c.id ?? i}
+                          className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]"
+                        >
                           <span className="font-bold text-hp-ink">{c.author}</span>{" "}
                           <span className="text-hp-ink/80">{c.text}</span>
+                          <CommentReviewStatus comment={c} />
                         </div>
                       ))}
                       {comments.length === 0 && (
@@ -193,36 +197,14 @@ export function CulturalEventDetailModal({
                 </div>
 
                 <div className="absolute inset-x-0 bottom-0 border-t border-hp-ink/10 bg-hp-paper/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
-                  <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
-                    <input
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                      name={`cultural-event-comment-${event.id}`}
-                      aria-label={tr(lang, s.quickComment)}
-                      autoComplete="off"
+                  <div className="mb-2">
+                    <CommentComposer
+                      binding={commentDraft}
+                      inputId={`cultural-event-comment-${event.id}`}
+                      label={tr(lang, s.quickComment)}
                       placeholder={tr(lang, s.quickComment)}
-                      className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
-                      onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-                        if (e.key === "Enter" && text.trim()) {
-                          onComment(text.trim());
-                          setText("");
-                        }
-                      }}
+                      submitLabel={tr(lang, s.postComment)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (text.trim()) {
-                          onComment(text.trim());
-                          setText("");
-                        }
-                      }}
-                      className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
-                      disabled={!text.trim()}
-                      aria-label={tr(lang, s.postComment)}
-                    >
-                      <Send size={12} />
-                    </button>
                   </div>
                   <div className="flex gap-2">
                     {hasTicketUrl ? (

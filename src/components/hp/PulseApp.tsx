@@ -1,3 +1,11 @@
+import { useCommentDrafts } from "./use-comment-drafts";
+import {
+  mergeComments,
+  visibleComments,
+  reconcileCommentGroups,
+  type CommentTarget,
+  type CommentSubmissionResult,
+} from "@/lib/hp/comment-drafts";
 import {
   lazy,
   Suspense,
@@ -454,6 +462,12 @@ export function PulseApp() {
       ? account.userId
       : null;
   const accountProfileId = account.status === "ready" ? account.profile.id : null;
+  const commentViewerUserId =
+    account.status === "ready" || account.status === "needsProfile" ? account.userId : null;
+  const commentViewerUserIdRef = useRef(commentViewerUserId);
+  commentViewerUserIdRef.current = commentViewerUserId;
+  const bindCommentDraft = useCommentDrafts(commentViewerUserId, account.status === "loading");
+  const commentsForViewer = (comments: Comment[]) => visibleComments(comments, commentViewerUserId);
 
   // sheet snap
   const mapBodyRef = useRef<HTMLDivElement>(null);
@@ -809,9 +823,11 @@ export function PulseApp() {
       setActivitySnapshot(buildPulseActivitySnapshot(data));
       setAreaIntelligence(deriveAreaIntelligenceSnapshot(data));
       lastActivityRefreshAtRef.current = Date.now();
-      setPlaceComments(data.placeComments);
-      setRouteComments(data.routeComments);
-      setCulturalEventComments(data.culturalEventComments);
+      setPlaceComments((previous) => reconcileCommentGroups(previous, data.placeComments));
+      setRouteComments((previous) => reconcileCommentGroups(previous, data.routeComments));
+      setCulturalEventComments((previous) =>
+        reconcileCommentGroups(previous, data.culturalEventComments),
+      );
       setSelectedPlace((current) =>
         current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
       );
@@ -1239,81 +1255,46 @@ export function PulseApp() {
       );
     });
   };
-  const addPlaceComment = (id: string, text: string) => {
+  const submitComment = async (
+    target: CommentTarget,
+    text: string,
+  ): Promise<CommentSubmissionResult> => {
     if (account.status !== "ready") {
       requireProfile("comment");
-      return;
+      return { status: account.status === "needsProfile" ? "profile-required" : "auth-required" };
     }
-    const authorName = profileDisplayName(account.profile);
-    const optimisticComment: Comment = {
-      author: authorName,
-      text,
-      userId: account.userId,
-      profileId: account.profile.id,
-      postingIdentity: account.profile.defaultIdentity,
-      authorKind: "user",
-    };
-    setPlaceComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast(t("Comment posted"));
-    void addPulseComment({ type: "place", id }, text, {
-      profileId: account.profile.id,
-      authorName,
-      identity: account.profile.defaultIdentity,
-    })
-      .then((savedComment) => {
-        setPlaceComments((m) => ({
-          ...m,
-          [id]: (m[id] ?? []).map((comment) =>
-            comment === optimisticComment ? savedComment : comment,
-          ),
-        }));
-      })
-      .catch((error) => {
-        console.warn("Could not persist place comment.", error);
-        setPlaceComments((m) => ({
-          ...m,
-          [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
-        }));
-        handleWriteError(error, t("Could not post comment"));
+    const userId = account.userId;
+    try {
+      const savedComment = await addPulseComment(target, text, {
+        expectedUserId: userId,
+        profileId: account.profile.id,
+        authorName: profileDisplayName(account.profile),
+        identity: account.profile.defaultIdentity,
       });
-  };
-  const addPostComment = (id: string, text: string) => {
-    if (account.status !== "ready") {
-      requireProfile("comment");
-      return;
+      const setComments = {
+        place: setPlaceComments,
+        post: setPostComments,
+        route: setRouteComments,
+        cultural_event: setCulturalEventComments,
+      }[target.type];
+      setComments((groups) => ({
+        ...groups,
+        [target.id]: mergeComments(groups[target.id] ?? [], [savedComment]),
+      }));
+      // A response to the previous account must not interrupt the current viewer.
+      if (commentViewerUserIdRef.current === userId) showToast(t("Submitted for review"));
+      return { status: "submitted", comment: savedComment };
+    } catch (error) {
+      if (isAuthRequiredError(error)) {
+        if (commentViewerUserIdRef.current === userId) {
+          setAuthOpen(true);
+          showToast(t("Your session expired. Sign in again."));
+        }
+        return { status: "auth-required" };
+      }
+      // The shared draft controller keeps the text and exposes a retry action.
+      throw error;
     }
-    const authorName = profileDisplayName(account.profile);
-    const optimisticComment: Comment = {
-      author: authorName,
-      text,
-      userId: account.userId,
-      profileId: account.profile.id,
-      postingIdentity: account.profile.defaultIdentity,
-      authorKind: "user",
-    };
-    setPostComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast(t("Comment posted"));
-    void addPulseComment({ type: "post", id }, text, {
-      profileId: account.profile.id,
-      authorName,
-      identity: account.profile.defaultIdentity,
-    })
-      .then((savedComment) => {
-        setPostComments((m) => ({
-          ...m,
-          [id]: (m[id] ?? []).map((comment) =>
-            comment === optimisticComment ? savedComment : comment,
-          ),
-        }));
-      })
-      .catch((error) => {
-        console.warn("Could not persist post comment.", error);
-        setPostComments((m) => ({
-          ...m,
-          [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
-        }));
-        handleWriteError(error, t("Could not post comment"));
-      });
   };
   const toggleSavePost = (id: string) => {
     if (account.status !== "ready") {
@@ -1366,44 +1347,6 @@ export function PulseApp() {
         language === "GR" ? "Δεν ήταν δυνατή η αποθήκευση της διαδρομής" : "Could not save route",
       );
     });
-  };
-  const addRouteComment = (id: string, text: string) => {
-    if (account.status !== "ready") {
-      requireProfile("comment");
-      return;
-    }
-    const authorName = profileDisplayName(account.profile);
-    const optimisticComment: Comment = {
-      author: authorName,
-      text,
-      userId: account.userId,
-      profileId: account.profile.id,
-      postingIdentity: account.profile.defaultIdentity,
-      authorKind: "user",
-    };
-    setRouteComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast(t("Comment posted"));
-    void addPulseComment({ type: "route", id }, text, {
-      profileId: account.profile.id,
-      authorName,
-      identity: account.profile.defaultIdentity,
-    })
-      .then((savedComment) => {
-        setRouteComments((m) => ({
-          ...m,
-          [id]: (m[id] ?? []).map((comment) =>
-            comment === optimisticComment ? savedComment : comment,
-          ),
-        }));
-      })
-      .catch((error) => {
-        console.warn("Could not persist route comment.", error);
-        setRouteComments((m) => ({
-          ...m,
-          [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
-        }));
-        handleWriteError(error, t("Could not post comment"));
-      });
   };
   const addLocalPost = async ({
     text,
@@ -1765,45 +1708,6 @@ export function PulseApp() {
       setCulturalEventLikes((m) => ({ ...m, [id]: !nextLiked }));
       handleWriteError(error, t("Could not save"));
     });
-  };
-
-  const addCulturalEventComment = (id: string, text: string) => {
-    if (account.status !== "ready") {
-      requireProfile("comment");
-      return;
-    }
-    const authorName = profileDisplayName(account.profile);
-    const optimisticComment: Comment = {
-      author: authorName,
-      text,
-      userId: account.userId,
-      profileId: account.profile.id,
-      postingIdentity: account.profile.defaultIdentity,
-      authorKind: "user",
-    };
-    setCulturalEventComments((m) => ({ ...m, [id]: [...(m[id] ?? []), optimisticComment] }));
-    showToast(t("Comment posted"));
-    void addPulseComment({ type: "cultural_event", id }, text, {
-      profileId: account.profile.id,
-      authorName,
-      identity: account.profile.defaultIdentity,
-    })
-      .then((savedComment) => {
-        setCulturalEventComments((m) => ({
-          ...m,
-          [id]: (m[id] ?? []).map((comment) =>
-            comment === optimisticComment ? savedComment : comment,
-          ),
-        }));
-      })
-      .catch((error) => {
-        console.warn("Could not persist cultural event comment.", error);
-        setCulturalEventComments((m) => ({
-          ...m,
-          [id]: (m[id] ?? []).filter((comment) => comment !== optimisticComment),
-        }));
-        handleWriteError(error, t("Could not post comment"));
-      });
   };
 
   const toggleMeetRsvp = (event: MeetEvent, next: RsvpStatus) => {
@@ -2177,7 +2081,12 @@ export function PulseApp() {
               toggleLike={toggleLike}
               savedPosts={savedPosts}
               toggleSavePost={toggleSavePost}
-              commentsByPost={postComments}
+              commentsByPost={Object.fromEntries(
+                Object.entries(postComments).map(([id, comments]) => [
+                  id,
+                  visibleComments(comments, null),
+                ]),
+              )}
               onOpenPost={setOpenPost}
               onOpenMap={jumpToMap}
               onShare={sharePost}
@@ -2214,7 +2123,12 @@ export function PulseApp() {
               routes={routes}
               onOpenRoute={setOpenRoute}
               savedRoutes={savedRoutes}
-              routeComments={routeComments}
+              routeComments={Object.fromEntries(
+                Object.entries(routeComments).map(([id, comments]) => [
+                  id,
+                  commentsForViewer(comments),
+                ]),
+              )}
               findAuthor={findAuthor}
               showMustSee={readyProfile(account)?.defaultIdentity === "TOURIST"}
               places={places}
@@ -2405,8 +2319,11 @@ export function PulseApp() {
               posts={openPlace ? allPosts.filter((p) => p.placeId === openPlace.id) : []}
               onOpenMap={jumpToMap}
               onShare={sharePlace}
-              comments={openPlace ? (placeComments[openPlace.id] ?? []) : []}
-              onComment={addPlaceComment}
+              comments={commentsForViewer(openPlace ? (placeComments[openPlace.id] ?? []) : [])}
+              commentDraft={bindCommentDraft(
+                openPlace ? { type: "place", id: openPlace.id } : null,
+                submitComment,
+              )}
               findAuthor={findAuthor}
               findPostAuthor={findPostAuthor}
               storyGroups={placeStoryGroups}
@@ -2443,10 +2360,13 @@ export function PulseApp() {
                   ? (postLikes[openPost.id] ?? openPost.likes) + (likes[openPost.id] ? 1 : 0)
                   : 0
               }
-              comments={
-                openPost ? [...openPost.comments, ...(postComments[openPost.id] ?? [])] : []
-              }
-              onComment={(t) => openPost && addPostComment(openPost.id, t)}
+              comments={commentsForViewer(
+                openPost ? mergeComments(postComments[openPost.id] ?? [], openPost.comments) : [],
+              )}
+              commentDraft={bindCommentDraft(
+                openPost ? { type: "post", id: openPost.id } : null,
+                submitComment,
+              )}
               saved={openPost ? !!savedPosts[openPost.id] : false}
               onSave={() => openPost && toggleSavePost(openPost.id)}
               onShare={sharePost}
@@ -2464,10 +2384,13 @@ export function PulseApp() {
               onOpenMap={jumpToMap}
               onMapRoute={startRouteOnMap}
               saved={openRoute ? !!savedRoutes[openRoute.id] : false}
-              comments={openRoute ? (routeComments[openRoute.id] ?? []) : []}
+              comments={commentsForViewer(openRoute ? (routeComments[openRoute.id] ?? []) : [])}
               onSave={() => openRoute && toggleSaveRoute(openRoute.id)}
               onShare={() => openRoute && shareRoute(openRoute)}
-              onComment={(text) => openRoute && addRouteComment(openRoute.id, text)}
+              commentDraft={bindCommentDraft(
+                openRoute ? { type: "route", id: openRoute.id } : null,
+                submitComment,
+              )}
               findPlace={findPlace}
               findAuthor={findAuthor}
             />
@@ -2565,12 +2488,13 @@ export function PulseApp() {
                     (culturalEventLikes[openCulturalEvent.id] ? 1 : 0)
                   : 0
               }
-              comments={
-                openCulturalEvent ? (culturalEventComments[openCulturalEvent.id] ?? []) : []
-              }
-              onComment={(text) =>
-                openCulturalEvent && addCulturalEventComment(openCulturalEvent.id, text)
-              }
+              comments={commentsForViewer(
+                openCulturalEvent ? (culturalEventComments[openCulturalEvent.id] ?? []) : [],
+              )}
+              commentDraft={bindCommentDraft(
+                openCulturalEvent ? { type: "cultural_event", id: openCulturalEvent.id } : null,
+                submitComment,
+              )}
             />
           </Suspense>
         )}

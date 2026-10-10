@@ -58,6 +58,9 @@ jobs:
       - name: Test — creation and Athens Meet times
         run: npm run test:creation
 
+      - name: Test — comment drafts (offline)
+        run: npm run test:comment-drafts
+
       - name: Test — discovery
         run: npm run test:discovery
 

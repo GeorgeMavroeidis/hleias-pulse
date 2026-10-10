@@ -14,6 +14,17 @@ export type TranslationParams = Record<string, string | number>;
 const STORAGE_KEY = "ilia-pulse-language";
 
 const EL: Record<string, string> = {
+  "Submitting comment…": "Υποβολή σχολίου…",
+  "Could not submit. Your draft is saved. Try again.":
+    "Η υποβολή απέτυχε. Το πρόχειρό σου διατηρήθηκε. Δοκίμασε ξανά.",
+  "Your draft is saved. Sign in, then send it when you are ready.":
+    "Το πρόχειρό σου διατηρήθηκε. Συνδέσου και στείλε το όταν είσαι έτοιμος.",
+  "Your draft is saved. Complete your profile, then send it when you are ready.":
+    "Το πρόχειρό σου διατηρήθηκε. Ολοκλήρωσε το προφίλ σου και στείλε το όταν είσαι έτοιμος.",
+  "Submitted for review": "Υποβλήθηκε για έλεγχο",
+  Retry: "Δοκίμασε ξανά",
+  "Retry comment": "Επανάληψη υποβολής σχολίου",
+  "Switch to your other saved draft": "Εναλλαγή στο άλλο αποθηκευμένο πρόχειρό σου",
   "Local spots, routes, and tips.": "Τοπικά σημεία, διαδρομές και συμβουλές.",
   "Open search": "Άνοιγμα αναζήτησης",
   "Close search": "Κλείσιμο αναζήτησης",
