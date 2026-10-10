@@ -1,6 +1,6 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Check, Gift, Palette } from "lucide-react";
+import { Search, Check, Gift, Palette, X } from "lucide-react";
 import { type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { AccountBubble } from "./AuthAccountSheets";
@@ -69,6 +69,7 @@ export function TopBar({
     MARKER_ANIMATION_THEMES.find((theme) => theme.id === animationTheme) ??
     MARKER_ANIMATION_THEMES[0];
   const appearanceButtonRef = useRef<HTMLButtonElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
   const appearanceMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -127,6 +128,7 @@ export function TopBar({
             {t("Deals")}
           </button>
           <button
+            ref={searchButtonRef}
             type="button"
             onClick={() => {
               setAppearanceOpen(false);
@@ -265,6 +267,32 @@ export function TopBar({
           </motion.div>
         )}
       </AnimatePresence>
+      {query.trim() && (
+        <div
+          className="hp-safe-px flex min-w-0 items-center gap-2 pb-2"
+          role="group"
+          aria-label={t("Active search")}
+        >
+          <span
+            className="min-w-0 truncate rounded-full bg-hp-ink/5 px-3 py-1.5 text-[12px] text-hp-ink"
+            title={query}
+          >
+            {t("Search: {query}", { query })}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              searchButtonRef.current?.focus();
+            }}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-hp-ink/15 px-2.5 py-2 text-[11px] font-bold text-hp-ink"
+            aria-label={t("Clear search")}
+          >
+            <X size={12} aria-hidden="true" />
+            {t("Clear search")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
