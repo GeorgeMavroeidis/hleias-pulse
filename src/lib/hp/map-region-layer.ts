@@ -1,0 +1,198 @@
+import type {
+  ExpressionSpecification,
+  Map as MapLibreMap,
+  SymbolLayerSpecification,
+} from "maplibre-gl";
+import { DAY_MAP_PALETTE } from "./map-cartography";
+import { MAP_POLICY, mapDisclosure } from "./map-policy";
+import type { RegionalDiscovery } from "./regional-discovery";
+import type { TranslationParams } from "../i18n";
+import type { MarkerPulseSignal } from "./marker-pulse";
+import { observationLabel } from "./surface-freshness";
+import { evaluateFreshness } from "./freshness";
+
+export const REGION_SOURCE_ID = "hp-regional-discovery";
+export const REGION_LAYER_ID = "hp-regional-signals";
+type Translate = (key: string, params?: TranslationParams) => string;
+const TIER_NAMES = { quiet: "Quiet", moving: "Moving", hot: "Hot", live: "Live" } as const;
+
+/** Public copy uses canonical activity tiers and real observation time, never CSS levels. */
+export function markerActivityDescription(
+  signal: MarkerPulseSignal,
+  nowMs: number,
+  language: "GR" | "EN",
+  t: Translate,
+  includeExact = true,
+) {
+  if (signal.level === null) return t("Community activity unavailable");
+  const freshness = evaluateFreshness({ observedAt: signal.lastSignalAt, nowMs });
+  // Retained snapshots can outlive their projection clock during recovery.
+  // Re-check claims with the shared evidence boundaries, never the fetch time.
+  const tier =
+    signal.tier === "live" && (!freshness.isCurrent || signal.quality !== "confirmed")
+      ? "hot"
+      : signal.tier;
+  const status = !signal.lastSignalAt
+    ? signal.score > 0
+      ? t("Community activity unavailable")
+      : t("Quiet")
+    : freshness.state === "unknown"
+      ? t("Community activity unavailable")
+      : !freshness.isRecent || signal.score === 0
+        ? t("Historical community activity")
+        : t("Recent community activity: {level}", { level: t(TIER_NAMES[tier]) });
+  if (!signal.lastSignalAt) return status;
+  const observed = observationLabel(signal.lastSignalAt, nowMs, language);
+  return [status, observed.relative, includeExact ? observed.exact : undefined]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function regionalDescription(
+  row: RegionalDiscovery,
+  filterLabel: string | null | undefined,
+  t: Translate,
+  nowMs: number,
+  language: "GR" | "EN",
+  includeExact = false,
+) {
+  const count = row.contextualPlaceIds.length;
+  const places = filterLabel
+    ? t(count === 1 ? "{count} {filter} place" : "{count} {filter} places", {
+        count,
+        filter: filterLabel,
+      })
+    : t(count === 1 ? "{count} place" : "{count} places", { count });
+  if (!count) return t("No matching places");
+  return row.signal.level === null
+    ? t("Explore · {places}", { places })
+    : `${markerActivityDescription(row.signal, nowMs, language, t, includeExact)} · ${places}`;
+}
+
+export function regionalGeoJson(
+  rows: RegionalDiscovery[],
+  selectedId: string | null,
+  filterLabel: string | null | undefined,
+  t: Translate,
+  nowMs: number,
+  language: "GR" | "EN",
+) {
+  return {
+    type: "FeatureCollection" as const,
+    features: rows
+      .filter((row) => row.searchedPlaceIds.length > 0)
+      .map((row) => ({
+        type: "Feature" as const,
+        id: row.region.id,
+        geometry: {
+          type: "Point" as const,
+          coordinates: [row.region.anchor.lng, row.region.anchor.lat],
+        },
+        // Deliberately exclude raw evidence, contributor IDs and internal scores.
+        properties: {
+          regionId: row.region.id,
+          name: t(row.region.name),
+          description: regionalDescription(row, filterLabel, t, nowMs, language),
+          count: row.contextualPlaceIds.length,
+          priority:
+            row.region.id === selectedId
+              ? -10000
+              : row.contextualPlaceIds.length
+                ? -row.contextualPlaceIds.length
+                : 1,
+          selected: row.region.id === selectedId,
+          contextOpacity: row.contextualPlaceIds.length ? 1 : 0.55,
+        },
+      })),
+  };
+}
+
+export function regionalSymbolLayer(): SymbolLayerSpecification {
+  const stops: unknown[] = [];
+  for (let step = 0; step <= 10; step++) {
+    const zoom = MAP_POLICY.regionFadeStart + step / 10;
+    stops.push(zoom, ["*", mapDisclosure(zoom).regionOpacity, ["get", "contextOpacity"]]);
+  }
+  // Zoom must be the input of the outermost interpolate expression.
+  const opacity = ["interpolate", ["linear"], ["zoom"], ...stops] as ExpressionSpecification;
+  return {
+    id: REGION_LAYER_ID,
+    source: REGION_SOURCE_ID,
+    type: "symbol",
+    maxzoom: MAP_POLICY.regionFadeEnd,
+    layout: {
+      "icon-image": ["case", ["get", "selected"], "hp-region-selected", "hp-region-core"],
+      "icon-size": 1,
+      "icon-allow-overlap": false,
+      "icon-ignore-placement": false,
+      "icon-optional": false,
+      "text-optional": false,
+      "symbol-sort-key": ["get", "priority"],
+      "text-field": [
+        "format",
+        ["get", "name"],
+        { "font-scale": 1 },
+        "\n",
+        {},
+        ["get", "description"],
+        { "font-scale": 0.72 },
+      ],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": 13,
+      "text-anchor": "top",
+      "text-offset": [0, 1.25],
+      "text-max-width": 15,
+      "text-padding": 5,
+      "icon-padding": 5,
+      "text-allow-overlap": false,
+    },
+    paint: {
+      "icon-opacity": opacity,
+      "text-opacity": opacity,
+      "text-color": DAY_MAP_PALETTE.primaryText,
+      "text-halo-color": DAY_MAP_PALETTE.land,
+      "text-halo-width": 2,
+      "text-halo-blur": 0.5,
+    },
+  };
+}
+
+/** One code-drawn sprite, matching existing Pulse geometry. No remote assets. */
+export function installRegionalLayer(map: MapLibreMap) {
+  if (map.getSource(REGION_SOURCE_ID)) return;
+  const sunset =
+    getComputedStyle(map.getContainer()).getPropertyValue("--hp-sunset").trim() || "#ed7948";
+  for (const selected of [false, true]) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Regional sprite unavailable");
+    ctx.fillStyle = DAY_MAP_PALETTE.land;
+    ctx.beginPath();
+    ctx.arc(32, 32, 19, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = DAY_MAP_PALETTE.primaryText;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = sunset;
+    ctx.beginPath();
+    ctx.arc(32, 32, 14, 0, Math.PI * 2);
+    ctx.fill();
+    if (selected) {
+      ctx.beginPath();
+      ctx.arc(32, 32, 25, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    map.addImage(
+      selected ? "hp-region-selected" : "hp-region-core",
+      ctx.getImageData(0, 0, 64, 64),
+      { pixelRatio: 2 },
+    );
+  }
+  map.addSource(REGION_SOURCE_ID, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  // Last symbol layer places first in MapLibre's reverse-order collision pass.
+  map.addLayer(regionalSymbolLayer());
+}

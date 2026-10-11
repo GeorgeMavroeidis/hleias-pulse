@@ -14,6 +14,26 @@ export type TranslationParams = Record<string, string | number>;
 const STORAGE_KEY = "ilia-pulse-language";
 
 const EL: Record<string, string> = {
+  Moving: "Κίνηση",
+  "Historical community activity": "Παλαιότερη δραστηριότητα κοινότητας",
+  "Explore · {places}": "Εξερεύνησε · {places}",
+  "{count} place": "{count} σημείο",
+  "{count} {filter} place": "{count} σημείο · {filter}",
+  "{count} {filter} places": "{count} σημεία · {filter}",
+  "No matching places": "Δεν υπάρχουν σχετικά σημεία",
+  "Visible map areas": "Ορατές περιοχές χάρτη",
+  "Marker motion": "Κίνηση παλμού",
+  "Restrained rings for recent community activity.":
+    "Διακριτικοί κύκλοι για πρόσφατη δραστηριότητα της κοινότητας.",
+  "The same Pulse identity, with slower motion.": "Ο ίδιος παλμός, με πιο αργή κίνηση.",
+  "Community activity unavailable": "Δεν υπάρχουν αξιόπιστα δεδομένα δραστηριότητας",
+  "Recent community activity: {level}": "Πρόσφατη δραστηριότητα κοινότητας: {level}",
+  "Zoom into {count} places near {area}": "Μεγέθυνση σε {count} σημεία κοντά στο {area}",
+  "{area} places": "Σημεία στην περιοχή {area}",
+  "Tap a place or cluster": "Πάτησε ένα σημείο ή μια ομάδα",
+  "{filter} areas": "Περιοχές: {filter}",
+  "Events listed": "Υπάρχουν εκδηλώσεις",
+  "Stories available": "Υπάρχουν ιστορίες",
   "Submitting comment…": "Υποβολή σχολίου…",
   "Could not submit. Your draft is saved. Try again.":
     "Η υποβολή απέτυχε. Το πρόχειρό σου διατηρήθηκε. Δοκίμασε ξανά.",
@@ -854,7 +874,7 @@ const EL: Record<string, string> = {
   "Based on live activity and signals": "Με βάση τη ζωντανή δραστηριότητα και τα σήματα",
   "Tap any area to focus the map there": "Πάτησε μια περιοχή για να εστιάσει ο χάρτης εκεί",
   "{count} signals": "{count} σήματα",
-  Hot: "Ζωντανή",
+  Hot: "Έντονη",
   Active: "Ενεργή",
   Calm: "Ήσυχη",
   "Very lively right now": "Πολλή κίνηση αυτή τη στιγμή",

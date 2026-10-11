@@ -4,7 +4,6 @@
 @import "./styles/theme.css";
 @import "./styles/base.css";
 @import "./styles/shell.css";
-@import "./styles/markers.css";
 @import "./styles/utilities.css";
 @import "./styles/stories.css";
 @import "./styles/engagement.css";
@@ -12,8 +11,7 @@
 @import "./styles/place-detail.css";
 @import "./styles/deals.css";
 @import "./styles/map-base.css";
-@import "./styles/marker-themes.css";
-@import "./styles/marker-anatomy.css";
+@import "./styles/pulse-markers.css";
 @import "./styles/controls.css";
 @import "./styles/map-chrome.css";
 @import "./styles/map-overlays.css";
