@@ -368,11 +368,11 @@ function activityLineForCluster(
     (place) => place.type === "sunset" || place.tags.includes("sunset"),
   );
   if (eventCount > 0 && postCount > 0)
-    return `${postCount} posts · ${eventCount} event${eventCount === 1 ? "" : "s"}`;
-  if (eventCount > 0) return `${eventCount} event${eventCount === 1 ? "" : "s"} tonight`;
+    return `${postCount} posts · ${eventCount} announcement${eventCount === 1 ? "" : "s"}`;
+  if (eventCount > 0) return `${eventCount} recent announcement${eventCount === 1 ? "" : "s"}`;
   if (hasSunset) return `sunset · ${postCount} posts`;
-  if (tone === "nature" || tone === "village") return `${postCount} tips`;
-  if (tone === "music") return `tonight · ${postCount} posts`;
+  if (tone === "nature" || tone === "village") return `${postCount} recent posts`;
+  if (tone === "music") return `${postCount} recent posts`;
   return `${postCount} posts`;
 }
 
@@ -560,7 +560,7 @@ function createChildIcon(
   const size = childMarkerSize(tier);
   const line =
     eventCount > 0
-      ? `${eventCount} event${eventCount === 1 ? "" : "s"}`
+      ? `${eventCount} announcement${eventCount === 1 ? "" : "s"}`
       : `${place.recentPostCount} posts`;
   const avatars = place.avatars
     .slice(0, 2)
@@ -618,7 +618,7 @@ function createActivityClusterIcon(
     .join("");
   const line =
     node.eventCount > 0
-      ? `${node.eventCount} event${node.eventCount === 1 ? "" : "s"}`
+      ? `${node.eventCount} announcement${node.eventCount === 1 ? "" : "s"}`
       : `${node.postCount} posts`;
 
   const element = document.createElement("div");
@@ -1328,10 +1328,15 @@ export function SocialMap({
       if (coast?.status === "moving") return "Activity around the coast";
       return `${clusters.length} area${clusters.length === 1 ? "" : "s"} on map`;
     }
-    if (clusters.some((cluster) => cluster.tone === "beach" && cluster.status !== "quiet")) {
+    if (
+      clusters.some(
+        (cluster) =>
+          cluster.tone === "beach" && (cluster.status === "hot" || cluster.status === "live"),
+      )
+    ) {
       return "Hot around the coast";
     }
-    return `${clusters.length} area${clusters.length === 1 ? "" : "s"} moving tonight`;
+    return `${clusters.length} area${clusters.length === 1 ? "" : "s"} on map`;
   }, [
     activeFilterLabel,
     clusters,

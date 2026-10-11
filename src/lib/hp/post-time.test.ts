@@ -30,7 +30,7 @@ test("Now eligibility uses the strict three-hour observation window with no froz
 test("post and story display helpers use the injected clock, including later-scene story grouping", () => {
   const scene = buildTrafficPreviewScene("later", NOW);
   const firstPost = scene.data.posts[0];
-  assert.equal(displayPostTime(firstPost, scene.nowMs), "3 hours ago");
+  assert.equal(displayPostTime(firstPost, scene.nowMs), "Reported 3 hours ago");
   const groups = buildPlaceStoryGroups(
     scene.data.places,
     new Set(),
@@ -47,10 +47,10 @@ test("post and story display helpers use the injected clock, including later-sce
       "EN",
       scene.nowMs,
     ),
-    "3 hours ago",
+    "Reported 3 hours ago",
   );
   const eventPost = { ...firstPost, kind: "event" as const, time: "Saturday · 20:30" };
-  assert.equal(displayPostTime(eventPost, scene.nowMs), "Saturday · 20:30");
+  assert.equal(displayPostTime(eventPost, scene.nowMs), "Reported 3 hours ago");
 });
 
 test("fixed preview/domain clocks do not consult the wall clock", () => {

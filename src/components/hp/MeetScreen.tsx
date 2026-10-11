@@ -20,6 +20,7 @@ import {
   type MeetEvent,
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
+import { meetPhase } from "@/lib/hp/surface-freshness";
 import { EventCard } from "./EventCard";
 import { useModeration } from "./use-moderation";
 import { useI18n } from "@/lib/i18n";
@@ -65,7 +66,6 @@ export function MeetScreen({
   const filtered = useMemo(() => {
     return (
       events
-        .filter((e) => +new Date(e.happensAt) >= nowMs - 60 * 60 * 1000) // hide long-past
         // Blocked hosts are filtered server-side; muted ones are hidden here.
         .filter((e) => !moderation.isHidden(e.userId))
         .filter((e) => {
@@ -73,7 +73,11 @@ export function MeetScreen({
           if (filter === "mine") return rsvp[e.id] === "going" || rsvp[e.id] === "maybe";
           return e.category === filter;
         })
-        .sort((a, b) => +new Date(a.happensAt) - +new Date(b.happensAt))
+        .sort(
+          (a, b) =>
+            Number(meetPhase(a, nowMs) === "ended") - Number(meetPhase(b, nowMs) === "ended") ||
+            +new Date(a.happensAt) - +new Date(b.happensAt),
+        )
     );
   }, [events, filter, moderation, rsvp, nowMs]);
 

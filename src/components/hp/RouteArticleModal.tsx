@@ -1,5 +1,6 @@
 import type { CommentDraftBinding } from "@/lib/hp/comment-drafts";
 import { CommentComposer, CommentReviewStatus } from "./CommentComposer";
+import { observationLabel } from "@/lib/hp/surface-freshness";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Map as MapIcon,
@@ -36,7 +37,9 @@ export function RouteArticleModal({
   commentDraft,
   findPlace,
   findAuthor,
+  nowMs = Date.now(),
 }: {
+  nowMs?: number;
   route: RouteItem | null;
   onClose: () => void;
   onOpenMap: (id: string) => void;
@@ -212,6 +215,12 @@ export function RouteArticleModal({
                           <span className="font-bold text-hp-ink">{c.author}</span>{" "}
                           <span className="text-hp-ink/80">{c.text}</span>
                           <CommentReviewStatus comment={c} />
+                          <span
+                            title={observationLabel(c.createdAt, nowMs, language).exact}
+                            className="mt-1 block text-[10px] text-hp-muted"
+                          >
+                            {observationLabel(c.createdAt, nowMs, language).relative}
+                          </span>
                         </div>
                       ))}
                       {comments.length === 0 && (

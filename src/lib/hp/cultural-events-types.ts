@@ -1,3 +1,5 @@
+import { meetDateTimeInput } from "./meet-time";
+
 /**
  * Cultural events domain types (theater, concerts, festivals).
  *
@@ -44,10 +46,12 @@ export interface CulturalEvent {
  * only becomes past from the next day onwards — a 21:00 show today is still
  * upcoming at 22:00 today.
  */
-export const isEventPast = (event: Pick<CulturalEvent, "eventDate">): boolean => {
-  const endOfEventDay = new Date(event.eventDate);
-  endOfEventDay.setHours(23, 59, 59, 999);
-  return endOfEventDay.getTime() < Date.now();
+export const isEventPast = (
+  event: Pick<CulturalEvent, "eventDate">,
+  nowMs = Date.now(),
+): boolean => {
+  if (!Number.isFinite(Date.parse(event.eventDate)) || !Number.isFinite(nowMs)) return false;
+  return meetDateTimeInput(event.eventDate).slice(0, 10) < meetDateTimeInput(nowMs).slice(0, 10);
 };
 
 export interface CreateCulturalEventInput {

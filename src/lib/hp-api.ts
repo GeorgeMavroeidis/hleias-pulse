@@ -104,6 +104,7 @@ type PostRow = Pick<
   | "likes_count"
   | "image_url"
   | "created_at"
+  | "moderation_status"
 >;
 type RouteRow = Pick<
   TableRow<"routes">,
@@ -146,6 +147,7 @@ type LiveStoryRow = Pick<
   | "parking"
   | "condition"
   | "created_at"
+  | "moderation_status"
 >;
 type MeetEventRow = Pick<
   TableRow<"meet_events">,
@@ -171,6 +173,7 @@ type MeetEventRow = Pick<
   | "hot"
   | "attendee_avatar_urls"
   | "created_at"
+  | "moderation_status"
 >;
 type CulturalEventRow = Pick<
   TableRow<"cultural_events">,
@@ -272,11 +275,11 @@ const COMMENT_RETURN_COLUMNS =
 const PLACE_RETURN_COLUMNS =
   "id,name,greek_name,type,area,x,y,lat,lng,pulse,mood,crowd,budget,best_time,tags,short,image_url,hotness,comment_count,recent_post_count,status,user_id,profile_id,created_by_identity,moderation_status";
 const POST_RETURN_COLUMNS =
-  "id,author_id,author_kind,user_id,profile_id,posting_identity,place_id,kind,display_time,text,tags,likes_count,image_url,created_at";
+  "id,author_id,author_kind,user_id,profile_id,posting_identity,place_id,kind,display_time,text,tags,likes_count,image_url,created_at,moderation_status";
 const STORY_RETURN_COLUMNS =
-  "id,label,place_id,user_id,profile_id,kind,author_name,author_type,author_avatar_url,media_url,caption,expires_after_hours,crowd,parking,condition,created_at";
+  "id,label,place_id,user_id,profile_id,kind,author_name,author_type,author_avatar_url,media_url,caption,expires_after_hours,crowd,parking,condition,created_at,moderation_status";
 const MEET_EVENT_RETURN_COLUMNS =
-  "id,place_id,user_id,profile_id,title,host_name,host_avatar_url,host_type,starts_at,duration_min,category,vibe,price,capacity,description,cover_url,tags,going_count,maybe_count,hot,attendee_avatar_urls,created_at";
+  "id,place_id,user_id,profile_id,title,host_name,host_avatar_url,host_type,starts_at,duration_min,category,vibe,price,capacity,description,cover_url,tags,going_count,maybe_count,hot,attendee_avatar_urls,created_at,moderation_status";
 const CULTURAL_EVENT_RETURN_COLUMNS =
   "id,title,greek_title,event_type,venue_name,area,place_id,lat,lng,event_date,organizer_name,organizer_id,description_el,description_en,poster_url,ticket_url,is_past_event,is_official,likes_count,moderation_status,user_id,created_at";
 const ORGANIZER_RETURN_COLUMNS = "id,display_name,bio,verification_status";
@@ -623,6 +626,7 @@ function mapPlace(row: PlaceRow, avatarsByPlace: Record<string, PlaceAvatarRow[]
 
 function mapPost(row: PostRow, commentsByPost: Record<string, Comment[]>): Post {
   return {
+    moderationStatus: row.moderation_status ?? "published",
     id: row.id,
     authorId: row.author_id,
     placeId: row.place_id,
@@ -672,6 +676,7 @@ function mapStory(row: LiveStoryRow): StoryItem {
       : undefined;
 
   return {
+    moderationStatus: row.moderation_status ?? "published",
     id: row.id,
     label: row.label,
     placeId: row.place_id,
@@ -691,6 +696,7 @@ function mapStory(row: LiveStoryRow): StoryItem {
 
 function mapMeetEvent(row: MeetEventRow, place?: Place): MeetEvent {
   return {
+    moderationStatus: row.moderation_status ?? "published",
     id: row.id,
     title: row.title,
     placeId: row.place_id,
@@ -931,15 +937,6 @@ async function fetchPublishedCommentRows(): Promise<CommentRow[]> {
 async function fetchPulseData(): Promise<PulseData> {
   const client = assertSupabase();
 
-  // Keep the small pool of evergreen editorial stories cycling (see
-  // 20260907130000_loop_generic_stories.sql) before reading the bootstrap, so
-  // an expired one is already refreshed by the time it's fetched below.
-  // Best-effort: a failure here shouldn't block the rest of the app loading.
-  const refreshResult = await client.rpc("refresh_generic_stories");
-  if (refreshResult.error) {
-    console.warn("Could not refresh generic stories.", refreshResult.error);
-  }
-
   const [result, routePreviewResult, commentRows] = await Promise.all([
     client.rpc("get_pulse_bootstrap"),
     client
@@ -1040,13 +1037,16 @@ async function fetchPulseData(): Promise<PulseData> {
   return pulseData;
 }
 
-export async function loadPulseData(): Promise<PulseData> {
-  if (!pulseDataRequest) {
-    pulseDataRequest = fetchPulseData().finally(() => {
-      pulseDataRequest = null;
-    });
+export async function loadPulseData(options: { force?: boolean } = {}): Promise<PulseData> {
+  if (!pulseDataRequest || options.force) {
+    const request = fetchPulseData();
+    pulseDataRequest = request;
+    void request
+      .finally(() => {
+        if (pulseDataRequest === request) pulseDataRequest = null;
+      })
+      .catch(() => undefined);
   }
-
   return pulseDataRequest;
 }
 

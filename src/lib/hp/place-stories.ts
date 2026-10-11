@@ -1,5 +1,5 @@
-import { formatDistanceStrict } from "date-fns";
-import { el, enUS } from "date-fns/locale";
+import { storyObservedAt } from "./freshness";
+import { observationLabel, storyHasCurrentReport, storyIsVisible } from "./surface-freshness";
 import type { Place, StoryItem } from "../hp-model";
 
 /**
@@ -32,6 +32,7 @@ export interface PlaceStory {
   userId?: string | null;
   profileId?: string | null;
   createdAt?: string;
+  currentReport: boolean;
 }
 
 export interface PlaceStoryGroup {
@@ -48,11 +49,11 @@ export interface PlaceStoryGroup {
 
 export const STORY_KIND_LABEL: Record<StoryKind, string> = {
   photo: "Photo",
-  report: "Live report",
+  report: "Report",
   beach_status: "Beach status",
-  business_status: "Open now",
+  business_status: "Business update",
   editor_note: "Editor tip",
-  event: "Tonight",
+  event: "Event update",
   route_tease: "Route",
 };
 
@@ -142,45 +143,19 @@ export function toneStyle(tone: StoryTone): ToneStyle {
   return tone === "muted" ? MUTED_TONE : TONE_STYLES[tone];
 }
 
-/**
- * A real relative-time label ("3 hours ago", "2 days ago") in either
- * language. Previously this only handled minutes/hours and fell back to the
- * literal word "today" past 24h — wrong for anything actually a day or more
- * old, which every one of the evergreen editorial stories eventually is
- * between refreshes. The Greek call site had its own, worse version that
- * never converted units at all: any story older than a minute showed the
- * raw minute count forever (e.g. "πριν από 20411′"). date-fns already ships
- * a Greek locale, so this uses it instead of hand-rolled formatting.
- *
- * `createdAt` is preferred when available; `minutesAgo` (and the language's
- * own minute-counting fallback) only covers the rare case where a story
- * somehow has no real timestamp.
- */
+/** Missing observation timestamps remain unknown, even on recycled stories. */
 export function formatStoryTime(
   minutesAgo: number,
   createdAt: string | undefined,
   language: "GR" | "EN",
   nowMs = Date.now(),
 ): string {
-  if (minutesAgo < 1) return language === "GR" ? "τώρα" : "just now";
-  const time = createdAt ? new Date(createdAt).getTime() : NaN;
-  if (Number.isFinite(time)) {
-    return formatDistanceStrict(time, nowMs, {
-      addSuffix: true,
-      locale: language === "GR" ? el : enUS,
-    });
-  }
-  if (minutesAgo < 60) {
-    const n = Math.round(minutesAgo);
-    return language === "GR" ? `πριν από ${n}′` : `${n} min ago`;
-  }
-  const hours = Math.round(minutesAgo / 60);
-  return language === "GR" ? `πριν από ${hours} ώ.` : `${hours}h ago`;
+  return observationLabel(createdAt, nowMs, language).relative;
 }
 
 function minutesSince(iso: string, nowMs: number): number {
   const time = new Date(iso).getTime();
-  if (!Number.isFinite(time)) return 0;
+  if (!Number.isFinite(time)) return Number.POSITIVE_INFINITY;
   return Math.max(0, Math.round((nowMs - time) / 60_000));
 }
 
@@ -198,12 +173,13 @@ function mapServerStory(story: StoryItem, nowMs: number): PlaceStory {
     authorType: story.authorType,
     authorAvatarUrl: story.authorAvatarUrl,
     caption: story.caption,
-    minutesAgo: minutesSince(story.createdAt, nowMs),
+    minutesAgo: minutesSince(storyObservedAt(story) ?? "", nowMs),
     expiresAfterHours: story.expiresAfterHours,
     report: story.report,
+    currentReport: storyHasCurrentReport(story, nowMs),
     userId: story.userId,
     profileId: story.profileId,
-    createdAt: story.createdAt,
+    createdAt: storyObservedAt(story) ?? undefined,
   };
 }
 
@@ -218,7 +194,7 @@ export function buildPlaceStoryGroups(
 
   for (const serverStory of serverStories) {
     const place = byId.get(serverStory.placeId);
-    if (!place) continue;
+    if (!place || !storyIsVisible(serverStory, nowMs)) continue;
 
     const story = mapServerStory(serverStory, nowMs);
     const list = bucket.get(story.placeId) ?? [];
@@ -240,7 +216,7 @@ export function buildPlaceStoryGroups(
       stories: ordered,
       tone: storyToneForPlace(place, ordered),
       hasUnseen,
-      live: place.hotness >= 8 && hasUnseen,
+      live: ordered.some((story) => story.currentReport),
       latestMinutesAgo: latestMinutesAgo(ordered),
       count: ordered.length,
     });
@@ -250,9 +226,7 @@ export function buildPlaceStoryGroups(
     if (a.live !== b.live) return a.live ? -1 : 1;
     if (a.hasUnseen !== b.hasUnseen) return a.hasUnseen ? -1 : 1;
     if (a.latestMinutesAgo !== b.latestMinutesAgo) return a.latestMinutesAgo - b.latestMinutesAgo;
-    const placeA = byId.get(a.placeId);
-    const placeB = byId.get(b.placeId);
-    return (placeB?.hotness ?? 0) - (placeA?.hotness ?? 0);
+    return a.placeName.localeCompare(b.placeName);
   });
 
   return groups;

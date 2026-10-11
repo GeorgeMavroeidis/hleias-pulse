@@ -138,8 +138,6 @@ import {
   type PlaceStory,
   type PlaceStoryGroup,
 } from "@/lib/hp/place-stories";
-import { LiveTicker } from "./LiveTicker";
-import { TrendingHero } from "./TrendingHero";
 import type {
   BusinessStatus,
   DealCode,
@@ -151,12 +149,20 @@ import type {
 import { OnboardingGate } from "./OnboardingGate";
 import { AccountBubble, AccountSheet, AuthSheet, PasswordRecoverySheet } from "./AuthAccountSheets";
 import { IdentitySegments, SectionHeader, fieldClass } from "./blend-ui";
+import { useFreshnessClock } from "./use-freshness-clock";
+import {
+  PulseRefreshController,
+  reconcilePosts,
+  reconcileOpenDetail,
+  visibleDetail,
+} from "@/lib/hp/pulse-refresh";
+import { systemClock } from "@/lib/hp/freshness";
+import { contentVisibleToViewer, isPublishedContent, meetPhase } from "@/lib/hp/surface-freshness";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
-import { buildPulseActivitySnapshot, type PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
+import { buildPulseActivitySnapshot } from "@/lib/hp/pulse-activity";
 import {
   deriveAreaIntelligenceSnapshot,
   type AreaState,
-  type AreaIntelligenceSnapshot,
   type SignalQuality,
 } from "@/lib/hp/area-intelligence";
 import {
@@ -317,17 +323,27 @@ function useEverTrue(value: boolean): boolean {
 export function PulseApp() {
   const { language, setLanguage, t } = useI18n();
   const [pulseData, setPulseData] = useState<PulseData>(emptyPulseData);
-  const [activitySnapshot, setActivitySnapshot] = useState<PulseActivitySnapshot>({});
-  const [areaIntelligence, setAreaIntelligence] = useState<AreaIntelligenceSnapshot>({});
+  const [nowMs, setNowMs] = useFreshnessClock();
+  const activitySnapshot = useMemo(
+    () => buildPulseActivitySnapshot(pulseData, nowMs),
+    [pulseData, nowMs],
+  );
+  const areaIntelligence = useMemo(
+    () => deriveAreaIntelligenceSnapshot(pulseData, nowMs),
+    [pulseData, nowMs],
+  );
+  const [fetchedAtMs, setFetchedAtMs] = useState<number | null>(null);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const acceptedDataRef = useRef(false);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
   const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
-  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [selectedPlaceRecord, setSelectedPlace] = useState<Place | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [mapBackStack, setMapBackStack] = useState<MapViewSnapshot[]>([]);
-  const [openPlace, setOpenPlace] = useState<Place | null>(null);
-  const [openPost, setOpenPost] = useState<Post | null>(null);
-  const [openRoute, setOpenRoute] = useState<RouteItem | null>(null);
+  const [openPlaceRecord, setOpenPlace] = useState<Place | null>(null);
+  const [openPostRecord, setOpenPost] = useState<Post | null>(null);
+  const [openRouteRecord, setOpenRoute] = useState<RouteItem | null>(null);
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
   const [activeLens, setActiveLens] = useState<DiscoveryLens | null>(null);
   const [mapDiscoveryViewport, setMapDiscoveryViewport] = useState<MapDiscoveryViewport | null>(
@@ -350,7 +366,7 @@ export function PulseApp() {
     {},
   );
   const [culturalEventComments, setCulturalEventComments] = useState<Record<string, Comment[]>>({});
-  const [openCulturalEvent, setOpenCulturalEvent] = useState<CulturalEvent | null>(null);
+  const [openCulturalEventRecord, setOpenCulturalEvent] = useState<CulturalEvent | null>(null);
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
   const [savedRoutes, setSavedRoutes] = useState<Record<string, boolean>>({});
   const [savedDetailContext, setSavedDetailContext] = useState<SavedContent | null>(null);
@@ -395,11 +411,23 @@ export function PulseApp() {
   const [toast, setToast] = useState<string | null>(null);
   const initialShareHandled = useRef(false);
   const lastActivityRefreshAtRef = useRef(0);
-  const activityRefreshInFlightRef = useRef(false);
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const [storyViewer, setStoryViewer] = useState<{ placeId: string; storyId?: string } | null>(
     null,
   );
+
+  const accountStorageUserId =
+    account.status === "ready" ||
+    account.status === "needsProfile" ||
+    account.status === "anonymous"
+      ? account.userId
+      : null;
+
+  const selectedPlace = visibleDetail(selectedPlaceRecord, accountStorageUserId);
+  const openPlace = visibleDetail(openPlaceRecord, accountStorageUserId);
+  const openPost = visibleDetail(openPostRecord, accountStorageUserId);
+  const openRoute = visibleDetail(openRouteRecord, accountStorageUserId);
+  const openCulturalEvent = visibleDetail(openCulturalEventRecord, accountStorageUserId);
 
   // Gate first-load of the always-mounted, lazily-chunked modals — see `useEverTrue`.
   const placeDetailEverOpened = useEverTrue(!!openPlace);
@@ -412,13 +440,50 @@ export function PulseApp() {
   const dealCodeEverOpened = useEverTrue(!!dealCodeModal);
   const culturalEventDetailEverOpened = useEverTrue(!!openCulturalEvent);
 
-  const places = pulseData.places;
-  const posts = pulseData.posts;
+  const places = useMemo(
+    () =>
+      pulseData.places
+        .filter((place) => contentVisibleToViewer(place, accountStorageUserId))
+        .map((place) => {
+          const metric = activitySnapshot[place.id];
+          return {
+            ...place,
+            hotness: (metric?.score ?? 0) / 10,
+            pulse: metric?.score ?? 0,
+            recentPostCount: metric?.postCount ?? 0,
+            commentCount: metric?.commentCount ?? 0,
+            crowd: "",
+            // Stored portraits are not dated evidence of who is present.
+            avatars: [],
+            status: (metric?.tier === "live"
+              ? "busy"
+              : metric?.tier === "hot"
+                ? "popular"
+                : metric?.tier === "moving"
+                  ? "active"
+                  : "quiet") as Place["status"],
+          };
+        }),
+    [pulseData.places, activitySnapshot, accountStorageUserId],
+  );
+  const posts = useMemo(
+    () => pulseData.posts.filter((post) => contentVisibleToViewer(post, accountStorageUserId)),
+    [pulseData.posts, accountStorageUserId],
+  );
   const events = pulseData.events;
   const deals = pulseData.deals;
-  const culturalEvents = pulseData.culturalEvents;
+  const culturalEvents = useMemo(
+    () =>
+      pulseData.culturalEvents.filter((event) =>
+        contentVisibleToViewer(event, accountStorageUserId),
+      ),
+    [pulseData.culturalEvents, accountStorageUserId],
+  );
   const routes = pulseData.routes;
-  const stories = pulseData.stories;
+  const stories = useMemo(
+    () => pulseData.stories.filter((story) => contentVisibleToViewer(story, accountStorageUserId)),
+    [pulseData.stories, accountStorageUserId],
+  );
   const vibeChips = pulseData.vibeChips;
 
   const placeById = useMemo(() => new Map(places.map((place) => [place.id, place])), [places]);
@@ -441,8 +506,8 @@ export function PulseApp() {
   const routeById = useMemo(() => new Map(routes.map((route) => [route.id, route])), [routes]);
 
   const placeStoryGroups = useMemo(
-    () => buildPlaceStoryGroups(places, seen, stories),
-    [places, seen, stories],
+    () => buildPlaceStoryGroups(places, seen, stories, nowMs),
+    [places, seen, stories, nowMs],
   );
   const storyPlaceIds = useMemo(() => storyPlaceIdSet(placeStoryGroups), [placeStoryGroups]);
 
@@ -466,16 +531,9 @@ export function PulseApp() {
   const findAuthor = (id: string) =>
     authorById.get(id) ??
     savedDetailContext?.authors.find((author) => author.id === id) ??
-    pulseData.authors[0] ??
     fallbackAuthor;
   const findPostAuthor = (post: Post) =>
     displayAuthorForPost(post, findAuthor(post.authorId), profilesById);
-  const accountStorageUserId =
-    account.status === "ready" ||
-    account.status === "needsProfile" ||
-    account.status === "anonymous"
-      ? account.userId
-      : null;
   const accountProfileId = account.status === "ready" ? account.profile.id : null;
   const commentViewerUserId =
     account.status === "ready" || account.status === "needsProfile" ? account.userId : null;
@@ -845,94 +903,103 @@ export function PulseApp() {
       text: truncateShareText(story.caption),
     });
 
-  const refreshPulseData = useCallback(async () => {
-    try {
-      setDataStatus("loading");
-      const data = await loadPulseData();
-      setPulseData(data);
-      setActivitySnapshot(buildPulseActivitySnapshot(data));
-      setAreaIntelligence(deriveAreaIntelligenceSnapshot(data));
-      lastActivityRefreshAtRef.current = Date.now();
-      setPlaceComments((previous) => reconcileCommentGroups(previous, data.placeComments));
-      setRouteComments((previous) => reconcileCommentGroups(previous, data.routeComments));
-      setCulturalEventComments((previous) =>
-        reconcileCommentGroups(previous, data.culturalEventComments),
-      );
-      setSelectedPlace((current) =>
-        current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
-      );
-      setOpenPlace((current) =>
-        current
-          ? (data.places.find((p) => p.id === current.id) ??
-            savedDetailContextRef.current?.places.find((p) => p.id === current.id) ??
-            null)
-          : null,
-      );
-      setOpenPost((current) =>
-        current
-          ? (data.posts.find((p) => p.id === current.id) ??
-            savedDetailContextRef.current?.posts.find((p) => p.id === current.id) ??
-            null)
-          : null,
-      );
-      setOpenRoute((current) =>
-        current
-          ? (data.routes.find((r) => r.id === current.id) ??
-            savedDetailContextRef.current?.routes.find((r) => r.id === current.id) ??
-            null)
-          : null,
-      );
-      setDataStatus("ready");
-    } catch (error) {
-      console.warn("Could not load Supabase pulse data.", error);
-      setPulseData(emptyPulseData);
-      setDataStatus("error");
-    }
-  }, []);
+  const detailViewerUserIdRef = useRef(accountStorageUserId);
+  detailViewerUserIdRef.current = accountStorageUserId;
+
+  const refreshController = useMemo(
+    () =>
+      new PulseRefreshController(() => loadPulseData({ force: true }), systemClock, {
+        aged: setNowMs,
+        accepted: (data, fetchedAt) => {
+          acceptedDataRef.current = true;
+          lastActivityRefreshAtRef.current = fetchedAt;
+          setPulseData(data);
+          setFetchedAtMs(fetchedAt);
+          setRefreshFailed(false);
+          setUserPosts((local) =>
+            local.filter((post) => !data.posts.some((row) => row.id === post.id)),
+          );
+          setPostComments((previous) =>
+            reconcileCommentGroups(
+              previous,
+              Object.fromEntries(data.posts.map((post) => [post.id, post.comments])),
+            ),
+          );
+          setPlaceComments((previous) => reconcileCommentGroups(previous, data.placeComments));
+          setRouteComments((previous) => reconcileCommentGroups(previous, data.routeComments));
+          setCulturalEventComments((previous) =>
+            reconcileCommentGroups(previous, data.culturalEventComments),
+          );
+          // A capped bootstrap may retain only permission-checked Saved context.
+          setSelectedPlace((current) =>
+            reconcileOpenDetail(
+              current,
+              data.places,
+              savedDetailContextRef.current?.places ?? [],
+              detailViewerUserIdRef.current,
+            ),
+          );
+          setOpenPlace((current) =>
+            reconcileOpenDetail(
+              current,
+              data.places,
+              savedDetailContextRef.current?.places ?? [],
+              detailViewerUserIdRef.current,
+            ),
+          );
+          setOpenPost((current) =>
+            reconcileOpenDetail(
+              current,
+              data.posts,
+              savedDetailContextRef.current?.posts ?? [],
+              detailViewerUserIdRef.current,
+            ),
+          );
+          setOpenRoute((current) =>
+            reconcileOpenDetail(
+              current,
+              data.routes,
+              savedDetailContextRef.current?.routes ?? [],
+              detailViewerUserIdRef.current,
+            ),
+          );
+          setOpenCulturalEvent((current) =>
+            reconcileOpenDetail(current, data.culturalEvents, [], detailViewerUserIdRef.current),
+          );
+          setDataStatus("ready");
+        },
+        failed: (error) => {
+          console.warn("Could not refresh Pulse data.", error);
+          setRefreshFailed(true);
+          setDataStatus(acceptedDataRef.current ? "ready" : "error");
+        },
+      }),
+    [setNowMs],
+  );
+  const refreshPulseData = useCallback(() => refreshController.refresh(), [refreshController]);
 
   useEffect(() => {
     void refreshPulseData();
-  }, [refreshPulseData]);
-
-  useEffect(() => {
-    if (hasPasswordRecoveryUrl()) setPasswordRecoveryOpen(true);
-  }, []);
-
-  const refreshActivitySnapshot = useCallback(async () => {
-    if (typeof document === "undefined" || document.hidden || activityRefreshInFlightRef.current) {
-      return;
-    }
-
-    activityRefreshInFlightRef.current = true;
-    try {
-      const data = await loadPulseData();
-      setActivitySnapshot(buildPulseActivitySnapshot(data));
-      setAreaIntelligence(deriveAreaIntelligenceSnapshot(data));
-      lastActivityRefreshAtRef.current = Date.now();
-    } catch (error) {
-      console.warn("Could not refresh the map activity snapshot.", error);
-    } finally {
-      activityRefreshInFlightRef.current = false;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof document === "undefined") return;
-
     const refreshIfStale = () => {
-      if (document.hidden || Date.now() - lastActivityRefreshAtRef.current < 60_000) return;
-      void refreshActivitySnapshot();
+      if (!document.hidden && systemClock.nowMs() - lastActivityRefreshAtRef.current >= 60_000)
+        void refreshPulseData();
     };
-    const interval = window.setInterval(refreshIfStale, 60_000);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void refreshPulseData();
+    }, 60_000);
     window.addEventListener("focus", refreshIfStale);
     document.addEventListener("visibilitychange", refreshIfStale);
-
     return () => {
+      refreshController.invalidate();
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshIfStale);
       document.removeEventListener("visibilitychange", refreshIfStale);
     };
-  }, [refreshActivitySnapshot]);
+  }, [refreshController, refreshPulseData, accountStorageUserId]);
+
+  useEffect(() => {
+    if (hasPasswordRecoveryUrl()) setPasswordRecoveryOpen(true);
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -1022,6 +1089,11 @@ export function PulseApp() {
     const previousSavedContext = savedDetailContextRef.current;
     savedDetailContextRef.current = null;
     setSavedDetailContext(null);
+    setSelectedPlace((current) => visibleDetail(current, accountStorageUserId));
+    setOpenPlace((current) => visibleDetail(current, accountStorageUserId));
+    setOpenPost((current) => visibleDetail(current, accountStorageUserId));
+    setOpenRoute((current) => visibleDetail(current, accountStorageUserId));
+    setOpenCulturalEvent((current) => visibleDetail(current, accountStorageUserId));
     if (previousSavedContext) {
       setOpenPlace((current) =>
         current && previousSavedContext.places.some((place) => place.id === current.id)
@@ -1070,10 +1142,17 @@ export function PulseApp() {
     if (!seenOnboarding) setOnboardingOpen(true);
   }, []);
 
-  const allPosts = useMemo(() => [...userPosts, ...posts], [posts, userPosts]);
+  const allPosts = useMemo(
+    () =>
+      reconcilePosts(
+        userPosts.filter((post) => post.userId === accountStorageUserId),
+        posts,
+      ),
+    [posts, userPosts, accountStorageUserId],
+  );
   const discoverySnapshot = useMemo<DiscoverySnapshot>(
-    () => deriveDiscoverySnapshot({ ...pulseData, posts: allPosts }),
-    [allPosts, pulseData],
+    () => deriveDiscoverySnapshot(pulseData, nowMs),
+    [pulseData, nowMs],
   );
   const savedPostIds = useMemo(
     () =>
@@ -1090,12 +1169,21 @@ export function PulseApp() {
     [savedRoutes],
   );
   const meetEvents = useMemo(
-    () => [...pulseData.meetEvents].sort((a, b) => +new Date(a.happensAt) - +new Date(b.happensAt)),
-    [pulseData.meetEvents],
+    () =>
+      pulseData.meetEvents
+        .filter((event) => contentVisibleToViewer(event, accountStorageUserId))
+        .sort((a, b) => +new Date(a.happensAt) - +new Date(b.happensAt)),
+    [pulseData.meetEvents, accountStorageUserId],
   );
   const activityTicks = useMemo(
-    () => buildActivityTicks(allPosts, placeById, meetEvents),
-    [allPosts, meetEvents, placeById],
+    () =>
+      buildActivityTicks(allPosts, placeById, meetEvents, {
+        nowMs,
+        findAuthor: (post) =>
+          displayAuthorForPost(post, authorById.get(post.authorId) ?? fallbackAuthor, profilesById),
+        stories,
+      }),
+    [allPosts, meetEvents, placeById, nowMs, authorById, profilesById, stories],
   );
 
   // Blocks and mutes are keyed by auth user id, but the blocked list has to show
@@ -1108,7 +1196,7 @@ export function PulseApp() {
       map.set(userId, { name, avatarUrl });
     };
     for (const post of allPosts) {
-      const base = authorById.get(post.authorId) ?? pulseData.authors[0] ?? fallbackAuthor;
+      const base = authorById.get(post.authorId) ?? fallbackAuthor;
       const author = displayAuthorForPost(post, base, profilesById);
       add(post.userId, author.name, author.avatarUrl);
     }
@@ -1121,16 +1209,7 @@ export function PulseApp() {
       }
     }
     return map;
-  }, [
-    allPosts,
-    authorById,
-    culturalEvents,
-    meetEvents,
-    placeStoryGroups,
-    places,
-    profilesById,
-    pulseData.authors,
-  ]);
+  }, [allPosts, authorById, culturalEvents, meetEvents, placeStoryGroups, places, profilesById]);
 
   const resolveUserLabel = useCallback(
     (userId: string) => userLabelsById.get(userId) ?? null,
@@ -1773,11 +1852,14 @@ export function PulseApp() {
   };
 
   const toggleMeetRsvp = (event: MeetEvent, next: RsvpStatus) => {
+    const phase = meetPhase(event, systemClock.nowMs());
+    if (!isPublishedContent(event) || (phase !== "upcoming" && phase !== "inProgress")) return;
     if (account.status !== "ready") {
       requireProfile("rsvp");
       return;
     }
 
+    const acceptedAtWrite = lastActivityRefreshAtRef.current;
     const previous = rsvpMap[event.id] ?? null;
     const clearing = previous === next;
     setRsvpMap((map) => {
@@ -1816,23 +1898,44 @@ export function PulseApp() {
         else delete copy[event.id];
         return copy;
       });
-      setPulseData((data) => ({
-        ...data,
-        meetEvents: data.meetEvents.map((item) => (item.id === event.id ? event : item)),
-      }));
+      // A newer accepted refresh already contains the server's RSVP counts.
+      if (lastActivityRefreshAtRef.current === acceptedAtWrite)
+        setPulseData((data) => ({
+          ...data,
+          meetEvents: data.meetEvents.map((item) =>
+            item.id !== event.id
+              ? item
+              : {
+                  ...item,
+                  going: Math.max(
+                    0,
+                    item.going -
+                      ((previous === "going" ? -1 : 0) + (!clearing && next === "going" ? 1 : 0)),
+                  ),
+                  maybe: Math.max(
+                    0,
+                    item.maybe -
+                      ((previous === "maybe" ? -1 : 0) + (!clearing && next === "maybe" ? 1 : 0)),
+                  ),
+                },
+          ),
+        }));
       handleWriteError(error, t("Could not save RSVP"));
     });
   };
 
-  const markTrendingGoing = (place: Place) => {
-    const event = meetEvents.find((item) => item.placeId === place.id);
-    if (!event) {
-      showToast(t("No gathering there yet"));
-      setTab("meet");
-      setMeetSubTab("community");
+  const markTrendingGoing = (event: MeetEvent) => {
+    const current = meetEvents.find((item) => item.id === event.id);
+    if (
+      !current ||
+      !isPublishedContent(current) ||
+      meetPhase(current, systemClock.nowMs()) !== "upcoming"
+    ) {
+      const place = findPlace(event.placeId);
+      if (place) setOpenPlace(place);
       return;
     }
-    toggleMeetRsvp(event, "going");
+    toggleMeetRsvp(current, "going");
     setTab("meet");
     setMeetSubTab("community");
   };
@@ -1979,7 +2082,7 @@ export function PulseApp() {
       origin,
       activeLens,
       discoverySnapshot,
-      { excludeAreaId: selectedCluster?.id ?? null },
+      { excludeAreaId: selectedCluster?.id ?? null, now: nowMs },
     );
     if (!recommendation) return null;
     const cluster = mapClusters.find((item) => item.id === recommendation.areaId);
@@ -1991,6 +2094,7 @@ export function PulseApp() {
     mapDiscoveryViewport,
     selectedCluster,
     showDiscoveryEmptyState,
+    nowMs,
   ]);
   const availableMapHeight = Math.max(0, safeMapAreaH - sheetH);
   const utilityRailHidden = availableMapHeight < 248;
@@ -2096,6 +2200,9 @@ export function PulseApp() {
               )}
             </AnimatePresence>
             <MapBottomSheet
+              key={accountStorageUserId ?? "guest"}
+              nowMs={nowMs}
+              previewActivitySnapshot={activitySnapshot}
               cluster={selectedCluster}
               selectedPlace={sel}
               events={events}
@@ -2141,10 +2248,14 @@ export function PulseApp() {
               </div>
             )}
             <PulseFeed
+              nowMs={nowMs}
               posts={filteredPosts}
               storyGroups={placeStoryGroups}
               activityTicks={activityTicks}
               trendingPlace={trendingPlace}
+              activitySnapshot={activitySnapshot}
+              meetEvents={meetEvents}
+              stories={stories}
               onOpenStory={(placeId) => setStoryViewer({ placeId })}
               likes={likes}
               postLikes={postLikes}
@@ -2242,6 +2353,8 @@ export function PulseApp() {
             <Suspense fallback={null}>
               {meetSubTab === "community" ? (
                 <MeetScreen
+                  key={accountStorageUserId ?? "guest"}
+                  nowMs={nowMs}
                   events={meetEvents}
                   rsvp={rsvpMap}
                   findPlace={findPlace}
@@ -2251,6 +2364,8 @@ export function PulseApp() {
                 />
               ) : (
                 <CulturalEventsScreen
+                  key={accountStorageUserId ?? "guest"}
+                  nowMs={nowMs}
                   events={culturalEvents}
                   lang={language}
                   onOpenDetail={setOpenCulturalEvent}
@@ -2340,6 +2455,31 @@ export function PulseApp() {
           )}
 
           <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
+            {refreshFailed && dataStatus === "ready" && (
+              <div
+                role="status"
+                className="absolute inset-x-4 top-4 z-[60] rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-xs"
+              >
+                {t("Could not refresh. Showing earlier data.")}{" "}
+                {fetchedAtMs && (
+                  <span>
+                    {t("Last checked")}:{" "}
+                    {new Intl.DateTimeFormat(language === "GR" ? "el-GR" : "en-GB", {
+                      timeZone: "Europe/Athens",
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(fetchedAtMs)}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void refreshPulseData()}
+                  className="ml-2 underline"
+                >
+                  {t("Try again")}
+                </button>
+              </div>
+            )}
             {dataStatus !== "ready" && (
               <div
                 role={dataStatus === "error" ? "alert" : "status"}
@@ -2389,7 +2529,10 @@ export function PulseApp() {
         {placeDetailEverOpened && (
           <Suspense fallback={null}>
             <PlaceDetailModal
+              key={accountStorageUserId ?? "guest"}
+              nowMs={nowMs}
               place={openPlace}
+              activityMetric={openPlace ? activitySnapshot[openPlace.id] : undefined}
               events={events}
               onClose={() => setOpenPlace(null)}
               onSave={toggleSave}
@@ -2430,6 +2573,8 @@ export function PulseApp() {
         {postDetailEverOpened && (
           <Suspense fallback={null}>
             <PostDetailModal
+              key={accountStorageUserId ?? "guest"}
+              nowMs={nowMs}
               post={openPost}
               onClose={() => setOpenPost(null)}
               onOpenMap={jumpToMap}
@@ -2459,6 +2604,8 @@ export function PulseApp() {
         {routeArticleEverOpened && (
           <Suspense fallback={null}>
             <RouteArticleModal
+              key={accountStorageUserId ?? "guest"}
+              nowMs={nowMs}
               route={openRoute}
               onClose={() => setOpenRoute(null)}
               onOpenMap={jumpToMap}
@@ -2555,6 +2702,8 @@ export function PulseApp() {
         {culturalEventDetailEverOpened && (
           <Suspense fallback={null}>
             <CulturalEventDetailModal
+              key={accountStorageUserId ?? "guest"}
+              nowMs={nowMs}
               event={openCulturalEvent}
               lang={language}
               onClose={() => setOpenCulturalEvent(null)}
@@ -2660,6 +2809,8 @@ export function PulseApp() {
         {storyViewer && (
           <Suspense fallback={null}>
             <PlaceStoryViewer
+              key={accountStorageUserId ?? "guest"}
+              nowMs={nowMs}
               groups={placeStoryGroups}
               startPlaceId={storyViewer.placeId}
               startStoryId={storyViewer.storyId}
