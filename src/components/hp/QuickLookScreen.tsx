@@ -56,7 +56,7 @@ interface Props {
   onOpenRoute: (route: RouteItem) => void;
 }
 
-function Card({ card, onOpen }: { card: SummaryCard; onOpen: () => void }) {
+export function SummaryCardButton({ card, onOpen }: { card: SummaryCard; onOpen: () => void }) {
   const { t } = useI18n();
   return (
     <button
@@ -185,10 +185,10 @@ export function QuickLookScreen({ places, routes, onOpenPlace, onOpenRoute }: Pr
         <div className="hp-stagger flex flex-col gap-2">
           {mode === "places"
             ? placeCards.map(({ place, card }) => (
-                <Card key={card.id} card={card} onOpen={() => onOpenPlace(place)} />
+                <SummaryCardButton key={card.id} card={card} onOpen={() => onOpenPlace(place)} />
               ))
             : routeCards.map(({ route, card }) => (
-                <Card key={card.id} card={card} onOpen={() => onOpenRoute(route)} />
+                <SummaryCardButton key={card.id} card={card} onOpen={() => onOpenRoute(route)} />
               ))}
         </div>
 

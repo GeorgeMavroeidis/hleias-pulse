@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  CalendarDays,
   Car,
   CheckCircle2,
   Compass,
@@ -69,7 +70,13 @@ function FreshnessLine({ card }: { card: EssentialsCard }) {
   );
 }
 
-export function EssentialsScreen({ onOpenQuickLook }: { onOpenQuickLook: () => void }) {
+export function EssentialsScreen({
+  onOpenQuickLook,
+  onOpenTrip,
+}: {
+  onOpenQuickLook: () => void;
+  onOpenTrip: () => void;
+}) {
   const { language, t } = useI18n();
   const groups = useMemo(() => essentialsBySection(ESSENTIALS_CARDS, REGION), []);
   const [active, setActive] = useState<EssentialsSectionId | "all">("all");
@@ -91,6 +98,24 @@ export function EssentialsScreen({ onOpenQuickLook }: { onOpenQuickLook: () => v
             {t("What you need to know so your days here go smoothly.")}
           </p>
         </header>
+
+        {/* The trip planner is the main thing a visitor does here, so it
+            sits above the reference cards. */}
+        <button
+          type="button"
+          onClick={onOpenTrip}
+          className="hp-card-lift mb-4 flex w-full items-center gap-3 rounded-2xl bg-hp-ink p-4 text-left text-hp-paper transition active:scale-[0.99]"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-hp-sunset">
+            <CalendarDays size={18} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-black">{t("Plan your days")}</span>
+            <span className="block text-[11.5px] opacity-75">
+              {t("Tell us how long you stay, then pick what to do")}
+            </span>
+          </span>
+        </button>
 
         <div className="-mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
           {[

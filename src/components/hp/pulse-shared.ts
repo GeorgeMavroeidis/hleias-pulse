@@ -24,8 +24,9 @@ export type Tab =
   | "saved"
   | "deals"
   | "essentials"
-  | "quicklook";
-export type NavTab = Exclude<Tab, "saved" | "deals" | "essentials" | "quicklook">;
+  | "quicklook"
+  | "trip";
+export type NavTab = Exclude<Tab, "saved" | "deals" | "essentials" | "quicklook" | "trip">;
 export type MeetSubTab = "community" | "events";
 export type ComposerMode = "post" | "place" | "story" | "event" | "question";
 export type MarkerAnimationTheme = "calm" | "pulse" | "signal";
@@ -149,7 +150,8 @@ export const isTab = (value: string | null): value is Tab =>
   value === "saved" ||
   value === "deals" ||
   value === "essentials" ||
-  value === "quicklook";
+  value === "quicklook" ||
+  value === "trip";
 
 export const truncateShareText = (text: string) =>
   text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;
