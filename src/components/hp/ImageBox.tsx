@@ -5,16 +5,24 @@ interface Props extends React.ImgHTMLAttributes<HTMLImageElement> {
   alt: string;
   rounded?: string;
   gradientFallback?: string;
+  failedContent?: React.ReactNode;
 }
 
-export function ImageBox({
+export function ImageBox(props: Props) {
+  return <ImageBoxSource key={`${props.src}:${props.srcSet ?? ""}`} {...props} />;
+}
+
+function ImageBoxSource({
   src,
   alt,
   className = "",
   rounded = "rounded-2xl",
   gradientFallback,
+  failedContent,
   width = 800,
   height = 600,
+  onLoad,
+  onError,
   ...rest
 }: Props) {
   const [loaded, setLoaded] = useState(false);
@@ -33,14 +41,23 @@ export function ImageBox({
           width={width}
           height={height}
           loading="lazy"
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-          className={`h-full w-full object-cover transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
+          onLoad={(event) => {
+            setLoaded(true);
+            onLoad?.(event);
+          }}
+          onError={(event) => {
+            setFailed(true);
+            onError?.(event);
+          }}
+          className={`h-full w-full object-cover hp-image-reveal ${loaded ? "opacity-100" : "opacity-0"}`}
           {...rest}
         />
       )}
-      {!loaded && !failed && (
-        <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-black/10 to-black/20" />
+      {!loaded && !failed && <div className="hp-image-loading absolute inset-0" />}
+      {failed && failedContent && (
+        <div className="absolute inset-0 grid place-items-center bg-hp-paper text-xs text-hp-muted">
+          {failedContent}
+        </div>
       )}
     </div>
   );
