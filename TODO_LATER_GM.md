@@ -31,7 +31,7 @@
        with 5 sections and 9 cards; each card shows Draft / Checked {date} /
        Needs re-checking. Only the 112 card has real text — **the team writes
        the rest** in `src/lib/hp/essentials.ts`. Tests: `npm run
- test:essentials`. Later: move content to an admin-edited table; add
+test:essentials`. Later: move content to an admin-edited table; add
        official source links; English check of every card.
    - [ ] **Team task:** fill in the draft cards (ferries, cruise arrivals,
          car/taxi/bus, roads, first days, heat & fire, sea, hospitals &
@@ -43,10 +43,18 @@
        existing English descriptions.
    - [ ] **Team task:** read over the Greek descriptions and fix anything that
          sounds off; tune the rough visit times per kind of place.
-3. [ ] ← _next_ **Trip builder, device-only** — "how many days?", take a ready-made route
-       or build your own by swiping summary cards into days; Trip card per day.
-       No database change until we know it is fun.
-4. [ ] **Titles + "% of Ilia discovered"** — decide the denominator (places vs.
+3. [x] **Trip planner ("Σχεδίασε τις μέρες σου")** — done locally 2026-10-11 on
+       branch `feat/trip-planner` (local only). Essentials → big card at the top.
+       Pick how many days → fill them with a keep/skip card deck (moves on to the
+       next day by itself once a day is full) or with ready-made routes; progress
+       bar "X of N days planned"; warning on an over-full day; move/remove items.
+       Saved on the phone only.
+   - [ ] **Try it with real people** (friends, a few tourists) and note: is it
+         fun? what is missing? That decides whether step 8 (saving to the
+         account) is worth building.
+   - [ ] Later ideas: order stops within a day by distance; show the day on
+         the map; a "my trip today" shortcut each morning; share a trip.
+4. [ ] ← _next_ **Titles + "% of Ilia discovered"** — decide the denominator (places vs.
        areas vs. weighted) and how a visit counts without being fakeable.
 5. [ ] **Points / levels / rewards** — decision pending; if yes, built on the same
        events (visit, route finished, deal used, helpful tip). No cash.
