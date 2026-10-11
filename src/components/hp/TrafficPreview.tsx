@@ -1,3 +1,6 @@
+import { buildMapRegions, deriveRegionalDiscovery } from "@/lib/hp/regional-discovery";
+import { markerPulseInputFromActivity, deriveMarkerPulseSnapshot } from "@/lib/hp/marker-pulse";
+import { deriveDiscoverySnapshot } from "@/lib/hp/discovery";
 import { useCommentDrafts } from "./use-comment-drafts";
 import { observationLabel } from "@/lib/hp/surface-freshness";
 import type { PlacePulseMetric } from "@/lib/hp/pulse-activity";
@@ -41,9 +44,9 @@ import { RoutesScreen } from "./RoutesScreen";
 import { buildAreaClusters, SocialMap } from "./SocialMap";
 import {
   AREA_STATE_LABEL,
-  MARKER_ANIMATION_THEMES,
+  MARKER_MOTION_OPTIONS,
   SIGNAL_QUALITY_LABEL,
-  type MarkerAnimationTheme,
+  type MarkerMotion,
   type NavTab,
 } from "./pulse-shared";
 import "@/styles/traffic-preview.css";
@@ -184,7 +187,7 @@ export function TrafficPreview() {
   );
   const [sceneIndex, setSceneIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [theme, setTheme] = useState<MarkerAnimationTheme>("pulse");
+  const [theme, setTheme] = useState<MarkerMotion>("pulse");
   const [tab, setTab] = useState<NavTab>("map");
   const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
@@ -272,6 +275,35 @@ export function TrafficPreview() {
         ? sceneSnapshot.activitySnapshot
         : buildPulseActivitySnapshot(data, sceneSnapshot.nowMs),
     [data, sceneSnapshot],
+  );
+  const markerPulseInput = useMemo(
+    () =>
+      markerPulseInputFromActivity(
+        activitySnapshot,
+        data.places.map((place) => place.id),
+        clock.anchorMs,
+      ),
+    [activitySnapshot, data.places, clock.anchorMs],
+  );
+  const markerPulseSnapshot = useMemo(
+    () => deriveMarkerPulseSnapshot(markerPulseInput, sceneSnapshot.nowMs),
+    [markerPulseInput, sceneSnapshot.nowMs],
+  );
+  const discoverySnapshot = useMemo(
+    () => deriveDiscoverySnapshot(data, sceneSnapshot.nowMs),
+    [data, sceneSnapshot.nowMs],
+  );
+  const regions = useMemo(
+    () =>
+      deriveRegionalDiscovery(
+        buildMapRegions(data.places),
+        new Set(data.places.map((place) => place.id)),
+        null,
+        discoverySnapshot,
+        markerPulseInput,
+        sceneSnapshot.nowMs,
+      ),
+    [data.places, discoverySnapshot, markerPulseInput, sceneSnapshot.nowMs],
   );
   const areaIntelligence = useMemo(
     () =>
@@ -447,10 +479,10 @@ export function TrafficPreview() {
                 Marker motion
                 <select
                   value={theme}
-                  onChange={(event) => setTheme(event.target.value as MarkerAnimationTheme)}
-                  aria-label="Marker animation theme"
+                  onChange={(event) => setTheme(event.target.value as MarkerMotion)}
+                  aria-label="Marker motion"
                 >
-                  {MARKER_ANIMATION_THEMES.map((option) => (
+                  {MARKER_MOTION_OPTIONS.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
                     </option>
@@ -480,10 +512,7 @@ export function TrafficPreview() {
             </p>
           </header>
 
-          <div
-            className="hp-app-shell hp-traffic-preview__phone"
-            data-marker-animation-theme={theme}
-          >
+          <div className="hp-app-shell hp-traffic-preview__phone" data-marker-motion={theme}>
             <div className="hp-traffic-preview__phone-topbar">
               <div className="flex items-center gap-2">
                 <img
@@ -509,6 +538,10 @@ export function TrafficPreview() {
                 >
                   <SocialMap
                     clusters={clusters}
+                    regions={regions}
+                    markerPulseSnapshot={markerPulseSnapshot}
+                    discoverySnapshot={discoverySnapshot}
+                    nowMs={sceneSnapshot.nowMs}
                     totalPlaceCount={data.places.length}
                     onAvailabilityChange={setMapAvailable}
                     onOpenPlace={setOpenPlace}

@@ -1,3 +1,6 @@
+import { buildMapRegions, deriveRegionalDiscovery } from "@/lib/hp/regional-discovery";
+import { markerPulseInputFromActivity, deriveMarkerPulseSnapshot } from "@/lib/hp/marker-pulse";
+import { MARKER_MOTION_STORAGE_KEY } from "@/lib/hp/marker-motion";
 import { useCommentDrafts } from "./use-comment-drafts";
 import {
   mergeComments,
@@ -195,7 +198,7 @@ import {
   type NavTab,
   type MeetSubTab,
   type ComposerMode,
-  type MarkerAnimationTheme,
+  type MarkerMotion,
   type CreateStoryInput,
   type PostingIdentity,
   AREA_STATE_LABEL,
@@ -207,9 +210,7 @@ import {
   DISCOVERY_LENS_LABEL,
   TAB_ITEMS,
   HP_TRANSITION,
-  MARKER_ANIMATION_THEME_STORAGE_KEY,
-  MARKER_ANIMATION_THEMES,
-  initialMarkerAnimationTheme,
+  initialMarkerMotion,
   type ShareTarget,
   type MapViewSnapshot,
   openStreetMapUrl,
@@ -333,6 +334,19 @@ export function PulseApp() {
     [pulseData, nowMs],
   );
   const [fetchedAtMs, setFetchedAtMs] = useState<number | null>(null);
+  const markerPulseInput = useMemo(
+    () =>
+      markerPulseInputFromActivity(
+        activitySnapshot,
+        pulseData.places.map((place) => place.id),
+        fetchedAtMs,
+      ),
+    [activitySnapshot, pulseData.places, fetchedAtMs],
+  );
+  const markerPulseSnapshot = useMemo(
+    () => deriveMarkerPulseSnapshot(markerPulseInput, nowMs),
+    [markerPulseInput, nowMs],
+  );
   const [refreshFailed, setRefreshFailed] = useState(false);
   const acceptedDataRef = useRef(false);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -353,9 +367,7 @@ export function PulseApp() {
   const [mapAvailable, setMapAvailable] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const [markerAnimationTheme, setMarkerAnimationTheme] = useState<MarkerAnimationTheme>(
-    initialMarkerAnimationTheme,
-  );
+  const [markerMotion, setMarkerMotion] = useState<MarkerMotion>(initialMarkerMotion);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [visitedPlaceIds, setVisitedPlaceIds] = useState<string[]>([]);
@@ -820,12 +832,12 @@ export function PulseApp() {
     }
   };
 
-  const updateMarkerAnimationTheme = (next: MarkerAnimationTheme) => {
-    setMarkerAnimationTheme(next);
+  const updateMarkerMotion = (next: MarkerMotion) => {
+    setMarkerMotion(next);
     try {
-      window.localStorage.setItem(MARKER_ANIMATION_THEME_STORAGE_KEY, next);
+      window.localStorage.setItem(MARKER_MOTION_STORAGE_KEY, next);
     } catch (error) {
-      console.warn("Could not save marker animation preference.", error);
+      console.warn("Could not save marker motion preference.", error);
     }
   };
 
@@ -2030,6 +2042,19 @@ export function PulseApp() {
     () => buildAreaClusters(mapPlaces, events, activitySnapshot, areaIntelligence),
     [activitySnapshot, areaIntelligence, events, mapPlaces],
   );
+  const mapRegions = useMemo(() => buildMapRegions(places), [places]);
+  const regionalDiscovery = useMemo(
+    () =>
+      deriveRegionalDiscovery(
+        mapRegions,
+        new Set(mapPlaces.map((place) => place.id)),
+        activeLens,
+        discoverySnapshot,
+        markerPulseInput,
+        nowMs,
+      ),
+    [mapRegions, mapPlaces, activeLens, discoverySnapshot, markerPulseInput, nowMs],
+  );
   const mapPlaceIdSet = useMemo(() => new Set(mapPlaces.map((place) => place.id)), [mapPlaces]);
   const mapAreaIdSet = useMemo(
     () => new Set(mapClusters.map((cluster) => cluster.id)),
@@ -2154,6 +2179,9 @@ export function PulseApp() {
         >
           <SocialMap
             clusters={mapClusters}
+            regions={regionalDiscovery}
+            markerPulseSnapshot={markerPulseSnapshot}
+            nowMs={nowMs}
             totalPlaceCount={places.length}
             onAvailabilityChange={setMapAvailable}
             searchQuery={query}
@@ -2426,7 +2454,7 @@ export function PulseApp() {
     <MotionConfig reducedMotion="user">
       <div
         className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10"
-        data-marker-animation-theme={markerAnimationTheme}
+        data-marker-motion={markerMotion}
       >
         <div
           className="flex min-h-0 flex-1 flex-col"
@@ -2437,8 +2465,8 @@ export function PulseApp() {
             query={query}
             setQuery={setQuery}
             onSetLanguage={setAppLanguage}
-            animationTheme={markerAnimationTheme}
-            onSetAnimationTheme={updateMarkerAnimationTheme}
+            markerMotion={markerMotion}
+            onSetMarkerMotion={updateMarkerMotion}
             appearanceOpen={appearanceOpen}
             setAppearanceOpen={setAppearanceOpen}
             showSearch={showSearch}
