@@ -3,8 +3,13 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 // The validator/filter evaluator shipped with our installed MapLibre renderer.
 import { featureFilter, validateStyleMin } from "@maplibre/maplibre-gl-style-spec";
-import type { LayerSpecification, StyleSpecification } from "maplibre-gl";
-import { createIliaMapStyle, DAY_MAP_PALETTE } from "../src/lib/hp/map-cartography";
+import type { LayerSpecification, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
+import {
+  applyMapPalette,
+  ATMOSPHERE_MAP_PALETTES,
+  createIliaMapStyle,
+  DAY_MAP_PALETTE,
+} from "../src/lib/hp/map-cartography";
 import { removeAdministrativeBoundaries } from "../src/lib/hp/map-core";
 
 // Real Bright response captured 2026-10-01. Test fixture only, never a runtime
@@ -195,4 +200,93 @@ test("palette changes do not change density, fonts, assets or route overlays", (
     if ("filter" in before && "filter" in after) assert.deepEqual(before.filter, after.filter);
     assert.deepEqual(before.layout, after.layout);
   }
+});
+
+test("all atmospheres validate and keep label contrast and coastline separation", () => {
+  const luminance = (hex: string) => {
+    const rgb = hex
+      .slice(1)
+      .match(/../g)!
+      .map((part) => parseInt(part, 16) / 255)
+      .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  };
+  const contrast = (a: string, b: string) =>
+    (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
+  for (const [name, palette] of Object.entries(ATMOSPHERE_MAP_PALETTES)) {
+    const variant = createIliaMapStyle(upstream, palette);
+    assert.deepEqual(
+      validateStyleMin(variant).map((e) => e.message),
+      [],
+      name,
+    );
+    for (const [foreground, background] of [
+      [palette.primaryText, palette.land],
+      [palette.secondaryText, palette.land],
+      [palette.waterText, palette.water],
+    ])
+      assert.ok(contrast(foreground, background) >= 4.5, `${name}: ${foreground} on ${background}`);
+    assert.ok(contrast(palette.land, palette.water) >= 1.5, `${name}: land/sea separation`);
+    for (let i = 0; i < styled.layers.length; i++) {
+      const before = styled.layers[i],
+        after = variant.layers[i];
+      assert.deepEqual({ ...after, paint: undefined }, { ...before, paint: undefined });
+    }
+    assert.deepEqual(variant.sources, styled.sources);
+    assert.equal(variant.glyphs, styled.glyphs);
+    assert.deepEqual(variant.sprite, styled.sprite);
+  }
+});
+
+test("runtime updates use only paint colors/transitions and match initial styles without touching overlays", () => {
+  const route: LayerSpecification = {
+    id: "hp-route-solid",
+    type: "line",
+    source: "openmaptiles",
+    "source-layer": "transportation",
+    paint: { "line-color": "#e06a32", "line-width": 4 },
+  };
+  const state: StyleSpecification = {
+    ...structuredClone(styled),
+    layers: [...structuredClone(styled.layers), route],
+  };
+  const sources = state.sources,
+    layers = state.layers;
+  const routesBefore = structuredClone(route);
+  const calls: string[] = [];
+  const fake = {
+    getStyle: () => state,
+    getLayer: (id: string) => state.layers.find((layer) => layer.id === id),
+    setPaintProperty: (id: string, property: string, value: unknown) => {
+      assert.match(
+        property,
+        /^(background|fill|fill-outline|line|text|text-halo)-color(-transition)?$/,
+      );
+      calls.push(property);
+      const layer = state.layers.find((layer) => layer.id === id)!;
+      (layer.paint as Record<string, unknown>)[property] = value;
+    },
+  } as unknown as MapLibreMap;
+  for (const duration of [800, 0])
+    for (const palette of Object.values(ATMOSPHERE_MAP_PALETTES)) {
+      applyMapPalette(fake, palette, duration);
+      const expected = createIliaMapStyle(upstream, palette);
+      for (const layer of expected.layers) {
+        const actual = state.layers.find((row) => row.id === layer.id)!;
+        const paint = Object.fromEntries(
+          Object.entries(actual.paint ?? {}).filter(([key]) => !key.endsWith("-transition")),
+        );
+        assert.deepEqual(paint, layer.paint ?? {}, layer.id);
+        for (const [property, value] of Object.entries(actual.paint ?? {}))
+          if (property.endsWith("-transition")) assert.deepEqual(value, { duration, delay: 0 });
+      }
+      assert.deepEqual(state.sources, sources);
+      assert.equal(state.layers, layers);
+      assert.deepEqual(route, routesBefore);
+      assert.deepEqual(
+        validateStyleMin(state).map((e) => e.message),
+        [],
+      );
+    }
+  assert.ok(calls.length > 0);
 });

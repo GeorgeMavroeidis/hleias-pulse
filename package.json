@@ -65,7 +65,8 @@
     "test:comment-drafts": "node --import tsx --test src/lib/hp/comment-drafts.test.ts src/components/hp/CommentComposer.test.tsx scripts/comment-api.test.ts",
     "smoke:comment-drafts": "node --import tsx scripts/smoke-comment-drafts.ts",
     "smoke:story-freshness": "node --import tsx scripts/smoke-story-freshness.ts",
-    "test:surfaces": "node --import tsx --test src/lib/hp/surface-freshness.test.ts src/lib/hp/pulse-refresh.test.ts src/lib/hp/activity-data.test.ts src/components/hp/freshness-surfaces.test.tsx"
+    "test:surfaces": "node --import tsx --test src/lib/hp/surface-freshness.test.ts src/lib/hp/pulse-refresh.test.ts src/lib/hp/activity-data.test.ts src/components/hp/freshness-surfaces.test.tsx",
+    "test:current-discovery": "node --import tsx --test src/lib/hp/map-discovery.test.ts src/lib/hp/map-discovery-content.test.ts src/lib/hp/context-copy.test.ts src/components/hp/MapBottomSheet.test.tsx src/lib/hp/temporal-atmosphere.test.ts src/lib/hp/region-identity.test.tsx src/lib/hp/map-frame.test.ts src/lib/hp/map-location.test.ts src/lib/hp/map-region-layer.test.ts"
   },
   "dependencies": {
     "@capacitor/app-launcher": "^8.0.1",
@@ -125,6 +126,7 @@
     "react-resizable-panels": "^4.6.5",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
+    "suncalc": "2.1.0",
     "supercluster": "^8.0.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",
