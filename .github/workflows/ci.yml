@@ -61,6 +61,9 @@ jobs:
       - name: Test — comment drafts (offline)
         run: npm run test:comment-drafts
 
+      - name: Test — truthful surfaces and refresh
+        run: npm run test:surfaces
+
       - name: Test — discovery
         run: npm run test:discovery
 

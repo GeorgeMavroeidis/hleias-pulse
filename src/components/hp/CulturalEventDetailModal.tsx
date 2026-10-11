@@ -1,7 +1,8 @@
 import type { CommentDraftBinding } from "@/lib/hp/comment-drafts";
 import { CommentComposer, CommentReviewStatus } from "./CommentComposer";
+import { observationLabel } from "@/lib/hp/surface-freshness";
 import { AnimatePresence, motion } from "framer-motion";
-import { format, isToday, isTomorrow } from "date-fns";
+import { formatMeetWhen, formatMeetDateTime } from "@/lib/hp/meet-time";
 import {
   BadgeCheck,
   Clock,
@@ -38,14 +39,6 @@ const TYPE_ICONS: Record<CulturalEventType, LucideIcon> = {
   other: Sparkles,
 };
 
-function formatWhen(iso: string, lang: Lang): string {
-  const d = new Date(iso);
-  const time = format(d, "HH:mm");
-  if (isToday(d)) return `${tr(lang, CULTURAL_EVENTS_STRINGS.today)} · ${time}`;
-  if (isTomorrow(d)) return `${tr(lang, CULTURAL_EVENTS_STRINGS.tomorrow)} · ${time}`;
-  return `${format(d, "EEE d MMM yyyy")} · ${time}`;
-}
-
 interface Props {
   event: CulturalEvent | null;
   lang: Lang;
@@ -56,6 +49,7 @@ interface Props {
   likeCount: number;
   comments: Comment[];
   commentDraft?: CommentDraftBinding;
+  nowMs?: number;
 }
 
 export function CulturalEventDetailModal({
@@ -68,6 +62,7 @@ export function CulturalEventDetailModal({
   likeCount,
   comments,
   commentDraft,
+  nowMs = Date.now(),
 }: Props) {
   const s = CULTURAL_EVENTS_STRINGS;
 
@@ -81,7 +76,7 @@ export function CulturalEventDetailModal({
           const description =
             lang === "EN" ? (event.descriptionEn ?? event.descriptionEl) : event.descriptionEl;
           const hasTicketUrl = Boolean(event.ticketUrl);
-          const past = isEventPast(event);
+          const past = isEventPast(event, nowMs);
 
           return (
             <motion.div
@@ -144,7 +139,10 @@ export function CulturalEventDetailModal({
                       <MapPin size={12} /> {event.venueName} · {event.area}
                     </span>
                     <span className="inline-flex items-center gap-1">
-                      <Clock size={12} /> {formatWhen(event.eventDate, lang)}
+                      <Clock size={12} />{" "}
+                      <span title={formatMeetDateTime(event.eventDate, lang)}>
+                        {formatMeetWhen(event.eventDate, lang, nowMs)}
+                      </span>
                     </span>
                   </div>
 
@@ -187,6 +185,12 @@ export function CulturalEventDetailModal({
                           <span className="font-bold text-hp-ink">{c.author}</span>{" "}
                           <span className="text-hp-ink/80">{c.text}</span>
                           <CommentReviewStatus comment={c} />
+                          <span
+                            title={observationLabel(c.createdAt, nowMs, lang).exact}
+                            className="mt-1 block text-[10px] text-hp-muted"
+                          >
+                            {observationLabel(c.createdAt, nowMs, lang).relative}
+                          </span>
                         </div>
                       ))}
                       {comments.length === 0 && (

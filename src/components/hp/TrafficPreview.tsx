@@ -1,4 +1,6 @@
 import { useCommentDrafts } from "./use-comment-drafts";
+import { observationLabel } from "@/lib/hp/surface-freshness";
+import type { PlacePulseMetric } from "@/lib/hp/pulse-activity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
@@ -16,10 +18,9 @@ import {
 import type { Author, Comment, Place, Post } from "@/lib/hp-model";
 import { fallbackAuthor } from "@/lib/hp-model";
 import { initialsAvatarDataUri } from "@/lib/hp/avatar";
-import type { ActivityTick } from "@/lib/hp/activity-data";
+import { buildActivityTicks, type ActivityTick } from "@/lib/hp/activity-data";
 import { deriveAreaIntelligenceSnapshot } from "@/lib/hp/area-intelligence";
 import { buildPulseActivitySnapshot } from "@/lib/hp/pulse-activity";
-import { evaluateFreshness } from "@/lib/hp/freshness";
 import { buildTrafficPreviewScene, TRAFFIC_SCENES } from "@/lib/hp/traffic-preview";
 import { buildPlaceStoryGroups, storyPlaceIdSet } from "@/lib/hp/place-stories";
 import type { RsvpStatus } from "@/lib/hp/meet-types";
@@ -45,12 +46,6 @@ import "@/styles/traffic-preview.css";
 const PLAY_DELAY_MS = 1800;
 const LAST_SCENE_INDEX = TRAFFIC_SCENES.length - 1;
 
-function minutesAgo(iso: string | null | undefined, now: number): number | null {
-  const freshness = evaluateFreshness({ observedAt: iso, nowMs: now });
-  return freshness.isCurrent ? Math.floor((freshness.ageMs ?? 0) / 60_000) : null;
-}
-
-/** The production ticker assigns stock portraits; the preview uses fictional initials only. */
 function buildPreviewTicks(
   posts: Post[],
   meetEvents: ReturnType<typeof buildTrafficPreviewScene>["data"]["meetEvents"],
@@ -59,59 +54,17 @@ function buildPreviewTicks(
   authors: Map<string, Author>,
   now: number,
 ): ActivityTick[] {
-  const postTicks: ActivityTick[] = posts.flatMap((post) => {
-    const ago = minutesAgo(post.createdAt, now);
-    if (ago === null) return [];
-    const author = authors.get(post.authorId) ?? fallbackAuthor;
-    return [
-      {
-        id: `post-${post.id}`,
-        who: author.name,
-        avatar: initialsAvatarDataUri(author.name),
-        verb: post.kind === "tip" ? ("dropped a tip" as const) : ("posted" as const),
-        at: places.get(post.placeId)?.name ?? "Ilia",
-        placeId: post.placeId,
-        minutesAgo: ago,
-      },
-    ];
+  return buildActivityTicks(posts, places, meetEvents, {
+    nowMs: now,
+    findAuthor: (post) => authors.get(post.authorId) ?? fallbackAuthor,
+    stories,
   });
-  const meetTicks: ActivityTick[] = meetEvents.flatMap((event) => {
-    const ago = minutesAgo(event.createdAt, now);
-    if (ago === null) return [];
-    return [
-      {
-        id: `meet-${event.id}`,
-        who: event.hostName,
-        avatar: initialsAvatarDataUri(event.hostName),
-        verb: "is going" as const,
-        at: places.get(event.placeId)?.name ?? "Ilia",
-        placeId: event.placeId,
-        minutesAgo: ago,
-      },
-    ];
-  });
-  const storyTicks: ActivityTick[] = stories.flatMap((story) => {
-    const ago = minutesAgo(story.createdAt, now);
-    if (ago === null) return [];
-    return [
-      {
-        id: `story-${story.id}`,
-        who: story.authorName,
-        avatar: initialsAvatarDataUri(story.authorName),
-        verb: "went live" as const,
-        at: places.get(story.placeId)?.name ?? "Ilia",
-        placeId: story.placeId,
-        minutesAgo: ago,
-      },
-    ];
-  });
-  return [...postTicks, ...meetTicks, ...storyTicks]
-    .sort((a, b) => a.minutesAgo - b.minutesAgo)
-    .slice(0, 8);
 }
 
 function PreviewPlaceDetails({
   place,
+  nowMs,
+  metric,
   postCount,
   storyCount,
   comments,
@@ -122,6 +75,8 @@ function PreviewPlaceDetails({
   onOpenPost,
 }: {
   place: Place;
+  nowMs: number;
+  metric?: PlacePulseMetric;
   postCount: number;
   storyCount: number;
   comments: Comment[];
@@ -131,6 +86,7 @@ function PreviewPlaceDetails({
   onOpenStory: () => void;
   onOpenPost: () => void;
 }) {
+  const { language } = useI18n();
   return (
     <div className="hp-preview-modal" role="presentation">
       <button
@@ -174,6 +130,12 @@ function PreviewPlaceDetails({
             <span className="rounded-full bg-hp-ink/5 px-2.5 py-1">{storyCount} stories</span>
             <span className="rounded-full bg-hp-ink/5 px-2.5 py-1">{comments.length} notes</span>
           </div>
+          <p
+            title={observationLabel(metric?.lastSignalAt, nowMs, language).exact}
+            className="mt-2 text-xs text-hp-muted"
+          >
+            {observationLabel(metric?.lastSignalAt, nowMs, language).relative}
+          </p>
           {comments.length > 0 && (
             <div className="mt-3 space-y-2">
               {comments.slice(0, 3).map((comment, index) => (
@@ -555,6 +517,7 @@ export function TrafficPreview() {
                   />
                   <div className="contents" inert={!mapAvailable} aria-hidden={!mapAvailable}>
                     <MapBottomSheet
+                      nowMs={sceneSnapshot.nowMs}
                       cluster={selectedCluster}
                       selectedPlace={selectedPlace}
                       events={data.events}
@@ -592,6 +555,9 @@ export function TrafficPreview() {
                     storyGroups={storyGroups}
                     activityTicks={activityTicks}
                     trendingPlace={trendingPlace}
+                    activitySnapshot={activitySnapshot}
+                    meetEvents={data.meetEvents}
+                    stories={data.stories}
                     onOpenStory={setStoryPlaceId}
                     likes={likes}
                     postLikes={{}}
@@ -652,6 +618,8 @@ export function TrafficPreview() {
             <BottomNav tab={tab} setTab={setTab} />
             {openPlace && (
               <PreviewPlaceDetails
+                nowMs={sceneSnapshot.nowMs}
+                metric={activitySnapshot[openPlace.id]}
                 place={openPlace}
                 postCount={data.posts.filter((post) => post.placeId === openPlace.id).length}
                 storyCount={data.stories.filter((story) => story.placeId === openPlace.id).length}
@@ -714,7 +682,11 @@ export function TrafficPreview() {
               <PlaceStoryViewer
                 groups={storyGroups}
                 startPlaceId={storyPlaceId}
-                markSeen={(ids) => setSeenStories((old) => new Set([...old, ...ids]))}
+                markSeen={(ids) =>
+                  setSeenStories((old) =>
+                    ids.every((id) => old.has(id)) ? old : new Set([...old, ...ids]),
+                  )
+                }
                 onClose={() => setStoryPlaceId(null)}
                 onOpenPlace={jumpToMap}
                 onOpenPlaceDetails={(id) => {

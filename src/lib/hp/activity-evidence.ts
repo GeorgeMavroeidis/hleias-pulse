@@ -1,4 +1,5 @@
 import type { PulseData } from "@/lib/hp-api";
+import { isPublishedContent } from "./surface-freshness";
 import { evaluateFreshness, storyObservedAt, timestampMs } from "@/lib/hp/freshness";
 
 export type ActivityEvidenceKind = "story" | "post" | "meetEvent" | "event" | "comment";
@@ -56,22 +57,24 @@ export function buildPlaceEvidence(
     list.push(item);
     byPlace.set(placeId, list);
   };
-  data.posts.forEach((post) => {
+  data.posts.filter(isPublishedContent).forEach((post) => {
     add(post.placeId, "post", post.createdAt, contributorId(post));
-    post.comments.forEach((comment) =>
-      add(post.placeId, "comment", comment.createdAt, contributorId(comment)),
-    );
+    post.comments
+      .filter(isPublishedContent)
+      .forEach((comment) =>
+        add(post.placeId, "comment", comment.createdAt, contributorId(comment)),
+      );
   });
   Object.entries(data.placeComments).forEach(([placeId, comments]) =>
-    comments.forEach((comment) =>
-      add(placeId, "comment", comment.createdAt, contributorId(comment)),
-    ),
+    comments
+      .filter(isPublishedContent)
+      .forEach((comment) => add(placeId, "comment", comment.createdAt, contributorId(comment))),
   );
   data.events.forEach((event) => add(event.placeId, "event", event.createdAt, null));
-  data.meetEvents.forEach((event) =>
-    add(event.placeId, "meetEvent", event.createdAt, contributorId(event)),
-  );
-  data.stories.forEach((story) => {
+  data.meetEvents
+    .filter(isPublishedContent)
+    .forEach((event) => add(event.placeId, "meetEvent", event.createdAt, contributorId(event)));
+  data.stories.filter(isPublishedContent).forEach((story) => {
     const observedAt = storyObservedAt(story);
     const timestamp = timestampMs(observedAt);
     const duration = story.expiresAfterHours ?? 24;

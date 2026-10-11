@@ -39,6 +39,8 @@ import { useModeration } from "./use-moderation";
 import { type PlaceStoryGroup } from "@/lib/hp/place-stories";
 import type { PlaceBusinessProfile } from "@/lib/hp/business-types";
 import { openStreetMapUrl } from "./pulse-shared";
+import type { PlacePulseMetric } from "@/lib/hp/pulse-activity";
+import { observationLabel } from "@/lib/hp/surface-freshness";
 import { displayPostTime } from "@/lib/hp/post-time";
 
 export function PlaceDetailModal({
@@ -63,7 +65,11 @@ export function PlaceDetailModal({
   onClaimPlace,
   onGetDealCode,
   gettingDealCode,
+  nowMs = Date.now(),
+  activityMetric,
 }: {
+  nowMs?: number;
+  activityMetric?: PlacePulseMetric;
   place: Place | null;
   events: PulseData["events"];
   onClose: () => void;
@@ -87,8 +93,8 @@ export function PlaceDetailModal({
   gettingDealCode: boolean;
 }) {
   const { language, t } = useI18n();
-  const eventCount = place ? events.filter((event) => event.placeId === place.id).length : 0;
-  const noteCount = place ? place.commentCount + comments.length : 0;
+  const eventCount = activityMetric?.eventCount ?? 0;
+  const noteCount = activityMetric?.commentCount ?? 0;
   const hasBusinessDetail = Boolean(
     businessProfile &&
     ((businessProfile.dealActive && businessProfile.dealText) ||
@@ -225,14 +231,21 @@ export function PlaceDetailModal({
                 ))}
               </div>
               <PlaceStats
-                postsToday={place.recentPostCount}
+                postsToday={activityMetric?.postCount ?? 0}
                 eventsTonight={eventCount}
                 notes={noteCount}
-                crowd={place.crowd}
+                crowd=""
                 budget={place.budget}
                 bestTime={place.bestTime}
                 mood={place.mood}
               />
+
+              <p
+                title={observationLabel(activityMetric?.lastSignalAt, nowMs, language).exact}
+                className="mt-2 text-xs text-hp-muted"
+              >
+                {observationLabel(activityMetric?.lastSignalAt, nowMs, language).relative}
+              </p>
 
               {hasBusinessDetail && <div className="hp-pd-rule" />}
 
@@ -346,12 +359,12 @@ export function PlaceDetailModal({
 
               <div className="mt-5">
                 <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-hp-muted">
-                  Recent posts
+                  {t("Posts at this place")}
                 </h3>
                 <div className="flex flex-col gap-2">
                   {visiblePosts.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-hp-ink/10 p-4 text-center text-[12px] text-hp-muted">
-                      No recent posts here yet. Be first.
+                      {t("No posts at this place yet.")}
                     </div>
                   )}
                   {visiblePosts.map((p) => {
@@ -377,8 +390,11 @@ export function PlaceDetailModal({
                           >
                             {a.type}
                           </span>
-                          <span className="ml-auto text-[10px] text-hp-muted">
-                            {displayPostTime(p)}
+                          <span
+                            title={observationLabel(p.createdAt, nowMs, language).exact}
+                            className="ml-auto text-[10px] text-hp-muted"
+                          >
+                            {displayPostTime(p, nowMs, language)}
                           </span>
                           <ContentMenu
                             className="-my-1"
@@ -424,6 +440,12 @@ export function PlaceDetailModal({
                         <span className="font-bold text-hp-ink">{c.author}</span>{" "}
                         <span className="text-hp-ink/80">{c.text}</span>
                         <CommentReviewStatus comment={c} />
+                        <span
+                          title={observationLabel(c.createdAt, nowMs, language).exact}
+                          className="mt-1 block text-[10px] text-hp-muted"
+                        >
+                          {observationLabel(c.createdAt, nowMs, language).relative}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -512,7 +534,7 @@ function PlaceStats({
     clauses.push(
       <span key="posts">
         <MessageCircle strokeWidth={2.2} />
-        <b>{postsToday}</b> {t("posts today")}
+        <b>{postsToday}</b> {t("recent posts")}
       </span>,
     );
   }
@@ -520,7 +542,7 @@ function PlaceStats({
     clauses.push(
       <span key="events">
         <CalendarHeart strokeWidth={2.2} />
-        <b>{eventsTonight}</b> {t("events tonight")}
+        <b>{eventsTonight}</b> {t("recent announcements")}
       </span>,
     );
   }
@@ -528,7 +550,7 @@ function PlaceStats({
     clauses.push(
       <span key="notes">
         <ListChecks strokeWidth={2.2} />
-        <b>{notes}</b> {t("local notes")}
+        <b>{notes}</b> {t("recent comments")}
       </span>,
     );
   }
@@ -579,7 +601,7 @@ function PlaceStats({
                         node,
                       ],
                 )
-              : t("Quiet here right now")}
+              : t("No recent reports")}
           </p>
           {descriptors.length > 0 && (
             <div className="hp-pd-desc">

@@ -17,6 +17,7 @@ import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
 import { openStreetMapUrl } from "./pulse-shared";
 import { ContentMenu } from "./ContentMenu";
+import { observationLabel } from "@/lib/hp/surface-freshness";
 import { displayPostTime } from "@/lib/hp/post-time";
 
 export function PostDetailModal({
@@ -122,9 +123,12 @@ export function PostDetailModal({
                           {a.type}
                         </span>
                       </div>
-                      <div className="text-[10px] text-hp-muted">
+                      <div
+                        title={observationLabel(post.createdAt, nowMs, language).exact}
+                        className="text-[10px] text-hp-muted"
+                      >
                         <MapPin size={9} className="mr-0.5 inline" />
-                        {p.name} · {displayPostTime(post, nowMs)}
+                        {p.name} · {displayPostTime(post, nowMs, language)}
                       </div>
                     </div>
                     {!previewMode && (
@@ -174,6 +178,12 @@ export function PostDetailModal({
                           <span className="font-bold text-hp-ink">{c.author}</span>{" "}
                           <span className="text-hp-ink/80">{c.text}</span>
                           <CommentReviewStatus comment={c} />
+                          <span
+                            title={observationLabel(c.createdAt, nowMs, language).exact}
+                            className="mt-1 block text-[10px] text-hp-muted"
+                          >
+                            {observationLabel(c.createdAt, nowMs, language).relative}
+                          </span>
                         </div>
                       ))}
                       {comments.length === 0 && (

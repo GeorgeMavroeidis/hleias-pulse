@@ -24,6 +24,7 @@ const TYPE_ICONS: Record<CulturalEventType, LucideIcon> = {
 };
 
 interface Props {
+  nowMs?: number;
   events: CulturalEvent[];
   lang: Lang;
   onOpenDetail: (event: CulturalEvent) => void;
@@ -31,7 +32,14 @@ interface Props {
   onCreate: () => void;
 }
 
-export function CulturalEventsScreen({ events, lang, onOpenDetail, canCreate, onCreate }: Props) {
+export function CulturalEventsScreen({
+  events,
+  lang,
+  onOpenDetail,
+  canCreate,
+  onCreate,
+  nowMs = Date.now(),
+}: Props) {
   const [filter, setFilter] = useState<Filter>("upcoming");
   const moderation = useModeration();
   const s = CULTURAL_EVENTS_STRINGS;
@@ -41,8 +49,8 @@ export function CulturalEventsScreen({ events, lang, onOpenDetail, canCreate, on
       .filter((e) => {
         // Blocked organisers are filtered server-side; muted ones are hidden here.
         if (moderation.isHidden(e.userId)) return false;
-        if (filter === "upcoming") return !isEventPast(e);
-        if (filter === "past") return isEventPast(e);
+        if (filter === "upcoming") return !isEventPast(e, nowMs);
+        if (filter === "past") return isEventPast(e, nowMs);
         return e.eventType === filter;
       })
       .sort((a, b) =>
@@ -50,7 +58,7 @@ export function CulturalEventsScreen({ events, lang, onOpenDetail, canCreate, on
           ? +new Date(b.eventDate) - +new Date(a.eventDate)
           : +new Date(a.eventDate) - +new Date(b.eventDate),
       );
-  }, [events, filter, moderation]);
+  }, [events, filter, moderation, nowMs]);
 
   const chips: { id: Filter; label: string; Icon?: LucideIcon }[] = [
     { id: "upcoming", label: tr(lang, s.upcoming) },
@@ -115,6 +123,7 @@ export function CulturalEventsScreen({ events, lang, onOpenDetail, canCreate, on
             <AnimatePresence initial={false}>
               {filtered.map((event) => (
                 <CulturalEventCard
+                  nowMs={nowMs}
                   key={event.id}
                   event={event}
                   lang={lang}

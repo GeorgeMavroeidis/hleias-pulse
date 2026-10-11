@@ -28,6 +28,14 @@ import { TrendingHero } from "./TrendingHero";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { ContentMenu } from "./ContentMenu";
 import { useModeration } from "./use-moderation";
+import type { MeetEvent } from "@/lib/hp/meet-types";
+import type { StoryItem } from "@/lib/hp-model";
+import type { PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
+import {
+  isPublishedContent,
+  observationLabel,
+  postQualifiesTonight,
+} from "@/lib/hp/surface-freshness";
 import { displayPostTime, isRecentlyPosted } from "@/lib/hp/post-time";
 
 export function PulseFeed({
@@ -35,6 +43,9 @@ export function PulseFeed({
   storyGroups,
   activityTicks,
   trendingPlace,
+  activitySnapshot = {},
+  meetEvents = [],
+  stories = [],
   onOpenStory,
   likes,
   postLikes,
@@ -56,6 +67,9 @@ export function PulseFeed({
   storyGroups: PlaceStoryGroup[];
   activityTicks: ReturnType<typeof buildActivityTicks>;
   trendingPlace: Place | null;
+  activitySnapshot?: PulseActivitySnapshot;
+  meetEvents?: MeetEvent[];
+  stories?: StoryItem[];
   onOpenStory: (placeId: string) => void;
   likes: Record<string, boolean>;
   postLikes: Record<string, number>;
@@ -66,7 +80,7 @@ export function PulseFeed({
   onOpenPost: (p: Post) => void;
   onOpenMap: (id: string) => void;
   onShare: (post: Post) => void;
-  onTrendingGoing: (place: Place) => void;
+  onTrendingGoing: (event: MeetEvent) => void;
   findPlace: (id: string) => Place | undefined;
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
@@ -74,7 +88,7 @@ export function PulseFeed({
   previewMode?: boolean;
   nowMs?: number;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const moderation = useModeration();
   const [filter, setFilter] = useState(previewMode ? "All" : "Now");
   const filters = previewMode
@@ -86,21 +100,8 @@ export function PulseFeed({
     if (!place) return false;
     // Blocked authors are filtered server-side; muted ones are hidden here.
     if (moderation.isHidden(post.userId)) return false;
-    if (filter === "Now") {
-      return (
-        place.status === "busy" ||
-        place.status === "popular" ||
-        post.kind === "event" ||
-        isRecentlyPosted(post, nowMs) ||
-        post.tags.some((tag) => ["live", "now", "packed", "busy"].includes(tag))
-      );
-    }
-    if (filter === "Tonight") {
-      return (
-        post.time.toLowerCase().includes("tonight") ||
-        post.tags.some((tag) => ["after", "night", "dj", "sunset"].includes(tag))
-      );
-    }
+    if (filter === "Now") return isPublishedContent(post) && isRecentlyPosted(post, nowMs);
+    if (filter === "Tonight") return postQualifiesTonight(post, meetEvents, nowMs);
     if (filter === "Weekend") {
       return place.tags.some((tag) => ["beach", "roadtrip", "village", "nature"].includes(tag));
     }
@@ -116,7 +117,7 @@ export function PulseFeed({
   });
   return (
     <div className="px-4 pb-28 pt-3">
-      <LiveTicker ticks={activityTicks} onOpenPlace={onOpenMap} />
+      <LiveTicker nowMs={nowMs} ticks={activityTicks} onOpenPlace={onOpenMap} />
       <PlaceStoryRail groups={storyGroups} onOpen={onOpenStory} />
 
       {/* Filter tabs */}
@@ -137,7 +138,10 @@ export function PulseFeed({
       {trendingPlace && (
         <TrendingHero
           place={trendingPlace}
-          index={0}
+          metric={activitySnapshot[trendingPlace.id]}
+          events={meetEvents}
+          stories={stories}
+          nowMs={nowMs}
           onOpen={(place) => onOpenMap(place.id)}
           onGoing={onTrendingGoing}
           previewMode={previewMode}
@@ -191,7 +195,11 @@ export function PulseFeed({
                     )}
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-hp-muted">
-                    <MapPin size={9} /> {p.name} · {displayPostTime(post, nowMs)}
+                    <MapPin size={9} />{" "}
+                    <span title={observationLabel(post.createdAt, nowMs, language).exact}>
+                      {p.name}
+                    </span>{" "}
+                    · {displayPostTime(post, nowMs, language)}
                   </div>
                 </div>
                 <button

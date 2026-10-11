@@ -61,6 +61,7 @@ export interface Place {
 }
 
 export interface Post {
+  moderationStatus?: string;
   id: string;
   authorId: string;
   placeId: string;
@@ -123,6 +124,7 @@ export interface RouteItem {
 }
 
 export interface StoryItem {
+  moderationStatus?: string;
   id: string;
   label: string;
   placeId: string;
