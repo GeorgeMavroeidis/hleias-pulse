@@ -17,6 +17,31 @@ export const TRAFFIC_SCENES = [
 ] as const;
 export type TrafficScene = (typeof TRAFFIC_SCENES)[number]["id"];
 
+export const TRAFFIC_PREVIEW_ACCEPTANCE_AT = "2026-10-05T15:00:00.000Z";
+
+/** A local preview clock is frozen once, whether chosen by URL or at page load. */
+export function resolveTrafficPreviewClock(previewAt: string | null, fallbackAnchorMs: number) {
+  // Accept an explicit UTC ISO instant only. The round trip also rejects dates
+  // such as February 30 that Date.parse would otherwise normalize silently.
+  const match = previewAt?.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,3}))?Z$/);
+  if (match) {
+    const canonical = `${match[1]}.${(match[2] ?? "").padEnd(3, "0")}Z`;
+    const anchorMs = Date.parse(canonical);
+    if (Number.isFinite(anchorMs) && new Date(anchorMs).toISOString() === canonical) {
+      return { anchorMs, mode: "fixed" as const, invalidPreviewAt: false };
+    }
+  }
+
+  if (!Number.isFinite(new Date(fallbackAnchorMs).getTime())) {
+    throw new RangeError("The preview session clock must be a valid instant");
+  }
+  return {
+    anchorMs: fallbackAnchorMs,
+    mode: "session" as const,
+    invalidPreviewAt: previewAt !== null,
+  };
+}
+
 export type TrafficPreviewSnapshot = {
   data: PulseData;
   nowMs: number;

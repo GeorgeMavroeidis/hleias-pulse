@@ -47,6 +47,8 @@
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
     "test:map-recovery": "tsx --test src/lib/hp/map-initialization.test.ts",
     "test:map-visuals": "tsx scripts/check-map-visuals.ts",
+    "test:map-cartography": "tsx --test scripts/check-map-cartography.test.ts",
+    "test:motion": "tsx --test src/lib/hp/motion.test.ts",
     "test:routing": "tsx --test scripts/check-route-preview.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",
     "build:ionian-land": "tsx scripts/build-ionian-land.ts",

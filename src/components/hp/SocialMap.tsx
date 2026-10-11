@@ -1,3 +1,6 @@
+import { Button } from "@/components/ui/button";
+import { HP_MOTION } from "@/lib/hp/motion";
+import { createIliaMapStyle } from "@/lib/hp/map-cartography";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, Crosshair, MapPinned, Minus, Plus } from "lucide-react";
 import Supercluster from "supercluster";
@@ -9,11 +12,7 @@ import type {
   StyleSpecification,
 } from "maplibre-gl";
 import { type EventItem, type Place } from "@/lib/hp-model";
-import {
-  coordinateBounds,
-  isFatalBasemapError,
-  removeAdministrativeBoundaries,
-} from "@/lib/hp/map-core";
+import { coordinateBounds, isFatalBasemapError } from "@/lib/hp/map-core";
 import { useImageUrls } from "@/lib/hp/image-cache";
 import { SEA_SHIMMER_LATLNGS, SEA_SHIMMER_MAX_ZOOM } from "@/lib/hp/sea-shimmer";
 import { IONIAN_LAND_POLYGONS } from "@/lib/hp/ionian-land";
@@ -68,7 +67,7 @@ async function loadBoundaryFreeBasemap(signal: AbortSignal): Promise<StyleSpecif
   if (!response.ok) {
     throw new Error(`Basemap style request failed (${response.status}).`);
   }
-  return removeAdministrativeBoundaries((await response.json()) as StyleSpecification);
+  return createIliaMapStyle((await response.json()) as StyleSpecification);
 }
 
 /** A source-free style avoids worker-backed tile/GeoJSON loading in the local preview. */
@@ -203,9 +202,9 @@ const ALL_MARKERS_RICH_ZOOM = 15.5;
 // whose pins sit within ~800m) need ~z16 to separate; spread areas stay lower.
 const AREA_FOCUS_MAX_ZOOM = 16.25;
 const ILIA_DETAIL_BBOX: [number, number, number, number] = [19.9, 36.35, 23.25, 39.15];
-const MAP_PAN_DURATION = 0.28;
-const MAP_OVERVIEW_DURATION = 0.34;
-const MAP_FOCUS_DURATION = 0.38;
+const MAP_PAN_DURATION = HP_MOTION.pan / 1000;
+const MAP_OVERVIEW_DURATION = HP_MOTION.overview / 1000;
+const MAP_FOCUS_DURATION = HP_MOTION.focus / 1000;
 const RICH_VISUAL_ZOOM = 13.25;
 const MIN_UTILITY_RAIL_HEIGHT = 248;
 const MIN_MAP_CHROME_HEIGHT = 188;
@@ -2624,14 +2623,16 @@ export function SocialMap({
       )}
 
       {mapReady && canGoBack && onBack && (
-        <button
+        <Button
+          variant="hpGhost"
+          size="hpIcon"
           type="button"
           onClick={onBack}
-          className="hp-icon-button hp-control-surface hp-map-back absolute"
+          className="hp-control-surface hp-map-back absolute"
           aria-label={t("Back to previous map view")}
         >
           <ChevronLeft size={18} strokeWidth={2.5} />
-        </button>
+        </Button>
       )}
 
       {mapReady && (
@@ -2657,12 +2658,12 @@ export function SocialMap({
                 onClick={() => selectDiscoveryCluster(cluster)}
                 aria-pressed={selected}
                 tabIndex={mapChromeHidden ? -1 : undefined}
-                className={`hp-chip hp-map-chip ${selected ? "is-active" : ""}`}
+                className={`hp-map-chip ${selected ? "is-active" : ""}`}
               >
                 <span className="hp-map-chip__face">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
                   {cluster.name}
-                  <span className="text-hp-muted">{cluster.places.length}</span>
+                  <span className="hp-map-chip__count">{cluster.places.length}</span>
                 </span>
               </button>
             );
@@ -2677,50 +2678,54 @@ export function SocialMap({
           aria-hidden={utilityRailHidden ? true : undefined}
         >
           <div className="hp-map-control-group" role="group" aria-label={t("Map zoom controls")}>
-            <button
+            <Button
+              variant="hpMap"
+              size="hpIcon"
               type="button"
               onClick={() => mapRef.current?.zoomIn()}
               disabled={!mapReady || zoom >= MAX_ZOOM}
               tabIndex={utilityRailHidden ? -1 : undefined}
-              className="hp-icon-button hp-map-icon-button"
               aria-label={t("Zoom in map")}
             >
               <Plus size={17} strokeWidth={2.5} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="hpMap"
+              size="hpIcon"
               type="button"
               onClick={zoomOut}
               disabled={!mapReady || zoom <= MIN_ZOOM}
               tabIndex={utilityRailHidden ? -1 : undefined}
-              className="hp-icon-button hp-map-icon-button"
               aria-label={t("Zoom out map")}
             >
               <Minus size={17} strokeWidth={2.5} />
-            </button>
+            </Button>
           </div>
           <div className="hp-map-control-group" role="group" aria-label={t("Map view controls")}>
             {!previewMode && (
-              <button
+              <Button
+                variant="hpMap"
+                size="hpIcon"
                 type="button"
                 onClick={locateUser}
                 disabled={!mapReady}
                 tabIndex={utilityRailHidden ? -1 : undefined}
-                className="hp-icon-button hp-map-icon-button"
                 aria-label={t("Find my location")}
               >
                 <Crosshair size={17} strokeWidth={2.2} />
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="hpMap"
+              size="hpIcon"
               type="button"
               onClick={resetToOverview}
               disabled={!mapReady}
               tabIndex={utilityRailHidden ? -1 : undefined}
-              className="hp-icon-button hp-map-icon-button"
               aria-label={t("Show Ilia overview")}
             >
               <MapPinned size={17} strokeWidth={2.2} />
-            </button>
+            </Button>
           </div>
         </div>
       )}

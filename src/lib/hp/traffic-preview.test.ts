@@ -1,8 +1,115 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { TRAFFIC_SCENES, buildTrafficPreviewScene } from "./traffic-preview";
+import {
+  TRAFFIC_PREVIEW_ACCEPTANCE_AT,
+  TRAFFIC_SCENES,
+  buildTrafficPreviewScene,
+  resolveTrafficPreviewClock,
+} from "./traffic-preview";
+import { isTonightMeet, meetPhase, postQualifiesTonight } from "./surface-freshness";
 
 const NOW = Date.parse("2026-10-05T12:00:00.000Z");
+
+test("the visible previewAt clock accepts strict UTC ISO instants without reading wall time", () => {
+  const previous = Date.now;
+  try {
+    Date.now = () => {
+      throw new Error("Unexpected wall-clock read");
+    };
+    for (const value of [
+      "2026-10-05T15:00:00Z",
+      "2026-10-05T15:00:00.1Z",
+      "2026-10-05T15:00:00.12Z",
+      TRAFFIC_PREVIEW_ACCEPTANCE_AT,
+    ]) {
+      assert.deepEqual(resolveTrafficPreviewClock(value, NOW), {
+        anchorMs: Date.parse(value),
+        mode: "fixed",
+        invalidPreviewAt: false,
+      });
+    }
+  } finally {
+    Date.now = previous;
+  }
+});
+
+test("missing or invalid previewAt uses exactly the captured session clock", () => {
+  assert.deepEqual(resolveTrafficPreviewClock(null, NOW), {
+    anchorMs: NOW,
+    mode: "session",
+    invalidPreviewAt: false,
+  });
+  for (const value of [
+    "",
+    "bad",
+    "2026-10-05",
+    "2026-10-05T15:00:00",
+    "2026-10-05T18:00:00+03:00",
+    "2026-10-05T15:00:00.1234Z",
+    " 2026-10-05T15:00:00Z",
+    "2026-02-29T15:00:00Z",
+    "2026-04-31T15:00:00Z",
+    "2026-13-05T15:00:00Z",
+    "2026-10-05T24:00:00Z",
+    "2026-10-05T15:60:00Z",
+    "2026-10-05T15:00:60Z",
+  ]) {
+    assert.deepEqual(
+      resolveTrafficPreviewClock(value, NOW),
+      {
+        anchorMs: NOW,
+        mode: "session",
+        invalidPreviewAt: true,
+      },
+      value,
+    );
+  }
+  assert.throws(() => resolveTrafficPreviewClock(null, Number.NaN), RangeError);
+});
+
+test("the fixed acceptance clock shares all scenes and keeps evening Meets across device timezones", () => {
+  const previous = process.env.TZ;
+  try {
+    for (const timezone of ["Europe/Athens", "America/Los_Angeles", "Asia/Tokyo", "UTC"]) {
+      process.env.TZ = timezone;
+      const clock = resolveTrafficPreviewClock(TRAFFIC_PREVIEW_ACCEPTANCE_AT, NOW);
+      const scenes = TRAFFIC_SCENES.map(({ id }) => buildTrafficPreviewScene(id, clock.anchorMs));
+      const live = scenes[3];
+      const later = scenes[4];
+      for (const scene of scenes.slice(0, 4)) assert.equal(scene.nowMs, clock.anchorMs);
+      assert.equal(later.nowMs - live.nowMs, 3 * 3_600_000 + 10 * 60_000);
+      assert.deepEqual(
+        live.data.posts,
+        later.data.posts.map((post, index) => ({
+          ...post,
+          time: live.data.posts[index].time,
+        })),
+      );
+      assert.deepEqual(live.data.meetEvents, later.data.meetEvents);
+      assert.deepEqual(live.data.stories, later.data.stories);
+      assert.ok(live.data.meetEvents.every((event) => isTonightMeet(event, live.nowMs)));
+      assert.ok(
+        live.data.posts.every((post) =>
+          postQualifiesTonight(post, live.data.meetEvents, live.nowMs),
+        ),
+      );
+      assert.ok(
+        later.data.posts.every(
+          (post) => !postQualifiesTonight(post, later.data.meetEvents, later.nowMs),
+        ),
+      );
+      assert.deepEqual(
+        later.data.meetEvents.map((event) => meetPhase(event, later.nowMs)),
+        ["inProgress", "inProgress", "upcoming"],
+      );
+      assert.equal(later.activitySnapshot[later.focusPlaceId].score, 0);
+      assert.equal(later.activitySnapshot[later.focusPlaceId].tier, "quiet");
+    }
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
+});
 
 test("traffic timeline crosses the real map tier thresholds", () => {
   assert.deepEqual(
