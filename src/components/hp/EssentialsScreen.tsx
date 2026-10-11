@@ -69,7 +69,7 @@ function FreshnessLine({ card }: { card: EssentialsCard }) {
   );
 }
 
-export function EssentialsScreen() {
+export function EssentialsScreen({ onOpenQuickLook }: { onOpenQuickLook: () => void }) {
   const { language, t } = useI18n();
   const groups = useMemo(() => essentialsBySection(ESSENTIALS_CARDS, REGION), []);
   const [active, setActive] = useState<EssentialsSectionId | "all">("all");
@@ -135,6 +135,27 @@ export function EssentialsScreen() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
+                  {/* "What to see" points at the real content rather than
+                      duplicating it: every place and route as a 2-line card. */}
+                  {section.id === "see" && (
+                    <button
+                      type="button"
+                      onClick={onOpenQuickLook}
+                      className="hp-card-lift flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/25 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
+                    >
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+                        <Eye size={16} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-black text-hp-ink">
+                          {t("Quick look at every place")}
+                        </span>
+                        <span className="block text-[11px] text-hp-muted">
+                          {t("Places and routes in two lines each")}
+                        </span>
+                      </span>
+                    </button>
+                  )}
                   {cards.map((card) => (
                     <article
                       key={card.id}

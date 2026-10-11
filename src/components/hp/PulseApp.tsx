@@ -234,6 +234,9 @@ const SavedScreen = lazy(() =>
 const DealsScreen = lazy(() =>
   import("./DealsScreen").then((module) => ({ default: module.DealsScreen })),
 );
+const QuickLookScreen = lazy(() =>
+  import("./QuickLookScreen").then((module) => ({ default: module.QuickLookScreen })),
+);
 // Essentials is imported eagerly, unlike the other screens: it is the screen
 // a visitor with no signal most needs, so it must not depend on fetching a
 // lazy chunk. It is small (static content, no data loading).
@@ -2293,7 +2296,20 @@ export function PulseApp() {
     }
 
     if (tab === "essentials") {
-      return <EssentialsScreen />;
+      return <EssentialsScreen onOpenQuickLook={() => setTab("quicklook")} />;
+    }
+
+    if (tab === "quicklook") {
+      return (
+        <Suspense fallback={null}>
+          <QuickLookScreen
+            places={places}
+            routes={routes}
+            onOpenPlace={setOpenPlace}
+            onOpenRoute={setOpenRoute}
+          />
+        </Suspense>
+      );
     }
 
     return (

@@ -765,6 +765,13 @@ const EL: Record<string, string> = {
   // Account sheet — section headers (Blend redesign)
   Identity: "Ταυτότητα",
   Essentials: "Χρήσιμα",
+  "Quick look": "Γρήγορη ματιά",
+  "Everything in two lines": "Όλα σε δύο γραμμές",
+  "Quick look at every place": "Γρήγορη ματιά σε όλα τα σημεία",
+  "Places and routes in two lines each": "Σημεία και διαδρομές, δύο γραμμές το καθένα",
+  "Greek summary coming soon": "Η ελληνική περίληψη έρχεται σύντομα",
+  "Times are rough estimates for planning.":
+    "Οι χρόνοι είναι πρόχειρες εκτιμήσεις για τον προγραμματισμό.",
   "Open essentials": "Άνοιγμα χρήσιμων πληροφοριών",
   "For your stay": "Για τη διαμονή σου",
   "What you need to know so your days here go smoothly.":

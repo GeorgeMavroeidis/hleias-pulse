@@ -16,8 +16,16 @@ import { type PlaceStory } from "@/lib/hp/place-stories";
 import { type AreaState, type SignalQuality } from "@/lib/hp/area-intelligence";
 import { type DiscoveryLens } from "@/lib/hp/discovery";
 
-export type Tab = "map" | "pulse" | "routes" | "meet" | "saved" | "deals" | "essentials";
-export type NavTab = Exclude<Tab, "saved" | "deals" | "essentials">;
+export type Tab =
+  | "map"
+  | "pulse"
+  | "routes"
+  | "meet"
+  | "saved"
+  | "deals"
+  | "essentials"
+  | "quicklook";
+export type NavTab = Exclude<Tab, "saved" | "deals" | "essentials" | "quicklook">;
 export type MeetSubTab = "community" | "events";
 export type ComposerMode = "post" | "place" | "story" | "event" | "question";
 export type MarkerAnimationTheme = "calm" | "pulse" | "signal";
@@ -140,7 +148,8 @@ export const isTab = (value: string | null): value is Tab =>
   value === "meet" ||
   value === "saved" ||
   value === "deals" ||
-  value === "essentials";
+  value === "essentials" ||
+  value === "quicklook";
 
 export const truncateShareText = (text: string) =>
   text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;
