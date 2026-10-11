@@ -249,7 +249,8 @@ const coreRule = pulseCss.match(/\.hp-pulse-core \{([\s\S]*?)\n\}/)?.[1];
 assert.ok(coreRule && !/animation|transform/.test(coreRule));
 const shell = readFileSync(new URL("../src/components/hp/PulseApp.tsx", import.meta.url), "utf8");
 assert.ok(/markerPulseInputFromActivity\(\s*activitySnapshot/.test(shell));
-assert.ok(shell.includes("deriveMarkerPulseSnapshot(markerPulseInput, nowMs)"));
+assert.ok(shell.includes("excludeHiddenPulseContributors(markerPulseInput, hiddenDiscoveryUsers)"));
+assert.ok(shell.includes("deriveMarkerPulseSnapshot(visibleMarkerPulseInput, nowMs)"));
 assert.equal((shell.match(/new PulseRefreshController\(/g) ?? []).length, 1);
 assert.doesNotMatch(mapSource, /setInterval|setMarkerPulseNow/);
 assert.ok(shell.includes("markerPulseSnapshot={markerPulseSnapshot}"));
@@ -261,7 +262,10 @@ console.log(
 // These source contracts complement the recovery unit suites and pending browser checks.
 assert.match(mapSource, /startMapInitialization/);
 assert.match(mapSource, /attempt\.ready\(\)/);
-assert.match(mapSource, /if \(!previewMode\) installRegionalLayer\(map\)/);
+assert.match(
+  mapSource,
+  /if \(!previewMode\) \{\s*applyMapPalette\(map, palette, 0\);\s*installRegionalLayer\(map, palette\);\s*\}/,
+);
 assert.match(mapSource, /if \(previewMode \|\| !maplibre \|\| !map \|\| !mapReady\) return/);
 assert.match(mapSource, /sources: \{\}/);
 assert.match(mapSource, /attachLocalPreviewLand/);
@@ -277,4 +281,33 @@ assert.match(
 assert.doesNotMatch(mapSource, /location\.reload|window\.location\.reload|console\.error/);
 console.log(
   "Guarded recovery, source-free local preview, bundled worker and marker teardown contracts passed.",
+);
+
+// Phase selection and atmosphere project onto the reliability-owned map lifecycle.
+assert.match(mapSource, /selection\?: MapSelection/);
+assert.match(mapSource, /discoverySafeMapRect\(/);
+assert.match(mapSource, /sheetGeometry\?\.subscribe\(sync\)/);
+assert.match(mapSource, /const isCurrent = \(\) => active && mapRef\.current === map/);
+assert.match(mapSource, /correctionFrame\.dispose\(\)/);
+assert.match(mapSource, /if \(sheetMotionRef\.current\) return null/);
+assert.match(mapSource, /cameraCaptureRef\.current = capture/);
+assert.match(mapSource, /if \(!map \|\| !mapReady \|\| mapRef\.current !== map\) return null/);
+assert.match(
+  mapSource,
+  /if \(previewMode \|\| !mapHasLoaded \|\| !map \|\| mapRef\.current !== map\) return/,
+);
+assert.match(mapSource, /framedRouteRevisionRef\.current !== routeFrameRevision/);
+assert.match(mapSource, /applyRegionalMapPalette\(map, palette, duration\)/);
+assert.match(mapSource, /if \(mapRef\.current !== map\) return/);
+assert.match(mapSource, /hp-preview-sea/);
+assert.match(mapSource, /svg\[data-hp-preview-land\] path/);
+assert.doesNotMatch(mapSource, /\.setStyle\(/);
+assert.match(mapSource, /locationRequestRef\.current\?\.cancel\(\)/);
+assert.match(mapSource, /if \(!previewMode && mapReady\) locationRequest\.start/);
+assert.match(mapSource, /aria-busy=\{locationStatus === "pending"\}/);
+assert.match(mapSource, /id="hp-map-location-status"/);
+assert.match(mapSource, /markerElement\.inert = !visibleForInteraction/);
+assert.match(mapSource, /marker\.getElement\(\)\.inert = false/);
+console.log(
+  "Controlled selection, guarded sheet frames, paint-only atmosphere and recoverable location contracts passed.",
 );

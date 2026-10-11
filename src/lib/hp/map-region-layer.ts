@@ -3,7 +3,11 @@ import type {
   Map as MapLibreMap,
   SymbolLayerSpecification,
 } from "maplibre-gl";
-import { DAY_MAP_PALETTE } from "./map-cartography";
+import {
+  applyMapColourUpdates,
+  DAY_MAP_PALETTE,
+  type MapCartographyPalette,
+} from "./map-cartography";
 import { MAP_POLICY, mapDisclosure } from "./map-policy";
 import type { RegionalDiscovery } from "./regional-discovery";
 import type { TranslationParams } from "../i18n";
@@ -101,13 +105,24 @@ export function regionalGeoJson(
                 ? -row.contextualPlaceIds.length
                 : 1,
           selected: row.region.id === selectedId,
-          contextOpacity: row.contextualPlaceIds.length ? 1 : 0.55,
+          contextOpacity:
+            row.region.id === selectedId
+              ? 1
+              : selectedId
+                ? row.contextualPlaceIds.length
+                  ? 0.76
+                  : 0.62
+                : row.contextualPlaceIds.length
+                  ? 1
+                  : 0.55,
         },
       })),
   };
 }
 
-export function regionalSymbolLayer(): SymbolLayerSpecification {
+export function regionalSymbolLayer(
+  palette: Readonly<MapCartographyPalette> = DAY_MAP_PALETTE,
+): SymbolLayerSpecification {
   const stops: unknown[] = [];
   for (let step = 0; step <= 10; step++) {
     const zoom = MAP_POLICY.regionFadeStart + step / 10;
@@ -149,8 +164,8 @@ export function regionalSymbolLayer(): SymbolLayerSpecification {
     paint: {
       "icon-opacity": opacity,
       "text-opacity": opacity,
-      "text-color": DAY_MAP_PALETTE.primaryText,
-      "text-halo-color": DAY_MAP_PALETTE.land,
+      "text-color": palette.primaryText,
+      "text-halo-color": palette.land,
       "text-halo-width": 2,
       "text-halo-blur": 0.5,
     },
@@ -158,11 +173,16 @@ export function regionalSymbolLayer(): SymbolLayerSpecification {
 }
 
 /** One code-drawn sprite, matching existing Pulse geometry. No remote assets. */
-export function installRegionalLayer(map: MapLibreMap) {
-  if (map.getSource(REGION_SOURCE_ID)) return;
+export function installRegionalLayer(
+  map: MapLibreMap,
+  palette: Readonly<MapCartographyPalette> = DAY_MAP_PALETTE,
+) {
+  if (map.getSource(REGION_SOURCE_ID) && map.getLayer(REGION_LAYER_ID)) return;
   const sunset =
     getComputedStyle(map.getContainer()).getPropertyValue("--hp-sunset").trim() || "#ed7948";
   for (const selected of [false, true]) {
+    const imageId = selected ? "hp-region-selected" : "hp-region-core";
+    if (map.hasImage(imageId)) continue;
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 64;
     const ctx = canvas.getContext("2d");
@@ -183,16 +203,29 @@ export function installRegionalLayer(map: MapLibreMap) {
       ctx.arc(32, 32, 25, 0, Math.PI * 2);
       ctx.stroke();
     }
-    map.addImage(
-      selected ? "hp-region-selected" : "hp-region-core",
-      ctx.getImageData(0, 0, 64, 64),
-      { pixelRatio: 2 },
-    );
+    map.addImage(imageId, ctx.getImageData(0, 0, 64, 64), { pixelRatio: 2 });
   }
-  map.addSource(REGION_SOURCE_ID, {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] },
-  });
+  if (!map.getSource(REGION_SOURCE_ID))
+    map.addSource(REGION_SOURCE_ID, {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    });
   // Last symbol layer places first in MapLibre's reverse-order collision pass.
-  map.addLayer(regionalSymbolLayer());
+  if (!map.getLayer(REGION_LAYER_ID)) map.addLayer(regionalSymbolLayer(palette));
+}
+
+/** Paint-only atmosphere changes preserve the source, sprites and disclosure topology. */
+export function applyRegionalMapPalette(
+  map: Pick<MapLibreMap, "getLayer" | "setPaintProperty">,
+  palette: Readonly<MapCartographyPalette>,
+  duration: number,
+) {
+  applyMapColourUpdates(
+    map,
+    [
+      { layerId: REGION_LAYER_ID, property: "text-color", value: palette.primaryText },
+      { layerId: REGION_LAYER_ID, property: "text-halo-color", value: palette.land },
+    ],
+    duration,
+  );
 }
