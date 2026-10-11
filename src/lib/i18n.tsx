@@ -764,6 +764,15 @@ const EL: Record<string, string> = {
     "Η καταχώρηση επιχείρησης είναι διαθέσιμη για λογαριασμούς Local και Guide.",
   // Account sheet — section headers (Blend redesign)
   Identity: "Ταυτότητα",
+  Activity: "Δραστηριότητα",
+  "For professionals": "Για επαγγελματίες",
+  "Edit profile": "Επεξεργασία προφίλ",
+  "Set when you joined": "Ορίστηκε στην εγγραφή",
+  "Your activity shows up here once you post, join a meetup or save a route.":
+    "Η δραστηριότητά σου θα εμφανιστεί εδώ μόλις δημοσιεύσεις, συμμετάσχεις σε meetup ή αποθηκεύσεις μια διαδρομή.",
+  "{places} places · {posts} posts · {routes} routes":
+    "{places} σημεία · {posts} δημοσιεύσεις · {routes} διαδρομές",
+  "Open team tools · {role}": "Εργαλεία ομάδας · {role}",
   "Profile details": "Στοιχεία προφίλ",
   "Roles & activity": "Ρόλοι & δραστηριότητα",
   // Account sheet — activity stat tiles

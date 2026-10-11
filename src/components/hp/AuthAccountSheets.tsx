@@ -877,6 +877,10 @@ export function AccountSheet({
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // The edit form is collapsed for an existing account: most visits to this
+  // sheet are to reach Saved / offers / sign-out, not to retype a name. A brand
+  // new account (needsProfile) has nothing to show yet, so it opens expanded.
+  const [editing, setEditing] = useState(false);
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
@@ -923,6 +927,8 @@ export function AccountSheet({
     setSaving(false);
     setMessage(null);
     setError(null);
+    setEditing(account.status === "needsProfile");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on open / profile change only
   }, [open, profile]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -987,6 +993,21 @@ export function AccountSheet({
   // Community roles section — not the apply CTAs, not an existing pending or
   // verified standing. Switching to Tourist hides it wholesale, by design.
   const showCommunityRoles = identity !== "TOURIST";
+
+  // Only an existing account's identity is locked in the UI. A brand new one
+  // still has to pick, once. (UI-only for now: the profiles RLS policy still
+  // lets a client rewrite default_identity directly -- that is the next step.)
+  const identityLocked = account.status === "ready";
+  const identityOption = PROFILE_IDENTITIES.find((option) => option.id === identity);
+
+  const dirty =
+    account.status === "needsProfile" ||
+    avatarFile !== null ||
+    displayName !== (profile?.displayName ?? "") ||
+    handle !== (profile?.handle ?? "") ||
+    identity !== (profile?.defaultIdentity ?? "LOCAL") ||
+    homeArea !== (profile?.homeArea ?? "") ||
+    bio !== (profile?.bio ?? "");
 
   const statTiles = [
     { n: stats.posts, l: "Posts", wash: "bg-hp-sunset/10", ink: "text-hp-sunset" },
@@ -1122,39 +1143,56 @@ export function AccountSheet({
                       <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
                         {t("Default identity")}
                       </div>
-                      <IdentitySegments
-                        options={PROFILE_IDENTITIES}
-                        value={identity}
-                        onChange={setIdentity}
-                      />
+                      {identityLocked ? (
+                        <div className="flex items-center justify-between gap-3 rounded-2xl bg-hp-ink/5 px-3 py-2.5">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <LockKeyhole size={13} className="shrink-0 text-hp-muted" />
+                            <span className="truncate text-[13px] font-black text-hp-ink">
+                              {identityOption ? t(identityOption.label) : t(identity)}
+                            </span>
+                          </span>
+                          <span className="text-right text-[10px] leading-tight text-hp-muted">
+                            {t("Set when you joined")}
+                          </span>
+                        </div>
+                      ) : (
+                        <IdentitySegments
+                          options={PROFILE_IDENTITIES}
+                          value={identity}
+                          onChange={setIdentity}
+                        />
+                      )}
                     </div>
                   </div>
                 </section>
 
-                {adminRole && (
-                  <button
-                    type="button"
-                    onClick={onOpenAdmin}
-                    className="hp-card-lift flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
-                  >
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hp-sunset text-hp-paper">
-                      <ShieldCheck size={16} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-black text-hp-ink">
-                        {t("Admin workspace")}
-                      </span>
-                      <span className="block text-[11px] text-hp-muted">
-                        Open team tools · {adminRole}
-                      </span>
-                    </span>
-                  </button>
-                )}
-
-                {/* ── Profile details ── */}
+                {/* ── Profile details: collapsed behind one button once the
+                    account exists ── */}
                 <section>
                   <SectionHeader icon={FileText} label={t("Profile details")} tone="deep" />
-                  <div className="hp-card-lift space-y-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3.5">
+                  {!editing && (
+                    <button
+                      type="button"
+                      onClick={() => setEditing(true)}
+                      className="hp-card-lift flex w-full items-center gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-left transition active:scale-[0.99]"
+                    >
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink">
+                        <FileText size={16} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-black text-hp-ink">
+                          {t("Edit profile")}
+                        </span>
+                        <span className="block truncate text-[11px] text-hp-muted">
+                          @{handle || "…"}
+                          {homeArea ? ` · ${homeArea}` : ""}
+                        </span>
+                      </span>
+                    </button>
+                  )}
+                  <div
+                    className={`hp-card-lift space-y-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3.5 ${editing ? "" : "hidden"}`}
+                  >
                     <div className="grid grid-cols-2 gap-2">
                       <Field label={t("Display name")}>
                         <input
@@ -1197,40 +1235,35 @@ export function AccountSheet({
                   </div>
                 </section>
 
-                {/* ── Roles & activity ── */}
+                {/* ── Activity: stats + shortcuts, the things people open this sheet for ── */}
                 <section>
-                  <SectionHeader icon={Users} label={t("Roles & activity")} tone="olive" />
+                  <SectionHeader icon={Users} label={t("Activity")} tone="olive" />
                   <div className="space-y-3">
-                    {showCommunityRoles && (
-                      <div className="space-y-2">
-                        <OrganizerSection
-                          status={organizerStatus}
-                          myEventsCount={organizerEventCount}
-                          onApply={onApplyOrganizer}
-                          onOpenComposer={onOpenOrganizerComposer}
-                          onOpenMyEvents={onOpenOrganizerEvents}
-                        />
-                        <BusinessSection
-                          status={businessStatus}
-                          myPlacesCount={businessPlaceCount}
-                          onApply={onApplyBusiness}
-                          onOpenPlaces={onOpenBusinessPlaces}
-                        />
+                    {statTiles.every((stat) => stat.n === 0) ? (
+                      <p className="rounded-2xl bg-hp-ink/5 px-3 py-3 text-[12px] leading-snug text-hp-muted">
+                        {t(
+                          "Your activity shows up here once you post, join a meetup or save a route.",
+                        )}
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-4 gap-2">
+                        {statTiles.map((stat) => (
+                          <div
+                            key={stat.l}
+                            className={`rounded-2xl ${stat.wash} p-2.5 text-center`}
+                          >
+                            <div
+                              className={`hp-num text-[20px] font-black leading-none ${stat.ink}`}
+                            >
+                              {stat.n}
+                            </div>
+                            <div className="mt-1 text-[9px] font-bold uppercase tracking-wide text-hp-muted">
+                              {t(stat.l)}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
-
-                    <div className="grid grid-cols-4 gap-2">
-                      {statTiles.map((stat) => (
-                        <div key={stat.l} className={`rounded-2xl ${stat.wash} p-2.5 text-center`}>
-                          <div className={`hp-num text-[20px] font-black leading-none ${stat.ink}`}>
-                            {stat.n}
-                          </div>
-                          <div className="mt-1 text-[9px] font-bold uppercase tracking-wide text-hp-muted">
-                            {t(stat.l)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
 
                     <button
                       type="button"
@@ -1245,13 +1278,38 @@ export function AccountSheet({
                           {t("Saved")}
                         </span>
                         <span className="block text-[11px] text-hp-muted">
-                          {saved.placeCount} places · {saved.postCount} posts · {saved.routeCount}{" "}
-                          routes
+                          {t("{places} places · {posts} posts · {routes} routes", {
+                            places: saved.placeCount,
+                            posts: saved.postCount,
+                            routes: saved.routeCount,
+                          })}
                         </span>
                       </span>
                     </button>
                   </div>
                 </section>
+
+                {/* ── For professionals: organizer + business applications ── */}
+                {showCommunityRoles && (
+                  <section>
+                    <SectionHeader icon={Store} label={t("For professionals")} tone="deep" />
+                    <div className="space-y-2">
+                      <OrganizerSection
+                        status={organizerStatus}
+                        myEventsCount={organizerEventCount}
+                        onApply={onApplyOrganizer}
+                        onOpenComposer={onOpenOrganizerComposer}
+                        onOpenMyEvents={onOpenOrganizerEvents}
+                      />
+                      <BusinessSection
+                        status={businessStatus}
+                        myPlacesCount={businessPlaceCount}
+                        onApply={onApplyBusiness}
+                        onOpenPlaces={onOpenBusinessPlaces}
+                      />
+                    </div>
+                  </section>
+                )}
 
                 {isPushSupported() && (
                   <section>
@@ -1305,24 +1363,49 @@ export function AccountSheet({
                 )}
                 {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
 
-                <div className="grid grid-cols-[1fr_auto] gap-2">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
-                  >
-                    {saving ? t("Working...") : t("Save profile")}
-                  </button>
+                {adminRole && (
                   <button
                     type="button"
-                    onClick={signOut}
-                    disabled={saving}
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-hp-ink/15 text-hp-ink disabled:opacity-45"
-                    aria-label={t("Sign out")}
+                    onClick={onOpenAdmin}
+                    className="hp-card-lift flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/20 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
                   >
-                    <LogOut size={15} />
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+                      <ShieldCheck size={16} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-black text-hp-ink">
+                        {t("Admin workspace")}
+                      </span>
+                      <span className="block text-[11px] text-hp-muted">
+                        {t("Open team tools · {role}", { role: adminRole })}
+                      </span>
+                    </span>
                   </button>
-                </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={signOut}
+                  disabled={saving}
+                  className="flex w-full items-center justify-center gap-2 rounded-full border border-hp-ink/15 py-3 text-[13px] font-bold text-hp-ink disabled:opacity-45"
+                >
+                  <LogOut size={15} />
+                  {t("Sign out")}
+                </button>
+
+                {/* Save bar: only present when there is something to save, and
+                    pinned so it never sits three screens below the form. */}
+                {dirty && (
+                  <div className="sticky bottom-0 -mx-4 -mb-4 border-t border-hp-ink/10 bg-hp-bg/95 p-4 backdrop-blur">
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper shadow-[0_10px_24px_-12px_rgba(224,106,50,0.7)] transition active:scale-[0.99] disabled:opacity-45 disabled:shadow-none"
+                    >
+                      {saving ? t("Working...") : t("Save profile")}
+                    </button>
+                  </div>
+                )}
               </form>
             )}
           </motion.div>
