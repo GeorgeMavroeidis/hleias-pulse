@@ -26,12 +26,17 @@
 
 ## Now — in this order, one at a time
 
-1. [ ] **Essentials** — the "what you need so you don't suffer" cards (getting
-       here/around, roads, what to see, watch out for, emergencies). First
-       version: a screen with team-written cards, each with a "last checked"
-       date, **no database change**, placeholder text only — real facts come
-       from the team. ← _in progress_
-2. [ ] **2-line summaries** for every place/route (start from `places.short`),
+1. [x] **Essentials v1** — done locally 2026-10-11 on branch `feat/essentials`
+       (local only, not pushed). "Χρήσιμα" pill under the logo opens a screen
+       with 5 sections and 9 cards; each card shows Draft / Checked {date} /
+       Needs re-checking. Only the 112 card has real text — **the team writes
+       the rest** in `src/lib/hp/essentials.ts`. Tests: `npm run
+    test:essentials`. Later: move content to an admin-edited table; add
+       official source links; English check of every card.
+   - [ ] **Team task:** fill in the draft cards (ferries, cruise arrivals,
+         car/taxi/bus, roads, first days, heat & fire, sea, hospitals &
+         pharmacies) with a source link and the date you checked.
+2. [ ] ← _next_ **2-line summaries** for every place/route (start from `places.short`),
        shown as quick-pick cards.
 3. [ ] **Trip builder, device-only** — "how many days?", take a ready-made route
        or build your own by swiping summary cards into days; Trip card per day.
