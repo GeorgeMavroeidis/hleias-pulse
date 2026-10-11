@@ -42,6 +42,11 @@
   how many days, what you like. Open: nothing decided yet on whether answers are
   stored or only tune the first screens; sign-up is also where Local/Visitor is
   now set once.
+- **Titles + "% of Ilia discovered"** (2026-10-11) — titles earned by what you do, and a
+  percentage showing how much of the prefecture a person has discovered (needs a
+  decided denominator: places vs. areas vs. weighted). Points and levels still
+  under consideration. Details and the cheating question in
+  `docs/TOURIST_STAY_PACK.md`.
 - **Tourist rewards** (2026-10-11) — deals (built), stamps for visiting
   stops/finishing trips (`user_place_visits` exists), and a small reward for
   leaving feedback about Pulse itself. Not cash (payments are a guardrail).

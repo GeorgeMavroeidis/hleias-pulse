@@ -103,6 +103,27 @@ storage. (See phases.)
 - Watch the incentive: rewarding _posting_ invites spam; reward being
   **useful** (saves, "helpful" marks), and let moderation (already built) act.
 
+### Titles and "how much of Ilia have you discovered"
+
+Added 2026-10-11. Both are **derived from what a person does**, never picked:
+
+- **Titles** — earned, shown on the profile and next to a name (e.g. a first
+  route finished, a beach-hopper, a night-owl, "Guide" for locals whose tips are
+  saved). The list of titles and what earns each is still to be invented.
+- **Discovery %** — "you have discovered 34% of Ilia". It needs a clear
+  denominator, so decide early: share of **places** visited, or of **areas/
+  villages**, or weighted per category (beaches, sights, food, villages)? Each
+  verified visit is already recordable via `user_place_visits`. It is also the
+  natural per-region number once other regions exist (a % per region).
+- **Honesty about cheating:** a visit that is only a tap can be faked from the
+  sofa. Options: count a visit only after a deal redeemed there or a
+  stamp, or only with a coarse "I'm nearby" check. Remember location precision
+  is personal data (GDPR) — store the visit, not a track of where someone was.
+- **Points and levels** are being considered (decision pending). If they come,
+  they should sit on top of the same events (visit, route finished, deal used,
+  helpful tip) so there is one source of truth, and rewards are things like
+  deals, badges and early access — not cash.
+
 ## Built to travel: other regions later
 
 The owner may take Pulse beyond Ilia (neighbouring prefectures, maybe all of
