@@ -31,14 +31,19 @@
        with 5 sections and 9 cards; each card shows Draft / Checked {date} /
        Needs re-checking. Only the 112 card has real text — **the team writes
        the rest** in `src/lib/hp/essentials.ts`. Tests: `npm run
-    test:essentials`. Later: move content to an admin-edited table; add
+ test:essentials`. Later: move content to an admin-edited table; add
        official source links; English check of every card.
    - [ ] **Team task:** fill in the draft cards (ferries, cruise arrivals,
          car/taxi/bus, roads, first days, heat & fire, sea, hospitals &
          pharmacies) with a source link and the date you checked.
-2. [ ] ← _next_ **2-line summaries** for every place/route (start from `places.short`),
-       shown as quick-pick cards.
-3. [ ] **Trip builder, device-only** — "how many days?", take a ready-made route
+2. [x] **2-line summaries ("Γρήγορη ματιά")** — done locally 2026-10-11 on branch
+       `feat/place-summaries` (local only). Essentials → "Τι να δεις" → "Γρήγορη
+       ματιά σε όλα τα σημεία": all 51 places and 5 routes as short cards with
+       time / cost / best time / who it suits. Greek text translated from the
+       existing English descriptions.
+   - [ ] **Team task:** read over the Greek descriptions and fix anything that
+         sounds off; tune the rough visit times per kind of place.
+3. [ ] ← _next_ **Trip builder, device-only** — "how many days?", take a ready-made route
        or build your own by swiping summary cards into days; Trip card per day.
        No database change until we know it is fun.
 4. [ ] **Titles + "% of Ilia discovered"** — decide the denominator (places vs.
