@@ -764,6 +764,18 @@ const EL: Record<string, string> = {
     "Η καταχώρηση επιχείρησης είναι διαθέσιμη για λογαριασμούς Local και Guide.",
   // Account sheet — section headers (Blend redesign)
   Identity: "Ταυτότητα",
+  Essentials: "Χρήσιμα",
+  "Open essentials": "Άνοιγμα χρήσιμων πληροφοριών",
+  "For your stay": "Για τη διαμονή σου",
+  "What you need to know so your days here go smoothly.":
+    "Όσα χρειάζεται να ξέρεις για να κυλήσουν ομαλά οι μέρες σου εδώ.",
+  "Draft — not verified yet": "Πρόχειρο — δεν έχει ελεγχθεί ακόμα",
+  "Checked {date}": "Ελέγχθηκε {date}",
+  "Needs re-checking — confirm with the official source":
+    "Θέλει νέο έλεγχο — επιβεβαίωσε στην επίσημη πηγή",
+  "Official source": "Επίσημη πηγή",
+  "Information only — always confirm times and closures with the official source.":
+    "Μόνο ενημερωτικά — επιβεβαίωνε πάντα ωράρια και κλεισίματα στην επίσημη πηγή.",
   "Profile details": "Στοιχεία προφίλ",
   "Roles & activity": "Ρόλοι & δραστηριότητα",
   // Account sheet — activity stat tiles

@@ -1,6 +1,6 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Check, Gift, Palette } from "lucide-react";
+import { Search, Check, Compass, Gift, Palette } from "lucide-react";
 import { type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { AccountBubble } from "./AuthAccountSheets";
@@ -46,6 +46,7 @@ interface TopBarProps {
   onOpenAccount: () => void;
   onOpenAuth: () => void;
   onOpenDeals: () => void;
+  onOpenEssentials: () => void;
 }
 
 export function TopBar({
@@ -62,6 +63,7 @@ export function TopBar({
   onOpenAccount,
   onOpenAuth,
   onOpenDeals,
+  onOpenEssentials,
 }: TopBarProps) {
   const { language, t } = useI18n();
   const searchActive = showSearch || query.trim().length > 0;
@@ -157,8 +159,19 @@ export function TopBar({
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
-      <div className="hp-safe-px pb-1.5 pt-0.5">
-        <p className="text-[12px] text-hp-muted">{t("Local spots, routes, and tips.")}</p>
+      {/* The icon row above is full on a 375px phone, so the Essentials entry
+          rides on the tagline row instead of squeezing in a fifth button. */}
+      <div className="hp-safe-px flex items-center justify-between gap-2 pb-1.5 pt-0.5">
+        <p className="truncate text-[12px] text-hp-muted">{t("Local spots, routes, and tips.")}</p>
+        <button
+          type="button"
+          onClick={onOpenEssentials}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-hp-ink/5 px-2.5 py-1 text-[11px] font-bold text-hp-ink"
+          aria-label={t("Open essentials")}
+        >
+          <Compass size={12} strokeWidth={2.6} />
+          {t("Essentials")}
+        </button>
       </div>
       <AnimatePresence>
         {appearanceOpen && (

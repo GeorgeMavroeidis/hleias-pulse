@@ -210,6 +210,7 @@ import {
   DISCOVERY_PLACE_IDS,
 } from "./pulse-shared";
 import { Toast, TopBar, VibeChips, DiscoveryLensRail } from "./PulseTopBar";
+import { EssentialsScreen } from "./EssentialsScreen";
 import { MapBottomSheet, type DiscoverySuggestion } from "./MapBottomSheet";
 import { PulseFeed, MustSeeTodayDeck, LocalDiscoveryCard } from "./PulseFeed";
 import { BottomNav } from "./BottomNav";
@@ -233,6 +234,9 @@ const SavedScreen = lazy(() =>
 const DealsScreen = lazy(() =>
   import("./DealsScreen").then((module) => ({ default: module.DealsScreen })),
 );
+// Essentials is imported eagerly, unlike the other screens: it is the screen
+// a visitor with no signal most needs, so it must not depend on fetching a
+// lazy chunk. It is small (static content, no data loading).
 const MeetScreen = lazy(() =>
   import("./MeetScreen").then((module) => ({ default: module.MeetScreen })),
 );
@@ -2288,6 +2292,10 @@ export function PulseApp() {
       );
     }
 
+    if (tab === "essentials") {
+      return <EssentialsScreen />;
+    }
+
     return (
       <div className="h-full overflow-y-auto">
         <Suspense fallback={null}>
@@ -2338,6 +2346,7 @@ export function PulseApp() {
             onOpenAccount={() => setProfileOpen(true)}
             onOpenAuth={() => setAuthOpen(true)}
             onOpenDeals={() => setTab("deals")}
+            onOpenEssentials={() => setTab("essentials")}
           />
           {tab === "map" ? (
             <DiscoveryLensRail active={activeLens} onChange={setActiveLens} />
