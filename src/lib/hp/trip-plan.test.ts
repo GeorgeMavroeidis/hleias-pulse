@@ -12,6 +12,7 @@ import {
   parsePlan,
   plannedDayCount,
   removeItem,
+  resetSkipped,
   routeHours,
   setDays,
   skip,
@@ -144,4 +145,18 @@ test("stored plans are validated; junk means start fresh", () => {
   assert.ok(plan);
   assert.deepEqual(plan.items, [{ kind: "place", id: "beach", day: 2 }]);
   assert.deepEqual(plan.skipped, ["cafe"]);
+});
+
+test("skipped cards can be brought back, and nothing else changes", () => {
+  let plan = createPlan(2, NOW);
+  plan = addItem(plan, { kind: "place", id: "museum", day: 1 });
+  plan = skip(plan, "beach");
+  const back = resetSkipped(plan);
+  assert.deepEqual(back.skipped, []);
+  assert.deepEqual(back.items, plan.items);
+  assert.equal(resetSkipped(back), back);
+  assert.deepEqual(
+    deck(back, places).map((p) => p.id),
+    ["beach", "cafe"],
+  );
 });

@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
+import { NearMeBar } from "./NearMeBar";
+import { distanceLabel, useNearOrigin, withDistance } from "@/lib/hp/near-me";
 import type { Place, PlaceType, RouteItem } from "@/lib/hp-model";
 import {
   placeSummary,
@@ -161,24 +163,31 @@ export function QuickLookScreen({ onBack, places, routes, onOpenPlace, onOpenRou
   const { language, t } = useI18n();
   const [mode, setMode] = useState<"places" | "routes">("places");
   const [type, setType] = useState<PlaceType | "all">("all");
+  const origin = useNearOrigin();
 
   const presentTypes = useMemo(
     () => PLACE_TYPES.filter((pt) => places.some((place) => place.type === pt)),
     [places],
   );
 
-  const placeCards = useMemo(
-    () =>
-      places
-        .filter((place) => type === "all" || place.type === type)
-        .map((place) => ({ place, card: placeSummary(place, language) }))
-        .sort(
-          (a, b) =>
-            b.place.hotness - a.place.hotness ||
-            a.card.title.localeCompare(b.card.title, language === "GR" ? "el" : "en"),
-        ),
-    [places, type, language],
-  );
+  const placeCards = useMemo(() => {
+    const filtered = places.filter((place) => type === "all" || place.type === type);
+    // Near me: nearest first, with the distance. Otherwise liveliest first.
+    const ordered = origin
+      ? withDistance(filtered, origin)
+      : [...filtered]
+          .sort(
+            (a, b) =>
+              b.hotness - a.hotness ||
+              a.name.localeCompare(b.name, language === "GR" ? "el" : "en"),
+          )
+          .map((place) => ({ place, km: null as number | null, minutes: 0 }));
+    return ordered.map(({ place, km, minutes }) => ({
+      place,
+      card: placeSummary(place, language),
+      near: km === null ? null : distanceLabel(km, minutes, language),
+    }));
+  }, [places, type, language, origin]);
 
   const routeCards = useMemo(
     () => routes.map((route) => ({ route, card: routeSummary(route, language) })),
@@ -224,6 +233,8 @@ export function QuickLookScreen({ onBack, places, routes, onOpenPlace, onOpenRou
           ))}
         </div>
 
+        {mode === "places" && <NearMeBar places={places} />}
+
         {mode === "places" && (
           <div className="-mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
             <button
@@ -254,7 +265,7 @@ export function QuickLookScreen({ onBack, places, routes, onOpenPlace, onOpenRou
 
         {mode === "places" ? (
           <div className="hp-stagger grid grid-cols-2 gap-2.5">
-            {placeCards.map(({ place, card }) => {
+            {placeCards.map(({ place, card, near }) => {
               const time = card.facts.find((f) => f.kind === "time")?.label;
               const cost = card.facts.find((f) => f.kind === "budget")?.label;
               return (
@@ -264,6 +275,14 @@ export function QuickLookScreen({ onBack, places, routes, onOpenPlace, onOpenRou
                   title={card.title}
                   meta={[time, cost].filter(Boolean).join(" · ")}
                   onOpen={() => onOpenPlace(place)}
+                  badge={
+                    near ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-hp-paper/95 px-2 py-1 text-[10px] font-black text-hp-deep shadow">
+                        <MapPin size={10} />
+                        {near}
+                      </span>
+                    ) : undefined
+                  }
                 />
               );
             })}

@@ -70,6 +70,11 @@ export function moveItem(
   return addItem(plan, { kind, id, day });
 }
 
+/** Bring back every card the visitor skipped, so the deck is never a dead end. */
+export function resetSkipped(plan: TripPlan): TripPlan {
+  return plan.skipped.length === 0 ? plan : { ...plan, skipped: [] };
+}
+
 export function skip(plan: TripPlan, id: string): TripPlan {
   return plan.skipped.includes(id) ? plan : { ...plan, skipped: [...plan.skipped, id] };
 }

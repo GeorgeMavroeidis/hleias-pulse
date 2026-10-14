@@ -31,6 +31,7 @@ import {
   moveItem,
   plannedDayCount,
   removeItem,
+  resetSkipped,
   savePlan,
   setDays,
   skip,
@@ -45,6 +46,8 @@ import {
 } from "@/lib/hp/essentials";
 import { SECTION_GRADIENT, SECTION_ICONS } from "./essentials-icons";
 import { ImageBox } from "./ImageBox";
+import { NearMeBar } from "./NearMeBar";
+import { distanceLabel, useNearOrigin, withDistance } from "@/lib/hp/near-me";
 import { PhotoTile } from "./QuickLookScreen";
 
 // Region is fixed until a second one exists (docs/TOURIST_STAY_PACK.md).
@@ -224,6 +227,7 @@ export function TripPlannerScreen({
   const [targetDay, setTargetDay] = useState(1);
   const [kept, setKept] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
+  const origin = useNearOrigin();
 
   useEffect(() => savePlan(plan), [plan]);
 
@@ -315,7 +319,10 @@ export function TripPlannerScreen({
     );
   }
 
-  const deckPlaces = deck(plan, places);
+  // With a location (or a stay base) the deck starts from what is nearest.
+  const deckBase = deck(plan, places);
+  const deckNear = origin ? withDistance(deckBase, origin) : null;
+  const deckPlaces = deckNear ? deckNear.map((row) => row.place) : deckBase;
   const planned = plannedDayCount(plan);
 
   // ── 2. Card deck: keep or skip, one place at a time ──
@@ -356,6 +363,8 @@ export function TripPlannerScreen({
             {t("Kept {n}", { n: kept })}
           </span>
         </div>
+
+        <NearMeBar places={places} />
 
         <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
           {t("Add to")}
@@ -405,7 +414,12 @@ export function TripPlannerScreen({
                         {card.line}
                       </span>
                       <span className="mt-2 flex flex-wrap gap-1.5">
-                        {card.facts.slice(0, 3).map((fact) => (
+                        {deckNear && (
+                          <span className="rounded-full bg-hp-sea/90 px-2.5 py-1 text-[10.5px] font-bold">
+                            {distanceLabel(deckNear[0].km, deckNear[0].minutes, language)}
+                          </span>
+                        )}
+                        {card.facts.slice(0, deckNear ? 2 : 3).map((fact) => (
                           <span
                             key={fact.kind}
                             className="rounded-full bg-white/20 px-2.5 py-1 text-[10.5px] font-bold backdrop-blur"
@@ -419,8 +433,28 @@ export function TripPlannerScreen({
                 })()}
               </motion.div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-hp-ink/20 p-6 text-center text-[12.5px] text-hp-muted">
-                {t("You've seen every place. Nice!")}
+              <div className="rounded-3xl border border-dashed border-hp-ink/20 p-6 text-center">
+                <p className="text-[14px] font-black text-hp-ink">
+                  {plan.skipped.length > 0
+                    ? t("You skipped {n} places.", { n: plan.skipped.length })
+                    : t("You've seen every place. Nice!")}
+                </p>
+                {plan.skipped.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPlan(resetSkipped(plan))}
+                    className="mt-3 rounded-full bg-hp-sunset px-4 py-2 text-[12.5px] font-bold text-hp-paper"
+                  >
+                    {t("See them again")}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setView("plan")}
+                  className="mt-2 block w-full text-[12px] font-bold text-hp-ink/70"
+                >
+                  {t("Back to my trip")}
+                </button>
               </div>
             )}
           </AnimatePresence>

@@ -785,6 +785,17 @@ const EL: Record<string, string> = {
   Essentials: "Χρήσιμα",
   "Quick look": "Γρήγορη ματιά",
   Trip: "Ταξίδι",
+  "What is close to you?": "Τι είναι κοντά σου;",
+  "We show distance and drive time. Your location stays on your phone.":
+    "Δείχνουμε απόσταση και χρόνο με το αυτοκίνητο. Η τοποθεσία σου μένει στο κινητό σου.",
+  "or where are you staying?": "ή πού μένεις;",
+  "Near: {name}": "Κοντά σε: {name}",
+  "Stop sorting by distance": "Σταμάτα την ταξινόμηση ανά απόσταση",
+  "We could not get your location. Allow it in your browser, or choose where you stay.":
+    "Δεν πήραμε την τοποθεσία σου. Δώσε άδεια στον browser ή διάλεξε πού μένεις.",
+  "You skipped {n} places.": "Προσπέρασες {n} μέρη.",
+  "See them again": "Δες τα ξανά",
+  Change: "Αλλαγή",
   "Welcome to Ilia": "Καλώς ήρθες στην Ηλεία",
   "Plan your days in a minute": "Φτιάξε το πρόγραμμά σου σε ένα λεπτό",
   "{n} days · {m} stops": "{n} μέρες · {m} στάσεις",
