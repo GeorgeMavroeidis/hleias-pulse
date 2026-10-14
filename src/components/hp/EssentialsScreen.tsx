@@ -17,7 +17,7 @@ import {
   type EssentialsCard,
   type EssentialsSectionId,
 } from "@/lib/hp/essentials";
-import { SECTION_ICONS } from "./essentials-icons";
+import { SECTION_GRADIENT, SECTION_ICONS } from "./essentials-icons";
 
 // The region is fixed until there is a second one; see "Built to travel" in
 // docs/TOURIST_STAY_PACK.md.
@@ -143,15 +143,17 @@ export function EssentialsScreen({
             const Icon = SECTION_ICONS[section.id];
             return (
               <section key={section.id}>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[9px] bg-hp-sunset text-hp-paper">
-                    <Icon size={14} strokeWidth={2.2} />
+                <div
+                  className={`mb-2.5 flex items-center gap-3 rounded-3xl bg-gradient-to-br p-3.5 text-hp-paper shadow-[0_10px_22px_-14px_rgba(23,20,17,0.6)] ${SECTION_GRADIENT[section.id]}`}
+                >
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/20 backdrop-blur">
+                    <Icon size={22} strokeWidth={2.2} />
                   </span>
                   <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-hp-ink">
+                    <div className="text-[15px] font-black leading-tight">
                       {section.title[language]}
                     </div>
-                    <div className="truncate text-[10.5px] text-hp-muted">
+                    <div className="text-[11px] font-semibold opacity-90">
                       {section.hint[language]}
                     </div>
                   </div>

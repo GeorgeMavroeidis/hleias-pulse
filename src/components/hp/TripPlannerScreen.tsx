@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CalendarDays,
   Check,
+  Heart,
   Layers,
   Minus,
   Plus,
@@ -42,18 +43,62 @@ import {
   sectionCounts,
   type EssentialsSectionId,
 } from "@/lib/hp/essentials";
-import { SECTION_ICONS } from "./essentials-icons";
-import { SummaryCardButton } from "./QuickLookScreen";
+import { SECTION_GRADIENT, SECTION_ICONS } from "./essentials-icons";
+import { ImageBox } from "./ImageBox";
+import { PhotoTile } from "./QuickLookScreen";
 
 // Region is fixed until a second one exists (docs/TOURIST_STAY_PACK.md).
 const REGION = "ilia";
 
-/** "Practical info" — the always-there part of the Trip tab. */
+// Each day gets its own colour, cycling, so a week of cards is easy to tell apart.
+const DAY_COLORS = [
+  "bg-hp-sunset",
+  "bg-hp-sea",
+  "bg-hp-olive",
+  "bg-hp-purple",
+  "bg-hp-deep",
+  "bg-amber-500",
+];
+const dayColor = (day: number) => DAY_COLORS[(day - 1) % DAY_COLORS.length];
+
+/** Big photo header with a title on top — the first thing a visitor sees. */
+function TripHero({
+  imageUrl,
+  title,
+  subtitle,
+  children,
+}: {
+  imageUrl: string;
+  title: string;
+  subtitle?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="relative mb-4 min-h-[170px] overflow-hidden rounded-3xl shadow-[0_14px_30px_-16px_rgba(23,20,17,0.6)]">
+      {/* ImageBox is itself position:relative, so it sits in an absolute wrapper
+          to fill the header without pushing it taller. */}
+      <div className="absolute inset-0">
+        <ImageBox src={imageUrl} alt="" className="h-full w-full" rounded="rounded-3xl" />
+      </div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/10" />
+      <div className="relative flex min-h-[170px] flex-col justify-end p-4 text-hp-paper">
+        <h2 className="text-[26px] font-black leading-[1.05] [text-shadow:0_2px_10px_rgba(0,0,0,0.5)]">
+          {title}
+        </h2>
+        {subtitle && <p className="mt-1 text-[12.5px] font-semibold opacity-90">{subtitle}</p>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** "Good to know" — coloured tiles, the always-there part of the Trip tab. */
 function PracticalTiles({
   showDrafts,
+  seeImage,
   onOpenEssentials,
   onOpenQuickLook,
-}: Pick<Props, "showDrafts" | "onOpenEssentials" | "onOpenQuickLook">) {
+}: Pick<Props, "showDrafts" | "onOpenEssentials" | "onOpenQuickLook"> & { seeImage: string }) {
   const { language, t } = useI18n();
   const counts = sectionCounts(ESSENTIALS_CARDS, REGION, showDrafts);
   return (
@@ -61,7 +106,7 @@ function PracticalTiles({
       <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-hp-muted">
         {t("Good to know")}
       </p>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         {ESSENTIALS_SECTIONS.map((section) => {
           const Icon = SECTION_ICONS[section.id];
           const isSee = section.id === "see";
@@ -71,20 +116,35 @@ function PracticalTiles({
               key={section.id}
               type="button"
               onClick={() => (isSee ? onOpenQuickLook() : onOpenEssentials(section.id))}
-              className="hp-card-lift flex flex-col items-start gap-1 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-left transition active:scale-[0.99]"
+              className={`relative flex min-h-[112px] flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br p-3.5 text-left text-hp-paper shadow-[0_10px_22px_-14px_rgba(23,20,17,0.6)] transition active:scale-[0.98] ${SECTION_GRADIENT[section.id]} ${isSee ? "col-span-2" : ""}`}
             >
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-hp-sunset/12 text-hp-sunset">
-                <Icon size={15} />
+              {isSee && (
+                <>
+                  <span className="absolute inset-0">
+                    <ImageBox
+                      src={seeImage}
+                      alt=""
+                      className="h-full w-full"
+                      rounded="rounded-3xl"
+                    />
+                  </span>
+                  <span className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
+                </>
+              )}
+              <span className="relative grid h-10 w-10 place-items-center rounded-2xl bg-white/20 backdrop-blur">
+                <Icon size={20} />
               </span>
-              <span className="text-[12.5px] font-black leading-tight text-hp-ink">
-                {isSee ? t("Quick look at every place") : section.title[language]}
-              </span>
-              <span className="text-[10.5px] text-hp-muted">
-                {ready
-                  ? isSee
-                    ? t("Places and routes in two lines each")
-                    : t("{n} cards", { n: counts[section.id] })
-                  : t("Coming soon")}
+              <span className="relative">
+                <span className="block text-[14px] font-black leading-tight">
+                  {isSee ? t("Quick look at every place") : section.title[language]}
+                </span>
+                <span className="mt-0.5 block text-[11px] font-semibold opacity-85">
+                  {ready
+                    ? isSee
+                      ? t("Places and routes in two lines each")
+                      : t("{n} cards", { n: counts[section.id] })
+                    : t("Coming soon")}
+                </span>
               </span>
             </button>
           );
@@ -171,6 +231,11 @@ export function TripPlannerScreen({
   const routeById = useMemo(() => new Map(routes.map((r) => [r.id, r])), [routes]);
   const findPlace = useCallback((id: string) => placeById.get(id), [placeById]);
   const findRoute = useCallback((id: string) => routeById.get(id), [routeById]);
+  // The liveliest place's photo is the cover; it changes as the area heats up.
+  const heroUrl = useMemo(
+    () => [...places].sort((a, b) => b.hotness - a.hotness).find((p) => p.imageUrl)?.imageUrl ?? "",
+    [places],
+  );
 
   const openDeck = () => {
     if (!plan) return;
@@ -194,13 +259,11 @@ export function TripPlannerScreen({
   if (!plan) {
     return (
       <div className="h-full overflow-y-auto overscroll-contain px-4 pb-32 pt-3">
-        <header className="mb-6">
-          <p className="text-[9px] font-black uppercase tracking-[0.22em] text-hp-muted">
-            {t("Plan your stay")}
-          </p>
-          <h2 className="mt-1 text-3xl font-black leading-none text-hp-ink">{t("My trip")}</h2>
-          <div className="mt-1.5 h-[1.5px] bg-hp-ink" />
-        </header>
+        <TripHero
+          imageUrl={heroUrl}
+          title={t("Welcome to Ilia")}
+          subtitle={t("Plan your days in a minute")}
+        />
         <div className="hp-card-lift rounded-3xl border border-hp-ink/10 bg-hp-paper p-5 text-center">
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-hp-sunset text-hp-paper">
             <CalendarDays size={22} />
@@ -244,6 +307,7 @@ export function TripPlannerScreen({
         </div>
         <PracticalTiles
           showDrafts={showDrafts}
+          seeImage={heroUrl}
           onOpenEssentials={onOpenEssentials}
           onOpenQuickLook={onOpenQuickLook}
         />
@@ -304,7 +368,7 @@ export function TripPlannerScreen({
           })}
         </p>
 
-        <div className="relative min-h-[220px]">
+        <div className="relative">
           <AnimatePresence mode="popLayout">
             {top ? (
               <motion.div
@@ -313,16 +377,46 @@ export function TripPlannerScreen({
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.7}
                 onDragEnd={onDragEnd}
-                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                initial={{ opacity: 0, y: 14, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                whileDrag={{ rotate: 2 }}
-                className="cursor-grab touch-pan-y active:cursor-grabbing"
+                exit={{ opacity: 0, scale: 0.94 }}
+                whileDrag={{ rotate: 3 }}
+                className="relative h-[min(46dvh,400px)] w-full cursor-grab touch-pan-y overflow-hidden rounded-3xl shadow-[0_18px_36px_-18px_rgba(23,20,17,0.7)] active:cursor-grabbing"
               >
-                <SummaryCardButton
-                  card={placeSummary(top, language)}
-                  onOpen={() => onOpenPlace(top)}
+                <ImageBox
+                  src={top.imageUrl}
+                  alt={top.name}
+                  className="absolute inset-0 h-full w-full"
+                  rounded="rounded-3xl"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                {(() => {
+                  const card = placeSummary(top, language);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => onOpenPlace(top)}
+                      className="absolute inset-x-0 bottom-0 p-4 text-left text-hp-paper"
+                    >
+                      <span className="block text-[22px] font-black leading-tight [text-shadow:0_2px_10px_rgba(0,0,0,0.5)]">
+                        {card.title}
+                      </span>
+                      <span className="mt-1 line-clamp-2 block text-[12.5px] leading-snug opacity-90">
+                        {card.line}
+                      </span>
+                      <span className="mt-2 flex flex-wrap gap-1.5">
+                        {card.facts.slice(0, 3).map((fact) => (
+                          <span
+                            key={fact.kind}
+                            className="rounded-full bg-white/20 px-2.5 py-1 text-[10.5px] font-bold backdrop-blur"
+                          >
+                            {fact.label}
+                          </span>
+                        ))}
+                      </span>
+                    </button>
+                  );
+                })()}
               </motion.div>
             ) : (
               <div className="rounded-2xl border border-dashed border-hp-ink/20 p-6 text-center text-[12.5px] text-hp-muted">
@@ -334,24 +428,27 @@ export function TripPlannerScreen({
 
         {top && (
           <>
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-5 flex items-center justify-center gap-6">
               <button
                 type="button"
                 onClick={skipTop}
-                className="inline-flex items-center justify-center gap-1.5 rounded-full border border-hp-ink/15 py-3 text-[13px] font-bold text-hp-ink"
+                aria-label={t("Skip card")}
+                className="grid h-14 w-14 place-items-center rounded-full border border-hp-ink/15 bg-hp-paper text-hp-ink shadow-md transition active:scale-90"
               >
-                <X size={15} />
-                {t("Skip card")}
+                <X size={24} />
               </button>
               <button
                 type="button"
                 onClick={keepTop}
-                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper"
+                aria-label={t("Keep for day {n}", { n: targetDay })}
+                className="grid h-16 w-16 place-items-center rounded-full bg-hp-sunset text-hp-paper shadow-[0_12px_24px_-8px_rgba(224,106,50,0.8)] transition active:scale-90"
               >
-                <Check size={15} />
-                {t("Keep for day {n}", { n: targetDay })}
+                <Heart size={28} fill="currentColor" />
               </button>
             </div>
+            <p className="mt-2 text-center text-[11px] font-bold text-hp-ink">
+              {t("Keep for day {n}", { n: targetDay })}
+            </p>
             <p className="mt-2 text-center text-[10.5px] text-hp-muted">
               {t("Swipe right to keep, left to skip · {n} left", { n: deckPlaces.length })}
             </p>
@@ -382,8 +479,14 @@ export function TripPlannerScreen({
             const inPlan = hasItem(plan, "route", route.id);
             return (
               <div key={route.id} className="space-y-1.5">
-                <SummaryCardButton
-                  card={routeSummary(route, language)}
+                <PhotoTile
+                  tall={false}
+                  imageUrl={route.imageUrl}
+                  title={route.title}
+                  meta={routeSummary(route, language)
+                    .facts.map((f) => f.label)
+                    .slice(0, 3)
+                    .join(" · ")}
                   onOpen={() => onOpenRoute(route)}
                 />
                 <button
@@ -411,72 +514,73 @@ export function TripPlannerScreen({
   // ── 4. The plan: one card per day ──
   return (
     <div className="h-full overflow-y-auto overscroll-contain px-4 pb-32 pt-3">
-      <header className="mb-4">
-        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-hp-muted">
-          {t("Plan your stay")}
-        </p>
-        <div className="mt-1 flex items-end justify-between">
-          <h2 className="text-3xl font-black leading-none text-hp-ink">{t("My trip")}</h2>
-          <div className="flex items-center gap-1.5 pb-0.5">
-            <button
-              type="button"
-              onClick={() => setPlan(setDays(plan, plan.days - 1))}
-              className="grid h-7 w-7 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-              aria-label={t("Fewer days")}
-            >
-              <Minus size={13} />
-            </button>
-            <span className="hp-num text-[13px] font-bold text-hp-ink">
-              {t("{n} days", { n: plan.days })}
+      <TripHero
+        imageUrl={heroUrl}
+        title={t("My trip")}
+        subtitle={t("{n} days · {m} stops", { n: plan.days, m: plan.items.length })}
+      >
+        {/* Progress — the "game" part: fill every day. */}
+        <div className="mt-3">
+          <div className="mb-1 flex items-center justify-between text-[11px] font-bold">
+            <span>{t("{done} of {total} days planned", { done: planned, total: plan.days })}</span>
+            <span className="inline-flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPlan(setDays(plan, plan.days - 1))}
+                className="grid h-6 w-6 place-items-center rounded-full bg-white/25 backdrop-blur"
+                aria-label={t("Fewer days")}
+              >
+                <Minus size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlan(setDays(plan, plan.days + 1))}
+                className="grid h-6 w-6 place-items-center rounded-full bg-white/25 backdrop-blur"
+                aria-label={t("More days")}
+              >
+                <Plus size={12} />
+              </button>
             </span>
-            <button
-              type="button"
-              onClick={() => setPlan(setDays(plan, plan.days + 1))}
-              className="grid h-7 w-7 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-              aria-label={t("More days")}
-            >
-              <Plus size={13} />
-            </button>
           </div>
+          <div className="h-2 overflow-hidden rounded-full bg-white/30">
+            <motion.div
+              className="h-full rounded-full bg-hp-sunset"
+              initial={false}
+              animate={{ width: `${(planned / plan.days) * 100}%` }}
+            />
+          </div>
+          {planned === plan.days && (
+            <p className="mt-1.5 text-[11.5px] font-black">{t("All set!")}</p>
+          )}
         </div>
-        <div className="mt-1.5 h-[1.5px] bg-hp-ink" />
-      </header>
+      </TripHero>
 
-      {/* Progress — the "game" part: fill every day. */}
-      <div className="mb-4">
-        <div className="mb-1 flex justify-between text-[11px] font-bold">
-          <span className="text-hp-ink">
-            {t("{done} of {total} days planned", { done: planned, total: plan.days })}
-          </span>
-          {planned === plan.days && <span className="text-hp-olive">{t("All set!")}</span>}
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-hp-ink/10">
-          <motion.div
-            className="h-full rounded-full bg-hp-sunset"
-            initial={false}
-            animate={{ width: `${(planned / plan.days) * 100}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="mb-5 grid grid-cols-2 gap-2">
+      <div className="mb-5 grid grid-cols-2 gap-2.5">
         <button
           type="button"
           onClick={openDeck}
-          className="hp-card-lift flex flex-col items-start gap-1 rounded-2xl border border-hp-sunset/25 bg-hp-sunset/10 p-3 text-left"
+          className="flex min-h-[96px] flex-col items-start justify-between rounded-3xl bg-gradient-to-br from-hp-sunset to-amber-500 p-3.5 text-left text-hp-paper shadow-[0_12px_24px_-14px_rgba(224,106,50,0.9)] transition active:scale-[0.98]"
         >
-          <Layers size={18} className="text-hp-sunset" />
-          <span className="text-[13px] font-black text-hp-ink">{t("Pick with cards")}</span>
-          <span className="text-[10.5px] text-hp-muted">{t("Keep or skip, one by one")}</span>
+          <Layers size={22} />
+          <span>
+            <span className="block text-[14px] font-black">{t("Pick with cards")}</span>
+            <span className="block text-[10.5px] font-semibold opacity-90">
+              {t("Keep or skip, one by one")}
+            </span>
+          </span>
         </button>
         <button
           type="button"
           onClick={openRoutes}
-          className="hp-card-lift flex flex-col items-start gap-1 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-left"
+          className="flex min-h-[96px] flex-col items-start justify-between rounded-3xl bg-gradient-to-br from-hp-sea to-hp-deep p-3.5 text-left text-hp-paper shadow-[0_12px_24px_-14px_rgba(14,58,91,0.9)] transition active:scale-[0.98]"
         >
-          <RouteIcon size={18} className="text-hp-deep" />
-          <span className="text-[13px] font-black text-hp-ink">{t("Ready-made routes")}</span>
-          <span className="text-[10.5px] text-hp-muted">{t("A whole day, done for you")}</span>
+          <RouteIcon size={22} />
+          <span>
+            <span className="block text-[14px] font-black">{t("Ready-made routes")}</span>
+            <span className="block text-[10.5px] font-semibold opacity-90">
+              {t("A whole day, done for you")}
+            </span>
+          </span>
         </button>
       </div>
 
@@ -488,10 +592,17 @@ export function TripPlannerScreen({
           return (
             <section
               key={day}
-              className="hp-card-lift rounded-2xl border border-hp-ink/10 bg-hp-paper p-3.5"
+              className="hp-card-lift rounded-3xl border border-hp-ink/10 bg-hp-paper p-3.5"
             >
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-[14px] font-black text-hp-ink">{t("Day {n}", { n: day })}</h3>
+                <h3 className="flex items-center gap-2 text-[14px] font-black text-hp-ink">
+                  <span
+                    className={`grid h-7 w-7 place-items-center rounded-full text-[12px] text-hp-paper ${dayColor(day)}`}
+                  >
+                    {day}
+                  </span>
+                  {t("Day {n}", { n: day })}
+                </h3>
                 {items.length > 0 && (
                   <span
                     className={`inline-flex items-center gap-1 text-[10.5px] font-bold ${full ? "text-hp-sunset" : "text-hp-muted"}`}
@@ -521,11 +632,21 @@ export function TripPlannerScreen({
                     return (
                       <li
                         key={`${item.kind}:${item.id}`}
-                        className="flex items-center gap-2 rounded-xl bg-hp-ink/5 px-2.5 py-2"
+                        className="flex items-center gap-2 rounded-xl bg-hp-ink/5 p-1.5 pr-2"
                       >
-                        {item.kind === "route" && (
-                          <RouteIcon size={13} className="shrink-0 text-hp-sunset" />
-                        )}
+                        <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg">
+                          <ImageBox
+                            src={place?.imageUrl ?? route?.imageUrl ?? ""}
+                            alt=""
+                            className="h-full w-full"
+                            rounded="rounded-lg"
+                          />
+                          {item.kind === "route" && (
+                            <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+                              <RouteIcon size={9} />
+                            </span>
+                          )}
+                        </span>
                         <button
                           type="button"
                           onClick={() => (place ? onOpenPlace(place) : onOpenRoute(route!))}
@@ -578,6 +699,7 @@ export function TripPlannerScreen({
 
       <PracticalTiles
         showDrafts={showDrafts}
+        seeImage={heroUrl}
         onOpenEssentials={onOpenEssentials}
         onOpenQuickLook={onOpenQuickLook}
       />

@@ -4,13 +4,21 @@ import {
   Clock,
   Coins,
   Footprints,
+  House,
+  Landmark,
   MapPin,
+  Moon,
   Route as RouteIcon,
   Sun,
+  Sunset,
+  TreePine,
   Users,
+  Utensils,
+  Waves,
   type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { ImageBox } from "./ImageBox";
 import type { Place, PlaceType, RouteItem } from "@/lib/hp-model";
 import {
   placeSummary,
@@ -49,6 +57,59 @@ const TYPE_LABEL: Record<PlaceType, { GR: string; EN: string }> = {
   night: { GR: "Νύχτα", EN: "Night" },
   sunset: { GR: "Ηλιοβασίλεμα", EN: "Sunset" },
 };
+
+const TYPE_ICON: Record<PlaceType, LucideIcon> = {
+  beach: Waves,
+  culture: Landmark,
+  nature: TreePine,
+  village: House,
+  food: Utensils,
+  local: MapPin,
+  night: Moon,
+  sunset: Sunset,
+};
+
+/** A photo tile: the picture does the talking, text is a title and one short line. */
+export function PhotoTile({
+  imageUrl,
+  title,
+  meta,
+  onOpen,
+  tall = true,
+  badge,
+}: {
+  imageUrl: string;
+  title: string;
+  meta: string;
+  onOpen: () => void;
+  tall?: boolean;
+  badge?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`group relative block w-full overflow-hidden rounded-2xl text-left shadow-[0_8px_20px_-12px_rgba(23,20,17,0.5)] transition active:scale-[0.98] ${
+        tall ? "aspect-[4/5]" : "aspect-[16/9]"
+      }`}
+    >
+      <ImageBox
+        src={imageUrl}
+        alt=""
+        className="absolute inset-0 h-full w-full transition duration-500 group-hover:scale-105"
+        rounded="rounded-2xl"
+      />
+      <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+      {badge && <span className="absolute right-2 top-2">{badge}</span>}
+      <span className="absolute inset-x-0 bottom-0 p-2.5 text-hp-paper">
+        <span className="block text-[13.5px] font-black leading-tight [text-shadow:0_1px_6px_rgba(0,0,0,0.45)] line-clamp-2">
+          {title}
+        </span>
+        <span className="mt-0.5 block text-[10.5px] font-semibold opacity-90">{meta}</span>
+      </span>
+    </button>
+  );
+}
 
 interface Props {
   onBack: () => void;
@@ -111,7 +172,11 @@ export function QuickLookScreen({ onBack, places, routes, onOpenPlace, onOpenRou
       places
         .filter((place) => type === "all" || place.type === type)
         .map((place) => ({ place, card: placeSummary(place, language) }))
-        .sort((a, b) => a.card.title.localeCompare(b.card.title, language === "GR" ? "el" : "en")),
+        .sort(
+          (a, b) =>
+            b.place.hotness - a.place.hotness ||
+            a.card.title.localeCompare(b.card.title, language === "GR" ? "el" : "en"),
+        ),
     [places, type, language],
   );
 
@@ -136,36 +201,27 @@ export function QuickLookScreen({ onBack, places, routes, onOpenPlace, onOpenRou
           <ArrowLeft size={14} />
           {t("Back to my trip")}
         </button>
-        <header className="mb-4">
-          <p className="text-[9px] font-black uppercase tracking-[0.22em] text-hp-muted">
-            {t("Everything in two lines")}
-          </p>
-          <div className="mt-1 flex items-end justify-between">
-            <h2 className="text-3xl font-black leading-none text-hp-ink">{t("Quick look")}</h2>
-            <span className="hp-num pb-1 text-[13px] font-bold text-hp-sunset">
-              {mode === "places" ? placeCards.length : routeCards.length}
-            </span>
-          </div>
-          <div className="mt-1.5 h-[1.5px] bg-hp-ink" />
+        <header className="mb-3 flex items-end justify-between">
+          <h2 className="text-3xl font-black leading-none text-hp-ink">{t("Quick look")}</h2>
+          <span className="hp-num pb-0.5 text-[13px] font-bold text-hp-sunset">
+            {mode === "places" ? placeCards.length : routeCards.length}
+          </span>
         </header>
 
-        <div className="mb-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setMode("places")}
-            className={chip(mode === "places")}
-            aria-pressed={mode === "places"}
-          >
-            {t("Places")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("routes")}
-            className={chip(mode === "routes")}
-            aria-pressed={mode === "routes"}
-          >
-            {t("Routes")}
-          </button>
+        <div className="mb-3 grid grid-cols-2 gap-1.5 rounded-full bg-hp-ink/5 p-1">
+          {(["places", "routes"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              aria-pressed={mode === m}
+              className={`rounded-full py-2 text-[12px] font-bold transition ${
+                mode === m ? "bg-hp-ink text-hp-paper" : "text-hp-ink/65"
+              }`}
+            >
+              {m === "places" ? t("Places") : t("Routes")}
+            </button>
+          ))}
         </div>
 
         {mode === "places" && (
@@ -178,29 +234,62 @@ export function QuickLookScreen({ onBack, places, routes, onOpenPlace, onOpenRou
             >
               {t("All")}
             </button>
-            {presentTypes.map((pt) => (
-              <button
-                key={pt}
-                type="button"
-                onClick={() => setType(pt)}
-                className={chip(type === pt)}
-                aria-pressed={type === pt}
-              >
-                {TYPE_LABEL[pt][language]}
-              </button>
-            ))}
+            {presentTypes.map((pt) => {
+              const Icon = TYPE_ICON[pt];
+              return (
+                <button
+                  key={pt}
+                  type="button"
+                  onClick={() => setType(pt)}
+                  className={`${chip(type === pt)} inline-flex items-center gap-1`}
+                  aria-pressed={type === pt}
+                >
+                  <Icon size={12} />
+                  {TYPE_LABEL[pt][language]}
+                </button>
+              );
+            })}
           </div>
         )}
 
-        <div className="hp-stagger flex flex-col gap-2">
-          {mode === "places"
-            ? placeCards.map(({ place, card }) => (
-                <SummaryCardButton key={card.id} card={card} onOpen={() => onOpenPlace(place)} />
-              ))
-            : routeCards.map(({ route, card }) => (
-                <SummaryCardButton key={card.id} card={card} onOpen={() => onOpenRoute(route)} />
-              ))}
-        </div>
+        {mode === "places" ? (
+          <div className="hp-stagger grid grid-cols-2 gap-2.5">
+            {placeCards.map(({ place, card }) => {
+              const time = card.facts.find((f) => f.kind === "time")?.label;
+              const cost = card.facts.find((f) => f.kind === "budget")?.label;
+              return (
+                <PhotoTile
+                  key={place.id}
+                  imageUrl={place.imageUrl}
+                  title={card.title}
+                  meta={[time, cost].filter(Boolean).join(" · ")}
+                  onOpen={() => onOpenPlace(place)}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="hp-stagger flex flex-col gap-2.5">
+            {routeCards.map(({ route, card }) => (
+              <PhotoTile
+                key={route.id}
+                tall={false}
+                imageUrl={route.imageUrl}
+                title={card.title}
+                meta={card.facts
+                  .map((f) => f.label)
+                  .slice(0, 3)
+                  .join(" · ")}
+                onOpen={() => onOpenRoute(route)}
+                badge={
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+                    <RouteIcon size={13} />
+                  </span>
+                }
+              />
+            ))}
+          </div>
+        )}
 
         <p className="mt-6 text-center text-[10.5px] leading-snug text-hp-muted">
           {t("Times are rough estimates for planning.")}

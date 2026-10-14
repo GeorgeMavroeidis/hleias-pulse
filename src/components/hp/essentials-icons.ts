@@ -9,3 +9,13 @@ export const SECTION_ICONS: Record<EssentialsSectionId, LucideIcon> = {
   watch: AlertTriangle,
   emergency: LifeBuoy,
 };
+
+// One colour per section so the Trip screens are not a wall of the same white
+// card. Gradients use the app's own palette (sea, deep, olive, purple, sunset).
+export const SECTION_GRADIENT: Record<EssentialsSectionId, string> = {
+  arrive: "from-hp-sea to-hp-deep",
+  roads: "from-hp-purple to-hp-deep",
+  see: "from-hp-olive to-hp-sea",
+  watch: "from-amber-400 to-hp-sunset",
+  emergency: "from-red-500 to-hp-sunset",
+};
