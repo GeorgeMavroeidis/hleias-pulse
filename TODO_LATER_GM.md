@@ -30,6 +30,11 @@
        "posting as" picker (post takes the account identity), one-row place
        picker with "Change", small place thumbnail instead of a big banner,
        vibes optional and collapsed.
+   - Also simplified (same branch): **Place** (name, type chips, description,
+     "use my location"; everything else optional), **Story**, **Event**.
+   - [ ] Later: let people upload a **photo** for a new place (needs a storage
+         rule = database change, so talk to Mavroeidis first); pick the spot on
+         a small map.
 2. [ ] ← _next_ **"Trip" tab** — a 5th button in the middle of the bottom bar, in
        its own colour, replacing the small "Essentials" pill under the logo.
        Inside: my trip on top ("Day 2 of 5"), big icons for Arrival / Roads /
