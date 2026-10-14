@@ -211,6 +211,9 @@ const EL: Record<string, string> = {
   // Create composer — Blend redesign
   "Posting as": "Δημοσίευση ως",
   "Posting as {name}": "Δημοσίευση ως {name}",
+  "Add a vibe (optional)": "Πρόσθεσε διάθεση (προαιρετικό)",
+  "Hide vibes": "Απόκρυψη διάθεσης",
+  "Vibe ({n})": "Διάθεση ({n})",
   "Profile identity will be stored with this contribution":
     "Η ταυτότητα του προφίλ σου θα αποθηκευτεί με αυτή την καταχώριση",
   "Sign in to post": "Συνδέσου για να δημοσιεύσεις",

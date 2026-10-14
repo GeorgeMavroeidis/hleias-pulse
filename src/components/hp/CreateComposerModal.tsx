@@ -18,7 +18,7 @@ import { type CreatePulsePlaceInput } from "@/lib/hp-api";
 import { profileAvatarUrl, profileDisplayName, type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
-import { IdentitySegments, SectionHeader, fieldClass } from "./blend-ui";
+import { SectionHeader, fieldClass } from "./blend-ui";
 import {
   MEET_CATEGORIES,
   MEET_CATEGORY_META,
@@ -29,7 +29,6 @@ import {
   type ComposerMode,
   type CreateStoryInput,
   type PostingIdentity,
-  POSTING_IDENTITIES,
   COMPOSER_MODE_ICONS,
   matchesPlaceQuery,
   readyProfile,
@@ -89,6 +88,9 @@ function SearchablePlacePicker({
   setQuery: (query: string) => void;
 }) {
   const { language } = useI18n();
+  // Closed by default: most people post about the place they are already
+  // looking at, so show just that and keep the search + list one tap away.
+  const [expanded, setExpanded] = useState(false);
   const selected = places.find((place) => place.id === value) ?? places[0];
   const results = useMemo(() => {
     const matches = query.trim()
@@ -101,81 +103,94 @@ function SearchablePlacePicker({
 
   return (
     <div className="rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
-      <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
-        <Search size={13} className="text-hp-muted" />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          name="create-post-place-search"
-          aria-label={language === "GR" ? "Αναζήτηση τοποθεσίας" : "Search post location"}
-          autoComplete="off"
-          placeholder={
-            language === "GR"
-              ? "Αναζήτησε τοποθεσία, περιοχή ή tag…"
-              : "Search location, area, tag..."
-          }
-          className="w-full bg-transparent text-[13px] outline-none placeholder:text-hp-muted"
+      <div className="flex items-center gap-2 rounded-xl bg-hp-ink/5 px-3 py-2">
+        <span
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ background: typeColor[selected.type] }}
         />
-      </div>
-      <div className="mb-2 rounded-xl bg-hp-ink/5 px-3 py-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-          {language === "GR" ? "Επιλεγμένο" : "Selected"}
-        </div>
-        <div className="truncate text-[13px] font-bold text-hp-ink">
+        <div className="min-w-0 flex-1 truncate text-[13px] font-bold text-hp-ink">
           {selected.name} <span className="font-semibold text-hp-muted">· {selected.area}</span>
         </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((on) => !on)}
+          aria-expanded={expanded}
+          className="shrink-0 rounded-full bg-hp-ink px-3 py-1 text-[11px] font-bold text-hp-paper"
+        >
+          {expanded
+            ? language === "GR"
+              ? "Κλείσιμο"
+              : "Close"
+            : language === "GR"
+              ? "Αλλαγή"
+              : "Change"}
+        </button>
       </div>
-      <div
-        className="grid max-h-56 gap-1 overflow-y-auto pr-1"
-        role="listbox"
-        aria-label={language === "GR" ? "Τοποθεσίες" : "Locations"}
-      >
-        {results.map((placeOption) => {
-          const selectedOption = placeOption.id === selected.id;
-          return (
-            <button
-              key={placeOption.id}
-              type="button"
-              role="option"
-              aria-selected={selectedOption}
-              onClick={() => {
-                onChange(placeOption.id);
-                setQuery("");
-              }}
-              className={`flex items-center gap-2 rounded-xl px-2.5 py-2 text-left transition ${
-                selectedOption ? "bg-hp-ink text-hp-paper" : "bg-hp-paper/75 text-hp-ink"
-              }`}
-            >
-              <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ background: typeColor[placeOption.type] }}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] font-bold">{placeOption.name}</span>
-                <span
-                  className={`block truncate text-[10px] ${
-                    selectedOption ? "text-hp-paper/65" : "text-hp-muted"
+      {expanded && (
+        <div className="mt-2">
+          <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
+            <Search size={13} className="text-hp-muted" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              name="create-post-place-search"
+              aria-label={language === "GR" ? "Αναζήτηση τοποθεσίας" : "Search post location"}
+              autoComplete="off"
+              placeholder={
+                language === "GR"
+                  ? "Αναζήτησε τοποθεσία, περιοχή ή tag…"
+                  : "Search location, area, tag..."
+              }
+              className="w-full bg-transparent text-[13px] outline-none placeholder:text-hp-muted"
+            />
+          </div>
+          <div
+            className="grid max-h-56 gap-1 overflow-y-auto pr-1"
+            role="listbox"
+            aria-label={language === "GR" ? "Τοποθεσίες" : "Locations"}
+          >
+            {results.map((placeOption) => {
+              const selectedOption = placeOption.id === selected.id;
+              return (
+                <button
+                  key={placeOption.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selectedOption}
+                  onClick={() => {
+                    onChange(placeOption.id);
+                    setQuery("");
+                    setExpanded(false);
+                  }}
+                  className={`flex items-center gap-2 rounded-xl px-2.5 py-2 text-left transition ${
+                    selectedOption ? "bg-hp-ink text-hp-paper" : "bg-hp-paper/75 text-hp-ink"
                   }`}
                 >
-                  {placeOption.area} · {placeOption.type}
-                </span>
-              </span>
-              <span
-                className={`text-[10px] font-bold ${
-                  selectedOption ? "text-hp-paper/75" : "text-hp-muted"
-                }`}
-              >
-                {placeOption.recentPostCount}
-              </span>
-            </button>
-          );
-        })}
-        {results.length === 0 && (
-          <div className="rounded-xl border border-dashed border-hp-ink/15 px-3 py-4 text-center text-[12px] text-hp-muted">
-            {language === "GR" ? "Δεν βρέθηκε τοποθεσία." : "No location matches that search."}
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: typeColor[placeOption.type] }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12px] font-bold">{placeOption.name}</span>
+                    <span
+                      className={`block truncate text-[10px] ${
+                        selectedOption ? "text-hp-paper/65" : "text-hp-muted"
+                      }`}
+                    >
+                      {placeOption.area} · {placeOption.type}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+            {results.length === 0 && (
+              <div className="rounded-xl border border-dashed border-hp-ink/15 px-3 py-4 text-center text-[12px] text-hp-muted">
+                {language === "GR" ? "Δεν βρέθηκε τοποθεσία." : "No location matches that search."}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -224,7 +239,10 @@ export function CreateComposerModal({
   const [text, setText] = useState("");
   const [place, setPlace] = useState(places[0]?.id ?? "");
   const [placeQuery, setPlaceQuery] = useState("");
-  const [identity, setIdentity] = useState<PostingIdentity>("LOCAL");
+  // The identity is the account's, fixed — no per-post override. (A tourist
+  // picking "Local" per post defeated the point of the label.)
+  const identity: PostingIdentity = composerIdentity(account);
+  const [showVibes, setShowVibes] = useState(false);
   const [vibes, setVibes] = useState<string[]>([]);
   const [placeName, setPlaceName] = useState("");
   const [placeArea, setPlaceArea] = useState("");
@@ -260,7 +278,6 @@ export function CreateComposerModal({
   useEffect(() => {
     if (!open) return;
     setMode(initialMode);
-    setIdentity(composerIdentity(account));
     setError(null);
     if (prefillPlace) {
       setPlaceLat(String(Number(prefillPlace.lat.toFixed(6))));
@@ -598,7 +615,13 @@ export function CreateComposerModal({
                       {t("Posting as {name}", { name: profileDisplayName(profile) })}
                     </span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                      {t("Profile identity will be stored with this contribution")}
+                      {t(
+                        identity === "TOURIST"
+                          ? "Tourist"
+                          : identity === "GUIDE"
+                            ? "Guide"
+                            : "Local",
+                      )}
                     </span>
                   </span>
                 </>
@@ -632,19 +655,6 @@ export function CreateComposerModal({
                 onSubmit={handlePostSubmit}
                 className="hp-stagger space-y-3"
               >
-                <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                  <ImageBox
-                    src={selectedPlace.imageUrl}
-                    alt={selectedPlace.name}
-                    className="h-full w-full"
-                    rounded="rounded-2xl"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
-                  <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
-                    <ImagePlus size={12} />
-                    {t("Using {place} image", { place: selectedPlace.name })}
-                  </span>
-                </div>
                 <label htmlFor="create-post-text" className="sr-only">
                   Post text
                 </label>
@@ -659,16 +669,6 @@ export function CreateComposerModal({
                   className={`${fieldClass()} resize-none`}
                   rows={3}
                 />
-                <div>
-                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {t("Posting as")}
-                  </div>
-                  <IdentitySegments
-                    options={POSTING_IDENTITIES}
-                    value={identity}
-                    onChange={setIdentity}
-                  />
-                </div>
                 <div>
                   <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
                     {t("Location")}
@@ -689,11 +689,34 @@ export function CreateComposerModal({
                     setQuery={setPlaceQuery}
                   />
                 </div>
+                <div className="flex items-center gap-2 text-[11px] text-hp-muted">
+                  <span className="h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-hp-ink/10">
+                    <ImageBox
+                      src={selectedPlace.imageUrl}
+                      alt={selectedPlace.name}
+                      className="h-full w-full"
+                      rounded="rounded-lg"
+                    />
+                  </span>
+                  <ImagePlus size={12} className="shrink-0" />
+                  <span className="min-w-0 truncate">
+                    {t("Using {place} image", { place: selectedPlace.name })}
+                  </span>
+                </div>
                 <div>
-                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    {t("Vibe")}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowVibes((on) => !on)}
+                    aria-expanded={showVibes}
+                    className="text-[11px] font-bold text-hp-ink/70"
+                  >
+                    {showVibes
+                      ? t("Hide vibes")
+                      : vibes.length > 0
+                        ? t("Vibe ({n})", { n: vibes.length })
+                        : t("Add a vibe (optional)")}
+                  </button>
+                  <div className={`mt-2 flex flex-wrap gap-1.5 ${showVibes ? "" : "hidden"}`}>
                     {vibeChips.map((v) => {
                       const on = vibes.includes(v);
                       return (
@@ -732,19 +755,6 @@ export function CreateComposerModal({
                 onSubmit={handleQuestionSubmit}
                 className="hp-stagger space-y-3"
               >
-                <div className="hp-card-lift relative h-40 overflow-hidden rounded-2xl border border-hp-ink/10 bg-white/50">
-                  <ImageBox
-                    src={selectedPlace.imageUrl}
-                    alt={selectedPlace.name}
-                    className="h-full w-full"
-                    rounded="rounded-2xl"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent" />
-                  <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-hp-paper backdrop-blur">
-                    <ImagePlus size={12} />
-                    {t("Using {place} image", { place: selectedPlace.name })}
-                  </span>
-                </div>
                 <label htmlFor="create-question-text" className="sr-only">
                   Question text
                 </label>
@@ -759,10 +769,6 @@ export function CreateComposerModal({
                   className={`${fieldClass()} resize-none`}
                   rows={3}
                 />
-                {/* No "posting as" picker here on purpose — a question always
-                    goes out under the account's own identity. The other
-                    modes let you override it per-post; whether that should
-                    change too is a separate discussion. */}
                 <div>
                   <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
                     {t("Location")}
@@ -782,6 +788,20 @@ export function CreateComposerModal({
                     query={placeQuery}
                     setQuery={setPlaceQuery}
                   />
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-hp-muted">
+                  <span className="h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-hp-ink/10">
+                    <ImageBox
+                      src={selectedPlace.imageUrl}
+                      alt={selectedPlace.name}
+                      className="h-full w-full"
+                      rounded="rounded-lg"
+                    />
+                  </span>
+                  <ImagePlus size={12} className="shrink-0" />
+                  <span className="min-w-0 truncate">
+                    {t("Using {place} image", { place: selectedPlace.name })}
+                  </span>
                 </div>
                 {error && <p className="text-[12px] font-semibold text-hp-sunset">{error}</p>}
                 <button
