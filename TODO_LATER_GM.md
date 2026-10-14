@@ -35,14 +35,21 @@
    - [ ] Later: let people upload a **photo** for a new place (needs a storage
          rule = database change, so talk to Mavroeidis first); pick the spot on
          a small map.
-2. [ ] ← _next_ **"Trip" tab** — a 5th button in the middle of the bottom bar, in
-       its own colour, replacing the small "Essentials" pill under the logo.
+2. [x] **"Trip" tab** — done locally on branch `feat/trip-tab` (stacked on essentials,
+       trip-planner and composer branches; local only) — a 5th button in the middle of the bottom bar, in
+       orange like the "+", replacing the small "Essentials" pill under the logo.
        Inside: my trip on top ("Day 2 of 5"), big icons for Arrival / Roads /
        Watch out / Emergency, ready-made routes. **Only verified cards are
        shown to visitors**; drafts are visible to the team only.
-3. [ ] **Profile redo** — current one is disliked on both looks and practicality
+3. [ ] ← _next_ **Profile redo** — current one is disliked on both looks and practicality
        (details to settle: what should come first when you open your profile?).
        Earlier local attempt: branch `feat/account-page-reorg`.
+
+**Heads-up (2026-10-14):** Mavroeidis has a chain of 13 open PRs (#88-#100, the
+"reliability" stack). #92 changes the same composer file as our PR #101 (it makes a
+place choice mandatory, with no default place) — whichever merges first, the other
+needs a rebase. The Trip tab branch will also overlap with #98-#100 (PulseApp,
+top bar, shared tab types). Agree the merge order with him before opening more PRs.
 
 ## Now — in this order, one at a time
 
