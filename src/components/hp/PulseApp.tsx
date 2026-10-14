@@ -211,6 +211,7 @@ import {
 } from "./pulse-shared";
 import { Toast, TopBar, VibeChips, DiscoveryLensRail } from "./PulseTopBar";
 import { EssentialsScreen } from "./EssentialsScreen";
+import type { EssentialsSectionId } from "@/lib/hp/essentials";
 import { MapBottomSheet, type DiscoverySuggestion } from "./MapBottomSheet";
 import { PulseFeed, MustSeeTodayDeck, LocalDiscoveryCard } from "./PulseFeed";
 import { BottomNav } from "./BottomNav";
@@ -322,6 +323,7 @@ export function PulseApp() {
   const [areaIntelligence, setAreaIntelligence] = useState<AreaIntelligenceSnapshot>({});
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("map");
+  const [essentialsSection, setEssentialsSection] = useState<EssentialsSectionId | "all">("all");
   const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
@@ -2301,8 +2303,12 @@ export function PulseApp() {
     if (tab === "essentials") {
       return (
         <EssentialsScreen
+          // Re-mount when the opened section changes so the chip follows the tile.
+          key={essentialsSection}
+          initialSection={essentialsSection}
+          showDrafts={Boolean(adminRole)}
+          onBack={() => setTab("trip")}
           onOpenQuickLook={() => setTab("quicklook")}
-          onOpenTrip={() => setTab("trip")}
         />
       );
     }
@@ -2311,6 +2317,13 @@ export function PulseApp() {
       return (
         <Suspense fallback={null}>
           <TripPlannerScreen
+            // The team sees unverified drafts; visitors only see checked cards.
+            showDrafts={Boolean(adminRole)}
+            onOpenEssentials={(section) => {
+              setEssentialsSection(section);
+              setTab("essentials");
+            }}
+            onOpenQuickLook={() => setTab("quicklook")}
             places={places}
             routes={routes}
             onOpenPlace={setOpenPlace}
@@ -2324,6 +2337,7 @@ export function PulseApp() {
       return (
         <Suspense fallback={null}>
           <QuickLookScreen
+            onBack={() => setTab("trip")}
             places={places}
             routes={routes}
             onOpenPlace={setOpenPlace}
@@ -2383,11 +2397,10 @@ export function PulseApp() {
             onOpenAccount={() => setProfileOpen(true)}
             onOpenAuth={() => setAuthOpen(true)}
             onOpenDeals={() => setTab("deals")}
-            onOpenEssentials={() => setTab("essentials")}
           />
           {tab === "map" ? (
             <DiscoveryLensRail active={activeLens} onChange={setActiveLens} />
-          ) : (
+          ) : tab === "trip" || tab === "essentials" || tab === "quicklook" ? null : (
             <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
           )}
 

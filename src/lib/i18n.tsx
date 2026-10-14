@@ -784,6 +784,12 @@ const EL: Record<string, string> = {
   Identity: "Ταυτότητα",
   Essentials: "Χρήσιμα",
   "Quick look": "Γρήγορη ματιά",
+  Trip: "Ταξίδι",
+  "Good to know": "Καλό είναι να ξέρεις",
+  "{n} cards": "{n} κάρτες",
+  "Coming soon": "Έρχεται σύντομα",
+  "Our team is checking these details so you can rely on them.":
+    "Η ομάδα μας ελέγχει αυτές τις πληροφορίες ώστε να μπορείς να βασιστείς πάνω τους.",
   "Plan your days": "Σχεδίασε τις μέρες σου",
   "Tell us how long you stay, then pick what to do": "Πες μας πόσο μένεις και διάλεξε τι θα κάνεις",
   "Plan your stay": "Σχεδίασε τη διαμονή σου",

@@ -36,9 +36,69 @@ import {
   suggestDay,
   type TripPlan,
 } from "@/lib/hp/trip-plan";
+import {
+  ESSENTIALS_CARDS,
+  ESSENTIALS_SECTIONS,
+  sectionCounts,
+  type EssentialsSectionId,
+} from "@/lib/hp/essentials";
+import { SECTION_ICONS } from "./essentials-icons";
 import { SummaryCardButton } from "./QuickLookScreen";
 
+// Region is fixed until a second one exists (docs/TOURIST_STAY_PACK.md).
+const REGION = "ilia";
+
+/** "Practical info" — the always-there part of the Trip tab. */
+function PracticalTiles({
+  showDrafts,
+  onOpenEssentials,
+  onOpenQuickLook,
+}: Pick<Props, "showDrafts" | "onOpenEssentials" | "onOpenQuickLook">) {
+  const { language, t } = useI18n();
+  const counts = sectionCounts(ESSENTIALS_CARDS, REGION, showDrafts);
+  return (
+    <section className="mt-6">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-hp-muted">
+        {t("Good to know")}
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        {ESSENTIALS_SECTIONS.map((section) => {
+          const Icon = SECTION_ICONS[section.id];
+          const isSee = section.id === "see";
+          const ready = isSee || counts[section.id] > 0;
+          return (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => (isSee ? onOpenQuickLook() : onOpenEssentials(section.id))}
+              className="hp-card-lift flex flex-col items-start gap-1 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-left transition active:scale-[0.99]"
+            >
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-hp-sunset/12 text-hp-sunset">
+                <Icon size={15} />
+              </span>
+              <span className="text-[12.5px] font-black leading-tight text-hp-ink">
+                {isSee ? t("Quick look at every place") : section.title[language]}
+              </span>
+              <span className="text-[10.5px] text-hp-muted">
+                {ready
+                  ? isSee
+                    ? t("Places and routes in two lines each")
+                    : t("{n} cards", { n: counts[section.id] })
+                  : t("Coming soon")}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 interface Props {
+  /** Team only: count unverified drafts on the practical-info tiles. */
+  showDrafts: boolean;
+  onOpenEssentials: (section: EssentialsSectionId) => void;
+  onOpenQuickLook: () => void;
   places: Place[];
   routes: RouteItem[];
   onOpenPlace: (place: Place) => void;
@@ -86,7 +146,15 @@ function DayPicker({
   );
 }
 
-export function TripPlannerScreen({ places, routes, onOpenPlace, onOpenRoute }: Props) {
+export function TripPlannerScreen({
+  showDrafts,
+  onOpenEssentials,
+  onOpenQuickLook,
+  places,
+  routes,
+  onOpenPlace,
+  onOpenRoute,
+}: Props) {
   const { language, t } = useI18n();
   const [plan, setPlan] = useState<TripPlan | null>(() =>
     typeof window === "undefined" ? null : loadPlan(),
@@ -174,6 +242,11 @@ export function TripPlannerScreen({ places, routes, onOpenPlace, onOpenRoute }: 
             {t("Your trip is saved on this phone only.")}
           </p>
         </div>
+        <PracticalTiles
+          showDrafts={showDrafts}
+          onOpenEssentials={onOpenEssentials}
+          onOpenQuickLook={onOpenQuickLook}
+        />
       </div>
     );
   }
@@ -502,6 +575,12 @@ export function TripPlannerScreen({ places, routes, onOpenPlace, onOpenRoute }: 
           );
         })}
       </div>
+
+      <PracticalTiles
+        showDrafts={showDrafts}
+        onOpenEssentials={onOpenEssentials}
+        onOpenQuickLook={onOpenQuickLook}
+      />
 
       <div className="mt-6 text-center">
         {confirmReset ? (

@@ -5,6 +5,8 @@ import {
   ESSENTIALS_SECTIONS,
   cardFreshness,
   essentialsBySection,
+  sectionCounts,
+  visibleCards,
   type EssentialsCard,
 } from "./essentials";
 
@@ -61,4 +63,31 @@ test("shipped content: ids unique, sections known, non-draft cards were checked"
     assert.ok(sectionIds.has(c.section), `${c.id}: unknown section ${c.section}`);
     if (!c.draft) assert.ok(c.lastCheckedAt, `${c.id}: published card without lastCheckedAt`);
   }
+});
+
+test("visitors never see draft cards; the team does", () => {
+  const cards = [
+    card({ id: "d", draft: true }),
+    card({ id: "p", draft: false, lastCheckedAt: "2026-10-11" }),
+  ];
+  assert.deepEqual(
+    visibleCards(cards, false).map((c) => c.id),
+    ["p"],
+  );
+  assert.equal(visibleCards(cards, true).length, 2);
+});
+
+test("section counts follow what is visible", () => {
+  const cards = [
+    card({ id: "a", section: "arrive", draft: true }),
+    card({ id: "e", section: "emergency", draft: false, lastCheckedAt: "2026-10-11" }),
+  ];
+  assert.deepEqual(sectionCounts(cards, "ilia", false), {
+    arrive: 0,
+    roads: 0,
+    see: 0,
+    watch: 0,
+    emergency: 1,
+  });
+  assert.equal(sectionCounts(cards, "ilia", true).arrive, 1);
 });

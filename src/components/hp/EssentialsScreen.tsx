@@ -1,33 +1,23 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
-  CalendarDays,
-  Car,
+  ArrowLeft,
   CheckCircle2,
   Compass,
   ExternalLink,
   Eye,
-  LifeBuoy,
   PencilLine,
-  Ship,
-  type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import {
   ESSENTIALS_CARDS,
   cardFreshness,
   essentialsBySection,
+  visibleCards,
   type EssentialsCard,
   type EssentialsSectionId,
 } from "@/lib/hp/essentials";
-
-const SECTION_ICONS: Record<EssentialsSectionId, LucideIcon> = {
-  arrive: Ship,
-  roads: Car,
-  see: Eye,
-  watch: AlertTriangle,
-  emergency: LifeBuoy,
-};
+import { SECTION_ICONS } from "./essentials-icons";
 
 // The region is fixed until there is a second one; see "Built to travel" in
 // docs/TOURIST_STAY_PACK.md.
@@ -71,20 +61,36 @@ function FreshnessLine({ card }: { card: EssentialsCard }) {
 }
 
 export function EssentialsScreen({
+  initialSection = "all",
+  showDrafts,
+  onBack,
   onOpenQuickLook,
-  onOpenTrip,
 }: {
+  initialSection?: EssentialsSectionId | "all";
+  /** Team only: also show unverified draft cards. Visitors never see drafts. */
+  showDrafts: boolean;
+  onBack: () => void;
   onOpenQuickLook: () => void;
-  onOpenTrip: () => void;
 }) {
   const { language, t } = useI18n();
-  const groups = useMemo(() => essentialsBySection(ESSENTIALS_CARDS, REGION), []);
-  const [active, setActive] = useState<EssentialsSectionId | "all">("all");
+  const groups = useMemo(
+    () => essentialsBySection(visibleCards(ESSENTIALS_CARDS, showDrafts), REGION),
+    [showDrafts],
+  );
+  const [active, setActive] = useState<EssentialsSectionId | "all">(initialSection);
   const visible = active === "all" ? groups : groups.filter((g) => g.section.id === active);
 
   return (
     <div className="relative h-full">
       <div className="h-full overflow-y-auto overscroll-contain px-4 pb-32 pt-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-3 inline-flex items-center gap-1 text-[12px] font-bold text-hp-ink"
+        >
+          <ArrowLeft size={14} />
+          {t("Back to my trip")}
+        </button>
         <header className="mb-4">
           <p className="text-[9px] font-black uppercase tracking-[0.22em] text-hp-muted">
             {t("For your stay")}
@@ -98,24 +104,6 @@ export function EssentialsScreen({
             {t("What you need to know so your days here go smoothly.")}
           </p>
         </header>
-
-        {/* The trip planner is the main thing a visitor does here, so it
-            sits above the reference cards. */}
-        <button
-          type="button"
-          onClick={onOpenTrip}
-          className="hp-card-lift mb-4 flex w-full items-center gap-3 rounded-2xl bg-hp-ink p-4 text-left text-hp-paper transition active:scale-[0.99]"
-        >
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-hp-sunset">
-            <CalendarDays size={18} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-black">{t("Plan your days")}</span>
-            <span className="block text-[11.5px] opacity-75">
-              {t("Tell us how long you stay, then pick what to do")}
-            </span>
-          </span>
-        </button>
 
         <div className="-mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
           {[
@@ -140,6 +128,15 @@ export function EssentialsScreen({
             );
           })}
         </div>
+
+        {visible.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-hp-ink/20 p-6 text-center">
+            <p className="text-[14px] font-black text-hp-ink">{t("Coming soon")}</p>
+            <p className="mt-1 text-[12px] leading-snug text-hp-muted">
+              {t("Our team is checking these details so you can rely on them.")}
+            </p>
+          </div>
+        )}
 
         <div className="hp-stagger flex flex-col gap-5">
           {visible.map(({ section, cards }) => {

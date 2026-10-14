@@ -216,3 +216,27 @@ export function essentialsBySection(
     }))
     .filter((group) => group.cards.length > 0);
 }
+
+/**
+ * What a visitor may see. Draft cards are template text, not verified facts, so
+ * only the team (showDrafts) sees them — a visitor never meets "Draft — not
+ * verified yet".
+ */
+export function visibleCards(cards: EssentialsCard[], showDrafts: boolean): EssentialsCard[] {
+  return showDrafts ? cards : cards.filter((card) => !card.draft);
+}
+
+/** How many cards each section would show, for the "coming soon" tiles. */
+export function sectionCounts(
+  cards: EssentialsCard[],
+  region: string,
+  showDrafts: boolean,
+  sections: EssentialsSection[] = ESSENTIALS_SECTIONS,
+): Record<EssentialsSectionId, number> {
+  const shown = visibleCards(cards, showDrafts).filter((card) => card.region === region);
+  const out = {} as Record<EssentialsSectionId, number>;
+  for (const section of sections) {
+    out[section.id] = shown.filter((card) => card.section === section.id).length;
+  }
+  return out;
+}

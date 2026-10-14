@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  ArrowLeft,
   Clock,
   Coins,
   Footprints,
@@ -50,6 +51,7 @@ const TYPE_LABEL: Record<PlaceType, { GR: string; EN: string }> = {
 };
 
 interface Props {
+  onBack: () => void;
   places: Place[];
   routes: RouteItem[];
   onOpenPlace: (place: Place) => void;
@@ -94,7 +96,7 @@ export function SummaryCardButton({ card, onOpen }: { card: SummaryCard; onOpen:
 
 // "Quick look": every place and route as a two-line card. This is the browsing
 // half of the trip builder; picking cards into days comes next.
-export function QuickLookScreen({ places, routes, onOpenPlace, onOpenRoute }: Props) {
+export function QuickLookScreen({ onBack, places, routes, onOpenPlace, onOpenRoute }: Props) {
   const { language, t } = useI18n();
   const [mode, setMode] = useState<"places" | "routes">("places");
   const [type, setType] = useState<PlaceType | "all">("all");
@@ -126,6 +128,14 @@ export function QuickLookScreen({ places, routes, onOpenPlace, onOpenRoute }: Pr
   return (
     <div className="relative h-full">
       <div className="h-full overflow-y-auto overscroll-contain px-4 pb-32 pt-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-3 inline-flex items-center gap-1 text-[12px] font-bold text-hp-ink"
+        >
+          <ArrowLeft size={14} />
+          {t("Back to my trip")}
+        </button>
         <header className="mb-4">
           <p className="text-[9px] font-black uppercase tracking-[0.22em] text-hp-muted">
             {t("Everything in two lines")}
