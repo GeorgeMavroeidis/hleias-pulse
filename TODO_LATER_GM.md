@@ -108,3 +108,16 @@ test:essentials`. Later: move content to an admin-edited table; add
       in Maps; share a trip; a "Today" view.
 - [ ] **Trip tab look** — done locally (`feat/trip-tab`): photo header, coloured tiles,
       big photo deck cards, photo grid for Quick look. Next: see it with real users.
+
+## Near me + time awareness (2026-10-14)
+
+- [x] **Near me** — done locally on `feat/trip-tab`: location or "where are you staying",
+      distance and drive time on cards, Quick look and the deck sorted nearest first,
+      dead end after skipping everything fixed.
+- [ ] **Day anchor** — once a stop is kept for a day, the deck only suggests places near it,
+      warns when something is far from the rest, orders stops within a day, shows the
+      day's km and drive time.
+- [ ] **Time awareness** — sunset time computed from date and place; soft time windows per
+      kind of place; opening hours and closed days only from verified data the team
+      collects (see `docs/TOURIST_STAY_PACK.md` -> "The day and the hour matter").
+- [ ] **Team task:** collect opening hours for the ~11 places listed in the checklist.

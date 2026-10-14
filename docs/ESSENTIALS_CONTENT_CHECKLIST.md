@@ -51,3 +51,18 @@ Start with the first six — with those done the Trip tab stops looking empty.
 2. **How often is "fresh"?** Default is 90 days; ferries and roads probably need less.
 3. **Should the app show a "last updated" date to visitors?** It does today.
 4. **Do we want the municipality's or another partner's logo on a card they verified?**
+
+## Opening hours to collect (needed for a trip planner that respects time)
+
+For each place below: **weekly opening hours, closed days, seasonal changes, and the
+source and date you checked**. Same rule as the cards: no guessing.
+
+- Ancient Olympia, Olympia Stadium, Archaeological Museum of Olympia, Museum of the
+  Ancient Olympic Games
+- Ancient Elis and the Elis agora, Samiko acropolis
+- Temple of Apollo Epicurius (Bassae), Chlemoutsi castle
+- Mercouri estate (winery visits), Skafidia monastery
+- Thermal baths of Kyllini, Nemouta waterfalls (access and season)
+
+Everything else (beaches, villages, ports) is open all day; we only need the best
+times, which we already have as a soft hint.

@@ -124,6 +124,24 @@ Added 2026-10-11. Both are **derived from what a person does**, never picked:
   helpful tip) so there is one source of truth, and rewards are things like
   deals, badges and early access — not cash.
 
+## The day and the hour matter
+
+Added 2026-10-14 after the first local tests. A plan is only real if it respects time:
+you cannot visit a museum at 07:00, watch the sunset at noon, or go to a museum on its
+closing day. What we have today and what we need:
+
+| Rule                                                            | What it needs                                             | Do we have it?                                                             |
+| --------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Sunset places only around sunset                                | Sunset time for that date and spot                        | **Yes, can be computed** from latitude, longitude and date (no data entry) |
+| Beaches in daylight, nightlife in the evening                   | A time window per kind of place                           | **Yes, as a soft hint** by place type (editable)                           |
+| Museums and archaeological sites: opening hours and closed days | Verified weekly hours per place, with a source and a date | **No.** Only a free-text "best time" exists. Must be collected by the team |
+| Seasonal changes (summer vs. winter hours, holidays)            | The same, per season                                      | **No**                                                                     |
+
+Rules we keep: never invent opening hours; show "hours not confirmed — check before
+you go" when we do not know; a place with verified hours is the only one the planner
+will refuse to put on a closed day or outside its hours. The list of places that need
+hours is in `docs/ESSENTIALS_CONTENT_CHECKLIST.md`.
+
 ## Built to travel: other regions later
 
 The owner may take Pulse beyond Ilia (neighbouring prefectures, maybe all of
