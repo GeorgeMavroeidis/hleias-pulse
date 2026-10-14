@@ -19,6 +19,44 @@
 - Village/area identity next to a user's name (e.g. "Local · Πύργος") instead
   of just the generic LOCAL/GUIDE/BUSINESS badge — cheap, free, and a real
   trust signal for tourists. Flagged 2026-09-07.
+- **Stay Pack for tourists** (2026-10-11) — a tourist stays ~7–10 days and will
+  likely never return, so the tourist side should answer "what do I need so I
+  don't suffer" (ferries, roads, what to see, what to watch out for), then let
+  them pick N days and either take a ready-made route or **build their own by
+  swiping through short summaries**, game-style. Locals feed it and earn;
+  tourists earn from deals and from feedback to us. Content must be built so it
+  can later cover other regions. Full plan, phases, open questions:
+  `docs/TOURIST_STAY_PACK.md`.
+- **Fixed identity, earned Guide title** (2026-10-11, decided in discussion, not
+  yet built) — Local vs. Visitor is chosen once at sign-up and not switchable
+  from the account page; **Guide is earned by locals whose tips prove useful**
+  (saves / helpful marks), never self-selected; Business stays on its existing
+  verification flow. Needs: (a) lock `profiles.default_identity` against client
+  writes (today's `Users can update own profile` policy lets a client write
+  `GUIDE`/`BUSINESS` directly), (b) a computed title column, (c) remove the
+  composer's own "Posting as" picker so a post takes the account's identity,
+  (d) migrate existing rows. Schema + auth model, so both maintainers first.
+  The UI half (identity read-only, collapsed edit form, pinned save bar) is
+  already on `feat/account-page-reorg`.
+- **A few onboarding questions at sign-up** (2026-10-11) — e.g. local or visiting,
+  how many days, what you like. Open: nothing decided yet on whether answers are
+  stored or only tune the first screens; sign-up is also where Local/Visitor is
+  now set once.
+- **Titles + "% of Ilia discovered"** (2026-10-11) — titles earned by what you do, and a
+  percentage showing how much of the prefecture a person has discovered (needs a
+  decided denominator: places vs. areas vs. weighted). Points and levels still
+  under consideration. Details and the cheating question in
+  `docs/TOURIST_STAY_PACK.md`.
+- **Tourist rewards** (2026-10-11) — deals (built), stamps for visiting
+  stops/finishing trips (`user_place_visits` exists), and a small reward for
+  leaving feedback about Pulse itself. Not cash (payments are a guardrail).
+- **Profile card / loyalty card** (2026-10-11, **all options still open**) —
+  turning the profile card into a flip-over customer card with a QR for shops
+  (stamps like "7 coffees, 1 free") was explored: QR first (€0, works on web and
+  iOS), NFC stand with NTAG 424 DNA tags later; own POS hardware judged not worth
+  it. The placement (profile vs. header shortcut) and whether a card exists at
+  all are undecided, and a tourist rarely reaches 7 stamps, so a card mainly
+  serves locals.
 
 ## UI / Authenticity polish
 
