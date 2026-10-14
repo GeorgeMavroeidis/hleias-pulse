@@ -39,6 +39,7 @@
     "test:essentials": "tsx --test src/lib/hp/essentials.test.ts",
     "test:summaries": "tsx --test src/lib/hp/summaries.test.ts",
     "test:trip-plan": "tsx --test src/lib/hp/trip-plan.test.ts",
+    "test:place-defaults": "tsx --test src/lib/hp/place-defaults.test.ts",
     "test:push-security": "tsx --test scripts/push-security.test.ts",
     "test:function-privileges": "tsx scripts/test-function-privileges.ts",
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
