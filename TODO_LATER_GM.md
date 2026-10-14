@@ -24,6 +24,21 @@
 - [ ] Profile card / customer loyalty card — **all options still open**
       (flip card, QR first, NFC stand later; no own POS hardware).
 
+## Decided 2026-10-14 (after trying the local build) — do in this order
+
+1. [x] **Simpler post form** — done locally on branch `feat/composer-simplify`: no
+       "posting as" picker (post takes the account identity), one-row place
+       picker with "Change", small place thumbnail instead of a big banner,
+       vibes optional and collapsed.
+2. [ ] ← _next_ **"Trip" tab** — a 5th button in the middle of the bottom bar, in
+       its own colour, replacing the small "Essentials" pill under the logo.
+       Inside: my trip on top ("Day 2 of 5"), big icons for Arrival / Roads /
+       Watch out / Emergency, ready-made routes. **Only verified cards are
+       shown to visitors**; drafts are visible to the team only.
+3. [ ] **Profile redo** — current one is disliked on both looks and practicality
+       (details to settle: what should come first when you open your profile?).
+       Earlier local attempt: branch `feat/account-page-reorg`.
+
 ## Now — in this order, one at a time
 
 1. [x] **Essentials v1** — done locally 2026-10-11 on branch `feat/essentials`
