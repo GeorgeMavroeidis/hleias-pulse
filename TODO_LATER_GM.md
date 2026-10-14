@@ -97,3 +97,14 @@ test:essentials`. Later: move content to an admin-edited table; add
 - Monetisation: pay-per-redemption, business subscriptions, sponsored placement
   (labelled), municipalities, affiliate links — after the 2027 season's numbers.
 - Ownership of Essentials content (who keeps it fresh) — open question.
+
+## At the very end (agreed 2026-10-14)
+
+- [ ] **Fill the Essentials cards** — checklist for the team in
+      `docs/ESSENTIALS_CONTENT_CHECKLIST.md` (8 cards, who owns each, what to check
+      them against). Do the first six before showing the Trip tab to real visitors.
+- [ ] **Trip tab, step B** — arrival date; events/meets during the stay; deals on
+      planned stops; weather and sunset time; "Ask a local" on a stop; open a day
+      in Maps; share a trip; a "Today" view.
+- [ ] **Trip tab look** — done locally (`feat/trip-tab`): photo header, coloured tiles,
+      big photo deck cards, photo grid for Quick look. Next: see it with real users.
