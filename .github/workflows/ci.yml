@@ -55,6 +55,9 @@ jobs:
       - name: Test — discovery
         run: npm run test:discovery
 
+      - name: Test — place form defaults
+        run: npm run test:place-defaults
+
       - name: Test — push security
         run: npm run test:push-security
 
