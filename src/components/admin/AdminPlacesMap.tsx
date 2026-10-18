@@ -198,13 +198,13 @@ export function AdminPlacesMap({
   }, [draftLat, draftLng, mapReady]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-hp-ink/15 bg-hp-bg shadow-sm">
       <div
         ref={nodeRef}
         className="h-[420px] w-full xl:h-[560px]"
         aria-label={t("Choose the place position on the map")}
       />
-      <p className="border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+      <p className="border-t border-hp-ink/15 bg-hp-raised px-3 py-2 text-xs text-hp-muted">
         {t("Click a pin to open it, or click the map to move the selected place.")}
       </p>
     </div>

@@ -156,7 +156,7 @@ export function PlaceDetailModal({
                   <X size={16} />
                 </button>
               </div>
-              <div className="absolute bottom-3 left-4 right-4 text-hp-paper">
+              <div className="absolute bottom-3 left-4 right-4 text-hp-on-media">
                 <span
                   className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
                   style={{ background: typeColor[place.type] }}
@@ -371,7 +371,7 @@ export function PlaceDetailModal({
                           />
                           <span className="text-[12px] font-bold text-hp-ink">{a.name}</span>
                           <span
-                            className="rounded-sm px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-paper"
+                            className="rounded-sm px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-on-media"
                             style={{ background: authorTypeColor[a.type] }}
                           >
                             {a.type}
@@ -397,7 +397,7 @@ export function PlaceDetailModal({
                   })}
                 </div>
               </div>
-              <div className="mt-5 rounded-2xl border border-hp-ink/10 bg-white/60 p-3">
+              <div className="mt-5 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 p-3">
                 <label
                   htmlFor={`place-detail-comment-${place.id}`}
                   className="text-[10px] font-bold uppercase tracking-wider text-hp-muted"

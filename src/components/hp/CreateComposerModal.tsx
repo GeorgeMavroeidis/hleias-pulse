@@ -106,7 +106,7 @@ function SearchablePlacePicker({
   if (!selected) return null;
 
   return (
-    <div className="rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
+    <div className="rounded-2xl border border-hp-ink/10 bg-hp-raised/60 p-2.5">
       <div className="flex items-center gap-2 rounded-xl bg-hp-ink/5 px-3 py-2">
         <span
           className="h-2 w-2 shrink-0 rounded-full"
@@ -618,7 +618,7 @@ export function CreateComposerModal({
               </button>
             </div>
 
-            <div className="mb-4 grid grid-cols-5 gap-1 rounded-full border border-hp-ink/10 bg-white/50 p-1">
+            <div className="mb-4 grid grid-cols-5 gap-1 rounded-full border border-hp-ink/10 bg-hp-raised/50 p-1">
               {(["post", "question", "place", "story", "event"] as ComposerMode[]).map((option) => {
                 const ModeIcon = COMPOSER_MODE_ICONS[option];
                 return (
@@ -922,7 +922,7 @@ export function CreateComposerModal({
 
                 <div>
                   <div className={LABEL}>{t("Where is it?")}</div>
-                  <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
+                  <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 p-2.5">
                     <MapPin
                       size={16}
                       className={placeLat && placeLng ? "text-hp-olive" : "text-hp-muted"}
@@ -1140,7 +1140,7 @@ export function CreateComposerModal({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
+                <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-hp-ink/10 bg-hp-raised/50 p-1.5">
                   {(["photo", "report"] as const).map((option) => {
                     const active = storyKind === option;
                     return (
@@ -1161,7 +1161,7 @@ export function CreateComposerModal({
                 </div>
 
                 {storyKind === "report" && (
-                  <div className="rounded-2xl border border-hp-ink/10 bg-white/50 p-2.5">
+                  <div className="rounded-2xl border border-hp-ink/10 bg-hp-raised/50 p-2.5">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
@@ -1242,7 +1242,7 @@ export function CreateComposerModal({
 
                 <div>
                   <div className={LABEL}>{t("Visible for")}</div>
-                  <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
+                  <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-hp-raised/50 p-1.5">
                     {(
                       [
                         { h: 6, label: "6h" },

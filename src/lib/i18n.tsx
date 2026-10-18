@@ -14,6 +14,10 @@ export type TranslationParams = Record<string, string | number>;
 const STORAGE_KEY = "ilia-pulse-language";
 
 const EL: Record<string, string> = {
+  "Color scheme": "Χρωματική εμφάνιση",
+  Light: "Φωτεινό",
+  Dark: "Σκοτεινό",
+  System: "Σύστημα",
   "Local spots, routes, and tips.": "Τοπικά σημεία, διαδρομές και συμβουλές.",
   "Open search": "Άνοιγμα αναζήτησης",
   "Close search": "Κλείσιμο αναζήτησης",

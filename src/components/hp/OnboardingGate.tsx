@@ -80,7 +80,7 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
                   className="flex max-w-sm flex-col items-center"
                 >
                   <span
-                    className="mb-6 grid h-20 w-20 place-items-center rounded-3xl text-hp-paper shadow-lg"
+                    className="mb-6 grid h-20 w-20 place-items-center rounded-3xl text-hp-on-media dark:text-[#101c2a] shadow-lg"
                     style={{ background: SLIDES[step].tint }}
                   >
                     {(() => {

@@ -99,8 +99,8 @@ type ModerationItem = {
 
 const PAGE_SIZE = 12;
 const inputClass =
-  "mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100";
-const labelClass = "text-xs font-bold uppercase tracking-[0.12em] text-slate-500";
+  "mt-1 w-full rounded-lg border border-hp-ink/15 bg-hp-raised px-3 py-2 text-sm text-hp-ink shadow-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100";
+const labelClass = "text-xs font-bold uppercase tracking-[0.12em] text-hp-muted";
 
 const TABS: Array<{ id: AdminTab; label: string; icon: typeof LayoutDashboard }> = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -192,10 +192,10 @@ function StatusBadge({ status }: { status: string }) {
   const { t } = useI18n();
   const palette =
     status === "published"
-      ? "bg-emerald-50 text-emerald-700 ring-emerald-600/15"
+      ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 ring-emerald-600/15"
       : status === "hidden"
-        ? "bg-slate-100 text-slate-600 ring-slate-500/15"
-        : "bg-amber-50 text-amber-800 ring-amber-600/15";
+        ? "bg-hp-bg text-hp-muted ring-slate-500/15"
+        : "bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 ring-amber-600/15";
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ring-1 ${palette}`}
@@ -209,7 +209,7 @@ function EmptyState({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
 
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm text-slate-500">
+    <div className="rounded-xl border border-dashed border-hp-ink/20 bg-hp-raised px-5 py-10 text-center text-sm text-hp-muted">
       {typeof children === "string" ? t(children) : children}
     </div>
   );
@@ -228,8 +228,8 @@ function SectionHeader({
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h2 className="text-xl font-black tracking-tight text-slate-950">{t(title)}</h2>
-        <p className="mt-1 text-sm text-slate-500">{t(detail)}</p>
+        <h2 className="text-xl font-black tracking-tight text-hp-ink">{t(title)}</h2>
+        <p className="mt-1 text-sm text-hp-muted">{t(detail)}</p>
       </div>
       {action}
     </div>
@@ -244,9 +244,9 @@ function ActionButton({
   const { t } = useI18n();
   const classes =
     tone === "danger"
-      ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+      ? "border-red-200 bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60"
       : tone === "muted"
-        ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+        ? "border-hp-ink/15 bg-hp-raised text-hp-ink hover:bg-hp-paper"
         : "border-orange-600 bg-orange-600 text-white hover:bg-orange-700";
   return (
     <button
@@ -313,7 +313,7 @@ export function AdminDashboard() {
   if (!role) return <AdminDenied />;
 
   return (
-    <main className="min-h-[100dvh] bg-slate-100 text-slate-900">
+    <main className="min-h-[100dvh] bg-hp-bg text-hp-ink">
       <div className="mx-auto grid min-h-[100dvh] max-w-[1600px] lg:grid-cols-[248px_1fr]">
         <aside className="border-b border-slate-800 bg-slate-950 px-4 py-5 text-slate-100 lg:border-b-0 lg:border-r">
           <a href="/" className="mb-8 flex items-center gap-3 px-2 text-left">
@@ -348,7 +348,7 @@ export function AdminDashboard() {
                   key={item.id}
                   type="button"
                   onClick={() => setTab(item.id)}
-                  className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition lg:w-full ${active ? "bg-white text-slate-950" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
+                  className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition lg:w-full ${active ? "bg-hp-raised text-hp-ink" : "text-slate-300 hover:bg-hp-raised/10 hover:text-white"}`}
                 >
                   <Icon size={17} />
                   {t(item.label)}
@@ -356,8 +356,8 @@ export function AdminDashboard() {
               );
             })}
           </nav>
-          <div className="mt-8 hidden rounded-xl border border-white/10 bg-white/5 p-3 lg:block">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          <div className="mt-8 hidden rounded-xl border border-white/10 bg-hp-raised/5 p-3 lg:block">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-hp-muted">
               {language === "GR" ? "Συνδεδεμένος ως" : "Signed in as"}
             </div>
             <div className="mt-1 truncate text-sm font-bold">
@@ -369,7 +369,7 @@ export function AdminDashboard() {
 
         <section className="min-w-0 px-4 py-6 sm:px-7 lg:px-10">
           <header className="mb-7 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold text-slate-500">
+            <div className="text-sm font-semibold text-hp-muted">
               {language === "GR" ? "Διαχείριση περιεχομένου" : "Content operations"}
             </div>
             <div className="flex items-center gap-2">
@@ -383,7 +383,7 @@ export function AdminDashboard() {
           </header>
           {notice && (
             <div
-              className={`mb-5 rounded-xl border px-4 py-3 text-sm font-semibold ${notice.tone === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}
+              className={`mb-5 rounded-xl border px-4 py-3 text-sm font-semibold ${notice.tone === "error" ? "border-red-200 bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300" : "border-emerald-200 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300"}`}
             >
               {notice.message}
             </div>
@@ -427,7 +427,7 @@ export function AdminDashboard() {
 function AdminLoading() {
   const { t } = useI18n();
   return (
-    <main className="grid min-h-[100dvh] place-items-center bg-slate-100 text-sm font-bold text-slate-500">
+    <main className="grid min-h-[100dvh] place-items-center bg-hp-bg text-sm font-bold text-hp-muted">
       {t("Loading admin workspace…")}
     </main>
   );
@@ -436,11 +436,11 @@ function AdminLoading() {
 function AdminSignIn() {
   const { language, t } = useI18n();
   return (
-    <main className="grid min-h-[100dvh] place-items-center bg-slate-100 p-5">
-      <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
+    <main className="grid min-h-[100dvh] place-items-center bg-hp-bg p-5">
+      <div className="max-w-md rounded-2xl bg-hp-raised p-8 text-center shadow-sm ring-1 ring-hp-ink/15">
         <ShieldCheck className="mx-auto h-10 w-10 text-orange-500" />
-        <h1 className="mt-4 text-2xl font-black text-slate-950">{t("Sign in first")}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-500">
+        <h1 className="mt-4 text-2xl font-black text-hp-ink">{t("Sign in first")}</h1>
+        <p className="mt-2 text-sm leading-6 text-hp-muted">
           {language === "GR"
             ? "Ο χώρος διαχείρισης είναι διαθέσιμος μόνο σε εγκεκριμένα μέλη της ομάδας."
             : "The admin workspace is available only to an approved, signed-in team member."}
@@ -459,11 +459,11 @@ function AdminSignIn() {
 function AdminDenied() {
   const { language, t } = useI18n();
   return (
-    <main className="grid min-h-[100dvh] place-items-center bg-slate-100 p-5">
-      <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
+    <main className="grid min-h-[100dvh] place-items-center bg-hp-bg p-5">
+      <div className="max-w-md rounded-2xl bg-hp-raised p-8 text-center shadow-sm ring-1 ring-hp-ink/15">
         <CircleAlert className="mx-auto h-10 w-10 text-amber-500" />
-        <h1 className="mt-4 text-2xl font-black text-slate-950">{t("No admin access")}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-500">
+        <h1 className="mt-4 text-2xl font-black text-hp-ink">{t("No admin access")}</h1>
+        <p className="mt-2 text-sm leading-6 text-hp-muted">
           {language === "GR"
             ? "Ο λογαριασμός σου είναι συνδεδεμένος, αλλά δεν ανήκει ακόμη στην ομάδα διαχείρισης."
             : "Your account is signed in, but it is not a member of the admin team yet. Ask an Owner to add your profile."}
@@ -516,8 +516,16 @@ function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeratio
     .flat()
     .filter((item) => item.moderation_status === "published").length;
   const metrics = [
-    { label: "Needs review", value: pending, tone: "text-amber-700 bg-amber-50" },
-    { label: "Published items", value: published, tone: "text-emerald-700 bg-emerald-50" },
+    {
+      label: "Needs review",
+      value: pending,
+      tone: "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50",
+    },
+    {
+      label: "Published items",
+      value: published,
+      tone: "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50",
+    },
     {
       label: "Map places",
       value: data.places.filter((place) => place.moderation_status === "published").length,
@@ -545,20 +553,18 @@ function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeratio
         ))}
       </div>
       <div className="mt-7 grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="rounded-2xl bg-hp-raised p-5 shadow-sm ring-1 ring-hp-ink/15">
           <h3 className="text-base font-black">{t("Recent admin activity")}</h3>
           <div className="mt-4 divide-y divide-slate-100">
             {data.auditLogs.length ? (
               data.auditLogs.slice(0, 8).map((log) => (
                 <div key={log.id} className="flex items-center gap-3 py-3 text-sm">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500">
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-hp-bg text-hp-muted">
                     <FilePenLine size={15} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="font-bold text-slate-800">
-                      {log.action.replaceAll("_", " ")}
-                    </span>
-                    <span className="ml-1 text-slate-500">
+                    <span className="font-bold text-hp-ink">{log.action.replaceAll("_", " ")}</span>
+                    <span className="ml-1 text-hp-muted">
                       {log.entity_type}
                       {log.entity_id ? ` · ${log.entity_id}` : ""}
                     </span>
@@ -625,7 +631,7 @@ const BEST_TIME_SUGGESTIONS = ["morning", "afternoon", "sunset", "evening", "nig
 const THIN_COPY_LENGTH = 40;
 const ILIA_FALLBACK = { lat: 37.68, lng: 21.52 };
 const selectFilterClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 shadow-sm outline-none focus:border-orange-500";
+  "w-full rounded-lg border border-hp-ink/15 bg-hp-raised px-2 py-2 text-xs font-bold text-hp-ink shadow-sm outline-none focus:border-orange-500";
 
 function suggestionsFrom(
   places: AdminPlace[],
@@ -695,7 +701,9 @@ function IconButton({
       disabled={disabled}
       onClick={onClick}
       className={`rounded p-1 transition disabled:cursor-not-allowed disabled:opacity-30 ${
-        tone === "danger" ? "text-red-600 hover:bg-red-50" : "text-slate-600 hover:bg-slate-100"
+        tone === "danger"
+          ? "text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/60"
+          : "text-hp-muted hover:bg-hp-bg"
       }`}
     >
       {children}
@@ -714,15 +722,15 @@ function CountTile({
 }) {
   const { t } = useI18n();
   return (
-    <div className="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-xl bg-hp-raised px-3 py-2 shadow-sm ring-1 ring-hp-ink/15">
       <div
         className={`text-xl font-black tabular-nums ${
-          tone === "warn" && value > 0 ? "text-amber-600" : "text-slate-900"
+          tone === "warn" && value > 0 ? "text-amber-600 dark:text-amber-300" : "text-hp-ink"
         }`}
       >
         {value}
       </div>
-      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500">
+      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-hp-muted">
         {t(label)}
       </div>
     </div>
@@ -854,7 +862,7 @@ function PlacesPanel({ data, onSaved, setNotice }: PanelProps) {
             </select>
           </div>
 
-          <div className="mt-3 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+          <div className="mt-3 overflow-hidden rounded-2xl bg-hp-raised shadow-sm ring-1 ring-hp-ink/15">
             <div className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto xl:max-h-[600px]">
               {visible.length ? (
                 visible.map((place) => {
@@ -868,28 +876,28 @@ function PlacesPanel({ data, onSaved, setNotice }: PanelProps) {
                       onClick={() => setSelectedId(place.id)}
                       className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition ${
                         isSelected
-                          ? "bg-orange-50 ring-1 ring-inset ring-orange-300"
-                          : "hover:bg-slate-50"
+                          ? "bg-orange-50 dark:bg-orange-950/50 ring-1 ring-inset ring-orange-300"
+                          : "hover:bg-hp-paper"
                       }`}
                     >
                       {noImage ? (
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-hp-bg text-slate-400">
                           <ImagePlus size={15} />
                         </span>
                       ) : (
                         <img
-                          className="h-10 w-10 shrink-0 rounded-lg bg-slate-100 object-cover"
+                          className="h-10 w-10 shrink-0 rounded-lg bg-hp-bg object-cover"
                           src={place.image_url}
                           alt=""
                         />
                       )}
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-bold">{place.name}</span>
-                        <span className="block truncate text-xs text-slate-500">
+                        <span className="block truncate text-xs text-hp-muted">
                           {place.area} · {t(PLACE_TYPE_LABEL_KEYS[place.type] ?? place.type)}
                         </span>
                         {(noImage || thinCopy) && (
-                          <span className="block truncate text-[11px] font-bold text-amber-600">
+                          <span className="block truncate text-[11px] font-bold text-amber-600 dark:text-amber-300">
                             {[noImage ? t("No photo") : "", thinCopy ? t("Thin copy") : ""]
                               .filter(Boolean)
                               .join(" · ")}
@@ -905,20 +913,20 @@ function PlacesPanel({ data, onSaved, setNotice }: PanelProps) {
               )}
             </div>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-hp-muted">
             {visible.length} / {data.places.length} {t("shown")}
           </p>
         </aside>
 
         <div className="min-w-0">
-          <div className="mb-2 flex gap-1 rounded-lg bg-slate-100 p-1">
+          <div className="mb-2 flex gap-1 rounded-lg bg-hp-bg p-1">
             {(["all", "filtered"] as const).map((scope) => (
               <button
                 key={scope}
                 type="button"
                 onClick={() => setMapScope(scope)}
                 className={`flex-1 rounded-md px-3 py-1.5 text-xs font-bold transition ${
-                  mapScope === scope ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                  mapScope === scope ? "bg-hp-raised text-hp-ink shadow-sm" : "text-hp-muted"
                 }`}
               >
                 {scope === "all"
@@ -1138,13 +1146,13 @@ function PlaceEditor({
         event.preventDefault();
         void persist(status);
       }}
-      className="self-start overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"
+      className="self-start overflow-hidden rounded-2xl bg-hp-raised shadow-sm ring-1 ring-hp-ink/15"
     >
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 border-b border-hp-ink/15 bg-hp-raised/95 px-4 py-3 backdrop-blur">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="truncate text-base font-black">{place ? place.name : t("New place")}</h3>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-hp-muted">
               {dirty ? t("Unsaved changes") : place ? t("Saved") : t("Nothing entered yet")}
             </p>
           </div>
@@ -1174,14 +1182,14 @@ function PlaceEditor({
             </ActionButton>
           )}
         </div>
-        <div className="mt-3 flex gap-1 rounded-lg bg-slate-100 p-1">
+        <div className="mt-3 flex gap-1 rounded-lg bg-hp-bg p-1">
           {(["basics", "details"] as const).map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => setTab(item)}
               className={`flex-1 rounded-md px-3 py-1.5 text-xs font-bold transition ${
-                tab === item ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                tab === item ? "bg-hp-raised text-hp-ink shadow-sm" : "text-hp-muted"
               }`}
             >
               {t(item === "basics" ? "Basics" : "Details")}
@@ -1249,7 +1257,7 @@ function PlaceEditor({
                 />
               </Field>
             </div>
-            <p className="-mt-1 text-xs text-slate-500">
+            <p className="-mt-1 text-xs text-hp-muted">
               {t("Drag the pin on the map to set the exact position.")}
             </p>
             <Field label="Description">
@@ -1261,15 +1269,15 @@ function PlaceEditor({
               />
             </Field>
             {short.trim().length > 0 && short.trim().length < THIN_COPY_LENGTH && (
-              <p className="-mt-1 text-xs font-bold text-amber-600">
+              <p className="-mt-1 text-xs font-bold text-amber-600 dark:text-amber-300">
                 {t("This description is very short.")}
               </p>
             )}
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-xl border border-hp-ink/15 bg-hp-paper p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className={labelClass}>{t("Photos")}</span>
-                <label className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                <label className="cursor-pointer rounded-lg border border-hp-ink/15 bg-hp-raised px-2.5 py-1.5 text-xs font-bold text-hp-ink hover:bg-hp-paper">
                   <span className="flex items-center gap-1.5">
                     <ImagePlus size={14} /> {t("Upload")}
                   </span>
@@ -1306,11 +1314,11 @@ function PlaceEditor({
                   {photos.map((photo, index) => (
                     <li
                       key={`${photo}-${index}`}
-                      className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+                      className="overflow-hidden rounded-lg border border-hp-ink/15 bg-hp-raised"
                     >
                       <img className="h-20 w-full object-cover" src={photo} alt="" />
                       <div className="flex items-center justify-between gap-1 px-1.5 py-1">
-                        <span className="truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                        <span className="truncate text-[10px] font-bold uppercase tracking-wide text-hp-muted">
                           {index === 0 ? t("Primary") : `#${index + 1}`}
                         </span>
                         <span className="flex shrink-0 items-center gap-0.5">
@@ -1350,7 +1358,7 @@ function PlaceEditor({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-3 text-xs text-slate-500">{t("No photos yet.")}</p>
+                <p className="mt-3 text-xs text-hp-muted">{t("No photos yet.")}</p>
               )}
             </div>
           </>
@@ -1541,7 +1549,7 @@ function StoryEditor({
   return (
     <form
       onSubmit={save}
-      className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
+      className="self-start rounded-2xl bg-hp-raised p-5 shadow-sm ring-1 ring-hp-ink/15"
     >
       <h3 className="text-base font-black">{t(story ? "Edit story" : "New story")}</h3>
       <div className="mt-4 grid gap-3">
@@ -1630,7 +1638,7 @@ function StoryEditor({
               value={mediaUrl}
               onChange={(event) => setMediaUrl(event.target.value)}
             />
-            <label className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2">
+            <label className="cursor-pointer rounded-lg border border-hp-ink/15 px-3 py-2">
               <ImagePlus size={16} />
               <input
                 className="hidden"
@@ -1771,7 +1779,7 @@ function MeetEditor({
   return (
     <form
       onSubmit={save}
-      className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
+      className="self-start rounded-2xl bg-hp-raised p-5 shadow-sm ring-1 ring-hp-ink/15"
     >
       <h3 className="text-base font-black">{t(event ? "Edit Meet event" : "New Meet event")}</h3>
       <div className="mt-4 grid gap-3">
@@ -1840,7 +1848,7 @@ function MeetEditor({
               value={coverUrl}
               onChange={(e) => setCoverUrl(e.target.value)}
             />
-            <label className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2">
+            <label className="cursor-pointer rounded-lg border border-hp-ink/15 px-3 py-2">
               <ImagePlus size={16} />
               <input
                 className="hidden"
@@ -2003,7 +2011,7 @@ function CulturalEventEditor({
   return (
     <form
       onSubmit={save}
-      className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
+      className="self-start rounded-2xl bg-hp-raised p-5 shadow-sm ring-1 ring-hp-ink/15"
     >
       <h3 className="text-base font-black">
         {t(event ? "Edit cultural event" : "New cultural event")}
@@ -2124,7 +2132,7 @@ function CulturalEventEditor({
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+          <label className="flex items-center gap-2 text-sm font-bold text-hp-ink">
             <input
               type="checkbox"
               checked={isPastEvent}
@@ -2132,7 +2140,7 @@ function CulturalEventEditor({
             />
             {t("Past event")}
           </label>
-          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+          <label className="flex items-center gap-2 text-sm font-bold text-hp-ink">
             <input
               type="checkbox"
               checked={isOfficial}
@@ -2155,7 +2163,7 @@ function CulturalEventEditor({
               value={posterUrl}
               onChange={(e) => setPosterUrl(e.target.value)}
             />
-            <label className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2">
+            <label className="cursor-pointer rounded-lg border border-hp-ink/15 px-3 py-2">
               <ImagePlus size={16} />
               <input
                 className="hidden"
@@ -2228,17 +2236,17 @@ function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
         detail="Verify accounts before they can submit cultural events."
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="overflow-hidden rounded-2xl bg-hp-raised shadow-sm ring-1 ring-hp-ink/15">
           <div className="divide-y divide-slate-100">
             {data.organizers.length ? (
               data.organizers.map((organizer) => (
                 <div key={organizer.id} className="flex flex-wrap items-center gap-3 p-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{organizer.display_name}</span>
+                      <span className="font-bold text-hp-ink">{organizer.display_name}</span>
                       <StatusBadge status={organizer.verification_status} />
                     </div>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-600">{organizer.bio}</p>
+                    <p className="mt-1 max-w-2xl text-sm text-hp-muted">{organizer.bio}</p>
                     <time className="mt-1 block text-xs text-slate-400">
                       {t("Applied")} {formatDate(organizer.created_at, language)}
                     </time>
@@ -2262,9 +2270,9 @@ function OrganizersPanel({ data, onSaved, setNotice }: PanelProps) {
             )}
           </div>
         </div>
-        <div className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="self-start rounded-2xl bg-hp-raised p-5 shadow-sm ring-1 ring-hp-ink/15">
           <h3 className="font-black">{t("Add an organizer directly")}</h3>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-hp-muted">
             {t("Skip the self-service application and verify an existing user right away.")}
           </p>
           <div className="mt-4 grid gap-3">
@@ -2398,8 +2406,8 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="flex flex-col gap-6">
-          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-            <div className="border-b border-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+          <div className="overflow-hidden rounded-2xl bg-hp-raised shadow-sm ring-1 ring-hp-ink/15">
+            <div className="border-b border-hp-ink/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-hp-muted">
               {t("Business accounts")}
             </div>
             <div className="divide-y divide-slate-100">
@@ -2408,10 +2416,10 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
                   <div key={business.id} className="flex flex-wrap items-center gap-3 p-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">{business.display_name}</span>
+                        <span className="font-bold text-hp-ink">{business.display_name}</span>
                         <StatusBadge status={business.verification_status} />
                       </div>
-                      <p className="mt-1 max-w-2xl text-sm text-slate-600">{business.bio}</p>
+                      <p className="mt-1 max-w-2xl text-sm text-hp-muted">{business.bio}</p>
                       <time className="mt-1 block text-xs text-slate-400">
                         {t("Applied")} {formatDate(business.created_at, language)}
                       </time>
@@ -2439,8 +2447,8 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-            <div className="border-b border-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+          <div className="overflow-hidden rounded-2xl bg-hp-raised shadow-sm ring-1 ring-hp-ink/15">
+            <div className="border-b border-hp-ink/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-hp-muted">
               {t("Place claims")}
             </div>
             <div className="divide-y divide-slate-100">
@@ -2449,12 +2457,10 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
                   <div key={claim.id} className="flex flex-wrap items-center gap-3 p-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">
-                          {placeName(claim.place_id)}
-                        </span>
+                        <span className="font-bold text-hp-ink">{placeName(claim.place_id)}</span>
                         <StatusBadge status={claim.status} />
                       </div>
-                      <p className="mt-1 text-sm text-slate-600">
+                      <p className="mt-1 text-sm text-hp-muted">
                         {t("Claimed by")} {businessName(claim.business_id)}
                       </p>
                       {(claim.hours_text || claim.phone) && (
@@ -2463,7 +2469,7 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
                         </p>
                       )}
                       {claim.deal_text && (
-                        <p className="mt-1 max-w-2xl text-xs font-semibold text-orange-700">
+                        <p className="mt-1 max-w-2xl text-xs font-semibold text-orange-700 dark:text-orange-300">
                           🎁 {claim.deal_text}
                           {!claim.deal_active && (
                             <span className="ml-1 font-normal text-slate-400">
@@ -2471,7 +2477,7 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
                             </span>
                           )}
                           {(redemptionCounts[claim.id] ?? 0) > 0 && (
-                            <span className="ml-2 font-normal text-slate-500">
+                            <span className="ml-2 font-normal text-hp-muted">
                               🎟️ {redemptionCounts[claim.id]} {t("redeemed")}
                             </span>
                           )}
@@ -2504,9 +2510,9 @@ function BusinessesPanel({ data, onSaved, setNotice }: PanelProps) {
           </div>
         </div>
 
-        <div className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="self-start rounded-2xl bg-hp-raised p-5 shadow-sm ring-1 ring-hp-ink/15">
           <h3 className="font-black">{t("Add a business directly")}</h3>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-hp-muted">
             {t("Skip the self-service application and verify an existing user right away.")}
           </p>
           <div className="mt-4 grid gap-3">
@@ -2746,7 +2752,7 @@ function RouteEditor({
   return (
     <form
       onSubmit={save}
-      className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
+      className="self-start rounded-2xl bg-hp-raised p-5 shadow-sm ring-1 ring-hp-ink/15"
     >
       <h3 className="text-base font-black">{t(route ? "Edit route" : "New route")}</h3>
       <div className="mt-4 grid gap-3">
@@ -2801,7 +2807,7 @@ function RouteEditor({
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
             />
-            <label className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2">
+            <label className="cursor-pointer rounded-lg border border-hp-ink/15 px-3 py-2">
               <ImagePlus size={16} />
               <input
                 className="hidden"
@@ -2812,7 +2818,7 @@ function RouteEditor({
             </label>
           </div>
         </Field>
-        <div className="border-t border-slate-100 pt-4">
+        <div className="border-t border-hp-ink/10 pt-4">
           <div className="flex items-center justify-between">
             <span className={labelClass}>{t("Stops")}</span>
             <ActionButton tone="muted" onClick={addStop}>
@@ -2821,9 +2827,9 @@ function RouteEditor({
           </div>
           <div className="mt-3 space-y-3">
             {stops.map((stop, index) => (
-              <div key={index} className="rounded-xl border border-slate-200 p-3">
+              <div key={index} className="rounded-xl border border-hp-ink/15 p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-slate-500">
+                  <span className="text-xs font-black text-hp-muted">
                     {t("Stop {n}", { n: index + 1 })}
                   </span>
                   <button
@@ -3018,13 +3024,13 @@ function ModerationPanel({ data, canEdit, onSaved, setNotice }: PanelProps & { c
               setFilter(item);
               setPage(0);
             }}
-            className={`rounded-full px-3 py-1.5 text-sm font-bold ${filter === item ? "bg-slate-950 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"}`}
+            className={`rounded-full px-3 py-1.5 text-sm font-bold ${filter === item ? "bg-slate-950 text-white" : "bg-hp-raised text-hp-muted ring-1 ring-hp-ink/15"}`}
           >
             {t(item[0].toUpperCase() + item.slice(1))}
           </button>
         ))}
       </div>
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+      <div className="overflow-hidden rounded-2xl bg-hp-raised shadow-sm ring-1 ring-hp-ink/15">
         <div className="divide-y divide-slate-100">
           {pageItems.length ? (
             pageItems.map((item) => (
@@ -3044,7 +3050,7 @@ function ModerationPanel({ data, canEdit, onSaved, setNotice }: PanelProps & { c
       </div>
       {content.length > PAGE_SIZE && (
         <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-hp-muted">
             {t("Page {page} of {pages}", {
               page: page + 1,
               pages: Math.ceil(content.length / PAGE_SIZE),
@@ -3111,7 +3117,7 @@ function ModerationRow({
           </span>
           <StatusBadge status={item.status} />
         </div>
-        <div className="mt-1 font-bold text-slate-900">{item.title}</div>
+        <div className="mt-1 font-bold text-hp-ink">{item.title}</div>
         {editing ? (
           <div className="mt-2 flex gap-2">
             <textarea
@@ -3122,7 +3128,7 @@ function ModerationRow({
             <ActionButton onClick={() => void saveText()}>Save text</ActionButton>
           </div>
         ) : (
-          <p className="mt-1 max-w-3xl text-sm text-slate-600">{item.detail}</p>
+          <p className="mt-1 max-w-3xl text-sm text-hp-muted">{item.detail}</p>
         )}
         <time className="mt-2 block text-xs text-slate-400">
           {formatDate(item.createdAt, language)}
@@ -3177,27 +3183,27 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
         detail="Only Owners can add, change, or remove admin roles."
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="overflow-hidden rounded-2xl bg-hp-raised shadow-sm ring-1 ring-hp-ink/15">
           <div className="divide-y divide-slate-100">
             {data.members.length ? (
               data.members.map((member) => {
                 const profile = profileFor(member.user_id);
                 return (
                   <div key={member.user_id} className="flex items-center gap-3 p-4">
-                    <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 font-black text-slate-500">
+                    <div className="grid h-10 w-10 place-items-center rounded-full bg-hp-bg font-black text-hp-muted">
                       {(profile?.display_name || profile?.handle || "?").slice(0, 1).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-bold">
                         {profile?.display_name || profile?.handle || member.user_id}
                       </div>
-                      <div className="truncate text-xs text-slate-500">
+                      <div className="truncate text-xs text-hp-muted">
                         @{profile?.handle || t("profile incomplete")}
                       </div>
                     </div>
                     <select
                       aria-label={t("Member role")}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm font-bold"
+                      className="rounded-lg border border-hp-ink/15 bg-hp-raised px-2 py-1.5 text-sm font-bold"
                       value={member.role}
                       onChange={(event) =>
                         void setAdminMember(member.user_id, event.target.value as AdminRole)
@@ -3248,9 +3254,9 @@ function TeamPanel({ data, onSaved, setNotice }: PanelProps) {
             )}
           </div>
         </div>
-        <div className="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="self-start rounded-2xl bg-hp-raised p-5 shadow-sm ring-1 ring-hp-ink/15">
           <h3 className="font-black">{t("Add an existing user")}</h3>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-hp-muted">
             {t("A user must have signed in and completed a profile once before appearing here.")}
           </p>
           <div className="mt-4 grid gap-3">
@@ -3307,7 +3313,7 @@ function ContentList<T extends { id: string }>({
   image: (item: T) => string;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+    <div className="overflow-hidden rounded-2xl bg-hp-raised shadow-sm ring-1 ring-hp-ink/15">
       <div className="divide-y divide-slate-100">
         {items.length ? (
           items.map((item) => (
@@ -3315,16 +3321,16 @@ function ContentList<T extends { id: string }>({
               key={item.id}
               type="button"
               onClick={() => onSelect(item)}
-              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50 ${selectedId === item.id ? "bg-orange-50" : ""}`}
+              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-hp-paper ${selectedId === item.id ? "bg-orange-50 dark:bg-orange-950/50" : ""}`}
             >
               <img
                 src={image(item)}
                 alt=""
-                className="h-11 w-11 rounded-lg bg-slate-100 object-cover"
+                className="h-11 w-11 rounded-lg bg-hp-bg object-cover"
               />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-bold">{title(item)}</span>
-                <span className="block truncate text-xs text-slate-500">{subtitle(item)}</span>
+                <span className="block truncate text-xs text-hp-muted">{subtitle(item)}</span>
               </span>
               {"moderation_status" in item && (
                 <StatusBadge status={String(item.moderation_status)} />
@@ -3353,7 +3359,7 @@ function SearchInput({
     <input
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-orange-500"
+      className="w-full rounded-xl border border-hp-ink/15 bg-hp-raised px-4 py-3 text-sm shadow-sm outline-none focus:border-orange-500"
       placeholder={t(placeholder)}
     />
   );

@@ -92,7 +92,7 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
         </div>
         <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5">
           <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-paper shadow"
+            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-on-media dark:text-[#101c2a] shadow"
             style={{ background: meta.tone }}
           >
             <CategoryIcon size={10} strokeWidth={2.6} /> {t(meta.label)}
@@ -103,9 +103,9 @@ export function EventCard({ event, placeName, status, onToggle, onOpenPlace }: P
             </span>
           )}
         </div>
-        <div className="absolute bottom-2 left-3 right-3 text-hp-paper">
+        <div className="absolute bottom-2 left-3 right-3 text-hp-on-media">
           <h3 className="text-[16px] font-black leading-tight drop-shadow-sm">{event.title}</h3>
-          <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] font-bold text-hp-paper/85">
+          <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] font-bold text-hp-on-media/85">
             <MapPin size={10} /> {placeName}
           </div>
         </div>
