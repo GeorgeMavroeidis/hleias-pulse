@@ -1,4 +1,4 @@
-import { formatDistanceToNowStrict } from "date-fns";
+import { formatDistanceStrict } from "date-fns";
 import { el, enUS } from "date-fns/locale";
 import type { Place, StoryItem } from "../hp-model";
 
@@ -160,11 +160,12 @@ export function formatStoryTime(
   minutesAgo: number,
   createdAt: string | undefined,
   language: "GR" | "EN",
+  nowMs = Date.now(),
 ): string {
   if (minutesAgo < 1) return language === "GR" ? "τώρα" : "just now";
   const time = createdAt ? new Date(createdAt).getTime() : NaN;
   if (Number.isFinite(time)) {
-    return formatDistanceToNowStrict(time, {
+    return formatDistanceStrict(time, nowMs, {
       addSuffix: true,
       locale: language === "GR" ? el : enUS,
     });
@@ -177,17 +178,17 @@ export function formatStoryTime(
   return language === "GR" ? `πριν από ${hours} ώ.` : `${hours}h ago`;
 }
 
-function minutesSince(iso: string): number {
+function minutesSince(iso: string, nowMs: number): number {
   const time = new Date(iso).getTime();
   if (!Number.isFinite(time)) return 0;
-  return Math.max(0, Math.round((Date.now() - time) / 60_000));
+  return Math.max(0, Math.round((nowMs - time) / 60_000));
 }
 
 function latestMinutesAgo(stories: PlaceStory[]): number {
   return stories.reduce((min, story) => Math.min(min, story.minutesAgo), Number.POSITIVE_INFINITY);
 }
 
-function mapServerStory(story: StoryItem): PlaceStory {
+function mapServerStory(story: StoryItem, nowMs: number): PlaceStory {
   return {
     id: story.id,
     placeId: story.placeId,
@@ -197,7 +198,7 @@ function mapServerStory(story: StoryItem): PlaceStory {
     authorType: story.authorType,
     authorAvatarUrl: story.authorAvatarUrl,
     caption: story.caption,
-    minutesAgo: minutesSince(story.createdAt),
+    minutesAgo: minutesSince(story.createdAt, nowMs),
     expiresAfterHours: story.expiresAfterHours,
     report: story.report,
     userId: story.userId,
@@ -210,6 +211,7 @@ export function buildPlaceStoryGroups(
   places: Place[],
   seen: ReadonlySet<string>,
   serverStories: StoryItem[],
+  nowMs = Date.now(),
 ): PlaceStoryGroup[] {
   const byId = new Map(places.map((place) => [place.id, place]));
   const bucket = new Map<string, PlaceStory[]>();
@@ -218,7 +220,7 @@ export function buildPlaceStoryGroups(
     const place = byId.get(serverStory.placeId);
     if (!place) continue;
 
-    const story = mapServerStory(serverStory);
+    const story = mapServerStory(serverStory, nowMs);
     const list = bucket.get(story.placeId) ?? [];
     list.push(story);
     bucket.set(story.placeId, list);

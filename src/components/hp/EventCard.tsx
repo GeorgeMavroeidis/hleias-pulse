@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { format, isToday, isTomorrow } from "date-fns";
+import { addDays, format, isSameDay } from "date-fns";
 import {
   CalendarHeart,
   Check,
@@ -43,13 +43,15 @@ interface Props {
   onToggle: (event: MeetEvent, next: RsvpStatus) => void;
   onOpenPlace: (placeId: string) => void;
   previewMode?: boolean;
+  nowMs?: number;
 }
 
-function formatWhen(iso: string, language: AppLanguage): string {
+function formatWhen(iso: string, language: AppLanguage, nowMs: number): string {
   const d = new Date(iso);
   const time = format(d, "HH:mm");
-  if (isToday(d)) return `${language === "GR" ? "Σήμερα" : "Today"} · ${time}`;
-  if (isTomorrow(d)) return `${language === "GR" ? "Αύριο" : "Tomorrow"} · ${time}`;
+  if (isSameDay(d, new Date(nowMs))) return `${language === "GR" ? "Σήμερα" : "Today"} · ${time}`;
+  if (isSameDay(d, addDays(new Date(nowMs), 1)))
+    return `${language === "GR" ? "Αύριο" : "Tomorrow"} · ${time}`;
   return `${new Intl.DateTimeFormat(language === "GR" ? "el-GR" : "en-GB", {
     weekday: "short",
     day: "numeric",
@@ -64,6 +66,7 @@ export function EventCard({
   onToggle,
   onOpenPlace,
   previewMode = false,
+  nowMs = Date.now(),
 }: Props) {
   const { language, t } = useI18n();
   const meta = MEET_CATEGORY_META[event.category];
@@ -135,7 +138,7 @@ export function EventCard({
             </div>
           </div>
           <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-hp-deep">
-            <Clock size={11} /> {formatWhen(event.happensAt, language)}
+            <Clock size={11} /> {formatWhen(event.happensAt, language, nowMs)}
           </span>
           {!previewMode && (
             <ContentMenu

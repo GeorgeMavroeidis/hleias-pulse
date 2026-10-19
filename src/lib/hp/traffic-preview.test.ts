@@ -11,11 +11,19 @@ test("traffic timeline crosses the real map tier thresholds", () => {
   );
 
   const expectations = [
-    { scene: "quiet", posts: 0, meets: 0, tier: "quiet", state: "calm" },
-    { scene: "arriving", posts: 1, meets: 1, tier: "moving", state: "rising" },
-    { scene: "hot", posts: 8, meets: 2, tier: "hot", state: "hot" },
-    { scene: "live", posts: 13, meets: 3, tier: "live", state: "hot" },
-    { scene: "later", posts: 13, meets: 3, tier: "live", state: "cooling" },
+    { scene: "quiet", posts: 0, meets: 0, weight: 0, score: 0, tier: "quiet", state: "calm" },
+    {
+      scene: "arriving",
+      posts: 1,
+      meets: 1,
+      weight: 3.95,
+      score: 63,
+      tier: "moving",
+      state: "rising",
+    },
+    { scene: "hot", posts: 8, meets: 2, weight: 16.2, score: 98, tier: "hot", state: "hot" },
+    { scene: "live", posts: 13, meets: 3, weight: 24.85, score: 100, tier: "live", state: "hot" },
+    { scene: "later", posts: 13, meets: 3, weight: 0, score: 0, tier: "quiet", state: "cooling" },
   ] as const;
 
   for (const expected of expectations) {
@@ -28,8 +36,11 @@ test("traffic timeline crosses the real map tier thresholds", () => {
     assert.equal(result.focusAreaId, "kourouta");
     assert.equal(result.data.posts.length, expected.posts);
     assert.equal(result.data.meetEvents.length, expected.meets);
-    assert.equal(metric.postCount, expected.posts);
-    assert.equal(metric.eventCount, expected.meets);
+    assert.equal(metric.postCount, expected.scene === "later" ? 0 : expected.posts);
+    assert.equal(metric.eventCount, expected.scene === "later" ? 0 : expected.meets);
+    assert.ok(Math.abs(metric.evidenceWeight - expected.weight) < 0.0001);
+    assert.equal(metric.score, expected.score);
+    assert.equal(area.activityScore, expected.score);
     assert.equal(metric.tier, expected.tier, expected.scene);
     assert.equal(area.state, expected.state, expected.scene);
     assert.equal(result.data.places.length, 3);
@@ -55,14 +66,13 @@ test("later ages real timestamps but retains accumulated map content", () => {
     live.data.meetEvents.map((event) => event.id),
     later.data.meetEvents.map((event) => event.id),
   );
-  assert.equal(
-    Date.parse(live.data.meetEvents[0].happensAt) - Date.parse(later.data.meetEvents[0].happensAt),
-    3 * 60 * 60_000 + 10 * 60_000,
-  );
-  assert.ok(Date.parse(later.data.meetEvents[0].happensAt) < NOW);
+  assert.deepEqual(live.data.meetEvents, later.data.meetEvents);
+  assert.equal(later.nowMs - live.nowMs, 3 * 60 * 60_000 + 10 * 60_000);
+  assert.ok(Date.parse(later.data.meetEvents[0].happensAt) < later.nowMs);
+  assert.ok(Date.parse(later.data.meetEvents[2].happensAt) > later.nowMs);
   assert.equal(later.data.stories.length, live.data.stories.length);
-  assert.equal(later.activitySnapshot[focus].score, live.activitySnapshot[focus].score);
-  assert.equal(later.activitySnapshot[focus].tier, "live");
+  assert.equal(later.activitySnapshot[focus].score, 0);
+  assert.equal(later.activitySnapshot[focus].tier, "quiet");
   assert.equal(later.areaIntelligence[area].state, "cooling");
   assert.equal(later.areaIntelligence[area].evidence.recentWeight, 0);
   assert.ok(later.areaIntelligence[area].evidence.baselineWeight > 0);
@@ -70,7 +80,7 @@ test("later ages real timestamps but retains accumulated map content", () => {
   assert.equal(
     Date.parse(live.data.posts[0].createdAt ?? "") -
       Date.parse(later.data.posts[0].createdAt ?? ""),
-    3 * 60 * 60_000 + 10 * 60_000,
+    0,
   );
 });
 
@@ -96,4 +106,14 @@ test("same scene and clock produce isolated, deterministic fixtures", () => {
 
   first.data.posts[0].likes = 999;
   assert.notEqual(first.data.posts[0].likes, second.data.posts[0].likes);
+});
+
+test("fictional preview discussions are distinct across posts and the place", () => {
+  const { data, focusPlaceId } = buildTrafficPreviewScene("live", NOW);
+  const comments = [
+    ...data.posts.flatMap((post) => post.comments),
+    ...data.placeComments[focusPlaceId],
+  ];
+  assert.equal(comments.length, 11);
+  assert.equal(new Set(comments.map((comment) => comment.text)).size, 11);
 });

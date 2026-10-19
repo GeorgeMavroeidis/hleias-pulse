@@ -19,6 +19,7 @@ export type TrafficScene = (typeof TRAFFIC_SCENES)[number]["id"];
 
 export type TrafficPreviewSnapshot = {
   data: PulseData;
+  nowMs: number;
   activitySnapshot: PulseActivitySnapshot;
   areaIntelligence: AreaIntelligenceSnapshot;
   focusPlaceId: string;
@@ -133,14 +134,17 @@ const POST_COPY = [
 ] as const;
 
 const COMMENT_COPY = [
-  "Thanks for the update!",
-  "I am on my way.",
-  "That sounds lovely.",
-  "The north entrance worked for me too.",
-  "See you there!",
-  "The water looks great.",
-  "Saving this tip.",
-  "A perfect evening for it.",
+  "The Kourouta north access has room for bikes beside the dunes.",
+  "I will join at the promenade benches, opposite the beach steps.",
+  "The volleyball net near the boardwalk is free this afternoon.",
+  "The north entrance worked for me; the main Kourouta car park was busier.",
+  "Meet us at the wooden boardwalk before the Kourouta sunset walk.",
+  "The shallow stretch south of the promenade is clear for a swim.",
+  "The beach shower by the access ramp was working when I passed.",
+  "The quieter shore past the Kourouta bars is a good place for the evening walk.",
+  "The ramp at the Kourouta promenade is the easiest way to bring a pushchair down.",
+  "There is shade beside the north beach steps if you are waiting for the walking group.",
+  "The volleyball group is using the boardwalk as its meeting point, away from the swim area.",
 ] as const;
 
 const MEET_SEEDS = [
@@ -204,8 +208,9 @@ export function buildTrafficPreviewScene(
   scene: TrafficScene,
   now: Date | number = Date.now(),
 ): TrafficPreviewSnapshot {
-  const observedAt = now instanceof Date ? now.getTime() : now;
+  const anchorMs = now instanceof Date ? now.getTime() : now;
   const counts = SCENE_COUNTS[scene];
+  const observedAt = anchorMs + counts.ageMs;
   const people = authors();
   const places = PREVIEW_PLACES.map((place) => ({
     ...place,
@@ -216,8 +221,7 @@ export function buildTrafficPreviewScene(
   focusPlace.avatars = people
     .slice(0, Math.min(counts.posts, people.length))
     .map((author) => author.avatarUrl);
-  const createdAt = (minutesAgo: number) =>
-    new Date(observedAt - counts.ageMs - minutesAgo * MINUTE).toISOString();
+  const createdAt = (minutesAgo: number) => new Date(anchorMs - minutesAgo * MINUTE).toISOString();
 
   const posts: Post[] = POST_COPY.slice(0, counts.posts).map((copy, index) => {
     const author = people[index % people.length];
@@ -250,7 +254,7 @@ export function buildTrafficPreviewScene(
       hostName: host.name,
       hostAvatar: host.avatarUrl,
       hostType: host.type as MeetEvent["hostType"],
-      happensAt: new Date(observedAt - counts.ageMs + seed.offsetHours * HOUR).toISOString(),
+      happensAt: new Date(anchorMs + seed.offsetHours * HOUR).toISOString(),
       createdAt: createdAt(3 + index * 2),
       durationMin: 90,
       category: seed.category,
@@ -288,7 +292,7 @@ export function buildTrafficPreviewScene(
   });
 
   const placeComments = Array.from({ length: counts.placeComments }, (_, index) =>
-    makeComment(index + 3, createdAt(1 + index * 2), people),
+    makeComment(index + 8, createdAt(1 + index * 2), people),
   );
 
   const data: PulseData = {
@@ -313,7 +317,8 @@ export function buildTrafficPreviewScene(
 
   return {
     data,
-    activitySnapshot: buildPulseActivitySnapshot(data),
+    nowMs: observedAt,
+    activitySnapshot: buildPulseActivitySnapshot(data, observedAt),
     areaIntelligence: deriveAreaIntelligenceSnapshot(data, observedAt),
     focusPlaceId: TRAFFIC_FOCUS_PLACE_ID,
     focusAreaId: TRAFFIC_FOCUS_AREA_ID,

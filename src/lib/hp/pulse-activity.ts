@@ -1,75 +1,77 @@
-import type { Place, PlaceStatus } from "@/lib/hp-model";
+import type { Place } from "@/lib/hp-model";
 import type { PulseData } from "@/lib/hp-api";
+import {
+  buildPlaceEvidence,
+  evidenceScore,
+  type ActivityEvidence,
+} from "@/lib/hp/activity-evidence";
+import { deriveAreaIntelligence, type SignalQuality } from "@/lib/hp/area-intelligence";
+import { evaluateFreshness } from "@/lib/hp/freshness";
 
 export type PulseTier = "quiet" | "moving" | "hot" | "live";
 
 export type PlacePulseMetric = {
+  /** Derived from dated evidence; the stored Place.hotness is never used. */
   hotness: number;
   postCount: number;
   eventCount: number;
   commentCount: number;
+  storyCount: number;
+  evidenceWeight: number;
   score: number;
   tier: PulseTier;
+  signalQuality: SignalQuality;
+  lastSignalAt: string | null;
+  observedAt: number;
+  evidence: ActivityEvidence[];
 };
 
 export type PulseActivitySnapshot = Record<string, PlacePulseMetric>;
 
-const TIER_RANK: Record<PulseTier, number> = {
-  quiet: 0,
-  moving: 1,
-  hot: 2,
-  live: 3,
-};
-
-const STATUS_FLOOR: Record<PlaceStatus, PulseTier> = {
-  quiet: "quiet",
-  active: "moving",
-  popular: "hot",
-  busy: "live",
-};
-
-export function scorePulseActivity(
-  hotness: number,
-  postCount: number,
-  eventCount: number,
-  commentCount: number,
-) {
-  return hotness * 10 + postCount * 1.8 + eventCount * 14 + commentCount * 0.45;
+/** The same evidence formula is used by places, areas, and map clusters. */
+export function scorePulseActivity(evidenceWeight: number) {
+  return evidenceScore(evidenceWeight);
 }
 
-function tierFromScore(score: number): PulseTier {
-  if (score >= 105) return "live";
-  if (score >= 82) return "hot";
-  if (score >= 55) return "moving";
+export function pulseTierForMetric(score: number, confirmed = false): PulseTier {
+  // Compare the raw score: rounding 98.5 to 99 must not manufacture Live.
+  if (score >= 99 && confirmed) return "live";
+  if (score >= 75) return "hot";
+  if (score >= 28) return "moving";
   return "quiet";
 }
 
-function strongestTier(first: PulseTier, second: PulseTier) {
-  return TIER_RANK[first] >= TIER_RANK[second] ? first : second;
-}
-
-export function pulseTierForMetric(score: number, statuses: PlaceStatus[] = []): PulseTier {
-  return statuses.reduce(
-    (tier, status) => strongestTier(tier, STATUS_FLOOR[status]),
-    tierFromScore(score),
+function metricFromEvidence(evidence: ActivityEvidence[], observedAt: number): PlacePulseMetric {
+  const recent = evidence.filter(
+    (item) =>
+      evaluateFreshness({
+        observedAt: item.timestamp,
+        expiresAt: item.expiresAt,
+        nowMs: observedAt,
+      }).isRecent,
   );
-}
-
-export function fallbackPulseMetric(place: Place, eventCount = 0): PlacePulseMetric {
-  const score = scorePulseActivity(
-    place.hotness,
-    place.recentPostCount,
-    eventCount,
-    place.commentCount,
-  );
+  const weight = recent.reduce((sum, item) => sum + item.weight, 0);
+  const rawScore = scorePulseActivity(weight);
+  const intelligence = deriveAreaIntelligence({ areaId: "", evidence, observedAt });
   return {
-    hotness: place.hotness,
-    postCount: place.recentPostCount,
-    eventCount,
-    commentCount: place.commentCount,
-    score,
-    tier: pulseTierForMetric(score, [place.status]),
+    hotness: rawScore / 10,
+    postCount: recent.filter((item) => item.kind === "post").length,
+    eventCount: recent.filter((item) => item.kind === "event" || item.kind === "meetEvent").length,
+    commentCount: recent.filter((item) => item.kind === "comment").length,
+    storyCount: recent.filter((item) => item.kind === "story").length,
+    evidenceWeight: weight,
+    score: Math.round(rawScore),
+    tier: pulseTierForMetric(rawScore, intelligence.signalQuality === "confirmed"),
+    signalQuality: intelligence.signalQuality,
+    lastSignalAt: intelligence.lastSignalAt,
+    observedAt,
+    evidence,
   };
+}
+
+/** An undated place or event count cannot establish current activity. */
+export function fallbackPulseMetric(_place: Place, _eventCount = 0): PlacePulseMetric {
+  return metricFromEvidence([], Date.now());
 }
 
 export function pulseMetricForPlace(
@@ -83,82 +85,27 @@ export function pulseMetricForPlace(
 export function aggregatePulseMetrics(
   places: Place[],
   snapshot: PulseActivitySnapshot,
-  fallbackEventCounts: ReadonlyMap<string, number> = new Map(),
+  _fallbackEventCounts: ReadonlyMap<string, number> = new Map(),
 ): PlacePulseMetric {
-  if (places.length === 0) {
-    return {
-      hotness: 0,
-      postCount: 0,
-      eventCount: 0,
-      commentCount: 0,
-      score: 0,
-      tier: "quiet",
-    };
-  }
-
-  const metrics = places.map((place) =>
-    pulseMetricForPlace(place, snapshot, fallbackEventCounts.get(place.id) ?? 0),
+  const metrics = places.flatMap((place) => (snapshot[place.id] ? [snapshot[place.id]] : []));
+  // Snapshots share one accepted clock. Missing rows contribute no evidence.
+  const observedAt = metrics[0]?.observedAt ?? Date.now();
+  return metricFromEvidence(
+    metrics.flatMap((metric) => metric.evidence),
+    observedAt,
   );
-  const hotness = Math.max(
-    ...metrics.map((metric) => metric.hotness),
-    metrics.reduce((sum, metric) => sum + metric.hotness, 0) / metrics.length,
-  );
-  const postCount = metrics.reduce((sum, metric) => sum + metric.postCount, 0);
-  const eventCount = metrics.reduce((sum, metric) => sum + metric.eventCount, 0);
-  const commentCount = metrics.reduce((sum, metric) => sum + metric.commentCount, 0);
-  const score = scorePulseActivity(hotness, postCount, eventCount, commentCount);
-
-  return {
-    hotness,
-    postCount,
-    eventCount,
-    commentCount,
-    score,
-    tier: pulseTierForMetric(
-      score,
-      places.map((place) => place.status),
-    ),
-  };
 }
 
-export function buildPulseActivitySnapshot(data: PulseData): PulseActivitySnapshot {
-  const postCounts = new Map<string, number>();
-  const commentCounts = new Map<string, number>();
-  const eventCounts = new Map<string, number>();
-
-  data.posts.forEach((post) => {
-    postCounts.set(post.placeId, (postCounts.get(post.placeId) ?? 0) + 1);
-    commentCounts.set(post.placeId, (commentCounts.get(post.placeId) ?? 0) + post.comments.length);
-  });
-
-  Object.entries(data.placeComments).forEach(([placeId, comments]) => {
-    commentCounts.set(placeId, (commentCounts.get(placeId) ?? 0) + comments.length);
-  });
-
-  data.events.forEach((event) => {
-    eventCounts.set(event.placeId, (eventCounts.get(event.placeId) ?? 0) + 1);
-  });
-  data.meetEvents.forEach((event) => {
-    eventCounts.set(event.placeId, (eventCounts.get(event.placeId) ?? 0) + 1);
-  });
-
+export function buildPulseActivitySnapshot(
+  data: PulseData,
+  now: Date | number = Date.now(),
+): PulseActivitySnapshot {
+  const observedAt = now instanceof Date ? now.getTime() : now;
+  const evidenceByPlace = buildPlaceEvidence(data, observedAt);
   return Object.fromEntries(
-    data.places.map((place) => {
-      const postCount = Math.max(place.recentPostCount, postCounts.get(place.id) ?? 0);
-      const commentCount = Math.max(place.commentCount, commentCounts.get(place.id) ?? 0);
-      const eventCount = eventCounts.get(place.id) ?? 0;
-      const score = scorePulseActivity(place.hotness, postCount, eventCount, commentCount);
-      return [
-        place.id,
-        {
-          hotness: place.hotness,
-          postCount,
-          eventCount,
-          commentCount,
-          score,
-          tier: pulseTierForMetric(score, [place.status]),
-        },
-      ];
-    }),
+    data.places.map((place) => [
+      place.id,
+      metricFromEvidence(evidenceByPlace.get(place.id) ?? [], observedAt),
+    ]),
   );
 }
