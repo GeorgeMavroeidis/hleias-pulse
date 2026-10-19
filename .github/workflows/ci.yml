@@ -70,6 +70,8 @@ jobs:
       - name: Test — local browser isolation
         run: npm run test:local-browser
 
+      - name: Test — search, Deals and Saved recovery
+        run: npm run test:recovery
       - name: Test — place form defaults
         run: npm run test:place-defaults
 

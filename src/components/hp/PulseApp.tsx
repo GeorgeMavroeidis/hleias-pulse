@@ -6,6 +6,7 @@ import {
   type CommentTarget,
   type CommentSubmissionResult,
 } from "@/lib/hp/comment-drafts";
+import type { SavedContent, SavedTarget } from "@/lib/hp/saved-items";
 import {
   lazy,
   Suspense,
@@ -351,6 +352,9 @@ export function PulseApp() {
   const [openCulturalEvent, setOpenCulturalEvent] = useState<CulturalEvent | null>(null);
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
   const [savedRoutes, setSavedRoutes] = useState<Record<string, boolean>>({});
+  const [savedDetailContext, setSavedDetailContext] = useState<SavedContent | null>(null);
+  const savedDetailContextRef = useRef(savedDetailContext);
+  savedDetailContextRef.current = savedDetailContext;
   const [rsvpMap, setRsvpMap] = useState<Record<string, RsvpStatus>>({});
   const [streak, setStreak] = useState<StreakState>({
     count: 0,
@@ -422,12 +426,17 @@ export function PulseApp() {
     [pulseData.authors],
   );
   const profilesById = useMemo(() => {
-    const map = new Map(pulseData.profiles.map((profile) => [profile.id, profile]));
+    const map = new Map(
+      [...(savedDetailContext?.profiles ?? []), ...pulseData.profiles].map((profile) => [
+        profile.id,
+        profile,
+      ]),
+    );
     const profile =
       account.status === "ready" || account.status === "needsProfile" ? account.profile : null;
     if (profile) map.set(profile.id, profileSummaryFromAccount(profile));
     return map;
-  }, [account, pulseData.profiles]);
+  }, [account, pulseData.profiles, savedDetailContext]);
   const routeById = useMemo(() => new Map(routes.map((route) => [route.id, route])), [routes]);
 
   const placeStoryGroups = useMemo(
@@ -451,8 +460,13 @@ export function PulseApp() {
     }
   }, [placeStoryGroups, storyViewer]);
 
-  const findPlace = (id: string) => placeById.get(id);
-  const findAuthor = (id: string) => authorById.get(id) ?? pulseData.authors[0] ?? fallbackAuthor;
+  const findPlace = (id: string) =>
+    placeById.get(id) ?? savedDetailContext?.places.find((place) => place.id === id);
+  const findAuthor = (id: string) =>
+    authorById.get(id) ??
+    savedDetailContext?.authors.find((author) => author.id === id) ??
+    pulseData.authors[0] ??
+    fallbackAuthor;
   const findPostAuthor = (post: Post) =>
     displayAuthorForPost(post, findAuthor(post.authorId), profilesById);
   const accountStorageUserId =
@@ -468,6 +482,21 @@ export function PulseApp() {
   commentViewerUserIdRef.current = commentViewerUserId;
   const bindCommentDraft = useCommentDrafts(commentViewerUserId, account.status === "loading");
   const commentsForViewer = (comments: Comment[]) => visibleComments(comments, commentViewerUserId);
+
+  const acceptSavedDetailContext = (context: SavedContent) => {
+    setSavedDetailContext(context);
+    setPlaceComments((current) =>
+      reconcileCommentGroups(current, { ...current, ...context.placeComments }),
+    );
+    setRouteComments((current) =>
+      reconcileCommentGroups(current, { ...current, ...context.routeComments }),
+    );
+  };
+  const savedItemRemoved = (target: SavedTarget) => {
+    if (target.type === "place") setSavedIds((current) => current.filter((id) => id !== target.id));
+    if (target.type === "post") setSavedPosts((current) => ({ ...current, [target.id]: false }));
+    if (target.type === "route") setSavedRoutes((current) => ({ ...current, [target.id]: false }));
+  };
 
   // sheet snap
   const mapBodyRef = useRef<HTMLDivElement>(null);
@@ -832,13 +861,25 @@ export function PulseApp() {
         current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
       );
       setOpenPlace((current) =>
-        current ? (data.places.find((p) => p.id === current.id) ?? null) : null,
+        current
+          ? (data.places.find((p) => p.id === current.id) ??
+            savedDetailContextRef.current?.places.find((p) => p.id === current.id) ??
+            null)
+          : null,
       );
       setOpenPost((current) =>
-        current ? (data.posts.find((p) => p.id === current.id) ?? null) : null,
+        current
+          ? (data.posts.find((p) => p.id === current.id) ??
+            savedDetailContextRef.current?.posts.find((p) => p.id === current.id) ??
+            null)
+          : null,
       );
       setOpenRoute((current) =>
-        current ? (data.routes.find((r) => r.id === current.id) ?? null) : null,
+        current
+          ? (data.routes.find((r) => r.id === current.id) ??
+            savedDetailContextRef.current?.routes.find((r) => r.id === current.id) ??
+            null)
+          : null,
       );
       setDataStatus("ready");
     } catch (error) {
@@ -977,6 +1018,26 @@ export function PulseApp() {
 
   useEffect(() => {
     let ignore = false;
+    const previousSavedContext = savedDetailContextRef.current;
+    savedDetailContextRef.current = null;
+    setSavedDetailContext(null);
+    if (previousSavedContext) {
+      setOpenPlace((current) =>
+        current && previousSavedContext.places.some((place) => place.id === current.id)
+          ? null
+          : current,
+      );
+      setOpenPost((current) =>
+        current && previousSavedContext.posts.some((post) => post.id === current.id)
+          ? null
+          : current,
+      );
+      setOpenRoute((current) =>
+        current && previousSavedContext.routes.some((route) => route.id === current.id)
+          ? null
+          : current,
+      );
+    }
 
     async function loadUserState() {
       try {
@@ -2197,7 +2258,16 @@ export function PulseApp() {
     if (tab === "deals") {
       return (
         <Suspense fallback={null}>
-          <DealsScreen deals={deals} places={places} onOpenPlace={setOpenPlace} />
+          <DealsScreen
+            deals={deals}
+            places={places}
+            status={dataStatus}
+            onRetry={() => {
+              void refreshPulseData();
+            }}
+            onBrowsePlaces={() => setTab("map")}
+            onOpenPlace={setOpenPlace}
+          />
         </Suspense>
       );
     }
@@ -2206,21 +2276,22 @@ export function PulseApp() {
       <div className="h-full overflow-y-auto">
         <Suspense fallback={null}>
           <SavedScreen
-            savedPlaceIds={savedIds}
-            savedPostIds={savedPostIds}
-            savedRouteIds={savedRouteIds}
-            places={places}
-            posts={allPosts}
-            routes={routes}
-            onOpenPlace={setOpenPlace}
-            onOpenPost={setOpenPost}
-            onOpenRoute={setOpenRoute}
-            onUnsavePlace={toggleSave}
-            onUnsavePost={toggleSavePost}
-            onUnsaveRoute={toggleSaveRoute}
-            findPlace={findPlace}
-            findAuthor={findAuthor}
-            findPostAuthor={findPostAuthor}
+            key={accountStorageUserId ?? "guest"}
+            userId={accountStorageUserId}
+            onOpenPlace={(place, context) => {
+              acceptSavedDetailContext(context);
+              setOpenPlace(place);
+            }}
+            onOpenPost={(post, context) => {
+              acceptSavedDetailContext(context);
+              setOpenPost(post);
+            }}
+            onOpenRoute={(route, context) => {
+              acceptSavedDetailContext(context);
+              setOpenRoute(route);
+            }}
+            onRemoved={savedItemRemoved}
+            onBrowsePlaces={() => setTab("map")}
           />
         </Suspense>
       </div>

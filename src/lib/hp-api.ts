@@ -33,6 +33,7 @@ import {
 } from "./hp/business-types";
 import { supabase } from "./supabase/client";
 import type { Database } from "./supabase/database.types";
+import { savedTargetsFromRows, type SavedContent, type SavedTarget } from "./hp/saved-items";
 
 type TableRow<TableName extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][TableName]["Row"];
@@ -283,11 +284,6 @@ const BUSINESS_RETURN_COLUMNS =
   "id,display_name,bio,contact_phone,contact_email,verification_status";
 const PLACE_BUSINESS_PROFILE_RETURN_COLUMNS =
   "id,place_id,business_id,status,hours_text,phone,website_url,menu_url,photos,deal_text,deal_active";
-
-type SavedTarget =
-  | { type: "place"; id: string }
-  | { type: "post"; id: string }
-  | { type: "route"; id: string };
 
 export interface PulseData {
   authors: Author[];
@@ -1180,6 +1176,203 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
   };
 }
 
+// Page even ID-filtered reads: a saved discussion can exceed PostgREST's row
+// cap. Bounded ID batches also keep the request URL usable for large lists.
+async function readSavedPages<T>(
+  read: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  keyFor: (row: T) => string,
+): Promise<T[]> {
+  const rows = new Map<string, T>();
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const result = await read(from, from + pageSize - 1);
+    if (result.error) throw result.error;
+    for (const row of result.data ?? []) rows.set(keyFor(row), row);
+    if ((result.data?.length ?? 0) < pageSize) return [...rows.values()];
+  }
+}
+
+async function readSavedTargetRows<T>(
+  ids: string[],
+  read: (
+    batch: string[],
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  keyFor: (row: T) => string,
+): Promise<T[]> {
+  const rows: T[] = [];
+  const batchSize = 100;
+  for (let index = 0; index < ids.length; index += batchSize) {
+    const batch = ids.slice(index, index + batchSize);
+    rows.push(...(await readSavedPages((from, to) => read(batch, from, to), keyFor)));
+  }
+  return rows;
+}
+
+/** Resolve bookmarks by their stored IDs, independently of the capped feed.
+ * Every read uses the ordinary signed-in client, so current row permissions
+ * apply to the target and to the context needed to open its detail screen.
+ * Failed reads throw; only a successful missing-row read means unavailable.
+ */
+export async function loadSavedItems(expectedUserId?: string | null): Promise<SavedContent> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+  if (expectedUserId !== undefined && userId !== expectedUserId) throw new AuthRequiredError();
+  const saved = await readSavedPages(
+    (from, to) =>
+      client
+        .from("saved_items")
+        .select("id,target_type,place_id,post_id,route_id")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    (row) => row.id,
+  );
+  const targets = savedTargetsFromRows(saved);
+  const ids = (type: SavedTarget["type"]) =>
+    targets.filter((target) => target.type === type).map((target) => target.id);
+  const postIds = ids("post");
+  const routeIds = ids("route");
+  const [postRows, routeRows, stops] = await Promise.all([
+    readSavedTargetRows<PostRow>(
+      postIds,
+      (batch, from, to) =>
+        client
+          .from("posts")
+          .select(POST_RETURN_COLUMNS)
+          .in("id", batch)
+          .order("id")
+          .range(from, to),
+      (row) => row.id,
+    ),
+    readSavedTargetRows<RouteRow>(
+      routeIds,
+      (batch, from, to) =>
+        client
+          .from("routes")
+          .select(
+            "id,title,author_id,lede,duration,budget,tags,image_url,comment_count,saves_count,routing_profile,route_geometry,route_distance_m,route_duration_s,route_input_hash,route_generated_at",
+          )
+          .in("id", batch)
+          .order("id")
+          .range(from, to),
+      (row) => row.id,
+    ),
+    readSavedTargetRows<RouteStopRow>(
+      routeIds,
+      (batch, from, to) =>
+        client
+          .from("route_stops")
+          .select("route_id,position,display_time,place_id,title,body")
+          .in("route_id", batch)
+          .order("route_id")
+          .order("position")
+          .range(from, to),
+      (row) => JSON.stringify([row.route_id, row.position]),
+    ),
+  ]);
+  const placeIds = [
+    ...new Set([
+      ...ids("place"),
+      ...postRows.map((post) => post.place_id),
+      ...stops.map((stop) => stop.place_id),
+    ]),
+  ];
+  const authorIds = [
+    ...new Set([
+      ...postRows.map((post) => post.author_id),
+      ...routeRows.map((route) => route.author_id),
+    ]),
+  ];
+  const profileIds = [
+    ...new Set(postRows.map((post) => post.profile_id).filter((id): id is string => Boolean(id))),
+  ];
+  const commentsFor = (column: "post_id" | "place_id" | "route_id", targetIds: string[]) =>
+    readSavedTargetRows<CommentRow>(
+      targetIds,
+      (batch, from, to) =>
+        client
+          .from("comments")
+          .select(COMMENT_RETURN_COLUMNS)
+          .in(column, batch)
+          .order("created_at")
+          .order("id")
+          .range(from, to),
+      (row) => row.id,
+    );
+  const [placeRows, authors, profiles, postComments, placeComments, routeComments] =
+    await Promise.all([
+      readSavedTargetRows<PlaceRow>(
+        placeIds,
+        (batch, from, to) =>
+          client
+            .from("places")
+            .select(PLACE_RETURN_COLUMNS)
+            .in("id", batch)
+            .order("id")
+            .range(from, to),
+        (row) => row.id,
+      ),
+      readSavedTargetRows<AuthorRow>(
+        authorIds,
+        (batch, from, to) =>
+          client
+            .from("authors")
+            .select("id,name,type,avatar_url")
+            .in("id", batch)
+            .order("id")
+            .range(from, to),
+        (row) => row.id,
+      ),
+      readSavedTargetRows<ProfileRow>(
+        profileIds,
+        (batch, from, to) =>
+          client
+            .from("profiles")
+            .select(
+              "id,handle,display_name,avatar_url,avatar_path,default_identity,home_area,profile_completed_at",
+            )
+            .in("id", batch)
+            .order("id")
+            .range(from, to),
+        (row) => row.id,
+      ),
+      commentsFor("post_id", postIds),
+      commentsFor("place_id", placeIds),
+      commentsFor("route_id", routeIds),
+    ]);
+  // A session change midway through the multi-request read must not deliver
+  // the previous account's private bookmarks to the next account's screen.
+  if ((await currentPulseUserId()) !== userId) throw new AuthRequiredError();
+  const commentsByPost = groupBy(
+    postComments.map(mapComment),
+    (_, index) => postComments[index]?.post_id ?? null,
+  );
+  return {
+    targets,
+    places: placeRows.map((place) => mapPlace(place, {})),
+    posts: postRows.map((post) => mapPost(post, commentsByPost)),
+    routes: routeRows.map((route) =>
+      mapRoute(
+        route,
+        groupBy(stops, (stop) => stop.route_id),
+      ),
+    ),
+    authors: authors.map(mapAuthor),
+    profiles: profiles.map(mapProfile),
+    placeComments: groupBy(
+      placeComments.map(mapComment),
+      (_, index) => placeComments[index]?.place_id ?? null,
+    ),
+    routeComments: groupBy(
+      routeComments.map(mapComment),
+      (_, index) => routeComments[index]?.route_id ?? null,
+    ),
+  };
+}
+
 export async function createPulsePost(input: CreatePulsePostInput): Promise<Post> {
   const client = assertSupabase();
   const userId = await ensurePulseUserId();
@@ -2003,9 +2196,14 @@ export async function addPulseComment(
   return mapComment(result.data);
 }
 
-export async function setSavedItem(target: SavedTarget, saved: boolean) {
+export async function setSavedItem(
+  target: SavedTarget,
+  saved: boolean,
+  expectedUserId?: string | null,
+) {
   const client = assertSupabase();
   const userId = await ensurePulseUserId();
+  if (expectedUserId !== undefined && userId !== expectedUserId) throw new AuthRequiredError();
   const column = savedTargetColumn(target);
 
   if (!saved) {
