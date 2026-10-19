@@ -114,7 +114,7 @@ export function PostDetailModal({
                       <div className="flex items-center gap-1.5">
                         <span className="text-[13px] font-bold text-hp-ink">{a.name}</span>
                         <span
-                          className="rounded-sm px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-paper"
+                          className="rounded-sm px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-on-media"
                           style={{ background: authorTypeColor[a.type] }}
                         >
                           {a.type}
@@ -185,7 +185,7 @@ export function PostDetailModal({
                   </div>
                 </div>
                 <div className="absolute inset-x-0 bottom-0 border-t border-hp-ink/10 bg-hp-paper/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
-                  <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
+                  <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-raised/70 px-3 py-2">
                     <input
                       value={text}
                       onChange={(e) => setText(e.target.value)}

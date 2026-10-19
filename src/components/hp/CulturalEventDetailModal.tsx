@@ -124,7 +124,7 @@ export function CulturalEventDetailModal({
                   </button>
                   <div className="absolute left-3 top-3 flex items-center gap-1.5">
                     <span
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-paper shadow"
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-on-media dark:text-[#101c2a] shadow"
                       style={{ background: meta.tone }}
                     >
                       <TypeIcon size={10} strokeWidth={2.6} /> {tr(lang, meta.label)}
@@ -193,7 +193,7 @@ export function CulturalEventDetailModal({
                 </div>
 
                 <div className="absolute inset-x-0 bottom-0 border-t border-hp-ink/10 bg-hp-paper/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
-                  <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
+                  <div className="mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-raised/70 px-3 py-2">
                     <input
                       value={text}
                       onChange={(e) => setText(e.target.value)}

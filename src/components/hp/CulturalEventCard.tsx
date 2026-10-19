@@ -84,7 +84,7 @@ export function CulturalEventCard({ event, lang, onOpenDetail }: Props) {
         </div>
         <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5">
           <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-paper shadow"
+            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-on-media dark:text-[#101c2a] shadow"
             style={{ background: meta.tone }}
           >
             <TypeIcon size={10} strokeWidth={2.6} /> {tr(lang, meta.label)}
@@ -106,9 +106,9 @@ export function CulturalEventCard({ event, lang, onOpenDetail }: Props) {
             summary: title,
           }}
         />
-        <div className="absolute bottom-2 left-3 right-3 text-hp-paper">
+        <div className="absolute bottom-2 left-3 right-3 text-hp-on-media">
           <h3 className="text-[16px] font-black leading-tight drop-shadow-sm">{title}</h3>
-          <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] font-bold text-hp-paper/85">
+          <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] font-bold text-hp-on-media/85">
             <MapPin size={10} /> {event.venueName} · {event.area}
           </div>
         </div>

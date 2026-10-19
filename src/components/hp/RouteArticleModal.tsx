@@ -94,7 +94,7 @@ export function RouteArticleModal({
                   >
                     <X size={16} />
                   </button>
-                  <div className="absolute bottom-3 left-4 right-4 text-hp-paper">
+                  <div className="absolute bottom-3 left-4 right-4 text-hp-on-media">
                     <div className="mb-1 flex gap-1.5">
                       {route.tags.map((t) => (
                         <span
@@ -218,7 +218,7 @@ export function RouteArticleModal({
                         </div>
                       )}
                     </div>
-                    <div className="mt-3 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
+                    <div className="mt-3 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-raised/70 px-3 py-2">
                       <input
                         value={text}
                         onChange={(e) => setText(e.target.value)}
