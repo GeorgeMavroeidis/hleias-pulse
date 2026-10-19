@@ -529,9 +529,13 @@ function Overview({ data, onOpenModeration }: { data: AdminData; onOpenModeratio
     {
       label: "Map places",
       value: data.places.filter((place) => place.moderation_status === "published").length,
-      tone: "text-sky-700 bg-sky-50",
+      tone: "text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/50",
     },
-    { label: "Admin members", value: data.members.length, tone: "text-violet-700 bg-violet-50" },
+    {
+      label: "Admin members",
+      value: data.members.length,
+      tone: "text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/50",
+    },
   ];
   return (
     <>
