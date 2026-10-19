@@ -114,8 +114,8 @@
   padding: 6px 8px;
   border: 1px solid rgba(23, 20, 17, 0.12);
   border-radius: 999px;
-  background: rgba(255, 248, 236, 0.8);
-  color: rgba(23, 20, 17, 0.7);
+  background: color-mix(in srgb, var(--hp-paper) 80%, transparent);
+  color: color-mix(in srgb, var(--hp-ink) 70%, transparent);
   font-size: 10px;
   font-weight: 800;
   white-space: nowrap;
@@ -127,14 +127,14 @@
   height: 15px;
   place-items: center;
   border-radius: 50%;
-  background: rgba(23, 20, 17, 0.08);
+  background: color-mix(in srgb, var(--hp-ink) 8%, transparent);
   font-size: 9px;
 }
 
 .hp-traffic-preview__scene-list button.is-active {
   border-color: var(--hp-sunset);
   background: var(--hp-sunset);
-  color: #fff;
+  color: #171411;
 }
 
 .hp-traffic-preview__scene-list button.is-active span {
@@ -203,7 +203,7 @@
   min-height: 49px;
   padding: 8px 14px;
   border-bottom: 1px solid rgba(23, 20, 17, 0.1);
-  background: rgba(255, 248, 236, 0.96);
+  background: color-mix(in srgb, var(--hp-paper) 96%, transparent);
 }
 
 .hp-traffic-preview__phone-badge {
@@ -234,7 +234,7 @@
   padding: 20px;
   border: 1px solid rgba(23, 20, 17, 0.11);
   border-radius: 25px;
-  background: rgba(255, 248, 236, 0.95);
+  background: color-mix(in srgb, var(--hp-paper) 95%, transparent);
   box-shadow: 0 15px 35px rgba(23, 20, 17, 0.08);
 }
 
@@ -264,7 +264,7 @@
   padding: 11px;
   border: 1px solid rgba(23, 20, 17, 0.07);
   border-radius: 15px;
-  background: rgba(246, 240, 230, 0.8);
+  background: color-mix(in srgb, var(--hp-bg) 80%, transparent);
 }
 
 .hp-traffic-preview__metric-grid span {
@@ -433,4 +433,8 @@
     height: max(530px, calc(100dvh - 176px));
     border-radius: 20px;
   }
+}
+
+.dark .hp-traffic-preview__phone-badge {
+  color: var(--hp-sunset);
 }

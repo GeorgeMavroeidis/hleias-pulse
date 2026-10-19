@@ -75,12 +75,12 @@ function RouteCard({
           rounded="rounded-none"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        <div className="absolute bottom-2 left-3 right-3 text-hp-paper">
+        <div className="absolute bottom-2 left-3 right-3 text-hp-on-media">
           <div className="mb-1 flex gap-1.5">
             {route.tags.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full bg-white/25 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider backdrop-blur"
+                className="rounded-full bg-hp-raised/25 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider backdrop-blur"
               >
                 {tag}
               </span>
@@ -229,7 +229,7 @@ export function RoutesScreen({
         {t("Curated local routes with practical stops.")}
       </p>
       {showMustSee && <MustSeeTodayDeck places={places} onOpenPlace={onOpenPlace} />}
-      <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
+      <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 p-2.5">
         <div className="flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
           <Search size={13} className="text-hp-muted" />
           <input

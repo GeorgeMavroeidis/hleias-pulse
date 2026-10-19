@@ -39,7 +39,7 @@
   left: 0.85rem;
   bottom: 0.6rem;
   z-index: 1;
-  color: var(--hp-paper);
+  color: var(--hp-on-media);
 }
 .hp-coupon__name strong {
   display: block;

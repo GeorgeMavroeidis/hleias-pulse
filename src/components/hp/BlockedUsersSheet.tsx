@@ -101,7 +101,7 @@ export function BlockedUsersSheet({
             </p>
 
             {empty ? (
-              <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-white/45 px-5 py-10 text-center text-[13px] text-hp-muted">
+              <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-hp-raised/45 px-5 py-10 text-center text-[13px] text-hp-muted">
                 {t("You have not blocked or muted anyone.")}
               </div>
             ) : (
