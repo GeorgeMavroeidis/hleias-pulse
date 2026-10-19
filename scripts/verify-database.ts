@@ -226,6 +226,7 @@ for (const script of [
   "smoke:routes",
   "smoke:route-preview",
   "smoke:saved-items",
+  "smoke:seed-comments",
   "smoke:push-security",
 ])
   await runSmoke(script);

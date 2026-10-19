@@ -17,11 +17,6 @@ export interface Author {
   avatarUrl: string;
 }
 
-export interface Comment {
-  author: string;
-  text: string;
-}
-
 export interface Place {
   id: string;
   name: string;
@@ -57,7 +52,6 @@ export interface Post {
   tags: string[];
   likes: number;
   imageUrl: string;
-  comments: Comment[];
 }
 
 export interface EventItem {
@@ -1092,12 +1086,6 @@ export const PLACES: Place[] = RAW_PLACES.map((p, i) => {
   };
 });
 
-const SAMPLE_COMMENTS: Comment[] = [
-  { author: "Nikos", text: "parking is chaos after 21:00" },
-  { author: "Maria", text: "worth it tho" },
-  { author: "Eleni", text: "go before sunset, way calmer" },
-];
-
 export const POSTS: Post[] = [
   {
     id: "post-1",
@@ -1110,7 +1098,6 @@ export const POSTS: Post[] = [
     likes: 48,
     imageUrl:
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg/1280px-%CE%9A%CE%BF%CF%85%CF%81%CE%BF%CF%8D%CF%84%CE%B1_-_panoramio_%281%29.jpg",
-    comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
     id: "post-2",
@@ -1123,7 +1110,6 @@ export const POSTS: Post[] = [
     likes: 31,
     imageUrl:
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/500px_photo_%28255278229%29.jpeg/1280px-500px_photo_%28255278229%29.jpeg",
-    comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
     id: "post-3",
@@ -1136,7 +1122,6 @@ export const POSTS: Post[] = [
     likes: 64,
     imageUrl:
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg/1280px-%CE%A0%CE%BB%CE%B1%CF%84%CE%B5%CE%AF%CE%B1_%CE%91%CE%BC%CE%B1%CE%BB%CE%B9%CE%AC%CE%B4%CE%B1.jpg",
-    comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
     id: "post-4",
@@ -1149,7 +1134,6 @@ export const POSTS: Post[] = [
     likes: 22,
     imageUrl:
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg/1280px-%CE%9A%CE%B9%CE%BD%CE%B7%CE%BC%CE%B1%CF%84%CE%BF%CE%B3%CF%81%CE%AC%CF%86%CE%BF%CF%82_%C2%AB%CE%A1%CE%AD%CE%BE%C2%BB.jpg",
-    comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
     id: "post-5",
@@ -1162,7 +1146,6 @@ export const POSTS: Post[] = [
     likes: 57,
     imageUrl:
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Foloi_Forest_-_panoramio.jpg/1280px-Foloi_Forest_-_panoramio.jpg",
-    comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
     id: "post-6",
@@ -1174,7 +1157,6 @@ export const POSTS: Post[] = [
     tags: ["food", "sunset", "sea"],
     likes: 19,
     imageUrl: "https://upload.wikimedia.org/wikipedia/commons/8/81/Sunset_at_Agios_Andreas.jpg",
-    comments: SAMPLE_COMMENTS.slice(0, 2),
   },
   {
     id: "post-7",
@@ -1187,7 +1169,6 @@ export const POSTS: Post[] = [
     likes: 27,
     imageUrl:
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Katakolo_Port.jpg/1280px-Katakolo_Port.jpg",
-    comments: SAMPLE_COMMENTS.slice(0, 3),
   },
   {
     id: "post-8",
@@ -1200,7 +1181,6 @@ export const POSTS: Post[] = [
     likes: 39,
     imageUrl:
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Andritsaina_overview.jpg/1280px-Andritsaina_overview.jpg",
-    comments: SAMPLE_COMMENTS.slice(0, 3),
   },
 ];
 
