@@ -1,7 +1,10 @@
+import { useTheme } from "@/lib/theme-provider";
+import { applyBasemapTheme, themedBasemap } from "@/lib/hp/map-theme";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, Crosshair, MapPinned, Minus, Plus } from "lucide-react";
 import Supercluster from "supercluster";
 import "maplibre-gl/dist/maplibre-gl.css";
+import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type {
   ErrorEvent as MapLibreErrorEvent,
   Map as MapLibreMap,
@@ -97,8 +100,8 @@ function attachLocalPreviewLand(map: MapLibreMap): () => void {
   svg.style.pointerEvents = "none";
   const paths = IONIAN_LAND_POLYGONS.map(() => {
     const path = document.createElementNS(namespace, "path");
-    path.setAttribute("fill", "#eee7d8");
-    path.setAttribute("stroke", "#b6b89c");
+    path.setAttribute("fill", "var(--hp-preview-land, #eee7d8)");
+    path.setAttribute("stroke", "var(--hp-preview-coast, #b6b89c)");
     path.setAttribute("stroke-width", "1.2");
     path.setAttribute("stroke-linejoin", "round");
     path.setAttribute("fill-rule", "evenodd");
@@ -985,6 +988,14 @@ export function SocialMap({
   const ignoreBackgroundClickUntilRef = useRef(0);
   const lastZoomRef = useRef(OVERVIEW_ZOOM);
   const [mapReady, setMapReady] = useState(false);
+  const { colorScheme } = useTheme();
+  const colorSchemeRef = useRef(colorScheme);
+  colorSchemeRef.current = colorScheme;
+  const originalBasemapRef = useRef<StyleSpecification | null>(null);
+  useEffect(() => {
+    if (mapReady && mapRef.current && originalBasemapRef.current)
+      applyBasemapTheme(mapRef.current, originalBasemapRef.current, colorScheme);
+  }, [colorScheme, mapReady]);
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(OVERVIEW_ZOOM);
   const [attributionExpanded, setAttributionExpanded] = useState(true);
@@ -1530,10 +1541,13 @@ export function SocialMap({
       .then(([maplibre, basemapStyle]) => {
         if (cancelled || !mapNodeRef.current) return;
 
+        // MapLibre 6 ships its worker separately; let Vite bundle its dependencies.
+        maplibre.setWorkerUrl(mapWorkerUrl);
         maplibreModuleRef.current = maplibre;
+        originalBasemapRef.current = basemapStyle;
         map = new maplibre.Map({
           container: mapNodeRef.current,
-          style: basemapStyle,
+          style: themedBasemap(basemapStyle, colorSchemeRef.current),
           attributionControl: false,
           center: previewMode
             ? [PREVIEW_CENTER[1], PREVIEW_CENTER[0]]

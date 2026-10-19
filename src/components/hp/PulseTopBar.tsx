@@ -1,3 +1,4 @@
+import { useTheme } from "@/lib/theme-provider";
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Search, Check, Gift, Palette } from "lucide-react";
@@ -64,6 +65,7 @@ export function TopBar({
   onOpenDeals,
 }: TopBarProps) {
   const { language, t } = useI18n();
+  const { preference, setPreference } = useTheme();
   const searchActive = showSearch || query.trim().length > 0;
   const activeAnimationTheme =
     MARKER_ANIMATION_THEMES.find((theme) => theme.id === animationTheme) ??
@@ -173,6 +175,25 @@ export function TopBar({
             transition={HP_TRANSITION.state}
             className="hp-appearance-menu"
           >
+            <fieldset className="hp-appearance-section hp-color-scheme">
+              <legend className="hp-appearance-label">{t("Color scheme")}</legend>
+              <div className="hp-appearance-language">
+                {(["light", "dark", "system"] as const).map((option) => (
+                  <label key={option} className="hp-color-scheme-option">
+                    <input
+                      type="radio"
+                      name="color-scheme"
+                      value={option}
+                      checked={preference === option}
+                      onChange={() => setPreference(option)}
+                    />
+                    <span>
+                      {t(option === "light" ? "Light" : option === "dark" ? "Dark" : "System")}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <div className="hp-appearance-section">
               <span className="hp-appearance-label">{t("Language")}</span>
               <div className="hp-appearance-language" role="group" aria-label={t("Language")}>

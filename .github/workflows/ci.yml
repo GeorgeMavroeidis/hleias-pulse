@@ -61,11 +61,17 @@ jobs:
       - name: Test — comment drafts (offline)
         run: npm run test:comment-drafts
 
+      - name: Test — appearance and map theme
+        run: npm run test:theme
+
       - name: Test — discovery
         run: npm run test:discovery
 
       - name: Test — local browser isolation
         run: npm run test:local-browser
+
+      - name: Test — place form defaults
+        run: npm run test:place-defaults
 
       - name: Test — push security
         run: npm run test:push-security
