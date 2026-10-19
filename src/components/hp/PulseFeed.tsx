@@ -144,7 +144,7 @@ export function PulseFeed({
 
       <div className="flex flex-col gap-3">
         {visiblePosts.length === 0 && (
-          <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-white/45 px-5 py-10 text-center text-[13px] text-hp-muted">
+          <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-hp-raised/45 px-5 py-10 text-center text-[13px] text-hp-muted">
             {t("No posts match this filter yet.")}
           </div>
         )}
@@ -177,13 +177,13 @@ export function PulseFeed({
                   <div className="flex items-center gap-1.5">
                     <span className="text-[12px] font-bold text-hp-ink">{a.name}</span>
                     <span
-                      className="rounded-sm px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-paper"
+                      className="rounded-sm px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-on-media"
                       style={{ background: authorTypeColor[a.type] }}
                     >
                       {a.type}
                     </span>
                     {post.kind === "question" && (
-                      <span className="inline-flex items-center gap-0.5 rounded-sm bg-hp-sea px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-ink">
+                      <span className="inline-flex items-center gap-0.5 rounded-sm bg-hp-sea px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-ink dark:text-hp-bg">
                         <HelpCircle size={9} /> {t("Question")}
                       </span>
                     )}

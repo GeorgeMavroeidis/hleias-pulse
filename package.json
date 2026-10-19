@@ -36,6 +36,7 @@
     "smoke:verification-guards": "tsx scripts/smoke-verification-guards.ts",
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
+    "test:place-defaults": "tsx --test src/lib/hp/place-defaults.test.ts",
     "test:push-security": "tsx --test scripts/push-security.test.ts",
     "test:function-privileges": "tsx scripts/test-function-privileges.ts",
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
@@ -47,7 +48,8 @@
     "db:verify": "tsx scripts/verify-database.ts",
     "db:contract": "tsx scripts/check-db-contract.ts",
     "test:db-safety": "tsx --test scripts/local-database-safety.test.ts",
-    "check:migration-versions": "tsx scripts/check-migration-versions.ts"
+    "check:migration-versions": "tsx scripts/check-migration-versions.ts",
+    "test:theme": "tsx --test src/lib/theme.test.ts src/lib/hp/map-theme.test.ts"
   },
   "dependencies": {
     "@capacitor/app-launcher": "^8.0.1",

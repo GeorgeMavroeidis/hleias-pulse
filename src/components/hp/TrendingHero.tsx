@@ -71,12 +71,12 @@ export function TrendingHero({ place, index, onOpen, onGoing, previewMode = fals
         </div>
 
         {/* Title block */}
-        <div className="absolute bottom-3 left-3.5 right-3.5 text-hp-paper">
-          <div className="mb-1 flex items-center gap-1 text-[11px] font-bold text-hp-paper/85">
+        <div className="absolute bottom-3 left-3.5 right-3.5 text-hp-on-media">
+          <div className="mb-1 flex items-center gap-1 text-[11px] font-bold text-hp-on-media/85">
             <MapPin size={11} /> {place.area}
           </div>
           <h3 className="text-[22px] font-black leading-none drop-shadow-sm">{place.name}</h3>
-          <p className="mt-1 line-clamp-1 text-[12px] font-medium text-hp-paper/85">
+          <p className="mt-1 line-clamp-1 text-[12px] font-medium text-hp-on-media/85">
             {place.short}
           </p>
 
@@ -93,7 +93,7 @@ export function TrendingHero({ place, index, onOpen, onGoing, previewMode = fals
                 />
               ))}
             </div>
-            <span className="text-[11px] font-bold text-hp-paper/90">
+            <span className="text-[11px] font-bold text-hp-on-media/90">
               {t("{count} here recently", {
                 count: place.recentPostCount + place.commentCount,
               })}
