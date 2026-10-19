@@ -526,7 +526,7 @@ function AreaSheetContent({
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
+        <div className="mt-3 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 p-2.5">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
             {language === "GR" ? "Σημεία της περιοχής" : "Clustered elements"}
           </div>

@@ -37,7 +37,7 @@ export function CommentComposer({
       }}
       aria-busy={saving || undefined}
     >
-      <div className="flex items-center gap-2 rounded-full border border-hp-ink/10 bg-white/70 px-3 py-2">
+      <div className="flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-raised/70 px-3 py-2">
         <input
           id={inputId}
           name={inputId}
