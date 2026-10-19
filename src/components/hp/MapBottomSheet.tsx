@@ -13,6 +13,7 @@ import {
 import { typeColor, type Place } from "@/lib/hp-model";
 import { type PulseData } from "@/lib/hp-api";
 import type { PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
+import { observationLabel } from "@/lib/hp/surface-freshness";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
 import { type MapAreaCluster } from "./SocialMap";
@@ -64,7 +65,9 @@ export function MapBottomSheet({
   onClearSearch,
   previewMode = false,
   previewActivitySnapshot,
+  nowMs = Date.now(),
 }: {
+  nowMs?: number;
   cluster: MapAreaCluster | null;
   selectedPlace: Place | null;
   events: PulseData["events"];
@@ -261,6 +264,7 @@ export function MapBottomSheet({
           >
             {cluster ? (
               <AreaSheetContent
+                nowMs={nowMs}
                 cluster={cluster}
                 selectedPlace={selectedPlace}
                 events={events}
@@ -343,7 +347,7 @@ function TonightPulseContent({
   }
   return (
     <div className="hp-map-sheet__idle-copy">
-      <h3 className="text-[16px] font-black text-hp-ink">{t("Tonight's pulse")}</h3>
+      <h3 className="text-[16px] font-black text-hp-ink">{t("Explore Ilia")}</h3>
       <p className="text-[12px] text-hp-muted">{t("Tap a bubble to see what's happening.")}</p>
     </div>
   );
@@ -406,6 +410,7 @@ function DiscoveryEmptyState({
 }
 
 function AreaSheetContent({
+  nowMs,
   cluster,
   selectedPlace,
   events,
@@ -426,6 +431,7 @@ function AreaSheetContent({
   previewMode,
   previewActivitySnapshot,
 }: {
+  nowMs: number;
   cluster: MapAreaCluster;
   selectedPlace: Place | null;
   events: PulseData["events"];
@@ -473,6 +479,12 @@ function AreaSheetContent({
               <span>{cluster.activityLine}</span>
             </div>
             <h3 className="mt-1 text-[16px] font-black text-hp-ink">{cluster.name}</h3>
+            <p
+              title={observationLabel(intelligence?.lastSignalAt, nowMs, language).exact}
+              className="text-[10px] text-hp-muted"
+            >
+              {observationLabel(intelligence?.lastSignalAt, nowMs, language).relative}
+            </p>
             {intelligence && (
               <div
                 className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-hp-ink/65"
@@ -639,6 +651,24 @@ function AreaSheetContent({
           <p className="text-[11px] text-hp-muted">
             {focusPlace.greekName} · {focusPlace.area}
           </p>
+          <p
+            title={
+              observationLabel(
+                previewActivitySnapshot?.[focusPlace.id]?.lastSignalAt,
+                nowMs,
+                language,
+              ).exact
+            }
+            className="text-[10px] text-hp-muted"
+          >
+            {
+              observationLabel(
+                previewActivitySnapshot?.[focusPlace.id]?.lastSignalAt,
+                nowMs,
+                language,
+              ).relative
+            }
+          </p>
           <div className="mt-1 flex items-center gap-2 text-[11px] text-hp-ink/70">
             <span className="inline-flex items-center gap-0.5">
               <Radio size={11} />
@@ -647,17 +677,8 @@ function AreaSheetContent({
               {language === "GR" ? "δημοσιεύσεις" : "posts"}
             </span>
             <span className="inline-flex items-center gap-0.5">
-              <Clock size={11} />
-              {previewMode
-                ? (previewActivitySnapshot?.[focusPlace.id]?.eventCount ?? placeEvents.length)
-                : placeEvents.length}{" "}
-              {previewMode
-                ? language === "GR"
-                  ? "συναντήσεις"
-                  : "Meet"
-                : language === "GR"
-                  ? "εκδηλώσεις"
-                  : "events"}
+              <Clock size={11} /> {previewActivitySnapshot?.[focusPlace.id]?.eventCount ?? 0}{" "}
+              {t("recent announcements")}
             </span>
           </div>
         </div>

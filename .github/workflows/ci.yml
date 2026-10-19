@@ -64,6 +64,9 @@ jobs:
       - name: Test — appearance and map theme
         run: npm run test:theme
 
+      - name: Test — truthful surfaces and refresh
+        run: npm run test:surfaces
+
       - name: Test — discovery
         run: npm run test:discovery
 

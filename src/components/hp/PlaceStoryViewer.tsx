@@ -20,6 +20,8 @@ import {
   type PlaceStory,
   type PlaceStoryGroup,
 } from "@/lib/hp/place-stories";
+import { evaluateFreshness } from "@/lib/hp/freshness";
+import { observationLabel } from "@/lib/hp/surface-freshness";
 import { useI18n } from "@/lib/i18n";
 
 interface Props {
@@ -132,7 +134,10 @@ function AuthorChip({ story, nowMs }: { story: PlaceStory; nowMs: number }) {
             {t(STORY_AUTHOR_LABEL[story.authorType])}
           </span>
         </div>
-        <div className="text-[10px] font-semibold text-white/70">
+        <div
+          title={observationLabel(story.createdAt, nowMs, language).exact}
+          className="text-[10px] font-semibold text-white/70"
+        >
           {formatStoryTime(story.minutesAgo, story.createdAt, language, nowMs)} ·{" "}
           {t(STORY_KIND_LABEL[story.kind])}
         </div>
@@ -142,8 +147,10 @@ function AuthorChip({ story, nowMs }: { story: PlaceStory; nowMs: number }) {
 }
 
 /* ---------- report chips (crowd / parking / condition) ---------- */
-function ReportChips({ story }: { story: PlaceStory }) {
+function ReportChips({ story, nowMs }: { story: PlaceStory; nowMs: number }) {
   const { t } = useI18n();
+  if (!story.currentReport || !evaluateFreshness({ observedAt: story.createdAt, nowMs }).isCurrent)
+    return null;
   const report = story.report;
   if (!report) return null;
   const chips: { label: string; value: string }[] = [];
@@ -246,7 +253,24 @@ export function PlaceStoryViewer({
 }: Props) {
   const { language, t } = useI18n();
   const reducedMotion = useReducedMotion();
-  const [viewerGroups] = useState(() => groups);
+  const [viewerOrder] = useState(() =>
+    groups.map((group) => ({
+      placeId: group.placeId,
+      storyIds: group.stories.map((story) => story.id),
+    })),
+  );
+  const viewerGroups = useMemo(
+    () =>
+      viewerOrder.flatMap((original) => {
+        const current = groups.find((group) => group.placeId === original.placeId);
+        if (!current) return [];
+        const stories = original.storyIds.flatMap((id) =>
+          current.stories.filter((story) => story.id === id),
+        );
+        return stories.length ? [{ ...current, stories }] : [];
+      }),
+    [groups, viewerOrder],
+  );
   const initialGroup = useMemo(() => {
     const idx = Math.max(
       0,
@@ -270,6 +294,10 @@ export function PlaceStoryViewer({
   const [transitionDirection, setTransitionDirection] = useState(1);
 
   const group = viewerGroups[groupIndex];
+  useEffect(() => {
+    if (group && storyIndex >= group.stories.length)
+      setStoryIndex(Math.max(0, group.stories.length - 1));
+  }, [group, storyIndex]);
   const story = group?.stories[storyIndex];
 
   // Keep index bounds safe even if the viewer opens with stale or empty story data.
@@ -284,10 +312,13 @@ export function PlaceStoryViewer({
     }
   }, [groupIndex, onClose, viewerGroups.length]);
 
-  // Mark the active story seen.
+  // A seen-state rerender must not restart this effect or its active story.
+  const markSeenRef = useRef(markSeen);
+  markSeenRef.current = markSeen;
+  const activeStoryId = story?.id;
   useEffect(() => {
-    if (story) markSeen([story.id]);
-  }, [story, markSeen]);
+    if (activeStoryId) markSeenRef.current([activeStoryId]);
+  }, [activeStoryId]);
 
   const goToGroup = useCallback(
     (nextGroupIndex: number, storyPos: number, direction: number) => {
@@ -606,7 +637,7 @@ export function PlaceStoryViewer({
                     {story.caption}
                   </p>
                 )}
-                <ReportChips story={story} />
+                <ReportChips story={story} nowMs={nowMs} />
 
                 {/* action row */}
                 <div className="mt-3 flex items-center gap-2">

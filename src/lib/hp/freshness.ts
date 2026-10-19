@@ -108,3 +108,24 @@ export const RECYCLED_STORY_IDS: ReadonlySet<string> = new Set([
 export function storyObservedAt(story: { id: string; createdAt?: string | null }) {
   return RECYCLED_STORY_IDS.has(story.id) ? null : (story.createdAt ?? null);
 }
+
+export type ClockScheduler = {
+  every: (callback: () => void, intervalMs: number) => () => void;
+  onFocus: (callback: () => void) => () => void;
+  onVisibilityChange: (callback: () => void) => () => void;
+};
+
+/** The same clock advances even when no network request can complete. */
+export function subscribeFreshnessClock(
+  clock: Clock,
+  onTick: (nowMs: number) => void,
+  scheduler: ClockScheduler,
+) {
+  const update = () => onTick(clock.nowMs());
+  const cleanups = [
+    scheduler.every(update, 60_000),
+    scheduler.onFocus(update),
+    scheduler.onVisibilityChange(update),
+  ];
+  return () => cleanups.forEach((cleanup) => cleanup());
+}

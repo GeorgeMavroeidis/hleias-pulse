@@ -7631,19 +7631,13 @@
       "definitionLines": [
         "CREATE OR REPLACE FUNCTION public.refresh_generic_stories()",
         " RETURNS void",
-        " LANGUAGE sql",
+        " LANGUAGE plpgsql",
         " SECURITY DEFINER",
         " SET search_path TO ''",
         "AS $function$",
-        "  update public.stories",
-        "  set created_at = now()",
-        "  where id = any (array[",
-        "    'story-kourouta', 'story-kourouta-sunbeds', 'story-katakolo', 'story-olympia',",
-        "    'story-foloi', 'story-kyllini', 'story-zacharo', 'story-andritsaina',",
-        "    'story-kakovatos', 'story-kaiafas', 'story-chlemoutsi'",
-        "  ])",
-        "    and expires_after_hours is not null",
-        "    and created_at <= now() - make_interval(hours => expires_after_hours);",
+        "begin",
+        "  return;",
+        "end;",
         "$function$"
       ]
     },

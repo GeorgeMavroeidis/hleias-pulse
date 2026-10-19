@@ -1,11 +1,9 @@
 import { motion } from "framer-motion";
-import { addDays, format, isSameDay } from "date-fns";
 import {
   CalendarHeart,
   Check,
   Clock,
   Dumbbell,
-  Flame,
   MapPin,
   Music2,
   Sparkles,
@@ -21,9 +19,11 @@ import {
   type MeetEvent,
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
+import { isPublishedContent, meetPhase, observationLabel } from "@/lib/hp/surface-freshness";
+import { formatMeetWhen, formatMeetDateTime } from "@/lib/hp/meet-time";
 import { ImageBox } from "./ImageBox";
 import { ContentMenu } from "./ContentMenu";
-import { useI18n, type AppLanguage } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n";
 
 const CATEGORY_ICONS: Record<MeetCategory, LucideIcon> = {
   panigyri: CalendarHeart,
@@ -46,19 +46,6 @@ interface Props {
   nowMs?: number;
 }
 
-function formatWhen(iso: string, language: AppLanguage, nowMs: number): string {
-  const d = new Date(iso);
-  const time = format(d, "HH:mm");
-  if (isSameDay(d, new Date(nowMs))) return `${language === "GR" ? "Σήμερα" : "Today"} · ${time}`;
-  if (isSameDay(d, addDays(new Date(nowMs), 1)))
-    return `${language === "GR" ? "Αύριο" : "Tomorrow"} · ${time}`;
-  return `${new Intl.DateTimeFormat(language === "GR" ? "el-GR" : "en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(d)} · ${time}`;
-}
-
 export function EventCard({
   event,
   placeName,
@@ -69,6 +56,15 @@ export function EventCard({
   nowMs = Date.now(),
 }: Props) {
   const { language, t } = useI18n();
+  const phase = meetPhase(event, nowMs);
+  const canRsvp = isPublishedContent(event) && (phase === "upcoming" || phase === "inProgress");
+  const announcement = observationLabel(event.createdAt, nowMs, language);
+  const phaseLabel = {
+    upcoming: "Upcoming",
+    inProgress: "In progress",
+    ended: "Ended",
+    unknown: "Time unknown",
+  }[phase];
   const meta = MEET_CATEGORY_META[event.category];
   const CategoryIcon = CATEGORY_ICONS[event.category];
   const goingDisplay = event.going;
@@ -108,11 +104,9 @@ export function EventCard({
           >
             <CategoryIcon size={10} strokeWidth={2.6} /> {t(meta.label)}
           </span>
-          {event.hot && (
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-hp-sunset px-1.5 py-1 text-[9px] font-black uppercase tracking-wide text-hp-paper shadow">
-              <Flame size={9} /> Hot
-            </span>
-          )}
+          <span className="rounded-full bg-hp-paper px-2 py-1 text-[10px] font-bold text-hp-ink">
+            {t(phaseLabel)}
+          </span>
         </div>
         <div className="absolute bottom-2 left-3 right-3 text-hp-on-media">
           <h3 className="text-[16px] font-black leading-tight drop-shadow-sm">{event.title}</h3>
@@ -137,8 +131,14 @@ export function EventCard({
               <span className="font-semibold text-hp-muted">· {event.hostType.toLowerCase()}</span>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-hp-deep">
-            <Clock size={11} /> {formatWhen(event.happensAt, language, nowMs)}
+          <span
+            title={phase === "unknown" ? undefined : formatMeetDateTime(event.happensAt, language)}
+            className="inline-flex items-center gap-1 text-[10.5px] font-bold text-hp-deep"
+          >
+            <Clock size={11} />{" "}
+            {phase === "unknown"
+              ? t("Time unknown")
+              : formatMeetWhen(event.happensAt, language, nowMs)}
           </span>
           {!previewMode && (
             <ContentMenu
@@ -155,21 +155,19 @@ export function EventCard({
           )}
         </div>
 
-        {/* Social proof */}
+        <p title={announcement.exact} className="mt-2 text-[10px] text-hp-muted">
+          {announcement.relative}
+        </p>
+        {!isPublishedContent(event) && (
+          <p className="mt-1 text-xs text-hp-muted">{t("Awaiting publication")}</p>
+        )}
+
+        {/* RSVP counts are separate from announcement freshness. */}
         <div className="mt-2 flex items-center gap-2">
-          <div className="flex -space-x-2">
-            {event.attendeeAvatars.slice(0, 4).map((a, i) => (
-              <img
-                key={i}
-                src={a}
-                alt=""
-                loading="lazy"
-                className="h-5 w-5 rounded-full border-2 border-hp-paper object-cover"
-              />
-            ))}
-          </div>
           <span className="text-[11px] font-bold text-hp-ink/80">
-            {language === "GR" ? `${goingDisplay} συμμετέχουν` : `${goingDisplay} going`}
+            {language === "GR"
+              ? `${goingDisplay} δηλώσεις συμμετοχής`
+              : `${goingDisplay} going RSVPs`}
             {event.maybe > 0
               ? language === "GR"
                 ? ` · ${event.maybe} ίσως`
@@ -196,9 +194,10 @@ export function EventCard({
         <div className="mt-2.5 flex items-center gap-2">
           <button
             type="button"
+            disabled={!canRsvp}
             onClick={() => onToggle(event, "going")}
             aria-pressed={isGoing}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-[12.5px] font-black transition active:scale-[0.97] ${
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-[12.5px] font-black transition disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.97] ${
               isGoing
                 ? "bg-hp-ink text-hp-paper"
                 : "border-2 border-hp-ink text-hp-ink hover:bg-hp-ink/5"
@@ -215,9 +214,10 @@ export function EventCard({
           </button>
           <button
             type="button"
+            disabled={!canRsvp}
             onClick={() => onToggle(event, "maybe")}
             aria-pressed={isMaybe}
-            className={`rounded-full px-3.5 py-2.5 text-[12px] font-bold transition active:scale-95 ${
+            className={`rounded-full px-3.5 py-2.5 text-[12px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 ${
               isMaybe ? "bg-hp-purple/15 text-hp-purple" : "border border-hp-ink/12 text-hp-ink/70"
             }`}
           >

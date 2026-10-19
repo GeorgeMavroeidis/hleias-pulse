@@ -220,6 +220,7 @@ for (const script of [
   "smoke:comment-drafts",
   "smoke:live-surfaces",
   "smoke:meet-time",
+  "smoke:story-freshness",
   "smoke:moderation",
   "smoke:block-enforcement",
   "smoke:deal-race",

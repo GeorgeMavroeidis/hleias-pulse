@@ -1,51 +1,84 @@
-import type { Place, Post } from "../hp-model";
+import type { Author, Place, Post, StoryItem } from "../hp-model";
 import type { MeetEvent } from "./meet-types";
-
-/**
- * Derived activity helpers. Source rows come from Supabase; these helpers only
- * shape lightweight display summaries for the existing UI.
- */
+import { initialsAvatarDataUri } from "./avatar";
+import { evaluateFreshness, storyObservedAt } from "./freshness";
+import { isPublishedContent } from "./surface-freshness";
 
 export interface ActivityTick {
   id: string;
   who: string;
   avatar: string;
-  verb: "posted" | "is going" | "dropped a tip" | "went live" | "added a spot";
-  at: string; // place name
+  verb: "posted" | "dropped a tip" | "announced a gathering" | "shared a story";
+  at: string;
   placeId: string;
   minutesAgo: number;
+  observedAt: string;
 }
 
-/** Derive a live activity ticker from Supabase posts and Meet events. */
+/** Only dated, current publications may appear in the Live ticker. */
 export function buildActivityTicks(
   posts: Post[],
   places: Map<string, Place>,
   events: MeetEvent[],
+  options: { nowMs: number; findAuthor?: (post: Post) => Author; stories?: StoryItem[] },
 ): ActivityTick[] {
-  const placeName = (id: string) => places.get(id)?.name ?? "Ilia";
-  const fromPosts: ActivityTick[] = posts.slice(0, 8).map((p, i) => ({
-    id: `tick-post-${p.id}`,
-    who:
-      p.authorId === "you"
-        ? "You"
-        : p.authorId
-            .replace(/-/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase())
-            .slice(0, 14),
-    avatar: `https://i.pravatar.cc/60?img=${(i % 60) + 1}`,
-    verb: p.kind === "tip" ? "dropped a tip" : "posted",
-    at: placeName(p.placeId),
-    placeId: p.placeId,
-    minutesAgo: (i + 1) * 3,
-  }));
-  const fromEvents: ActivityTick[] = events.slice(0, 4).map((e, i) => ({
-    id: `tick-event-${e.id}`,
-    who: e.hostName.split(" ")[0],
-    avatar: e.hostAvatar,
-    verb: "is going",
-    at: e.title.split("—")[0].trim().slice(0, 22),
-    placeId: e.placeId,
-    minutesAgo: 8 + i * 5,
-  }));
-  return [...fromPosts, ...fromEvents].sort((a, b) => a.minutesAgo - b.minutesAgo);
+  const ticks: ActivityTick[] = [];
+  const add = (
+    id: string,
+    who: string,
+    avatar: string,
+    verb: ActivityTick["verb"],
+    placeId: string,
+    observedAt: string | null | undefined,
+  ) => {
+    const age = evaluateFreshness({ observedAt, nowMs: options.nowMs });
+    const place = places.get(placeId);
+    if (!age.isCurrent || !observedAt || !place) return;
+    ticks.push({
+      id,
+      who,
+      avatar: avatar || initialsAvatarDataUri(who),
+      verb,
+      at: place.name,
+      placeId,
+      minutesAgo: Math.floor((age.ageMs ?? 0) / 60_000),
+      observedAt,
+    });
+  };
+  posts.filter(isPublishedContent).forEach((post) => {
+    const author = options.findAuthor?.(post);
+    add(
+      `post-${post.id}`,
+      author?.name ?? "Community member",
+      author?.avatarUrl ?? "",
+      post.kind === "tip" ? "dropped a tip" : "posted",
+      post.placeId,
+      post.createdAt,
+    );
+  });
+  events
+    .filter(isPublishedContent)
+    .forEach((event) =>
+      add(
+        `meet-${event.id}`,
+        event.hostName,
+        event.hostAvatar,
+        "announced a gathering",
+        event.placeId,
+        event.createdAt,
+      ),
+    );
+  options.stories
+    ?.filter(isPublishedContent)
+    .forEach((story) =>
+      add(
+        `story-${story.id}`,
+        story.authorName,
+        story.authorAvatarUrl,
+        "shared a story",
+        story.placeId,
+        storyObservedAt(story),
+      ),
+    );
+  return ticks.sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt)).slice(0, 12);
 }

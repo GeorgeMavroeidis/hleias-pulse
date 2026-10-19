@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { format, isToday, isTomorrow } from "date-fns";
+import { formatMeetWhen, formatMeetDateTime } from "@/lib/hp/meet-time";
 import {
   BadgeCheck,
   Clock,
@@ -32,24 +32,17 @@ const TYPE_ICONS: Record<CulturalEventType, LucideIcon> = {
 };
 
 interface Props {
+  nowMs?: number;
   event: CulturalEvent;
   lang: Lang;
   onOpenDetail: (event: CulturalEvent) => void;
 }
 
-function formatWhen(iso: string, lang: Lang): string {
-  const d = new Date(iso);
-  const time = format(d, "HH:mm");
-  if (isToday(d)) return `${tr(lang, CULTURAL_EVENTS_STRINGS.today)} · ${time}`;
-  if (isTomorrow(d)) return `${tr(lang, CULTURAL_EVENTS_STRINGS.tomorrow)} · ${time}`;
-  return `${format(d, "EEE d MMM yyyy")} · ${time}`;
-}
-
-export function CulturalEventCard({ event, lang, onOpenDetail }: Props) {
+export function CulturalEventCard({ event, lang, onOpenDetail, nowMs = Date.now() }: Props) {
   const meta = CULTURAL_EVENT_TYPE_META[event.eventType];
   const TypeIcon = TYPE_ICONS[event.eventType];
   const hasTicketUrl = Boolean(event.ticketUrl);
-  const past = isEventPast(event);
+  const past = isEventPast(event, nowMs);
   const title = lang === "EN" ? event.title : event.greekTitle;
   const description =
     lang === "EN" ? (event.descriptionEn ?? event.descriptionEl) : event.descriptionEl;
@@ -124,7 +117,10 @@ export function CulturalEventCard({ event, lang, onOpenDetail }: Props) {
             <span className="text-[11px] font-bold text-hp-muted">{event.organizerName}</span>
           )}
           <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-hp-deep">
-            <Clock size={11} /> {formatWhen(event.eventDate, lang)}
+            <Clock size={11} />{" "}
+            <span title={formatMeetDateTime(event.eventDate, lang)}>
+              {formatMeetWhen(event.eventDate, lang, nowMs)}
+            </span>
           </span>
         </div>
 
