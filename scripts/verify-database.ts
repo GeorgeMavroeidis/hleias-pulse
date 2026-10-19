@@ -218,6 +218,7 @@ for (const script of [
   "smoke:auth-profile",
   "smoke:post-write",
   "smoke:live-surfaces",
+  "smoke:meet-time",
   "smoke:moderation",
   "smoke:block-enforcement",
   "smoke:deal-race",

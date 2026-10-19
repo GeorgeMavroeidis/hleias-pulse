@@ -8,6 +8,7 @@ import {
   type StoryItem,
 } from "./hp-model";
 import type { CreateMeetInput, MeetEvent, RsvpStatus } from "./hp/meet-types";
+import { requireFutureMeetStart } from "./hp/meet-time";
 import type { StreakState } from "./hp/meet-store";
 import { initialsAvatarDataUri } from "./hp/avatar";
 import { parseRouteGeometry } from "./hp/route-preview";
@@ -1395,6 +1396,8 @@ export async function setPulseMeetRsvp(
 }
 
 export async function createPulseMeetEvent(input: CreatePulseMeetEventInput): Promise<MeetEvent> {
+  const startsAt = requireFutureMeetStart(input.happensAt);
+  if (!input.place?.id?.trim()) throw new Error("Choose a valid place for the gathering.");
   const client = assertSupabase();
   const userId = await ensurePulseUserId();
   const id = `user-meet-${Date.now().toString(36)}-${randomIdSuffix()}`;
@@ -1410,7 +1413,7 @@ export async function createPulseMeetEvent(input: CreatePulseMeetEventInput): Pr
       host_name: input.hostName,
       host_avatar_url: input.hostAvatarUrl,
       host_type: meetHostType(input.hostType),
-      starts_at: input.happensAt,
+      starts_at: startsAt,
       duration_min: 120,
       category: meetCategory(input.category),
       vibe: input.vibe,
