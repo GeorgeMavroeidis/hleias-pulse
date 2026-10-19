@@ -304,7 +304,7 @@ export interface PulseData {
   placeComments: Record<string, Comment[]>;
   routeComments: Record<string, Comment[]>;
   culturalEventComments: Record<string, Comment[]>;
-  source: "supabase";
+  source: "supabase" | "preview";
 }
 
 // One active static deal, denormalised for the browsable Deals screen. The

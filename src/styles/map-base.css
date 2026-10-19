@@ -282,3 +282,8 @@
 .hp-real-map.hp-map-is-moving :is(.hp-area-marker__shell, .hp-child-marker__shell) {
   will-change: transform, opacity;
 }
+
+.dark .hp-real-map {
+  --hp-preview-land: #1c2d3c;
+  --hp-preview-coast: #28536a;
+}

@@ -1,15 +1,8 @@
-import {
-  blockUser,
-  getMyBlocks,
-  isReportAlreadyReviewedError,
-  muteUser,
-  reportContent,
-  unblockUser,
-  unmuteUser,
-  type ReportContentInput,
-  type ReportReason,
-  type ReportTargetType,
-} from "@/lib/hp-api";
+import type { ReportContentInput, ReportReason, ReportTargetType } from "@/lib/hp-api";
+
+// Keep the API client out of preview-only imports. Production loads it only
+// when an authenticated moderation action actually needs it.
+const loadModerationApi = () => import("@/lib/hp-api");
 
 export type { ReportReason, ReportTargetType };
 
@@ -118,7 +111,8 @@ export function syncModerationUser(userId: string | null) {
   if (state.currentUserId === userId) return;
   set({ currentUserId: userId, blockedIds: [], mutedIds: [] });
   if (!userId) return;
-  void getMyBlocks()
+  void loadModerationApi()
+    .then(({ getMyBlocks }) => getMyBlocks())
     .then((result) => {
       // The account may have changed again while the read was in flight.
       if (state.currentUserId !== userId) return;
@@ -167,15 +161,17 @@ export async function submitReport(
   input: ReportContentInput,
   alsoBlockUserId: string | null,
 ): Promise<boolean> {
+  let api: Awaited<ReturnType<typeof loadModerationApi>> | null = null;
   try {
-    await reportContent(input);
+    api = await loadModerationApi();
+    await api.reportContent(input);
     if (alsoBlockUserId) await applyBlock(alsoBlockUserId);
     return true;
   } catch (error) {
     // A moderator already actioned an earlier report of this target. There is
     // nothing to retry, so say so plainly instead of the generic write-error
     // toast, which invites a resubmit that fails identically every time.
-    if (isReportAlreadyReviewedError(error)) {
+    if (api?.isReportAlreadyReviewedError(error)) {
       bridge.showToast(
         bridge.translate("You have already reported this. A moderator has reviewed it."),
       );
@@ -187,6 +183,7 @@ export async function submitReport(
 }
 
 async function applyBlock(userId: string) {
+  const { blockUser } = await loadModerationApi();
   await blockUser(userId);
   set({
     blockedIds: state.blockedIds.includes(userId)
@@ -223,6 +220,7 @@ function announceMute(muted: boolean) {
 
 export async function unblock(userId: string) {
   try {
+    const { unblockUser } = await loadModerationApi();
     await unblockUser(userId);
     set({ blockedIds: state.blockedIds.filter((id) => id !== userId) });
     announceBlock(false);
@@ -240,7 +238,8 @@ export function toggleMute(target: ModerationTarget) {
     void unmute(userId);
     return;
   }
-  void muteUser(userId)
+  void loadModerationApi()
+    .then(({ muteUser }) => muteUser(userId))
     .then(() => {
       set({ mutedIds: [...state.mutedIds, userId] });
       announceMute(true);
@@ -252,6 +251,7 @@ export function toggleMute(target: ModerationTarget) {
 
 export async function unmute(userId: string) {
   try {
+    const { unmuteUser } = await loadModerationApi();
     await unmuteUser(userId);
     set({ mutedIds: state.mutedIds.filter((id) => id !== userId) });
     announceMute(false);

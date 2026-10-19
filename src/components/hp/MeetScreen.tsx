@@ -44,6 +44,7 @@ interface Props {
   onToggleRsvp: (event: MeetEvent, next: RsvpStatus) => void;
   onOpenPlace: (placeId: string) => void;
   onCreate: () => void;
+  previewMode?: boolean;
 }
 
 export function MeetScreen({
@@ -53,6 +54,7 @@ export function MeetScreen({
   onToggleRsvp,
   onOpenPlace,
   onCreate,
+  previewMode = false,
 }: Props) {
   const { t } = useI18n();
   const moderation = useModeration();
@@ -150,6 +152,7 @@ export function MeetScreen({
                   status={rsvp[event.id] ?? null}
                   onToggle={onToggleRsvp}
                   onOpenPlace={onOpenPlace}
+                  previewMode={previewMode}
                 />
               ))}
             </AnimatePresence>
@@ -158,18 +161,20 @@ export function MeetScreen({
       </div>
 
       {/* Host FAB */}
-      <motion.button
-        type="button"
-        whileTap={{ scale: 0.92 }}
-        initial={{ opacity: 0, scale: 0.86, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        onClick={onCreate}
-        className="absolute right-4 bottom-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-hp-sunset px-4 py-3 text-hp-paper shadow-[0_12px_28px_rgba(224,106,50,0.45)]"
-        aria-label={t("Host a gathering")}
-      >
-        <Plus size={18} strokeWidth={2.6} />
-        <span className="text-[13px] font-black">{t("Host")}</span>
-      </motion.button>
+      {!previewMode && (
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.92 }}
+          initial={{ opacity: 0, scale: 0.86, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          onClick={onCreate}
+          className="absolute right-4 bottom-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-hp-sunset px-4 py-3 text-hp-paper shadow-[0_12px_28px_rgba(224,106,50,0.45)]"
+          aria-label={t("Host a gathering")}
+        >
+          <Plus size={18} strokeWidth={2.6} />
+          <span className="text-[13px] font-black">{t("Host")}</span>
+        </motion.button>
+      )}
     </div>
   );
 }
