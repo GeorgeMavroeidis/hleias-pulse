@@ -50,6 +50,7 @@
     "test:map-visuals": "tsx scripts/check-map-visuals.ts",
     "test:map-cartography": "tsx --test scripts/check-map-cartography.test.ts scripts/check-map-appearance.test.ts src/lib/hp/map-preview-appearance.test.ts",
     "test:motion": "tsx --test src/lib/hp/motion.test.ts",
+    "test:current-map": "node --import tsx --test src/lib/hp/marker-pulse.test.ts src/lib/hp/regional-discovery.test.ts src/lib/hp/marker-motion.test.ts src/lib/hp/map-renderer.test.ts src/lib/hp/map-region-appearance.test.ts",
     "test:routing": "tsx --test scripts/check-route-preview.ts",
     "supabase:generate-seed": "tsx scripts/generate-supabase-seed.ts > supabase/seed.sql",
     "build:ionian-land": "tsx scripts/build-ionian-land.ts",

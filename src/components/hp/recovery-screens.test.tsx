@@ -107,8 +107,8 @@ test("collapsed search keeps the query and a dedicated accessible clear control"
           query="quiet beach"
           setQuery={noop}
           onSetLanguage={noop}
-          animationTheme="calm"
-          onSetAnimationTheme={noop}
+          markerMotion="calm"
+          onSetMarkerMotion={noop}
           appearanceOpen={false}
           setAppearanceOpen={noop}
           showSearch={false}

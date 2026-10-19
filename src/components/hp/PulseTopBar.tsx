@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { AccountBubble } from "./AuthAccountSheets";
 import { DISCOVERY_LENSES, type DiscoveryLens } from "@/lib/hp/discovery";
 import {
-  type MarkerAnimationTheme,
+  type MarkerMotion,
   DISCOVERY_LENS_LABEL,
   HP_TRANSITION,
-  MARKER_ANIMATION_THEMES,
+  MARKER_MOTION_OPTIONS,
 } from "./pulse-shared";
 
 export function Toast({ msg }: { msg: string | null }) {
@@ -38,8 +38,8 @@ interface TopBarProps {
   query: string;
   setQuery: (query: string) => void;
   onSetLanguage: (language: "GR" | "EN") => void;
-  animationTheme: MarkerAnimationTheme;
-  onSetAnimationTheme: (theme: MarkerAnimationTheme) => void;
+  markerMotion: MarkerMotion;
+  onSetMarkerMotion: (theme: MarkerMotion) => void;
   appearanceOpen: boolean;
   setAppearanceOpen: Dispatch<SetStateAction<boolean>>;
   showSearch: boolean;
@@ -54,8 +54,8 @@ export function TopBar({
   query,
   setQuery,
   onSetLanguage,
-  animationTheme,
-  onSetAnimationTheme,
+  markerMotion,
+  onSetMarkerMotion,
   appearanceOpen,
   setAppearanceOpen,
   showSearch,
@@ -69,9 +69,8 @@ export function TopBar({
   const reducedMotion = useReducedMotion();
   const { preference, setPreference } = useTheme();
   const searchActive = showSearch || query.trim().length > 0;
-  const activeAnimationTheme =
-    MARKER_ANIMATION_THEMES.find((theme) => theme.id === animationTheme) ??
-    MARKER_ANIMATION_THEMES[0];
+  const activeMarkerMotion =
+    MARKER_MOTION_OPTIONS.find((theme) => theme.id === markerMotion) ?? MARKER_MOTION_OPTIONS[0];
   const appearanceButtonRef = useRef<HTMLButtonElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const appearanceMenuRef = useRef<HTMLDivElement>(null);
@@ -160,7 +159,7 @@ export function TopBar({
             aria-label={t(appearanceOpen ? "Close appearance menu" : "Open appearance menu")}
             aria-expanded={appearanceOpen}
             aria-controls="hp-appearance-menu"
-            data-active-theme={animationTheme}
+            data-marker-motion={markerMotion}
           >
             <Palette size={18} strokeWidth={2} aria-hidden="true" />
           </Button>
@@ -221,35 +220,35 @@ export function TopBar({
 
             <div className="hp-appearance-section">
               <div className="hp-appearance-section-heading">
-                <span className="hp-appearance-label">{t("Marker animation")}</span>
+                <span className="hp-appearance-label">{t("Marker motion")}</span>
                 <span className="hp-animation-theme-current" aria-live="polite">
-                  {t("Current: {theme}", { theme: activeAnimationTheme.label })}
+                  {t("Current: {theme}", { theme: activeMarkerMotion.label })}
                 </span>
               </div>
               <div
                 className="hp-animation-theme-options"
                 role="radiogroup"
-                aria-label={t("Marker animation")}
+                aria-label={t("Marker motion")}
               >
-                {MARKER_ANIMATION_THEMES.map((theme) => {
-                  const selected = animationTheme === theme.id;
+                {MARKER_MOTION_OPTIONS.map((theme) => {
+                  const selected = markerMotion === theme.id;
                   return (
                     <button
                       key={theme.id}
                       type="button"
                       role="radio"
                       aria-checked={selected}
-                      onClick={() => onSetAnimationTheme(theme.id)}
+                      onClick={() => onSetMarkerMotion(theme.id)}
                       className="hp-animation-theme-option"
-                      data-theme-preview={theme.id}
+                      data-marker-motion={theme.id}
                     >
-                      <span className="hp-animation-theme-preview is-pulse-hot" aria-hidden="true">
-                        <span className="hp-marker-effects">
-                          <span className="hp-marker-field" />
-                          <span className="hp-marker-wave" />
-                          <span className="hp-marker-sweep" />
-                        </span>
-                        <span className="hp-marker-core hp-animation-theme-preview__core" />
+                      <span
+                        className="hp-pulse-preview"
+                        data-pulse-level="active"
+                        aria-hidden="true"
+                      >
+                        <span className="hp-pulse-ring" />
+                        <span className="hp-pulse-core" />
                       </span>
                       <span className="hp-animation-theme-copy">
                         <strong>{theme.label}</strong>

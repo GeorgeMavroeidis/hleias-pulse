@@ -41,7 +41,10 @@ export function pulseTierForMetric(score: number, confirmed = false): PulseTier 
   return "quiet";
 }
 
-function metricFromEvidence(evidence: ActivityEvidence[], observedAt: number): PlacePulseMetric {
+export function derivePulseActivityMetric(
+  evidence: ActivityEvidence[],
+  observedAt: number,
+): PlacePulseMetric {
   const recent = evidence.filter(
     (item) =>
       evaluateFreshness({
@@ -71,7 +74,7 @@ function metricFromEvidence(evidence: ActivityEvidence[], observedAt: number): P
 
 /** An undated place or event count cannot establish current activity. */
 export function fallbackPulseMetric(_place: Place, _eventCount = 0): PlacePulseMetric {
-  return metricFromEvidence([], Date.now());
+  return derivePulseActivityMetric([], Date.now());
 }
 
 export function pulseMetricForPlace(
@@ -90,7 +93,7 @@ export function aggregatePulseMetrics(
   const metrics = places.flatMap((place) => (snapshot[place.id] ? [snapshot[place.id]] : []));
   // Snapshots share one accepted clock. Missing rows contribute no evidence.
   const observedAt = metrics[0]?.observedAt ?? Date.now();
-  return metricFromEvidence(
+  return derivePulseActivityMetric(
     metrics.flatMap((metric) => metric.evidence),
     observedAt,
   );
@@ -105,7 +108,7 @@ export function buildPulseActivitySnapshot(
   return Object.fromEntries(
     data.places.map((place) => [
       place.id,
-      metricFromEvidence(evidenceByPlace.get(place.id) ?? [], observedAt),
+      derivePulseActivityMetric(evidenceByPlace.get(place.id) ?? [], observedAt),
     ]),
   );
 }

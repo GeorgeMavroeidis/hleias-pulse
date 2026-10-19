@@ -87,11 +87,11 @@ jobs:
       - name: Test — map visuals
         run: npm run test:map-visuals
 
-      - name: Test — map cartography and appearance
-        run: npm run test:map-cartography
-
-      - name: Test — interface motion
-        run: npm run test:motion
+      - name: Test — current map evidence and foundation
+        run: |
+          npm run test:current-map
+          npm run test:map-cartography
+          npm run test:motion
 
       - name: Test — route previews
         run: npm run test:routing
