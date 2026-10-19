@@ -37,6 +37,13 @@ the web build first and the iOS app during the season.
 
 ---
 
+## Appearance improvement — in progress
+
+App-wide Light / Dark / System preferences and matching map colors are implemented
+on `feat/dark-mode` and under review in PR #102. Delivery is the local preview and
+PR; live publication is deferred by the product owner. Preference is device-local;
+no database migration or paid service is needed.
+
 ## Right now
 
 **Stage 1 (REPAIR) is done. We're in Stage 2 (BUILD).**
