@@ -27,12 +27,13 @@
   select {
     font: inherit;
   }
+}
 
-  button:focus-visible,
-  input:focus-visible,
-  textarea:focus-visible,
-  select:focus-visible {
-    outline: 2px solid var(--hp-sunset);
-    outline-offset: 2px;
-  }
+/* Unlayered so scrolling rails can inset the ring without fighting layer priority. */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--hp-focus-color) !important;
+  outline-offset: 2px !important;
 }

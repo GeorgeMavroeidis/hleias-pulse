@@ -1,5 +1,18 @@
+import { Button } from "@/components/ui/button";
+import { HP_MOTION } from "@/lib/hp/motion";
 import { useTheme } from "@/lib/theme-provider";
-import { applyBasemapTheme, themedBasemap } from "@/lib/hp/map-theme";
+import {
+  applyMapAppearance,
+  createMapAppearanceStyle,
+  resolveMapPalette,
+  type MapAppearance,
+} from "@/lib/hp/map-cartography";
+import {
+  applyPreviewMapPalette,
+  attachLocalPreviewLand,
+  createLocalPreviewBasemapStyle,
+  type PreviewLandLayer,
+} from "@/lib/hp/map-preview-appearance";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, Crosshair, MapPinned, Minus, Plus } from "lucide-react";
 import Supercluster from "supercluster";
@@ -12,14 +25,9 @@ import type {
   StyleSpecification,
 } from "maplibre-gl";
 import { type EventItem, type Place } from "@/lib/hp-model";
-import {
-  coordinateBounds,
-  isFatalBasemapError,
-  removeAdministrativeBoundaries,
-} from "@/lib/hp/map-core";
+import { coordinateBounds, isFatalBasemapError } from "@/lib/hp/map-core";
 import { useImageUrls } from "@/lib/hp/image-cache";
 import { SEA_SHIMMER_LATLNGS, SEA_SHIMMER_MAX_ZOOM } from "@/lib/hp/sea-shimmer";
-import { IONIAN_LAND_POLYGONS } from "@/lib/hp/ionian-land";
 import {
   areaDefinitionForId,
   areaIdForPlace,
@@ -66,93 +74,49 @@ import {
 
 const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
 
-async function loadBoundaryFreeBasemap(signal: AbortSignal): Promise<StyleSpecification> {
+async function loadProviderBasemap(signal: AbortSignal): Promise<StyleSpecification> {
   const response = await fetch(OPENFREEMAP_STYLE_URL, { signal });
   if (!response.ok) {
     throw new Error(`Basemap style request failed (${response.status}).`);
   }
-  return removeAdministrativeBoundaries((await response.json()) as StyleSpecification);
+  return (await response.json()) as StyleSpecification;
 }
 
-/** A source-free style avoids worker-backed tile/GeoJSON loading in the local preview. */
-function localPreviewBasemapStyle(): StyleSpecification {
-  return {
-    version: 8,
-    name: "Ilia local preview",
-    sources: {},
-    layers: [
-      {
-        id: "hp-preview-sea",
-        type: "background",
-        paint: { "background-color": "#b9dce4" },
-      },
-    ],
+/** Each map attempt owns its untouched provider template or its source-free SVG preview. */
+type MapAppearanceSession = {
+  map: MapLibreMap;
+  provider: StyleSpecification | null;
+  previewLand: PreviewLandLayer | null;
+};
+
+function captureProviderStyle(style: StyleSpecification): StyleSpecification {
+  const captured = structuredClone(style);
+  const freeze = (value: unknown): void => {
+    if (value && typeof value === "object") {
+      Object.freeze(value);
+      Object.values(value).forEach(freeze);
+    }
   };
+  freeze(captured);
+  return captured;
 }
 
-/**
- * Project the bundled Natural Earth coast into an SVG above the preview canvas.
- * MapLibre's GeoJSON worker is unavailable in some embedded browsers, but its
- * map projection and DOM markers still work there. This layer uses neither a
- * worker nor a network request and stays aligned during pan and zoom.
- */
-function attachLocalPreviewLand(map: MapLibreMap): () => void {
-  const namespace = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(namespace, "svg");
-  svg.setAttribute("aria-hidden", "true");
-  svg.style.position = "absolute";
-  svg.style.inset = "0";
-  svg.style.width = "100%";
-  svg.style.height = "100%";
-  svg.style.zIndex = "1";
-  svg.style.pointerEvents = "none";
-  const paths = IONIAN_LAND_POLYGONS.map(() => {
-    const path = document.createElementNS(namespace, "path");
-    path.setAttribute("fill", "var(--hp-preview-land, #eee7d8)");
-    path.setAttribute("stroke", "var(--hp-preview-coast, #b6b89c)");
-    path.setAttribute("stroke-width", "1.2");
-    path.setAttribute("stroke-linejoin", "round");
-    path.setAttribute("fill-rule", "evenodd");
-    svg.append(path);
-    return path;
-  });
-  map.getCanvasContainer().append(svg);
-
-  let frame: number | null = null;
-  const draw = () => {
-    frame = null;
-    const width = map.getContainer().clientWidth;
-    const height = map.getContainer().clientHeight;
-    if (width <= 0 || height <= 0) return;
-    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    IONIAN_LAND_POLYGONS.forEach((polygon, index) => {
-      const d = polygon
-        .map(
-          (ring) =>
-            ring
-              .map(([lng, lat], pointIndex) => {
-                const point = map.project([lng, lat]);
-                return `${pointIndex === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
-              })
-              .join(" ") + " Z",
-        )
-        .join(" ");
-      paths[index].setAttribute("d", d);
-    });
-  };
-  const scheduleDraw = () => {
-    if (frame !== null) return;
-    frame = window.requestAnimationFrame(draw);
-  };
-  map.on("move", scheduleDraw);
-  map.on("resize", scheduleDraw);
-  scheduleDraw();
-  return () => {
-    map.off("move", scheduleDraw);
-    map.off("resize", scheduleDraw);
-    if (frame !== null) window.cancelAnimationFrame(frame);
-    svg.remove();
-  };
+/** Shared by initial readiness and the one runtime appearance effect. */
+function paintMapAppearance(
+  session: MapAppearanceSession,
+  appearance: MapAppearance,
+  duration: number,
+): void {
+  if (session.previewLand) {
+    applyPreviewMapPalette(
+      session.map,
+      session.previewLand,
+      resolveMapPalette(appearance),
+      duration,
+    );
+  } else if (session.provider) {
+    applyMapAppearance(session.map, session.provider, appearance, duration);
+  }
 }
 
 type LatLngTuple = [number, number];
@@ -206,9 +170,9 @@ const ALL_MARKERS_RICH_ZOOM = 15.5;
 // whose pins sit within ~800m) need ~z16 to separate; spread areas stay lower.
 const AREA_FOCUS_MAX_ZOOM = 16.25;
 const ILIA_DETAIL_BBOX: [number, number, number, number] = [19.9, 36.35, 23.25, 39.15];
-const MAP_PAN_DURATION = 0.28;
-const MAP_OVERVIEW_DURATION = 0.34;
-const MAP_FOCUS_DURATION = 0.38;
+const MAP_PAN_DURATION = HP_MOTION.pan / 1000;
+const MAP_OVERVIEW_DURATION = HP_MOTION.overview / 1000;
+const MAP_FOCUS_DURATION = HP_MOTION.focus / 1000;
 const RICH_VISUAL_ZOOM = 13.25;
 const MIN_UTILITY_RAIL_HEIGHT = 248;
 const MIN_MAP_CHROME_HEIGHT = 188;
@@ -973,6 +937,12 @@ export function SocialMap({
   previewMode = false,
 }: Props) {
   const { t } = useI18n();
+  const { colorScheme } = useTheme();
+  const appearance: MapAppearance = { colorScheme, atmosphere: "day" };
+  const appearanceRef = useRef(appearance);
+  appearanceRef.current = appearance;
+  const palette = resolveMapPalette(appearance);
+  const appearanceSessionRef = useRef<MapAppearanceSession | null>(null);
   const mapNodeRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const maplibreModuleRef = useRef<typeof import("maplibre-gl") | null>(null);
@@ -1026,14 +996,12 @@ export function SocialMap({
     () => uniqueMapPlaces(clusters.map((cluster) => cluster.places)),
     [clusters],
   );
-  const { colorScheme } = useTheme();
-  const colorSchemeRef = useRef(colorScheme);
-  colorSchemeRef.current = colorScheme;
-  const originalBasemapRef = useRef<StyleSpecification | null>(null);
   useEffect(() => {
-    if (mapReady && mapRef.current && originalBasemapRef.current)
-      applyBasemapTheme(mapRef.current, originalBasemapRef.current, colorScheme);
-  }, [colorScheme, mapReady]);
+    const session = appearanceSessionRef.current;
+    if (!mapReady || !session || mapRef.current !== session.map) return;
+    // Day-only scheme changes are immediate, including reduced-motion devices.
+    paintMapAppearance(session, appearanceRef.current, 0);
+  }, [colorScheme, mapReady, previewMode]);
   const [zoom, setZoom] = useState(OVERVIEW_ZOOM);
   const [attributionExpanded, setAttributionExpanded] = useState(true);
   const selectionKey = `${selectedAreaId ?? ""}|${selectedPlaceId ?? ""}`;
@@ -1569,6 +1537,8 @@ export function SocialMap({
 
   useEffect(() => {
     let map: MapLibreMap | null = null;
+    let providerTemplate: StyleSpecification | null = null;
+    let appearanceSession: MapAppearanceSession | null = null;
     let mapHasLoaded = false;
     let zoomFrame: number | null = null;
     let effectsResumeFrame: number | null = null;
@@ -1597,18 +1567,23 @@ export function SocialMap({
           signal,
           () =>
             previewMode
-              ? Promise.resolve(localPreviewBasemapStyle())
-              : loadBoundaryFreeBasemap(signal),
+              ? Promise.resolve(
+                  createLocalPreviewBasemapStyle(resolveMapPalette(appearanceRef.current)),
+                )
+              : loadProviderBasemap(signal),
         ),
       createMap: (maplibre, basemapStyle) => {
         if (!container) throw new Error("Map container unavailable");
         // MapLibre 6 ships its worker separately; let Vite bundle its dependencies.
         maplibre.setWorkerUrl(mapWorkerUrl);
         maplibreModuleRef.current = maplibre;
-        originalBasemapRef.current = basemapStyle;
+        providerTemplate = previewMode ? null : captureProviderStyle(basemapStyle);
+        const currentAppearance = appearanceRef.current;
         return new maplibre.Map({
           container,
-          style: themedBasemap(basemapStyle, colorSchemeRef.current),
+          style: providerTemplate
+            ? createMapAppearanceStyle(providerTemplate, currentAppearance)
+            : createLocalPreviewBasemapStyle(resolveMapPalette(currentAppearance)),
           attributionControl: false,
           center: previewMode
             ? [PREVIEW_CENTER[1], PREVIEW_CENTER[0]]
@@ -1629,7 +1604,16 @@ export function SocialMap({
       prepareMap: (instance, maplibre, attempt) => {
         map = instance;
         mapRef.current = map;
-        if (previewMode) attempt.addCleanup(attachLocalPreviewLand(map));
+        const previewLand = previewMode
+          ? attachLocalPreviewLand(map, resolveMapPalette(appearanceRef.current))
+          : null;
+        const session: MapAppearanceSession = { map, provider: providerTemplate, previewLand };
+        appearanceSession = session;
+        appearanceSessionRef.current = session;
+        attempt.addCleanup(() => {
+          previewLand?.dispose();
+          if (appearanceSessionRef.current === session) appearanceSessionRef.current = null;
+        });
         const onBasemapError = (event: MapLibreErrorEvent) => {
           if (!attempt.isActive()) return;
           const sourceId = "sourceId" in event ? event.sourceId : undefined;
@@ -1767,6 +1751,8 @@ export function SocialMap({
         });
         const onMapReady = () => {
           if (!attempt.isActive() || !map) return;
+          // Preferences may change between constructor and load; paint before exposing ready state.
+          if (appearanceSession) paintMapAppearance(appearanceSession, appearanceRef.current, 0);
           mapHasLoaded = true;
           const readyZoom = map.getZoom();
           lastZoomRef.current = readyZoom;
@@ -1798,6 +1784,9 @@ export function SocialMap({
       routeStopMarkersRef.current = [];
       userMarkerRef.current?.remove();
       userMarkerRef.current = null;
+      if (appearanceSessionRef.current === appearanceSession) appearanceSessionRef.current = null;
+      providerTemplate = null;
+      appearanceSession = null;
       mapRef.current = null;
       maplibreModuleRef.current = null;
       map = null;
@@ -2344,7 +2333,7 @@ export function SocialMap({
     const map = mapRef.current;
     routeStopMarkersRef.current.forEach((marker) => marker.remove());
     routeStopMarkersRef.current = [];
-    if (!maplibre || !map || !mapReady) return;
+    if (!maplibre || !map || !mapReady || previewMode) return;
     const sourceId = "hp-route-source";
     const solidId = "hp-route-solid";
     const fallbackId = "hp-route-fallback";
@@ -2436,7 +2425,7 @@ export function SocialMap({
       routeStopMarkersRef.current.forEach((marker) => marker.remove());
       routeStopMarkersRef.current = [];
     };
-  }, [mapReady, routePreview]);
+  }, [mapReady, previewMode, routePreview]);
 
   const resetToOverview = () => {
     if (selectionKeyRef.current !== "|") cameraHandledSelectionRef.current = "|";
@@ -2506,6 +2495,8 @@ export function SocialMap({
   const utilityRailHidden = availableMapHeight < MIN_UTILITY_RAIL_HEIGHT;
   const mapChromeHidden = availableMapHeight < MIN_MAP_CHROME_HEIGHT;
   const mapStyle = {
+    "--hp-map-land": palette.land,
+    backgroundColor: palette.land,
     "--hp-map-bottom-overlay-height": `${Math.max(0, bottomOverlayHeight)}px`,
   } as CSSProperties;
 
@@ -2638,14 +2629,16 @@ export function SocialMap({
       )}
 
       {mapReady && canGoBack && onBack && (
-        <button
+        <Button
+          variant="hpGhost"
+          size="hpIcon"
           type="button"
           onClick={onBack}
-          className="hp-icon-button hp-control-surface hp-map-back absolute"
+          className="hp-control-surface hp-map-back absolute"
           aria-label={t("Back to previous map view")}
         >
           <ChevronLeft size={18} strokeWidth={2.5} />
-        </button>
+        </Button>
       )}
 
       {mapReady && (
@@ -2671,12 +2664,12 @@ export function SocialMap({
                 onClick={() => selectDiscoveryCluster(cluster)}
                 aria-pressed={selected}
                 tabIndex={mapChromeHidden ? -1 : undefined}
-                className={`hp-chip hp-map-chip ${selected ? "is-active" : ""}`}
+                className={`hp-map-chip ${selected ? "is-active" : ""}`}
               >
                 <span className="hp-map-chip__face">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
                   {cluster.name}
-                  <span className="text-hp-muted">{cluster.places.length}</span>
+                  <span className="hp-map-chip__count">{cluster.places.length}</span>
                 </span>
               </button>
             );
@@ -2691,50 +2684,54 @@ export function SocialMap({
           aria-hidden={utilityRailHidden ? true : undefined}
         >
           <div className="hp-map-control-group" role="group" aria-label={t("Map zoom controls")}>
-            <button
+            <Button
+              variant="hpMap"
+              size="hpIcon"
               type="button"
               onClick={() => mapRef.current?.zoomIn()}
               disabled={!mapReady || zoom >= MAX_ZOOM}
               tabIndex={utilityRailHidden ? -1 : undefined}
-              className="hp-icon-button hp-map-icon-button"
               aria-label={t("Zoom in map")}
             >
               <Plus size={17} strokeWidth={2.5} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="hpMap"
+              size="hpIcon"
               type="button"
               onClick={zoomOut}
               disabled={!mapReady || zoom <= MIN_ZOOM}
               tabIndex={utilityRailHidden ? -1 : undefined}
-              className="hp-icon-button hp-map-icon-button"
               aria-label={t("Zoom out map")}
             >
               <Minus size={17} strokeWidth={2.5} />
-            </button>
+            </Button>
           </div>
           <div className="hp-map-control-group" role="group" aria-label={t("Map view controls")}>
             {!previewMode && (
-              <button
+              <Button
+                variant="hpMap"
+                size="hpIcon"
                 type="button"
                 onClick={locateUser}
                 disabled={!mapReady}
                 tabIndex={utilityRailHidden ? -1 : undefined}
-                className="hp-icon-button hp-map-icon-button"
                 aria-label={t("Find my location")}
               >
                 <Crosshair size={17} strokeWidth={2.2} />
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="hpMap"
+              size="hpIcon"
               type="button"
               onClick={resetToOverview}
               disabled={!mapReady}
               tabIndex={utilityRailHidden ? -1 : undefined}
-              className="hp-icon-button hp-map-icon-button"
               aria-label={t("Show Ilia overview")}
             >
               <MapPinned size={17} strokeWidth={2.2} />
-            </button>
+            </Button>
           </div>
         </div>
       )}

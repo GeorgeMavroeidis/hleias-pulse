@@ -1,9 +1,10 @@
 import { useTheme } from "@/lib/theme-provider";
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Search, Check, Gift, Palette, X } from "lucide-react";
 import { type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 import { AccountBubble } from "./AuthAccountSheets";
 import { DISCOVERY_LENSES, type DiscoveryLens } from "@/lib/hp/discovery";
 import {
@@ -65,6 +66,7 @@ export function TopBar({
   onOpenDeals,
 }: TopBarProps) {
   const { language, t } = useI18n();
+  const reducedMotion = useReducedMotion();
   const { preference, setPreference } = useTheme();
   const searchActive = showSearch || query.trim().length > 0;
   const activeAnimationTheme =
@@ -103,66 +105,70 @@ export function TopBar({
   }, [appearanceOpen, setAppearanceOpen]);
 
   return (
-    <div className="relative z-[60] border-b border-hp-ink/10 bg-hp-paper/95">
-      <div className="hp-safe-px flex items-center justify-between pt-2.5">
-        <div className="flex items-center gap-2.5" aria-label="ΗΛΕΙΑ PULSE">
+    <div className="hp-topbar relative z-[60]">
+      <div className="hp-topbar-row hp-safe-px">
+        <div className="hp-topbar-brand" aria-label="ΗΛΕΙΑ PULSE">
           <img
             src="/brand/ilia-pulse-logo.png"
             alt=""
             width={38}
             height={38}
             aria-hidden="true"
-            className="h-10 w-10 rounded-xl bg-hp-paper object-contain"
+            className="hp-topbar-logo"
           />
           <div className="hp-brand leading-[0.85]">
             <div className="text-[14px] font-black tracking-[0.04em] text-hp-ink">ΗΛΕΙΑ</div>
             <div className="text-[14px] font-black tracking-[0.18em] text-hp-sunset">PULSE</div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="hp-topbar-actions">
           <button
             type="button"
             onClick={onOpenDeals}
-            className="hp-deals-pill inline-flex items-center gap-1 rounded-full border border-hp-sunset/30 bg-hp-sunset/10 px-2.5 py-1.5 text-[11px] font-bold text-hp-sunset"
+            className="hp-deals-action"
             aria-label={t("Open deals")}
           >
-            <Gift size={13} strokeWidth={2.6} />
-            {t("Deals")}
+            <Gift size={17} strokeWidth={2} aria-hidden="true" />
+            <span className="hp-deals-action-label">{t("Deals")}</span>
           </button>
-          <button
+          <Button
+            variant="hpGhost"
+            size="hpIcon"
             ref={searchButtonRef}
             type="button"
             onClick={() => {
               setAppearanceOpen(false);
               setShowSearch((s) => !s);
             }}
-            className={`hp-icon-button hp-topbar-search h-9 w-9 ${searchActive ? "is-active" : ""} ${query.trim() ? "has-query" : ""}`}
+            className={`hp-topbar-search ${searchActive ? "is-active" : ""} ${query.trim() ? "has-query" : ""}`}
             aria-label={t(showSearch ? "Close search" : "Open search")}
             aria-expanded={showSearch}
             aria-pressed={searchActive}
           >
-            <Search size={16} strokeWidth={2.2} />
-          </button>
-          <button
+            <Search size={18} strokeWidth={2} aria-hidden="true" />
+          </Button>
+          <Button
+            variant="hpGhost"
+            size="hpIcon"
             ref={appearanceButtonRef}
             type="button"
             onClick={() => {
               setShowSearch(false);
               setAppearanceOpen((open) => !open);
             }}
-            className={`hp-icon-button hp-appearance-trigger h-9 w-9 ${appearanceOpen ? "is-active" : ""}`}
+            className={`hp-appearance-trigger ${appearanceOpen ? "is-active" : ""}`}
             aria-label={t(appearanceOpen ? "Close appearance menu" : "Open appearance menu")}
             aria-expanded={appearanceOpen}
             aria-controls="hp-appearance-menu"
             data-active-theme={animationTheme}
           >
-            <Palette size={16} strokeWidth={2.2} />
-          </button>
+            <Palette size={18} strokeWidth={2} aria-hidden="true" />
+          </Button>
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
-      <div className="hp-safe-px pb-1.5 pt-0.5">
-        <p className="text-[12px] text-hp-muted">{t("Local spots, routes, and tips.")}</p>
+      <div className="hp-topbar-subtitle hp-safe-px">
+        <p className="hp-topbar-subtitle-copy">{t("Local spots, routes, and tips.")}</p>
       </div>
       <AnimatePresence>
         {appearanceOpen && (
@@ -174,7 +180,7 @@ export function TopBar({
             initial={{ opacity: 0, y: -4, scale: 0.99 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -3, scale: 0.99 }}
-            transition={HP_TRANSITION.state}
+            transition={reducedMotion ? { duration: 0 } : HP_TRANSITION.state}
             className="hp-appearance-menu"
           >
             <fieldset className="hp-appearance-section hp-color-scheme">
@@ -266,10 +272,10 @@ export function TopBar({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={HP_TRANSITION.state}
+            transition={reducedMotion ? { duration: 0 } : HP_TRANSITION.state}
             className="hp-safe-px overflow-hidden"
           >
-            <div className="hp-search-field mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 px-3 py-2">
+            <div className="hp-search-field mb-2 flex items-center gap-2 px-3 py-2">
               <Search size={14} className="text-hp-muted" />
               <input
                 name="hp-search"
@@ -358,7 +364,7 @@ export function DiscoveryLensRail({
   const { t } = useI18n();
   return (
     <div
-      className="hp-discovery-lens-rail hp-no-scrollbar hp-safe-px flex gap-2 overflow-x-auto border-b border-hp-ink/10 bg-hp-paper py-2"
+      className="hp-discovery-lens-rail hp-no-scrollbar hp-safe-px"
       role="group"
       aria-label={t("Map discovery lenses")}
     >
@@ -370,7 +376,7 @@ export function DiscoveryLensRail({
             type="button"
             onClick={() => onChange(selected ? null : lens)}
             aria-pressed={selected}
-            className={`hp-chip hp-discovery-lens shrink-0 text-[12px] ${selected ? "is-active" : ""}`}
+            className={`hp-discovery-lens ${selected ? "is-active" : ""}`}
           >
             {t(DISCOVERY_LENS_LABEL[lens])}
           </button>

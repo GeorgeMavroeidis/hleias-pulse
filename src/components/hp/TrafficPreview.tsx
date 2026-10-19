@@ -21,7 +21,12 @@ import { initialsAvatarDataUri } from "@/lib/hp/avatar";
 import { buildActivityTicks, type ActivityTick } from "@/lib/hp/activity-data";
 import { deriveAreaIntelligenceSnapshot } from "@/lib/hp/area-intelligence";
 import { buildPulseActivitySnapshot } from "@/lib/hp/pulse-activity";
-import { buildTrafficPreviewScene, TRAFFIC_SCENES } from "@/lib/hp/traffic-preview";
+import {
+  buildTrafficPreviewScene,
+  resolveTrafficPreviewClock,
+  TRAFFIC_PREVIEW_ACCEPTANCE_AT,
+  TRAFFIC_SCENES,
+} from "@/lib/hp/traffic-preview";
 import { buildPlaceStoryGroups, storyPlaceIdSet } from "@/lib/hp/place-stories";
 import type { RsvpStatus } from "@/lib/hp/meet-types";
 import { useI18n } from "@/lib/i18n";
@@ -171,7 +176,12 @@ function PreviewPlaceDetails({
 
 export function TrafficPreview() {
   const { t } = useI18n();
-  const [anchor] = useState(() => new Date());
+  const [clock] = useState(() =>
+    resolveTrafficPreviewClock(
+      new URLSearchParams(window.location.search).get("previewAt"),
+      Date.now(),
+    ),
+  );
   const [sceneIndex, setSceneIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [theme, setTheme] = useState<MarkerAnimationTheme>("pulse");
@@ -192,8 +202,8 @@ export function TrafficPreview() {
   const mapStageRef = useRef<HTMLDivElement>(null);
   const scene = TRAFFIC_SCENES[sceneIndex];
   const sceneSnapshot = useMemo(
-    () => buildTrafficPreviewScene(scene.id, anchor),
-    [scene.id, anchor],
+    () => buildTrafficPreviewScene(scene.id, clock.anchorMs),
+    [scene.id, clock.anchorMs],
   );
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
@@ -369,7 +379,13 @@ export function TrafficPreview() {
   const previewPlaying = playing && sceneIndex < LAST_SCENE_INDEX;
 
   return (
-    <main className="hp-traffic-preview" data-preview-scene={scene.id} data-preview-tab={tab}>
+    <main
+      className="hp-traffic-preview"
+      data-preview-scene={scene.id}
+      data-preview-tab={tab}
+      data-preview-anchor={new Date(clock.anchorMs).toISOString()}
+      data-preview-now={new Date(sceneSnapshot.nowMs).toISOString()}
+    >
       <div className="hp-traffic-preview__layout">
         <div className="hp-traffic-preview__main">
           <header className="hp-traffic-preview__controls">
@@ -442,6 +458,26 @@ export function TrafficPreview() {
                 </select>
               </label>
             </div>
+            <p className="mt-2 text-[10px] leading-snug text-hp-muted" role="status">
+              Simulation clock:{" "}
+              <time dateTime={new Date(sceneSnapshot.nowMs).toISOString()}>
+                {new Intl.DateTimeFormat("en-GB", {
+                  timeZone: "Europe/Athens",
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(sceneSnapshot.nowMs)}
+              </time>{" "}
+              · Europe/Athens ·{" "}
+              {clock.mode === "fixed" ? "Fixed previewAt clock" : "Frozen at page load"}.
+              {clock.invalidPreviewAt && " Invalid previewAt ignored; using the session clock."}{" "}
+              <a
+                className="font-bold underline"
+                href={`?trafficPreview=1&previewAt=${encodeURIComponent(TRAFFIC_PREVIEW_ACCEPTANCE_AT)}`}
+              >
+                Use fixed acceptance clock
+              </a>
+              . To choose another instant, use previewAt with a UTC ISO timestamp ending in Z.
+            </p>
           </header>
 
           <div
@@ -753,7 +789,7 @@ export function TrafficPreview() {
           </div>
           <p className="hp-traffic-preview__note">
             {scene.id === "later"
-              ? "After three hours, recent area signals cool while the marker still reflects accumulated posts and Meet activity."
+              ? "After three hours and ten minutes, the current score is 0 and the marker is Quiet. Historical posts, unexpired stories, and scheduled Meets remain."
               : "Tap the map marker, Pulse cards, stories, or Meet RSVPs to inspect the simulated state."}
           </p>
           <button
