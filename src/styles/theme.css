@@ -64,6 +64,8 @@
     "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   /* Ηλεία Pulse palette */
   --hp-bg: #f6f0e6;
+  --hp-raised: #ffffff;
+  --hp-on-media: #fff8ec;
   --hp-paper: #fff8ec;
   --hp-ink: #171411;
   --hp-muted: #7c7468;
@@ -110,25 +112,36 @@
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
+  --hp-bg: #101c2a;
+  --hp-paper: #192a3b;
+  --hp-ink: #f6f0e6;
+  --hp-muted: #b3bdc8;
+  --hp-sea: #8bd5e8;
+  --hp-deep: #91cce9;
+  --hp-olive: #b5cb8b;
+  --hp-sunset: #ff9b66;
+  --hp-purple: #bd9aef;
+  --hp-border: rgb(246 240 230 / 16%);
+  --hp-raised: #24394d;
+  --background: var(--hp-bg);
+  --foreground: var(--hp-ink);
+  --card: var(--hp-paper);
+  --card-foreground: var(--hp-ink);
+  --popover: var(--hp-paper);
+  --popover-foreground: var(--hp-ink);
+  --primary: var(--hp-deep);
+  --primary-foreground: var(--hp-bg);
+  --secondary: var(--hp-raised);
+  --secondary-foreground: var(--hp-ink);
+  --muted: var(--hp-raised);
+  --muted-foreground: var(--hp-muted);
+  --accent: var(--hp-raised);
+  --accent-foreground: var(--hp-ink);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
+  --border: var(--hp-border);
+  --input: var(--hp-border);
+  --ring: var(--hp-sunset);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
