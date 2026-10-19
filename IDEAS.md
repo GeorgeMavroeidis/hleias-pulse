@@ -11,11 +11,10 @@
 ## New Feature Ideas
 
 - Myths — not a current feature, may revisit in brainstorming later
-- "Ask a local" — a question-and-answer surface in Pulse (tourists post a
-  question tied to a place, locals answer) rather than only one-way posts.
-  Flagged 2026-09-07 as the highest-leverage way to give locals a reason to
-  come back and post without being asked — see the "50-100 locals posting
-  unprompted" done-when in `ROADMAP.md` → Stage 3.
+- **"Ask a local" — built and merged** (#65). A question-and-answer surface in
+  Pulse lets tourists post a question tied to a place and locals answer.
+  Flagged 2026-09-07 as a way to give locals a reason to return — see the
+  "50-100 locals posting unprompted" done-when in `ROADMAP.md` → Stage 3.
 - Village/area identity next to a user's name (e.g. "Local · Πύργος") instead
   of just the generic LOCAL/GUIDE/BUSINESS badge — cheap, free, and a real
   trust signal for tourists. Flagged 2026-09-07.
@@ -26,22 +25,27 @@
   swiping through short summaries**, game-style. Locals feed it and earn;
   tourists earn from deals and from feedback to us. Content must be built so it
   can later cover other regions. Full plan, phases, open questions:
-  `docs/TOURIST_STAY_PACK.md`.
+  `docs/TOURIST_STAY_PACK.md`. Essentials, summaries, the planner, Trip tab and
+  Near Me are reported as local prototypes in `TODO_LATER_GM.md`; their code is
+  not available in this clone or included in this documentation PR. They still
+  need shared branches, review and acceptance before being counted as integrated.
 - **Fixed identity, earned Guide title** (2026-10-11, decided in discussion, not
   yet built) — Local vs. Visitor is chosen once at sign-up and not switchable
   from the account page; **Guide is earned by locals whose tips prove useful**
   (saves / helpful marks), never self-selected; Business stays on its existing
   verification flow. Needs: (a) lock `profiles.default_identity` against client
-  writes (today's `Users can update own profile` policy lets a client write
-  `GUIDE`/`BUSINESS` directly), (b) a computed title column, (c) remove the
-  composer's own "Posting as" picker so a post takes the account's identity,
-  (d) migrate existing rows. Schema + auth model, so both maintainers first.
+  writes (the current `Users can update own profile` policy permits direct
+  identity changes), (b) a computed title column, (c) migrate existing rows.
+  The composer's per-post identity picker was already removed in merged #101;
+  using the account identity in the UI does not enforce identity at the database.
+  The remaining schema + auth model needs both maintainers first.
   The UI half (identity read-only, collapsed edit form, pinned save bar) is
-  already on `feat/account-page-reorg`.
+  on the pushed `feat/account-page-reorg` branch, without an open PR as of
+  2026-10-19; it is not merged and its review is deferred.
 - **A few onboarding questions at sign-up** (2026-10-11) — e.g. local or visiting,
   how many days, what you like. Open: nothing decided yet on whether answers are
-  stored or only tune the first screens; sign-up is also where Local/Visitor is
-  now set once.
+  stored or only tune the first screens; setting Local/Visitor once at sign-up
+  is part of the proposed identity model, not an enforced rule today.
 - **Titles + "% of Ilia discovered"** (2026-10-11) — titles earned by what you do, and a
   percentage showing how much of the prefecture a person has discovered (needs a
   decided denominator: places vs. areas vs. weighted). Points and levels still

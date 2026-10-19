@@ -59,7 +59,7 @@ function draftFromClaim(claim: PlaceClaim): Draft {
 }
 
 function fieldClass() {
-  return "w-full rounded-2xl border border-hp-ink/10 bg-white/70 px-3 py-2 text-[12px] text-hp-ink outline-none placeholder:text-hp-muted";
+  return "w-full rounded-2xl border border-hp-ink/10 bg-hp-raised/70 px-3 py-2 text-[12px] text-hp-ink outline-none placeholder:text-hp-muted";
 }
 
 type DealDraft = { text: string; active: boolean };
@@ -373,7 +373,7 @@ export function BusinessPlacesSheet({
                           const feedback = redeemFeedback[entry.id];
                           const draft = codeDrafts[entry.id] ?? "";
                           return (
-                            <div className="hp-card-lift mt-3 rounded-2xl border border-hp-ink/10 bg-white/60 p-2.5">
+                            <div className="hp-card-lift mt-3 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 p-2.5">
                               <SectionHeader icon={Ticket} label={t("Verify a code")} tone="sea" />
                               <div className="mt-1.5 flex gap-2">
                                 <input

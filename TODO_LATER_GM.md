@@ -5,28 +5,41 @@
 > `docs/TOURIST_STAY_PACK.md` and `IDEAS.md`. The team-wide ordered plan is
 > still `ROADMAP.md`; this file is the personal queue that feeds it.
 >
-> Working rule (2026-10-11): **code changes stay local** (branches/worktrees on
-> this machine, not pushed); only these `.md` planning files go to `main`, via PR.
+> Historical working rule (2026-10-11): code changes stayed local while these
+> `.md` planning files went through PR review. The dated local milestones below
+> preserve Margaris's reports; a checked box is not proof of integration.
+>
+> Shared-Git reconciliation (2026-10-19, `origin/main` at `b13daaf`): the simpler
+> composer (#101) and Light / Dark / System appearance (#102) are merged.
+> `feat/account-page-reorg` is pushed but has no open PR and is not merged.
+> Essentials, summaries, Trip planner, Trip tab and Near Me implementation
+> branches are absent from this clone; their local status remains unverified.
+> Prepare the reliability/design stack first, then bring those implementations
+> into shared Git and review them separately. This PR adds documentation only;
+> it neither integrates those prototypes nor deploys the app.
 
 ## Parked — continue later
 
 ### Account / profile page
 
-- [x] UI reorganisation — local branch `feat/account-page-reorg` (identity shown
+- [x] UI reorganisation — pushed branch `feat/account-page-reorg` (identity shown
       read-only, edit form collapsed, pinned save bar, "Activity" and "For
       professionals" sections, labelled sign-out, translations). Checked
-      locally 2026-10-11, looks right.
+      locally 2026-10-11, looks right according to the local report. Not merged;
+      shared review remains pending.
 - [ ] Step 2 — lock `profiles.default_identity` against client writes (today the
       `Users can update own profile` RLS policy lets anyone write `GUIDE` /
-      `BUSINESS`), remove the composer's own "Posting as" picker, migrate
-      existing rows. Schema + auth model → talk to Mavroeidis first.
+      `BUSINESS`), migrate existing rows. The composer's per-post "Posting as"
+      picker is already removed in merged #101; that UI change does not lock
+      the database identity. Schema + auth model → talk to Mavroeidis first.
 - [ ] Earned **Guide** title for locals (computed, never self-selected).
 - [ ] Profile card / customer loyalty card — **all options still open**
       (flip card, QR first, NFC stand later; no own POS hardware).
 
 ## Decided 2026-10-14 (after trying the local build) — do in this order
 
-1. [x] **Simpler post form** — done locally on branch `feat/composer-simplify`: no
+1. [x] **Simpler post form** — merged into `main` in #101 (the earlier local
+       report called the branch `feat/composer-simplify`): no
        "posting as" picker (post takes the account identity), one-row place
        picker with "Change", small place thumbnail instead of a big banner,
        vibes optional and collapsed.
@@ -45,11 +58,14 @@
        (details to settle: what should come first when you open your profile?).
        Earlier local attempt: branch `feat/account-page-reorg`.
 
-**Heads-up (2026-10-14):** Mavroeidis has a chain of 13 open PRs (#88-#100, the
-"reliability" stack). #92 changes the same composer file as our PR #101 (it makes a
-place choice mandatory, with no default place) — whichever merges first, the other
-needs a rebase. The Trip tab branch will also overlap with #98-#100 (PulseApp,
-top bar, shared tab types). Agree the merge order with him before opening more PRs.
+**Integration order (updated 2026-10-19):** the reliability/design stack is 12
+dependent PRs: #88 → #89 → #90 → #91 → #92 → #93 → #94 → #95 → #96 → #98 → #99 →
+#100. #97 is this independent documentation PR. #101 and #102 already landed;
+preserve their simpler composer and dark mode while updating the stack through
+ordinary merge commits, without rebasing or rewriting history. #92's explicit
+place selection must coexist with the simpler form. The Trip tab prototype may
+also overlap with #98–#100 (PulseApp, top bar, shared tab types); integrate it only
+after the reliability/design stack passes combined acceptance.
 
 ## Now — in this order, one at a time
 

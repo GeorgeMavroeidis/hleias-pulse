@@ -6,7 +6,7 @@
   z-index: 0;
   height: 100%;
   width: 100%;
-  background: #f2efe9;
+  background: var(--hp-bg);
   font-family: var(--hp-font-body);
 }
 

@@ -1,10 +1,15 @@
 # Stay Pack — a plan for the tourist who has 7–10 days
 
-> Status: **idea + plan, nothing built.** Written 2026-10-11 after a product
-> discussion. Everything below is a proposal for both maintainers to react to
-> before any schema or code is touched. Facts about the shipped app were checked
-> against the code; facts about ferries, roads and prices are deliberately _not_
-> stated here — they are content the team must verify.
+> Status: **product plan with reported local prototypes; not integrated.**
+> Written 2026-10-11; reconciled against `origin/main` (`b13daaf`) on 2026-10-19.
+> `TODO_LATER_GM.md` reports local Essentials, summaries, Trip planner, Trip tab
+> and Near Me implementations, but their branches are absent from this clone.
+> This documentation PR does not include or validate that code. The simpler
+> composer (#101) and dark mode (#102) are already merged; the pushed account
+> redesign remains separate. Proposals below still need review and acceptance,
+> including explicit approval for schema or auth-model changes. Facts about
+> ferries, roads and prices are deliberately _not_ stated here — the team must
+> verify that content.
 
 ## The idea in one paragraph
 
@@ -126,14 +131,14 @@ Added 2026-10-11. Both are **derived from what a person does**, never picked:
 
 ## The day and the hour matter
 
-Added 2026-10-14 after the first local tests. A plan is only real if it respects time:
+Added 2026-10-14 after reported local tests. A plan is only real if it respects time:
 you cannot visit a museum at 07:00, watch the sunset at noon, or go to a museum on its
 closing day. What we have today and what we need:
 
-| Rule                                                            | What it needs                                             | Do we have it?                                                             |
+| Rule                                                            | What it needs                                             | Current evidence / proposal                                                |
 | --------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Sunset places only around sunset                                | Sunset time for that date and spot                        | **Yes, can be computed** from latitude, longitude and date (no data entry) |
-| Beaches in daylight, nightlife in the evening                   | A time window per kind of place                           | **Yes, as a soft hint** by place type (editable)                           |
+| Sunset places only around sunset                                | Sunset time for that date and spot                        | Can be computed; planner integration remains to be verified               |
+| Beaches in daylight, nightlife in the evening                   | A time window per kind of place                           | Reported prototype hints; not verified in shared code                     |
 | Museums and archaeological sites: opening hours and closed days | Verified weekly hours per place, with a source and a date | **No.** Only a free-text "best time" exists. Must be collected by the team |
 | Seasonal changes (summer vs. winter hours, holidays)            | The same, per season                                      | **No**                                                                     |
 
@@ -161,13 +166,24 @@ Greece). The cheap time to make that possible is **now**:
 - `places` with a `short` summary, `user_place_visits` (visit tracking)
 - Saved items, Deals + QR codes, verified businesses
 - Moderation (report/block/mute) and the `/admin` workspace
-- Push notifications (a trip reminder is a natural later use)
+- Push notification subscription/delivery code (production worker provisioning
+  and deployment remain gated; a trip reminder is a later feature)
+- Ask a Local in Pulse (#65), simpler creation forms (#101), and Light / Dark /
+  System appearance (#102)
 
-What does **not** exist: any Essentials content, any trip/plan concept, region
-scoping, offline caching, tourist feedback collection, any reward mechanic
-beyond deals.
+What is **not integrated into current main**: Essentials, the trip planner or
+Trip tab, region scoping, offline caching, tourist feedback collection, or a
+reward mechanic beyond deals. The first three have reported local prototypes;
+their code and tests must be shared and reviewed before their status advances.
+The current service worker handles push notifications, not offline caching.
 
-## Phases (each one shippable on its own; none needs paid services)
+## Proposed phases (each one independently reviewable; no paid services required)
+
+This is the original product sequence, not a claim that the local prototypes
+follow it exactly. The reported Essentials v1 bundles device-local content
+without a table; evaluate that implementation before introducing the proposed
+database-backed editing below. Account/Trip implementation is deferred until
+the reliability/design integration is accepted.
 
 | Phase | What                                                                                          | Needs DB change? | Roughly |
 | ----- | --------------------------------------------------------------------------------------------- | ---------------- | ------- |

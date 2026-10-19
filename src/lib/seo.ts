@@ -13,7 +13,7 @@ export const siteMeta = [
   { name: "author", content: SITE_NAME },
   { name: "robots", content: "index, follow" },
   { name: "theme-color", content: THEME_COLOR },
-  { name: "color-scheme", content: "light" },
+  { name: "color-scheme", content: "light dark" },
   { property: "og:site_name", content: SITE_NAME },
   { property: "og:title", content: SITE_TITLE },
   { property: "og:description", content: SITE_DESCRIPTION },
