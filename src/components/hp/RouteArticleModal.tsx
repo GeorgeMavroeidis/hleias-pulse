@@ -94,7 +94,7 @@ export function RouteArticleModal({
                   >
                     <X size={16} />
                   </button>
-                  <div className="absolute bottom-3 left-4 right-4 text-hp-paper">
+                  <div className="absolute bottom-3 left-4 right-4 text-hp-on-media">
                     <div className="mb-1 flex gap-1.5">
                       {route.tags.map((t) => (
                         <span
