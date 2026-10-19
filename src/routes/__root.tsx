@@ -1,3 +1,4 @@
+import { ThemeProvider } from "../lib/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -124,12 +125,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="el">
+    <html lang="el" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script src="/theme-init.js" />
       </head>
       <body>
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
         <Scripts />
       </body>
     </html>

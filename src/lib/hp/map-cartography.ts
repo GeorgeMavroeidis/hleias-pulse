@@ -1,4 +1,11 @@
-import type { FilterSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
+import type {
+  FilterSpecification,
+  LayerSpecification,
+  Map as MapLibreMap,
+  StyleSpecification,
+} from "maplibre-gl";
+import type { ColorScheme } from "../theme";
+import { darkBasemapPaint } from "./map-theme";
 import { removeAdministrativeBoundaries } from "./map-core";
 
 /** Paint tokens are independent of density rules for Phase 6 atmosphere variants.
@@ -44,6 +51,43 @@ export const DAY_MAP_PALETTE: Readonly<MapCartographyPalette> = Object.freeze({
   majorRoad: "#e3c69f",
   majorCasing: "#b99c7b",
 });
+
+/** Phase 2 has one atmosphere. Phase 6 extends this resolver with its supplied clock. */
+export interface MapAppearance {
+  colorScheme: ColorScheme;
+  atmosphere: "day";
+}
+
+export const DARK_DAY_MAP_PALETTE: Readonly<MapCartographyPalette> = Object.freeze({
+  land: "#142230",
+  water: "#0b3047",
+  waterLine: "#28536a",
+  primaryText: "#dce2e5",
+  secondaryText: "#b3bdc8",
+  waterText: "#8ac5dc",
+  nature: "#213c39",
+  olive: "#35554a",
+  sand: "#464638",
+  urban: "#1c2d3c",
+  building: "#334555",
+  buildingOutline: "#425466",
+  minorRoad: "#506575",
+  minorCasing: "#273b4a",
+  secondaryRoad: "#74818a",
+  secondaryCasing: "#354957",
+  majorRoad: "#a28a70",
+  majorCasing: "#4b4b46",
+});
+
+const DAY_APPEARANCE_PALETTES = Object.freeze({
+  light: DAY_MAP_PALETTE,
+  dark: DARK_DAY_MAP_PALETTE,
+});
+
+/** ThemeProvider has already resolved System; map appearance adds no theme policy. */
+export function resolveMapPalette(appearance: MapAppearance): Readonly<MapCartographyPalette> {
+  return DAY_APPEARANCE_PALETTES[appearance.colorScheme];
+}
 
 // These are the actual Bright IDs inspected on 2026-10-01. Match IDs AND
 // types; do not recolor an upstream layer merely because its name looks similar.
@@ -346,4 +390,84 @@ export function createIliaMapStyle(
     ...boundaryFree,
     layers: boundaryFree.layers.map((layer) => styleLayer(layer, palette)),
   };
+}
+
+type MapColourProperty =
+  | "background-color"
+  | "fill-color"
+  | "fill-outline-color"
+  | "fill-extrusion-color"
+  | "line-color"
+  | "text-color"
+  | "text-halo-color";
+
+const COLOUR_PROPERTIES: readonly MapColourProperty[] = [
+  "background-color",
+  "fill-color",
+  "fill-outline-color",
+  "fill-extrusion-color",
+  "line-color",
+  "text-color",
+  "text-halo-color",
+];
+
+/**
+ * Compose from a captured, unthemed provider style before app overlays are installed.
+ * The pure fallback handles future provider IDs; the Bright ID/type rules then
+ * restore the reviewed hierarchy and apply Phase 2's one-time density/layout rules.
+ */
+export function createMapAppearanceStyle(
+  upstream: StyleSpecification,
+  appearance: MapAppearance,
+): StyleSpecification {
+  const palette = resolveMapPalette(appearance);
+  if (appearance.colorScheme === "light") return createIliaMapStyle(upstream, palette);
+  const darkStyle: StyleSpecification = {
+    ...upstream,
+    layers: upstream.layers.map((layer) => {
+      const fallback = darkBasemapPaint(layer, palette);
+      if (Object.keys(fallback).length === 0) return layer;
+      return {
+        ...layer,
+        paint: { ...("paint" in layer ? layer.paint : {}), ...fallback },
+      } as LayerSpecification;
+    }),
+  };
+  return createIliaMapStyle(darkStyle, palette);
+}
+
+/**
+ * The caller retains the same unthemed provider template used at initialization.
+ * Never use map.getStyle() here: its themed colors cannot restore Light originals.
+ * Only existing provider IDs and color paint/transition fields are written. App
+ * sources/layers, layout, geometry, camera, selection and markers remain untouched.
+ */
+export function applyMapAppearance(
+  map: Pick<MapLibreMap, "getLayer" | "setPaintProperty">,
+  upstream: StyleSpecification,
+  appearance: MapAppearance,
+  duration: number,
+): void {
+  const target = createMapAppearanceStyle(upstream, appearance);
+  const originals = new Map(upstream.layers.map((layer) => [layer.id, layer]));
+  const darkPalette = resolveMapPalette({ colorScheme: "dark", atmosphere: "day" });
+  for (const layer of target.layers) {
+    if (!map.getLayer(layer.id)) continue;
+    const original = originals.get(layer.id);
+    if (!original) continue;
+    // Dark fallback may add text colors or an extrusion color absent from Light.
+    // Include those properties on every update so returning to Light writes null.
+    const darkPaint = darkBasemapPaint(original, darkPalette);
+    const paint =
+      "paint" in layer ? (layer.paint as Record<string, unknown> | undefined) : undefined;
+    for (const property of COLOUR_PROPERTIES) {
+      if (!(property in darkPaint) && !Object.hasOwn(paint ?? {}, property)) continue;
+      map.setPaintProperty(layer.id, `${property}-transition`, { duration, delay: 0 });
+      map.setPaintProperty(
+        layer.id,
+        property as Parameters<MapLibreMap["setPaintProperty"]>[1],
+        (paint?.[property] ?? null) as Parameters<MapLibreMap["setPaintProperty"]>[2],
+      );
+    }
+  }
 }

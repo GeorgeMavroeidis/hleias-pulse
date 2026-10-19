@@ -61,6 +61,9 @@ jobs:
       - name: Test — comment drafts (offline)
         run: npm run test:comment-drafts
 
+      - name: Test — appearance and map theme
+        run: npm run test:theme
+
       - name: Test — truthful surfaces and refresh
         run: npm run test:surfaces
 
@@ -72,6 +75,8 @@ jobs:
 
       - name: Test — search, Deals and Saved recovery
         run: npm run test:recovery
+      - name: Test — place form defaults
+        run: npm run test:place-defaults
 
       - name: Test — push security
         run: npm run test:push-security
@@ -81,6 +86,12 @@ jobs:
 
       - name: Test — map visuals
         run: npm run test:map-visuals
+
+      - name: Test — map cartography and appearance
+        run: npm run test:map-cartography
+
+      - name: Test — interface motion
+        run: npm run test:motion
 
       - name: Test — route previews
         run: npm run test:routing
