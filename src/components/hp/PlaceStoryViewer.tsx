@@ -647,7 +647,7 @@ export function PlaceStoryViewer({
                       onClose();
                       onOpenPlace(group.placeId);
                     }}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-white py-2.5 text-[12px] font-extrabold text-hp-ink"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-hp-raised py-2.5 text-[12px] font-extrabold text-hp-ink"
                   >
                     <MapIcon size={14} /> {t("Map")}
                   </button>

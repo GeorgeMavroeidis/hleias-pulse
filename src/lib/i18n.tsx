@@ -71,6 +71,10 @@ const EL: Record<string, string> = {
   Remove: "Αφαίρεση",
   Refresh: "Ανανέωση",
   route: "διαδρομή",
+  "Color scheme": "Χρωματική εμφάνιση",
+  Light: "Φωτεινό",
+  Dark: "Σκοτεινό",
+  System: "Σύστημα",
   "Tonight's plan": "Το σχέδιο της βραδιάς",
   "Recent activity": "Πρόσφατη δραστηριότητα",
   "Explore this place": "Εξερεύνησε αυτό το σημείο",
@@ -297,6 +301,24 @@ const EL: Record<string, string> = {
   // Create composer — Blend redesign
   "Posting as": "Δημοσίευση ως",
   "Posting as {name}": "Δημοσίευση ως {name}",
+  "Add a vibe (optional)": "Πρόσθεσε διάθεση (προαιρετικό)",
+  "Hide vibes": "Απόκρυψη διάθεσης",
+  "Vibe ({n})": "Διάθεση ({n})",
+  "Where is it?": "Πού βρίσκεται;",
+  "Spot chosen": "Το σημείο ορίστηκε",
+  "Not set yet": "Δεν έχει οριστεί ακόμα",
+  "Use my location": "Χρήση της τοποθεσίας μου",
+  "Finding you…": "Σε εντοπίζουμε…",
+  "Tip: long-press the spot on the map and tap + to fill this in for you.":
+    "Συμβουλή: κράτα πατημένο το σημείο στον χάρτη και πάτα + για να συμπληρωθεί μόνο του.",
+  "Add more details (optional)": "Πρόσθεσε περισσότερες λεπτομέρειες (προαιρετικό)",
+  "Hide extra details": "Απόκρυψη επιπλέον λεπτομερειών",
+  "We fill this in from the nearest place": "Το συμπληρώνουμε από το πιο κοντινό σημείο",
+  "Exact coordinates": "Ακριβείς συντεταγμένες",
+  "Optional — we use a photo of a similar place":
+    "Προαιρετικό — βάζουμε φωτογραφία παρόμοιου σημείου",
+  "New places are checked by our team before everyone sees them.":
+    "Τα νέα σημεία ελέγχονται από την ομάδα μας πριν τα δουν όλοι.",
   "Profile identity will be stored with this contribution":
     "Η ταυτότητα του προφίλ σου θα αποθηκευτεί με αυτή την καταχώριση",
   "Sign in to post": "Συνδέσου για να δημοσιεύσεις",

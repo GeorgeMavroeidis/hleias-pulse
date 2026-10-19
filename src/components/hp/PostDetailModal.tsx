@@ -117,7 +117,7 @@ export function PostDetailModal({
                       <div className="flex items-center gap-1.5">
                         <span className="text-[13px] font-bold text-hp-ink">{a.name}</span>
                         <span
-                          className="rounded-sm px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-paper"
+                          className="rounded-sm px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-on-media"
                           style={{ background: authorTypeColor[a.type] }}
                         >
                           {a.type}

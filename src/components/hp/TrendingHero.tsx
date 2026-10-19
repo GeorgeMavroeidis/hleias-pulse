@@ -85,7 +85,7 @@ export function TrendingHero({
             {t("Parking reported full")}
           </span>
         )}
-        <div className="absolute bottom-3 left-4 right-4 text-hp-paper">
+        <div className="absolute bottom-3 left-4 right-4 text-hp-on-media">
           <p className="flex items-center gap-1 text-xs">
             <MapPin size={12} />
             {place.area}

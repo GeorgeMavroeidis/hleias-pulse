@@ -261,9 +261,14 @@ console.log(
 // These source contracts complement the recovery unit suites and pending browser checks.
 assert.match(mapSource, /startMapInitialization/);
 assert.match(mapSource, /attempt\.ready\(\)/);
-assert.match(mapSource, /if \(!previewMode\) installRegionalLayer\(map\)/);
+assert.match(mapSource, /if \(!previewMode\) installRegionalLayer\(map[,)]/);
 assert.match(mapSource, /if \(previewMode \|\| !maplibre \|\| !map \|\| !mapReady\) return/);
-assert.match(mapSource, /sources: \{\}/);
+const previewSource = readFileSync(
+  new URL("../src/lib/hp/map-preview-appearance.ts", import.meta.url),
+  "utf8",
+);
+assert.match(previewSource, /sources: \{\}/);
+assert.match(mapSource, /createLocalPreviewBasemapStyle\(resolveMapPalette/);
 assert.match(mapSource, /attachLocalPreviewLand/);
 assert.match(mapSource, /hp-preview-region-marker/);
 assert.match(mapSource, /hp-map-recovery__places/);

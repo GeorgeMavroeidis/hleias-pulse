@@ -14,7 +14,7 @@ import {
 import { uploadCulturalEventPoster } from "@/lib/hp-api";
 
 function fieldClass() {
-  return "w-full rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none placeholder:text-hp-muted";
+  return "w-full rounded-2xl border border-hp-ink/10 bg-hp-raised/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none placeholder:text-hp-muted";
 }
 
 // datetime-local wants "YYYY-MM-DDTHH:mm" in the viewer's local time, so an
@@ -239,7 +239,7 @@ export function OrganizerEventComposer({ open, lang, onClose, onSubmit, event, o
                   value={posterUrl}
                   onChange={(e) => setPosterUrl(e.target.value)}
                 />
-                <label className="shrink-0 cursor-pointer rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5 text-hp-ink">
+                <label className="shrink-0 cursor-pointer rounded-2xl border border-hp-ink/10 bg-hp-raised/60 px-3 py-2.5 text-hp-ink">
                   <ImagePlus size={16} />
                   <input
                     type="file"

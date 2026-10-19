@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../../lib/i18n";
+import { ThemeProvider } from "../../lib/theme-provider";
 import type { SavedContent } from "../../lib/hp/saved-items";
 // Rendering only: imported containers reach the app client, but these checks
 // must remain offline and must never initialize it against the hosted project.
@@ -100,23 +101,25 @@ test("Deals distinguishes loading, failure and successful empty; recovery action
 
 test("collapsed search keeps the query and a dedicated accessible clear control", () => {
   const html = renderToStaticMarkup(
-    <I18nProvider>
-      <TopBar
-        query="quiet beach"
-        setQuery={noop}
-        onSetLanguage={noop}
-        markerMotion="calm"
-        onSetMarkerMotion={noop}
-        appearanceOpen={false}
-        setAppearanceOpen={noop}
-        showSearch={false}
-        setShowSearch={noop}
-        account={{ status: "signedOut" }}
-        onOpenAccount={noop}
-        onOpenAuth={noop}
-        onOpenDeals={noop}
-      />
-    </I18nProvider>,
+    <ThemeProvider>
+      <I18nProvider>
+        <TopBar
+          query="quiet beach"
+          setQuery={noop}
+          onSetLanguage={noop}
+          markerMotion="calm"
+          onSetMarkerMotion={noop}
+          appearanceOpen={false}
+          setAppearanceOpen={noop}
+          showSearch={false}
+          setShowSearch={noop}
+          account={{ status: "signedOut" }}
+          onOpenAccount={noop}
+          onOpenAuth={noop}
+          onOpenDeals={noop}
+        />
+      </I18nProvider>
+    </ThemeProvider>,
   );
   assert.match(html, /Αναζήτηση: quiet beach/);
   assert.match(html, /aria-label="Καθαρισμός αναζήτησης"/);

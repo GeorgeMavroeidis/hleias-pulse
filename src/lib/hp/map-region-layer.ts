@@ -3,7 +3,7 @@ import type {
   Map as MapLibreMap,
   SymbolLayerSpecification,
 } from "maplibre-gl";
-import { DAY_MAP_PALETTE } from "./map-cartography";
+import { DAY_MAP_PALETTE, type MapCartographyPalette } from "./map-cartography";
 import { MAP_POLICY, mapDisclosure } from "./map-policy";
 import type { RegionalDiscovery } from "./regional-discovery";
 import type { TranslationParams } from "../i18n";
@@ -107,7 +107,9 @@ export function regionalGeoJson(
   };
 }
 
-export function regionalSymbolLayer(): SymbolLayerSpecification {
+export function regionalSymbolLayer(
+  palette: Readonly<MapCartographyPalette> = DAY_MAP_PALETTE,
+): SymbolLayerSpecification {
   const stops: unknown[] = [];
   for (let step = 0; step <= 10; step++) {
     const zoom = MAP_POLICY.regionFadeStart + step / 10;
@@ -149,50 +151,96 @@ export function regionalSymbolLayer(): SymbolLayerSpecification {
     paint: {
       "icon-opacity": opacity,
       "text-opacity": opacity,
-      "text-color": DAY_MAP_PALETTE.primaryText,
-      "text-halo-color": DAY_MAP_PALETTE.land,
+      "text-color": palette.primaryText,
+      "text-halo-color": palette.land,
       "text-halo-width": 2,
       "text-halo-blur": 0.5,
     },
   };
 }
 
-/** One code-drawn sprite, matching existing Pulse geometry. No remote assets. */
-export function installRegionalLayer(map: MapLibreMap) {
+type RegionalPaintMap = Pick<MapLibreMap, "getLayer" | "setPaintProperty"> &
+  Partial<Pick<MapLibreMap, "hasImage" | "updateImage">>;
+type RegionalSprite = { id: string; selected: boolean; context: CanvasRenderingContext2D };
+const regionalSprites = new WeakMap<
+  object,
+  { sprites: RegionalSprite[]; accent: string; signature: string }
+>();
+const spriteSignature = (palette: Readonly<MapCartographyPalette>) =>
+  `${palette.land}:${palette.primaryText}`;
+
+function drawRegionalSprite(
+  sprite: RegionalSprite,
+  palette: Readonly<MapCartographyPalette>,
+  accent: string,
+) {
+  const ctx = sprite.context;
+  ctx.clearRect(0, 0, 64, 64);
+  ctx.fillStyle = palette.land;
+  ctx.beginPath();
+  ctx.arc(32, 32, 19, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = palette.primaryText;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(32, 32, 14, 0, Math.PI * 2);
+  ctx.fill();
+  if (sprite.selected) {
+    ctx.beginPath();
+    ctx.arc(32, 32, 25, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  return ctx.getImageData(0, 0, 64, 64);
+}
+
+/** Palette colors share the existing sprite IDs and geometry. Activity accent is independent. */
+export function installRegionalLayer(
+  map: MapLibreMap,
+  palette: Readonly<MapCartographyPalette> = DAY_MAP_PALETTE,
+) {
   if (map.getSource(REGION_SOURCE_ID)) return;
-  const sunset =
+  const accent =
     getComputedStyle(map.getContainer()).getPropertyValue("--hp-sunset").trim() || "#ed7948";
-  for (const selected of [false, true]) {
+  const sprites = [false, true].map((selected) => {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 64;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Regional sprite unavailable");
-    ctx.fillStyle = DAY_MAP_PALETTE.land;
-    ctx.beginPath();
-    ctx.arc(32, 32, 19, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = DAY_MAP_PALETTE.primaryText;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = sunset;
-    ctx.beginPath();
-    ctx.arc(32, 32, 14, 0, Math.PI * 2);
-    ctx.fill();
-    if (selected) {
-      ctx.beginPath();
-      ctx.arc(32, 32, 25, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    map.addImage(
-      selected ? "hp-region-selected" : "hp-region-core",
-      ctx.getImageData(0, 0, 64, 64),
-      { pixelRatio: 2 },
-    );
-  }
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Regional sprite unavailable");
+    const sprite = { id: selected ? "hp-region-selected" : "hp-region-core", selected, context };
+    map.addImage(sprite.id, drawRegionalSprite(sprite, palette, accent), { pixelRatio: 2 });
+    return sprite;
+  });
   map.addSource(REGION_SOURCE_ID, {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
   });
   // Last symbol layer places first in MapLibre's reverse-order collision pass.
-  map.addLayer(regionalSymbolLayer());
+  map.addLayer(regionalSymbolLayer(palette));
+  regionalSprites.set(map, { sprites, accent, signature: spriteSignature(palette) });
+}
+
+/** Update colors only: no source, layer, sprite ID, disclosure, geometry or marker replacement. */
+export function applyRegionalMapPalette(
+  map: RegionalPaintMap,
+  palette: Readonly<MapCartographyPalette>,
+  duration: number,
+) {
+  if (!map.getLayer(REGION_LAYER_ID)) return;
+  for (const [property, value] of [
+    ["text-color", palette.primaryText],
+    ["text-halo-color", palette.land],
+  ] as const) {
+    map.setPaintProperty(REGION_LAYER_ID, `${property}-transition`, { duration, delay: 0 });
+    map.setPaintProperty(REGION_LAYER_ID, property, value);
+  }
+  const cached = regionalSprites.get(map);
+  if (!cached || cached.signature === spriteSignature(palette) || !map.hasImage || !map.updateImage)
+    return;
+  for (const sprite of cached.sprites) {
+    if (map.hasImage(sprite.id))
+      map.updateImage(sprite.id, drawRegionalSprite(sprite, palette, cached.accent));
+  }
+  cached.signature = spriteSignature(palette);
 }
