@@ -35,7 +35,7 @@ name: Smoke
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/local-traffic-preview, "feat/reliability-*"]
   push:
     branches: [main]
 

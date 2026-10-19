@@ -6,6 +6,10 @@
   "packageManager": "npm@10.9.2",
   "scripts": {
     "dev": "vite dev",
+    "dev:local": "node --import tsx scripts/local-browser.ts dev",
+    "build:local-test": "node --import tsx scripts/local-browser.ts build",
+    "preview:local-test": "node --import tsx scripts/local-browser.ts preview",
+    "test:local-browser": "node --import tsx --test scripts/local-browser.test.ts",
     "build": "npm run build:static",
     "build:tanstack": "vite build",
     "build:dev": "vite build --mode development",

@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import type { Database } from "./database.types";
+import { browserLocalConfig, localOnlyFetch, type BrowserBuildEnv } from "./browser-local-config";
 
 // The live project. Public by design: a publishable key is meant to ship to the
 // browser. The secret that must never be committed is the service_role key.
@@ -31,8 +32,12 @@ function nodeEnv(name: string): string | undefined {
   return value ? value : undefined;
 }
 
-const supabaseUrl = nodeEnv("SUPABASE_URL") ?? productionUrl;
-const supabasePublishableKey = nodeEnv("SUPABASE_PUBLISHABLE_KEY") ?? productionPublishableKey;
+const buildEnv = (import.meta as ImportMeta & { env?: BrowserBuildEnv }).env ?? {};
+const browserHostname = (globalThis as { location?: { hostname?: string } }).location?.hostname;
+const localBrowser = browserLocalConfig(buildEnv, browserHostname);
+const supabaseUrl = localBrowser?.url ?? nodeEnv("SUPABASE_URL") ?? productionUrl;
+const supabasePublishableKey =
+  localBrowser?.publishableKey ?? nodeEnv("SUPABASE_PUBLISHABLE_KEY") ?? productionPublishableKey;
 
 if (nodeEnv("HLEIAS_LOCAL_ONLY") === "1") {
   const configuredUrl = nodeEnv("SUPABASE_URL");
@@ -63,6 +68,7 @@ if (nodeEnv("CI") && supabaseUrl === productionUrl) {
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabasePublishableKey, {
+  ...(localBrowser ? { global: { fetch: localOnlyFetch(localBrowser.url) } } : {}),
   auth: {
     autoRefreshToken: true,
     detectSessionInUrl: true,

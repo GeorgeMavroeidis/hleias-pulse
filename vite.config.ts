@@ -8,6 +8,8 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   vite: {
+    // The local wrapper supplies only status-derived public configuration.
+    envDir: process.env.VITE_HLEIAS_LOCAL_ONLY === "1" ? false : undefined,
     // MapLibre creates its own module worker at runtime. Vite's dependency
     // optimizer otherwise rewrites that worker to a transient prebundle path.
     optimizeDeps: { exclude: ["maplibre-gl"] },
