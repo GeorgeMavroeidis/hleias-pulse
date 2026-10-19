@@ -58,6 +58,8 @@
     "test:freshness": "node --import tsx --test src/lib/hp/freshness.test.ts src/lib/hp/pulse-activity.test.ts src/lib/hp/post-time.test.ts src/lib/hp/traffic-preview.test.ts",
     "test:creation": "node --import tsx --test src/lib/hp/meet-time.test.ts src/components/hp/CreateComposerModal.test.tsx scripts/hp-meet-validation.test.ts",
     "smoke:meet-time": "node --import tsx scripts/smoke-meet-time.ts",
+    "test:comment-drafts": "node --import tsx --test src/lib/hp/comment-drafts.test.ts src/components/hp/CommentComposer.test.tsx scripts/comment-api.test.ts",
+    "smoke:comment-drafts": "node --import tsx scripts/smoke-comment-drafts.ts",
     "test:theme": "tsx --test src/lib/theme.test.ts src/lib/hp/map-theme.test.ts"
   },
   "dependencies": {

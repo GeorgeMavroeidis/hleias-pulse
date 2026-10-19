@@ -1,4 +1,6 @@
-import { useState, type ReactNode } from "react";
+import type { CommentDraftBinding } from "@/lib/hp/comment-drafts";
+import { CommentComposer, CommentReviewStatus } from "./CommentComposer";
+import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bookmark,
@@ -51,7 +53,7 @@ export function PlaceDetailModal({
   onOpenMap,
   onShare,
   comments,
-  onComment,
+  commentDraft,
   findAuthor,
   findPostAuthor,
   storyGroups,
@@ -73,7 +75,7 @@ export function PlaceDetailModal({
   onOpenMap: (id: string) => void;
   onShare: (place: Place) => void;
   comments: Comment[];
-  onComment: (id: string, text: string) => void;
+  commentDraft?: CommentDraftBinding;
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
   storyGroups: PlaceStoryGroup[];
@@ -84,7 +86,6 @@ export function PlaceDetailModal({
   onGetDealCode: () => void;
   gettingDealCode: boolean;
 }) {
-  const [commentText, setCommentText] = useState("");
   const { language, t } = useI18n();
   const eventCount = place ? events.filter((event) => event.placeId === place.id).length : 0;
   const noteCount = place ? place.commentCount + comments.length : 0;
@@ -404,43 +405,25 @@ export function PlaceDetailModal({
                 >
                   {language === "GR" ? "Γρήγορο σχόλιο" : "Quick comment"}
                 </label>
-                <div className="mt-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
-                  <input
-                    id={`place-detail-comment-${place.id}`}
-                    name={`place-detail-comment-${place.id}`}
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    autoComplete="off"
+                <div className="mt-2">
+                  <CommentComposer
+                    binding={commentDraft}
+                    inputId={`place-detail-comment-${place.id}`}
+                    label={language === "GR" ? "Γρήγορο σχόλιο" : "Quick comment"}
                     placeholder={t("Add a local note…")}
-                    className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && commentText.trim()) {
-                        onComment(place.id, commentText.trim());
-                        setCommentText("");
-                      }
-                    }}
+                    submitLabel={t("Post comment")}
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (commentText.trim()) {
-                        onComment(place.id, commentText.trim());
-                        setCommentText("");
-                      }
-                    }}
-                    className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
-                    disabled={!commentText.trim()}
-                    aria-label={`Post comment on ${place.name}`}
-                  >
-                    <Send size={12} />
-                  </button>
                 </div>
                 {comments.length > 0 && (
                   <div className="mt-3 flex flex-col gap-2">
                     {comments.slice(-3).map((c, i) => (
-                      <div key={i} className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]">
+                      <div
+                        key={c.id ?? i}
+                        className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]"
+                      >
                         <span className="font-bold text-hp-ink">{c.author}</span>{" "}
                         <span className="text-hp-ink/80">{c.text}</span>
+                        <CommentReviewStatus comment={c} />
                       </div>
                     ))}
                   </div>
