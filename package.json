@@ -41,6 +41,7 @@
     "smoke:verification-guards": "tsx scripts/smoke-verification-guards.ts",
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
+    "test:place-defaults": "tsx --test src/lib/hp/place-defaults.test.ts",
     "test:push-security": "tsx --test scripts/push-security.test.ts",
     "test:function-privileges": "tsx scripts/test-function-privileges.ts",
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
@@ -56,7 +57,8 @@
     "check:migration-versions": "tsx scripts/check-migration-versions.ts",
     "test:freshness": "node --import tsx --test src/lib/hp/freshness.test.ts src/lib/hp/pulse-activity.test.ts src/lib/hp/post-time.test.ts src/lib/hp/traffic-preview.test.ts",
     "test:creation": "node --import tsx --test src/lib/hp/meet-time.test.ts src/components/hp/CreateComposerModal.test.tsx scripts/hp-meet-validation.test.ts",
-    "smoke:meet-time": "node --import tsx scripts/smoke-meet-time.ts"
+    "smoke:meet-time": "node --import tsx scripts/smoke-meet-time.ts",
+    "test:theme": "tsx --test src/lib/theme.test.ts src/lib/hp/map-theme.test.ts"
   },
   "dependencies": {
     "@capacitor/app-launcher": "^8.0.1",

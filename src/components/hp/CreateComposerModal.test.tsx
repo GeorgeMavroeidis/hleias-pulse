@@ -82,7 +82,9 @@ test("contextual place selection uses only the given valid place ID", () => {
   const html = renderComposer("post", "two");
   assert.match(html, /data-testid="composer-post-place"[^>]*value="two"/);
   assert.match(html, /Chosen beach/);
-  assert.equal((html.match(/aria-selected="true"/g) ?? []).length, 1);
+  // Keep the simpler composer compact for a deliberately supplied place.
+  assert.match(html, /aria-expanded="false"/);
+  assert.doesNotMatch(html, /role="listbox"/);
   assert.doesNotMatch(renderComposer("post", "missing"), /aria-selected="true"/);
 });
 

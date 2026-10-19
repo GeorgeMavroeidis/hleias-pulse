@@ -20,7 +20,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export function fieldClass() {
-  return "w-full rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none transition placeholder:text-hp-muted focus:border-hp-sunset/45 focus:bg-white/85";
+  return "w-full rounded-2xl border border-hp-ink/10 bg-hp-raised/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none transition placeholder:text-hp-muted focus:border-hp-sunset/45 focus:bg-hp-raised/85";
 }
 
 export type SegmentOption<T extends string> = { id: T; label: string; helper: string };
@@ -37,7 +37,7 @@ export function IdentitySegments<T extends string>({
 }) {
   const { t } = useI18n();
   return (
-    <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
+    <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-hp-raised/50 p-1.5">
       {options.map((option) => {
         const active = value === option.id;
         return (
