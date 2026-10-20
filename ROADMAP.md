@@ -37,6 +37,22 @@ the web build first and the iOS app during the season.
 
 ---
 
+## Appearance and reliability integration
+
+The simpler composer (#101) and app-wide Light / Dark / System preferences (#102)
+are merged into main. Appearance remains device-local; live publication is deferred.
+
+The existing reliability and map-design PRs are being consolidated in order,
+preserving those changes. The final integration combines explicit place selection,
+Athens Meet-time validation, comment drafts, recovery and shared freshness, compact
+markers, Pulse / Calm motion, discovery sheets and a single appearance/atmosphere
+map palette. Dark stays navy across time periods; Light retains its temporal colors.
+
+See [the integration handoff](docs/reliability-integration.md) for branch/worktree
+contents and the merge procedure. Combined acceptance is required before human
+merges. Account redesign and Trip implementation remain separate work; hosted
+database changes, deployment and historical-worktree cleanup are deferred.
+
 ## Right now
 
 **Stage 1 (REPAIR) is done. We're in Stage 2 (BUILD).**
@@ -84,8 +100,8 @@ free-tier services. The paid/Apple track starts in February.
    one guarded connection helper (`scripts/lib/pg.ts`) instead of eight
    hand-copied ones. Left over: `smoke:admin`, `smoke:routes` and
    `smoke:verification-guards` still carry their own copy of that block.
-3. **Confirm the web deploy works end to end** — *build artifact verified
-   (2026-09-07), actual live Cloudflare deploy still unverified.* Built
+3. **Confirm the web deploy works end to end** — _build artifact verified
+   (2026-09-07), actual live Cloudflare deploy still unverified._ Built
    `cloudflare-static-dist` fresh off `main` and served it through
    `wrangler dev` (the same static-assets + SPA-fallback runtime Cloudflare
    uses, no account needed to run it locally): onboarding, map, Pulse feed,

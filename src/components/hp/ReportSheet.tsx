@@ -126,7 +126,7 @@ export function ReportSheet({
                 </p>
 
                 {target.summary && (
-                  <p className="mb-3 line-clamp-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2 text-[12px] italic text-hp-ink/75">
+                  <p className="mb-3 line-clamp-2 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 px-3 py-2 text-[12px] italic text-hp-ink/75">
                     {target.summary}
                   </p>
                 )}
@@ -145,7 +145,7 @@ export function ReportSheet({
                         className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition active:scale-[0.99] ${
                           active
                             ? "border-hp-sunset bg-hp-sunset/10"
-                            : "border-hp-ink/10 bg-white/50"
+                            : "border-hp-ink/10 bg-hp-raised/50"
                         }`}
                       >
                         <span
@@ -178,7 +178,7 @@ export function ReportSheet({
                     rows={3}
                     maxLength={400}
                     placeholder={t("What should we look at?")}
-                    className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none transition placeholder:text-hp-muted focus:border-hp-sunset/45 focus:bg-white/85"
+                    className="w-full resize-none rounded-2xl border border-hp-ink/10 bg-hp-raised/60 px-3 py-2.5 text-[13px] text-hp-ink outline-none transition placeholder:text-hp-muted focus:border-hp-sunset/45 focus:bg-hp-raised/85"
                   />
                 </label>
 
@@ -189,7 +189,7 @@ export function ReportSheet({
                     aria-checked={alsoBlock}
                     onClick={() => setAlsoBlock((value) => !value)}
                     className={`mt-2 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition active:scale-[0.99] ${
-                      alsoBlock ? "border-hp-ink bg-hp-ink/5" : "border-hp-ink/10 bg-white/50"
+                      alsoBlock ? "border-hp-ink bg-hp-ink/5" : "border-hp-ink/10 bg-hp-raised/50"
                     }`}
                   >
                     <span

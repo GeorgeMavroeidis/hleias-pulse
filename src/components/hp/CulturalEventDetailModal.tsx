@@ -119,7 +119,7 @@ export function CulturalEventDetailModal({
                   </button>
                   <div className="absolute left-3 top-3 flex items-center gap-1.5">
                     <span
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-paper shadow"
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide text-hp-on-media dark:text-[#101c2a] shadow"
                       style={{ background: meta.tone }}
                     >
                       <TypeIcon size={10} strokeWidth={2.6} /> {tr(lang, meta.label)}

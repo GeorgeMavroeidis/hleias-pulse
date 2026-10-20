@@ -262,12 +262,14 @@ console.log(
 // These source contracts complement the recovery unit suites and pending browser checks.
 assert.match(mapSource, /startMapInitialization/);
 assert.match(mapSource, /attempt\.ready\(\)/);
-assert.match(
-  mapSource,
-  /if \(!previewMode\) \{\s*applyMapPalette\(map, palette, 0\);\s*installRegionalLayer\(map, palette\);\s*\}/,
-);
+assert.match(mapSource, /if \(!previewMode\) installRegionalLayer\(map[,)]/);
 assert.match(mapSource, /if \(previewMode \|\| !maplibre \|\| !map \|\| !mapReady\) return/);
-assert.match(mapSource, /sources: \{\}/);
+const previewSource = readFileSync(
+  new URL("../src/lib/hp/map-preview-appearance.ts", import.meta.url),
+  "utf8",
+);
+assert.match(previewSource, /sources: \{\}/);
+assert.match(mapSource, /createLocalPreviewBasemapStyle\(resolveMapPalette/);
 assert.match(mapSource, /attachLocalPreviewLand/);
 assert.match(mapSource, /hp-preview-region-marker/);
 assert.match(mapSource, /hp-map-recovery__places/);
@@ -297,10 +299,19 @@ assert.match(
   /if \(previewMode \|\| !mapHasLoaded \|\| !map \|\| mapRef\.current !== map\) return/,
 );
 assert.match(mapSource, /framedRouteRevisionRef\.current !== routeFrameRevision/);
-assert.match(mapSource, /applyRegionalMapPalette\(map, palette, duration\)/);
-assert.match(mapSource, /if \(mapRef\.current !== map\) return/);
-assert.match(mapSource, /hp-preview-sea/);
-assert.match(mapSource, /svg\[data-hp-preview-land\] path/);
+assert.match(
+  mapSource,
+  /applyRegionalMapPalette\(session\.map, resolveMapPalette\(appearance\), duration\)/,
+);
+assert.match(
+  mapSource,
+  /if \(mapRef\.current !== session\.map \|\| appearanceSessionRef\.current !== session\) return/,
+);
+assert.match(previewSource, /hp-preview-sea/);
+assert.match(
+  mapSource,
+  /applyPreviewMapPalette\(\s*session\.map,\s*session\.previewLand,\s*resolveMapPalette\(appearance\),\s*duration/,
+);
 assert.doesNotMatch(mapSource, /\.setStyle\(/);
 assert.match(mapSource, /locationRequestRef\.current\?\.cancel\(\)/);
 assert.match(mapSource, /if \(!previewMode && mapReady\) locationRequest\.start/);

@@ -384,6 +384,7 @@ function regionalMapFixture(availableContext: boolean) {
     fillStyle: "",
     strokeStyle: "",
     lineWidth: 0,
+    clearRect() {},
     beginPath() {},
     arc() {},
     fill() {},

@@ -1,3 +1,16 @@
+import { useTheme } from "@/lib/theme-provider";
+import {
+  applyMapAppearance,
+  createMapAppearanceStyle,
+  resolveMapPalette,
+  type MapAppearance,
+} from "@/lib/hp/map-cartography";
+import {
+  applyPreviewMapPalette,
+  attachLocalPreviewLand,
+  createLocalPreviewBasemapStyle,
+  type PreviewLandLayer,
+} from "@/lib/hp/map-preview-appearance";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { Button } from "@/components/ui/button";
 import { HP_MOTION, HP_MAP_EASE } from "@/lib/hp/motion";
@@ -15,7 +28,6 @@ import {
   pointIsInSafeRect,
 } from "@/lib/hp/map-sheet-camera";
 import { createMarkerExits } from "@/lib/hp/marker-exit";
-import { IONIAN_LAND_POLYGONS } from "@/lib/hp/ionian-land";
 import { isFatalBasemapError } from "@/lib/hp/map-core";
 import {
   createMapViewportSync,
@@ -69,13 +81,6 @@ import type {
   GeoJSONSource,
 } from "maplibre-gl";
 import { type EventItem, type Place } from "@/lib/hp-model";
-import {
-  applyMapPalette,
-  applyMapColourUpdates,
-  ATMOSPHERE_MAP_PALETTES,
-  createIliaMapStyle,
-  type MapCartographyPalette,
-} from "@/lib/hp/map-cartography";
 import { ATMOSPHERE_TRANSITION_MS, type AtmospherePaletteKey } from "@/lib/hp/temporal-atmosphere";
 import { areaIdForPlace, type AreaTone } from "@/lib/hp/area-catalog";
 import { eventCountForPlace, type MapAreaCluster } from "@/lib/hp/map-clusters";
@@ -111,103 +116,50 @@ import type { TranslationParams } from "@/lib/i18n";
 
 const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
 
-async function loadIliaBasemap(
-  signal: AbortSignal,
-  palette: Readonly<MapCartographyPalette>,
-): Promise<StyleSpecification> {
+async function loadProviderBasemap(signal: AbortSignal): Promise<StyleSpecification> {
   const response = await fetch(OPENFREEMAP_STYLE_URL, { signal });
   if (!response.ok) {
     throw new Error(`Basemap style request failed (${response.status}).`);
   }
-  return createIliaMapStyle((await response.json()) as StyleSpecification, palette);
+  return (await response.json()) as StyleSpecification;
 }
 
-/** A source-free style avoids worker-backed tile/GeoJSON loading in the local preview. */
-function localPreviewBasemapStyle(palette: Readonly<MapCartographyPalette>): StyleSpecification {
-  return {
-    version: 8,
-    name: "Ilia local preview",
-    sources: {},
-    layers: [
-      {
-        id: "hp-preview-sea",
-        type: "background",
-        paint: { "background-color": palette.water },
-      },
-    ],
+/** Each map attempt owns its untouched provider template or its source-free SVG preview. */
+type MapAppearanceSession = {
+  map: MapLibreMap;
+  provider: StyleSpecification | null;
+  previewLand: PreviewLandLayer | null;
+};
+
+function captureProviderStyle(style: StyleSpecification): StyleSpecification {
+  const captured = structuredClone(style);
+  const freeze = (value: unknown): void => {
+    if (value && typeof value === "object") {
+      Object.freeze(value);
+      Object.values(value).forEach(freeze);
+    }
   };
+  freeze(captured);
+  return captured;
 }
 
-/**
- * Project the bundled Natural Earth coast into an SVG above the preview canvas.
- * MapLibre's GeoJSON worker is unavailable in some embedded browsers, but its
- * map projection and DOM markers still work there. This layer uses neither a
- * worker nor a network request and stays aligned during pan and zoom.
- */
-function attachLocalPreviewLand(
-  map: MapLibreMap,
-  palette: Readonly<MapCartographyPalette>,
-): () => void {
-  const namespace = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(namespace, "svg");
-  svg.setAttribute("aria-hidden", "true");
-  svg.dataset.hpPreviewLand = "true";
-  svg.style.position = "absolute";
-  svg.style.inset = "0";
-  svg.style.width = "100%";
-  svg.style.height = "100%";
-  svg.style.zIndex = "1";
-  svg.style.pointerEvents = "none";
-  const paths = IONIAN_LAND_POLYGONS.map(() => {
-    const path = document.createElementNS(namespace, "path");
-    path.setAttribute("fill", palette.land);
-    path.setAttribute("stroke", palette.olive);
-    path.setAttribute("stroke-width", "1.2");
-    path.setAttribute("stroke-linejoin", "round");
-    path.setAttribute("fill-rule", "evenodd");
-    svg.append(path);
-    return path;
-  });
-  map.getCanvasContainer().append(svg);
-
-  let active = true;
-  let frame: number | null = null;
-  const draw = () => {
-    frame = null;
-    if (!active) return;
-    const width = map.getContainer().clientWidth;
-    const height = map.getContainer().clientHeight;
-    if (width <= 0 || height <= 0) return;
-    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    IONIAN_LAND_POLYGONS.forEach((polygon, index) => {
-      const d = polygon
-        .map(
-          (ring) =>
-            ring
-              .map(([lng, lat], pointIndex) => {
-                const point = map.project([lng, lat]);
-                return `${pointIndex === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
-              })
-              .join(" ") + " Z",
-        )
-        .join(" ");
-      paths[index].setAttribute("d", d);
-    });
-  };
-  const scheduleDraw = () => {
-    if (!active || frame !== null) return;
-    frame = window.requestAnimationFrame(draw);
-  };
-  map.on("move", scheduleDraw);
-  map.on("resize", scheduleDraw);
-  scheduleDraw();
-  return () => {
-    active = false;
-    map.off("move", scheduleDraw);
-    map.off("resize", scheduleDraw);
-    if (frame !== null) window.cancelAnimationFrame(frame);
-    svg.remove();
-  };
+/** Shared by initial readiness and the one runtime appearance effect. */
+function paintMapAppearance(
+  session: MapAppearanceSession,
+  appearance: MapAppearance,
+  duration: number,
+): void {
+  if (session.previewLand) {
+    applyPreviewMapPalette(
+      session.map,
+      session.previewLand,
+      resolveMapPalette(appearance),
+      duration,
+    );
+  } else if (session.provider) {
+    applyMapAppearance(session.map, session.provider, appearance, duration);
+    applyRegionalMapPalette(session.map, resolveMapPalette(appearance), duration);
+  }
 }
 
 type LatLngTuple = [number, number];
@@ -486,6 +438,12 @@ export function SocialMap({
   previewMode = false,
 }: Props) {
   const { t, language } = useI18n();
+  const { colorScheme, ready: themeReady } = useTheme();
+  const appearance: MapAppearance = { colorScheme, atmosphere: atmospherePalette };
+  const appearanceRef = useRef(appearance);
+  appearanceRef.current = appearance;
+  const palette = resolveMapPalette(appearance);
+  const appearanceSessionRef = useRef<MapAppearanceSession | null>(null);
   const selectedAreaId = selection
     ? selection.kind === "idle"
       ? null
@@ -496,8 +454,6 @@ export function SocialMap({
       ? selection.placeId
       : null
     : legacySelectedPlaceId;
-  const atmospherePaletteRef = useRef(atmospherePalette);
-  atmospherePaletteRef.current = atmospherePalette;
   const initialCameraRef = useRef(initialCamera);
   const framedRouteRevisionRef = useRef(initialCamera?.framedRouteRevision ?? null);
   const focusSheetHeightsRef = useRef(
@@ -1009,7 +965,12 @@ export function SocialMap({
   }, [clusterById, flyToOverview, mapReady, selectedAreaId, selectedPlaceId, zoomIntoCluster]);
 
   useEffect(() => {
+    // Keep the bootstrap's CSS background until the saved/System preference is
+    // resolved, and construct the map only once that first appearance is known.
+    if (!themeReady) return;
     let map: MapLibreMap | null = null;
+    let providerTemplate: StyleSpecification | null = null;
+    let appearanceSession: MapAppearanceSession | null = null;
     let mapHasLoaded = false;
     let zoomFrame: number | null = null;
     let effectsResumeFrame: number | null = null;
@@ -1038,17 +999,21 @@ export function SocialMap({
           () =>
             previewMode
               ? Promise.resolve(
-                  localPreviewBasemapStyle(ATMOSPHERE_MAP_PALETTES[atmospherePaletteRef.current]),
+                  createLocalPreviewBasemapStyle(resolveMapPalette(appearanceRef.current)),
                 )
-              : loadIliaBasemap(signal, ATMOSPHERE_MAP_PALETTES[atmospherePaletteRef.current]),
+              : loadProviderBasemap(signal),
         ),
       createMap: (maplibre, basemapStyle) => {
         if (!container) throw new Error("Map container unavailable");
         maplibre.setWorkerUrl(mapWorkerUrl);
         maplibreModuleRef.current = maplibre;
+        providerTemplate = previewMode ? null : captureProviderStyle(basemapStyle);
+        const currentAppearance = appearanceRef.current;
         return new maplibre.Map({
           container,
-          style: basemapStyle,
+          style: providerTemplate
+            ? createMapAppearanceStyle(providerTemplate, currentAppearance)
+            : createLocalPreviewBasemapStyle(resolveMapPalette(currentAppearance)),
           attributionControl: false,
           center: previewMode
             ? [PREVIEW_CENTER[1], PREVIEW_CENTER[0]]
@@ -1076,10 +1041,16 @@ export function SocialMap({
       prepareMap: (instance, maplibre, attempt) => {
         map = instance;
         mapRef.current = map;
-        if (previewMode)
-          attempt.addCleanup(
-            attachLocalPreviewLand(map, ATMOSPHERE_MAP_PALETTES[atmospherePaletteRef.current]),
-          );
+        const previewLand = previewMode
+          ? attachLocalPreviewLand(map, resolveMapPalette(appearanceRef.current))
+          : null;
+        const session: MapAppearanceSession = { map, provider: providerTemplate, previewLand };
+        appearanceSession = session;
+        appearanceSessionRef.current = session;
+        attempt.addCleanup(() => {
+          previewLand?.dispose();
+          if (appearanceSessionRef.current === session) appearanceSessionRef.current = null;
+        });
         const onBasemapError = (event: MapLibreErrorEvent) => {
           if (!attempt.isActive()) return;
           const sourceId = "sourceId" in event ? event.sourceId : undefined;
@@ -1256,11 +1227,8 @@ export function SocialMap({
         const onMapReady = () => {
           if (!attempt.isActive() || !map) return;
           try {
-            const palette = ATMOSPHERE_MAP_PALETTES[atmospherePaletteRef.current];
-            if (!previewMode) {
-              applyMapPalette(map, palette, 0);
-              installRegionalLayer(map, palette);
-            }
+            if (!previewMode) installRegionalLayer(map, resolveMapPalette(appearanceRef.current));
+            if (appearanceSession) paintMapAppearance(appearanceSession, appearanceRef.current, 0);
           } catch {
             attempt.fail();
             return;
@@ -1311,6 +1279,9 @@ export function SocialMap({
       routeStopMarkersRef.current = [];
       userMarkerRef.current?.remove();
       userMarkerRef.current = null;
+      if (appearanceSessionRef.current === appearanceSession) appearanceSessionRef.current = null;
+      providerTemplate = null;
+      appearanceSession = null;
       mapRef.current = null;
       maplibreModuleRef.current = null;
       map = null;
@@ -1325,7 +1296,7 @@ export function SocialMap({
       scheduleMarkerViewportSyncRef.current = () => {};
     });
     return () => attempt.dispose();
-  }, [previewMode, mapAttemptNumber]);
+  }, [previewMode, mapAttemptNumber, themeReady]);
 
   useEffect(() => {
     const focused = document.activeElement;
@@ -1360,39 +1331,22 @@ export function SocialMap({
   };
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!mapReady || !map) return;
+    const session = appearanceSessionRef.current;
+    if (!mapReady || !session || mapRef.current !== session.map) return;
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const apply = () => {
-      if (mapRef.current !== map) return;
-      const palette = ATMOSPHERE_MAP_PALETTES[atmospherePalette];
+      if (mapRef.current !== session.map || appearanceSessionRef.current !== session) return;
       const duration = preference.matches ? 0 : ATMOSPHERE_TRANSITION_MS;
       if (preference.matches) {
-        map.stop();
+        session.map.stop();
         markerExitsRef.current.flush();
       }
-      if (previewMode) {
-        applyMapColourUpdates(
-          map,
-          [{ layerId: "hp-preview-sea", property: "background-color", value: palette.water }],
-          duration,
-        );
-        map
-          .getCanvasContainer()
-          .querySelectorAll<SVGPathElement>("svg[data-hp-preview-land] path")
-          .forEach((path) => {
-            path.setAttribute("fill", palette.land);
-            path.setAttribute("stroke", palette.olive);
-          });
-      } else {
-        applyMapPalette(map, palette, duration);
-        applyRegionalMapPalette(map, palette, duration);
-      }
+      paintMapAppearance(session, appearanceRef.current, duration);
     };
     apply();
     preference.addEventListener("change", apply);
     return () => preference.removeEventListener("change", apply);
-  }, [atmospherePalette, mapReady, previewMode]);
+  }, [colorScheme, atmospherePalette, mapReady, previewMode]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2171,7 +2125,8 @@ export function SocialMap({
   const mapChromeHidden = availableMapHeight < MIN_MAP_CHROME_HEIGHT;
   const mapStyle = {
     "--hp-map-bottom-overlay-height": `${Math.max(0, sheetGeometry?.get().height ?? bottomOverlayHeight)}px`,
-    "--hp-map-land": ATMOSPHERE_MAP_PALETTES[atmospherePalette].land,
+    "--hp-map-land": themeReady ? palette.land : "var(--hp-bg)",
+    backgroundColor: themeReady ? palette.land : "var(--hp-bg)",
   } as CSSProperties;
 
   return (

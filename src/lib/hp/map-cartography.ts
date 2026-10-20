@@ -5,8 +5,10 @@ import type {
   Map as MapLibreMap,
   StyleSpecification,
 } from "maplibre-gl";
-import { removeAdministrativeBoundaries } from "./map-core";
+import type { ColorScheme } from "../theme";
+import { darkBasemapPaint } from "./map-theme";
 import type { AtmospherePaletteKey } from "./temporal-atmosphere";
+import { removeAdministrativeBoundaries } from "./map-core";
 
 /** Paint tokens are independent of density rules for Phase 6 atmosphere variants.
  * Keep glyphs/sprites/sources stable: a full style swap would remove app overlays. */
@@ -54,7 +56,7 @@ export const DAY_MAP_PALETTE: Readonly<MapCartographyPalette> = Object.freeze({
 
 export const ATMOSPHERE_MAP_PALETTES: Readonly<
   Record<AtmospherePaletteKey, Readonly<MapCartographyPalette>>
-> = {
+> = Object.freeze({
   day: DAY_MAP_PALETTE,
   "golden-hour": Object.freeze({
     ...DAY_MAP_PALETTE,
@@ -114,67 +116,108 @@ export const ATMOSPHERE_MAP_PALETTES: Readonly<
     majorRoad: "#bf9e7b",
     majorCasing: "#8b725c",
   }),
-};
+});
 
-type MapColourProperty =
-  | "background-color"
-  | "fill-color"
-  | "fill-outline-color"
-  | "line-color"
-  | "text-color"
-  | "text-halo-color";
-export type MapColourUpdate = {
-  layerId: string;
-  property: MapColourProperty;
-  value: string | ExpressionSpecification;
-};
-const COLOUR_PROPERTIES = new Set<MapColourProperty>([
-  "background-color",
-  "fill-color",
-  "fill-outline-color",
-  "line-color",
-  "text-color",
-  "text-halo-color",
-]);
+export const DARK_ATMOSPHERE_MAP_PALETTES: Readonly<
+  Record<AtmospherePaletteKey, Readonly<MapCartographyPalette>>
+> = Object.freeze({
+  day: Object.freeze({
+    land: "#142230",
+    water: "#0b3047",
+    waterLine: "#28536a",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#213c39",
+    olive: "#35554a",
+    sand: "#464638",
+    urban: "#1c2d3c",
+    building: "#334555",
+    buildingOutline: "#425466",
+    minorRoad: "#506575",
+    minorCasing: "#273b4a",
+    secondaryRoad: "#74818a",
+    secondaryCasing: "#354957",
+    majorRoad: "#a28a70",
+    majorCasing: "#4b4b46",
+  }),
+  "golden-hour": Object.freeze({
+    land: "#172531",
+    water: "#103247",
+    waterLine: "#2d5367",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#293e37",
+    olive: "#3e5749",
+    sand: "#514837",
+    urban: "#23303c",
+    building: "#3c4956",
+    buildingOutline: "#4b5867",
+    minorRoad: "#586a76",
+    minorCasing: "#303e4a",
+    secondaryRoad: "#81868a",
+    secondaryCasing: "#404c57",
+    majorRoad: "#b29574",
+    majorCasing: "#575046",
+  }),
+  evening: Object.freeze({
+    land: "#13212f",
+    water: "#0b2b42",
+    waterLine: "#254d63",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#203934",
+    olive: "#325046",
+    sand: "#424136",
+    urban: "#1b2b39",
+    building: "#304151",
+    buildingOutline: "#3e4f61",
+    minorRoad: "#4c606f",
+    minorCasing: "#263746",
+    secondaryRoad: "#6c7b86",
+    secondaryCasing: "#324552",
+    majorRoad: "#98836c",
+    majorCasing: "#464641",
+  }),
+  "late-night": Object.freeze({
+    land: "#101c2a",
+    water: "#09263b",
+    waterLine: "#23465d",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#1d3533",
+    olive: "#2d4942",
+    sand: "#3b3d34",
+    urban: "#182634",
+    building: "#2c3c4b",
+    buildingOutline: "#38485a",
+    minorRoad: "#465867",
+    minorCasing: "#22323f",
+    secondaryRoad: "#657480",
+    secondaryCasing: "#2d3e4c",
+    majorRoad: "#8d7b68",
+    majorCasing: "#3f413d",
+  }),
+});
 
-/** Same ID/type-aware rules as initial cartography; runtime changes are colors only. */
-export function mapPaletteUpdates(
-  layers: LayerSpecification[],
-  palette: Readonly<MapCartographyPalette>,
-): MapColourUpdate[] {
-  return layers.flatMap((layer) => {
-    const styled = styleLayer(layer, palette);
-    if (styled === layer) return [];
-    return Object.entries(styled.paint ?? {}).flatMap(([property, value]) =>
-      COLOUR_PROPERTIES.has(property as MapColourProperty)
-        ? [
-            {
-              layerId: layer.id,
-              property: property as MapColourProperty,
-              value: value as MapColourUpdate["value"],
-            },
-          ]
-        : [],
-    );
-  });
+export const DARK_DAY_MAP_PALETTE = DARK_ATMOSPHERE_MAP_PALETTES.day;
+
+export interface MapAppearance {
+  colorScheme: ColorScheme;
+  atmosphere: AtmospherePaletteKey;
 }
-export function applyMapColourUpdates(
-  map: Pick<MapLibreMap, "getLayer" | "setPaintProperty">,
-  updates: MapColourUpdate[],
-  duration: number,
-) {
-  for (const update of updates) {
-    if (!map.getLayer(update.layerId)) continue;
-    map.setPaintProperty(update.layerId, `${update.property}-transition`, { duration, delay: 0 });
-    map.setPaintProperty(update.layerId, update.property, update.value);
-  }
-}
-export function applyMapPalette(
-  map: MapLibreMap,
-  palette: Readonly<MapCartographyPalette>,
-  duration: number,
-) {
-  applyMapColourUpdates(map, mapPaletteUpdates(map.getStyle().layers, palette), duration);
+
+const MAP_APPEARANCE_PALETTES = Object.freeze({
+  light: ATMOSPHERE_MAP_PALETTES,
+  dark: DARK_ATMOSPHERE_MAP_PALETTES,
+});
+
+/** Pure lookup: ThemeProvider supplies scheme, the existing shared clock supplies period. */
+export function resolveMapPalette(appearance: MapAppearance): Readonly<MapCartographyPalette> {
+  return MAP_APPEARANCE_PALETTES[appearance.colorScheme][appearance.atmosphere];
 }
 
 // These are the actual Bright IDs inspected on 2026-10-01. Match IDs AND
@@ -478,4 +521,107 @@ export function createIliaMapStyle(
     ...boundaryFree,
     layers: boundaryFree.layers.map((layer) => styleLayer(layer, palette)),
   };
+}
+
+type MapColourProperty =
+  | "background-color"
+  | "fill-color"
+  | "fill-outline-color"
+  | "fill-extrusion-color"
+  | "line-color"
+  | "text-color"
+  | "text-halo-color";
+
+const COLOUR_PROPERTIES: readonly MapColourProperty[] = [
+  "background-color",
+  "fill-color",
+  "fill-outline-color",
+  "fill-extrusion-color",
+  "line-color",
+  "text-color",
+  "text-halo-color",
+];
+
+/** Explicit colors for app-owned regional text; never infers ownership from live styles. */
+export type MapColourUpdate = {
+  layerId: string;
+  property: MapColourProperty;
+  value: string | ExpressionSpecification | null;
+};
+
+export function applyMapColourUpdates(
+  map: Pick<MapLibreMap, "getLayer" | "setPaintProperty">,
+  updates: MapColourUpdate[],
+  duration: number,
+): void {
+  for (const update of updates) {
+    if (!map.getLayer(update.layerId)) continue;
+    map.setPaintProperty(update.layerId, `${update.property}-transition`, { duration, delay: 0 });
+    map.setPaintProperty(
+      update.layerId,
+      update.property as Parameters<MapLibreMap["setPaintProperty"]>[1],
+      update.value as Parameters<MapLibreMap["setPaintProperty"]>[2],
+    );
+  }
+}
+
+/**
+ * Compose from a captured, unthemed provider style before app overlays are installed.
+ * The pure fallback handles future provider IDs; the Bright ID/type rules then
+ * restore the reviewed hierarchy and apply Phase 2's one-time density/layout rules.
+ */
+export function createMapAppearanceStyle(
+  upstream: StyleSpecification,
+  appearance: MapAppearance,
+): StyleSpecification {
+  const palette = resolveMapPalette(appearance);
+  if (appearance.colorScheme === "light") return createIliaMapStyle(upstream, palette);
+  const darkStyle: StyleSpecification = {
+    ...upstream,
+    layers: upstream.layers.map((layer) => {
+      const fallback = darkBasemapPaint(layer, palette);
+      if (Object.keys(fallback).length === 0) return layer;
+      return {
+        ...layer,
+        paint: { ...("paint" in layer ? layer.paint : {}), ...fallback },
+      } as LayerSpecification;
+    }),
+  };
+  return createIliaMapStyle(darkStyle, palette);
+}
+
+/**
+ * The caller retains the same unthemed provider template used at initialization.
+ * Never use map.getStyle() here: its themed colors cannot restore Light originals.
+ * Only existing provider IDs and color paint/transition fields are written. App
+ * sources/layers, layout, geometry, camera, selection and markers remain untouched.
+ */
+export function applyMapAppearance(
+  map: Pick<MapLibreMap, "getLayer" | "setPaintProperty">,
+  upstream: StyleSpecification,
+  appearance: MapAppearance,
+  duration: number,
+): void {
+  const target = createMapAppearanceStyle(upstream, appearance);
+  const originals = new Map(upstream.layers.map((layer) => [layer.id, layer]));
+  const darkPalette = resolveMapPalette({ colorScheme: "dark", atmosphere: appearance.atmosphere });
+  for (const layer of target.layers) {
+    if (!map.getLayer(layer.id)) continue;
+    const original = originals.get(layer.id);
+    if (!original) continue;
+    // Dark fallback may add text colors or an extrusion color absent from Light.
+    // Include those properties on every update so returning to Light writes null.
+    const darkPaint = darkBasemapPaint(original, darkPalette);
+    const paint =
+      "paint" in layer ? (layer.paint as Record<string, unknown> | undefined) : undefined;
+    for (const property of COLOUR_PROPERTIES) {
+      if (!(property in darkPaint) && !Object.hasOwn(paint ?? {}, property)) continue;
+      map.setPaintProperty(layer.id, `${property}-transition`, { duration, delay: 0 });
+      map.setPaintProperty(
+        layer.id,
+        property as Parameters<MapLibreMap["setPaintProperty"]>[1],
+        (paint?.[property] ?? null) as Parameters<MapLibreMap["setPaintProperty"]>[2],
+      );
+    }
+  }
 }

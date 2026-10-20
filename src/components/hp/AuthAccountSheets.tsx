@@ -280,7 +280,7 @@ export function AuthSheet({
             </div>
 
             {mode !== "forgotPassword" && (
-              <div className="mb-3 grid grid-cols-2 rounded-full border border-hp-ink/10 bg-white/50 p-1">
+              <div className="mb-3 grid grid-cols-2 rounded-full border border-hp-ink/10 bg-hp-raised/50 p-1">
                 {[
                   { id: "signIn" as const, label: t("Sign in") },
                   { id: "signUp" as const, label: t("New") },
@@ -329,7 +329,7 @@ export function AuthSheet({
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-hp-muted">
                       {t("Default identity")}
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-white/50 p-1.5">
+                    <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-hp-ink/10 bg-hp-raised/50 p-1.5">
                       {PROFILE_IDENTITIES.map((option) => {
                         const active = identity === option.id;
                         return (
@@ -359,7 +359,7 @@ export function AuthSheet({
               )}
 
               <Field label={t("Email")}>
-                <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
+                <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 px-3 py-2.5">
                   <Mail size={14} className="text-hp-muted" />
                   <input
                     type="email"
@@ -374,7 +374,7 @@ export function AuthSheet({
               </Field>
               {mode !== "forgotPassword" && (
                 <Field label={t("Password")}>
-                  <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
+                  <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 px-3 py-2.5">
                     <LockKeyhole size={14} className="text-hp-muted" />
                     <input
                       type="password"
@@ -554,7 +554,7 @@ export function PasswordRecoverySheet({
 
             <form onSubmit={submit} className="space-y-3">
               <Field label={t("New password")}>
-                <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
+                <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 px-3 py-2.5">
                   <LockKeyhole size={14} className="text-hp-muted" />
                   <input
                     type="password"
@@ -570,7 +570,7 @@ export function PasswordRecoverySheet({
                 </div>
               </Field>
               <Field label={t("Confirm new password")}>
-                <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-white/60 px-3 py-2.5">
+                <div className="flex items-center gap-2 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 px-3 py-2.5">
                   <LockKeyhole size={14} className="text-hp-muted" />
                   <input
                     type="password"

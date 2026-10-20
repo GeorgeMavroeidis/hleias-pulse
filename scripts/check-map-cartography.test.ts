@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { featureFilter, validateStyleMin } from "@maplibre/maplibre-gl-style-spec";
 import type { LayerSpecification, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import {
-  applyMapPalette,
+  applyMapAppearance,
   ATMOSPHERE_MAP_PALETTES,
   createIliaMapStyle,
   DAY_MAP_PALETTE,
@@ -260,16 +260,23 @@ test("runtime updates use only paint colors/transitions and match initial styles
     setPaintProperty: (id: string, property: string, value: unknown) => {
       assert.match(
         property,
-        /^(background|fill|fill-outline|line|text|text-halo)-color(-transition)?$/,
+        /^(background|fill|fill-outline|fill-extrusion|line|text|text-halo)-color(-transition)?$/,
       );
       calls.push(property);
       const layer = state.layers.find((layer) => layer.id === id)!;
-      (layer.paint as Record<string, unknown>)[property] = value;
+      const paint = (layer.paint ??= {} as never) as Record<string, unknown>;
+      if (value === null) delete paint[property];
+      else paint[property] = value;
     },
   } as unknown as MapLibreMap;
   for (const duration of [800, 0])
-    for (const palette of Object.values(ATMOSPHERE_MAP_PALETTES)) {
-      applyMapPalette(fake, palette, duration);
+    for (const [period, palette] of Object.entries(ATMOSPHERE_MAP_PALETTES)) {
+      applyMapAppearance(
+        fake,
+        upstream,
+        { colorScheme: "light", atmosphere: period as keyof typeof ATMOSPHERE_MAP_PALETTES },
+        duration,
+      );
       const expected = createIliaMapStyle(upstream, palette);
       for (const layer of expected.layers) {
         const actual = state.layers.find((row) => row.id === layer.id)!;
