@@ -40,6 +40,8 @@ scheme; the former three-theme control is superseded.
   image defaults, input retention and Athens DST/future-time checks remain.
 - Device appearance persistence, prepaint initialization, native appearance
   synchronization, bilingual accessible controls and media/QR exceptions remain.
+  Escape closes the appearance menu and restores its trigger focus without
+  also navigating the map selection underneath it.
 - Initial and runtime map colors derive from one resolver and an immutable,
   unthemed provider template. Color changes preserve the map, camera, selection,
   sources, route overlays and markers. Regional sprite pixels update under their
