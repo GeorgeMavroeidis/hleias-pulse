@@ -934,10 +934,37 @@ async function fetchPublishedCommentRows(): Promise<CommentRow[]> {
   }
 }
 
+async function fetchOwnPendingMeetRows(): Promise<MeetEventRow[]> {
+  const client = assertSupabase();
+  const { data, error } = await client.auth.getSession();
+  if (error) throw error;
+  const userId = data.session?.user.id;
+  if (!userId) return [];
+  const rows = new Map<string, MeetEventRow>();
+  const batchSize = 1000;
+  for (let offset = 0; ; offset += batchSize) {
+    // Bootstrap contains public gatherings only. Re-read the owner's pending
+    // rows under RLS so refresh preserves them and moderation can remove them.
+    const result = await client
+      .from("meet_events")
+      .select(MEET_EVENT_RETURN_COLUMNS)
+      .eq("user_id", userId)
+      .eq("moderation_status", "pending")
+      .order("created_at")
+      .order("id")
+      .range(offset, offset + batchSize - 1);
+    if (result.error) throw result.error;
+    for (const row of result.data ?? []) {
+      if (row.user_id === userId && row.moderation_status === "pending") rows.set(row.id, row);
+    }
+    if ((result.data?.length ?? 0) < batchSize) return [...rows.values()];
+  }
+}
+
 async function fetchPulseData(): Promise<PulseData> {
   const client = assertSupabase();
 
-  const [result, routePreviewResult, commentRows] = await Promise.all([
+  const [result, routePreviewResult, commentRows, ownPendingMeets] = await Promise.all([
     client.rpc("get_pulse_bootstrap"),
     client
       .from("routes")
@@ -945,6 +972,7 @@ async function fetchPulseData(): Promise<PulseData> {
         "id,routing_profile,route_geometry,route_distance_m,route_duration_s,route_input_hash,route_generated_at",
       ),
     fetchPublishedCommentRows(),
+    fetchOwnPendingMeetRows(),
   ]);
   if (result.error) throw result.error;
   // Deploys remain readable during the brief migration/code rollout window.
@@ -998,9 +1026,13 @@ async function fetchPulseData(): Promise<PulseData> {
     places,
     posts: (data.posts ?? []).map((post) => mapPost(post, commentsByPost)),
     events: (data.events ?? []).map(mapEvent),
-    meetEvents: (data.meet_events ?? []).map((event) =>
-      mapMeetEvent(event, placeById.get(event.place_id)),
-    ),
+    // A publication observed by bootstrap supersedes a pending read of the same
+    // ID, including when moderation happens between the two requests.
+    meetEvents: [
+      ...new Map(
+        [...ownPendingMeets, ...(data.meet_events ?? [])].map((event) => [event.id, event]),
+      ).values(),
+    ].map((event) => mapMeetEvent(event, placeById.get(event.place_id))),
     culturalEvents: (data.cultural_events ?? []).map(mapCulturalEvent),
     routes: (data.routes ?? []).map((route) => {
       const preview = routePreviewById.get(route.id);

@@ -48,7 +48,7 @@
     "test:secrets": "tsx --test scripts/check-secrets.test.ts",
     "test:map-recovery": "tsx --test src/lib/hp/map-initialization.test.ts",
     "test:map-visuals": "tsx scripts/check-map-visuals.ts",
-    "test:map-cartography": "tsx --test scripts/check-map-cartography.test.ts scripts/check-map-appearance.test.ts src/lib/hp/map-preview-appearance.test.ts",
+    "test:map-cartography": "tsx --test scripts/check-map-cartography.test.ts scripts/check-map-appearance.test.ts src/lib/hp/map-preview-appearance.test.ts scripts/check-map-temporal-appearance.test.ts",
     "test:motion": "tsx --test src/lib/hp/motion.test.ts",
     "test:current-map": "node --import tsx --test src/lib/hp/marker-pulse.test.ts src/lib/hp/regional-discovery.test.ts src/lib/hp/marker-motion.test.ts src/lib/hp/map-renderer.test.ts src/lib/hp/map-region-appearance.test.ts",
     "test:routing": "tsx --test scripts/check-route-preview.ts",
@@ -67,7 +67,8 @@
     "smoke:comment-drafts": "node --import tsx scripts/smoke-comment-drafts.ts",
     "test:theme": "tsx --test src/lib/theme.test.ts src/lib/hp/map-theme.test.ts",
     "smoke:story-freshness": "node --import tsx scripts/smoke-story-freshness.ts",
-    "test:surfaces": "node --import tsx --test src/lib/hp/surface-freshness.test.ts src/lib/hp/pulse-refresh.test.ts src/lib/hp/activity-data.test.ts src/components/hp/freshness-surfaces.test.tsx"
+    "test:surfaces": "node --import tsx --test src/lib/hp/surface-freshness.test.ts src/lib/hp/pulse-refresh.test.ts src/lib/hp/activity-data.test.ts src/components/hp/freshness-surfaces.test.tsx scripts/meet-refresh-api.test.ts",
+    "test:current-discovery": "node --import tsx --test src/lib/hp/map-discovery.test.ts src/lib/hp/map-discovery-content.test.ts src/lib/hp/context-copy.test.ts src/components/hp/MapBottomSheet.test.tsx src/lib/hp/temporal-atmosphere.test.ts src/lib/hp/region-identity.test.tsx src/lib/hp/map-frame.test.ts src/lib/hp/map-location.test.ts src/lib/hp/map-region-layer.test.ts"
   },
   "dependencies": {
     "@capacitor/app-launcher": "^8.0.1",
@@ -127,6 +128,7 @@
     "react-resizable-panels": "^4.6.5",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
+    "suncalc": "2.1.0",
     "supercluster": "^8.0.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",

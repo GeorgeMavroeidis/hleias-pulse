@@ -91,6 +91,8 @@ export function TopBar({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
       setAppearanceOpen(false);
       appearanceButtonRef.current?.focus();
     };

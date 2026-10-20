@@ -410,6 +410,8 @@ function regionalMapFixture(availableContext: boolean) {
   const sources = new Map<string, unknown>();
   const map = {
     getSource: (id: string) => sources.get(id),
+    getLayer: (id: string) => layers.find((layer) => layer.id === id),
+    hasImage: (id: string) => images.includes(id),
     getContainer: () => ({}),
     addImage: (id: string) => images.push(id),
     addSource: (id: string, source: unknown) => sources.set(id, source),

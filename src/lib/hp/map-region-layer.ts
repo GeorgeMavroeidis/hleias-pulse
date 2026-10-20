@@ -101,7 +101,16 @@ export function regionalGeoJson(
                 ? -row.contextualPlaceIds.length
                 : 1,
           selected: row.region.id === selectedId,
-          contextOpacity: row.contextualPlaceIds.length ? 1 : 0.55,
+          contextOpacity:
+            row.region.id === selectedId
+              ? 1
+              : selectedId
+                ? row.contextualPlaceIds.length
+                  ? 0.76
+                  : 0.62
+                : row.contextualPlaceIds.length
+                  ? 1
+                  : 0.55,
         },
       })),
   };
@@ -161,7 +170,7 @@ export function regionalSymbolLayer(
 
 type RegionalPaintMap = Pick<MapLibreMap, "getLayer" | "setPaintProperty"> &
   Partial<Pick<MapLibreMap, "hasImage" | "updateImage">>;
-type RegionalSprite = { id: string; selected: boolean; context: CanvasRenderingContext2D };
+type RegionalSprite = { id: string; selected: boolean; context: CanvasRenderingContext2D | null };
 const regionalSprites = new WeakMap<
   object,
   { sprites: RegionalSprite[]; accent: string; signature: string }
@@ -174,6 +183,12 @@ function drawRegionalSprite(
   palette: Readonly<MapCartographyPalette>,
   accent: string,
 ) {
+  if (!sprite.context) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 64;
+    sprite.context = canvas.getContext("2d");
+    if (!sprite.context) throw new Error("Regional sprite unavailable");
+  }
   const ctx = sprite.context;
   ctx.clearRect(0, 0, 64, 64);
   ctx.fillStyle = palette.land;
@@ -200,25 +215,38 @@ export function installRegionalLayer(
   map: MapLibreMap,
   palette: Readonly<MapCartographyPalette> = DAY_MAP_PALETTE,
 ) {
-  if (map.getSource(REGION_SOURCE_ID)) return;
+  if (map.getSource(REGION_SOURCE_ID) && map.getLayer(REGION_LAYER_ID)) return;
+  const cached = regionalSprites.get(map);
   const accent =
-    getComputedStyle(map.getContainer()).getPropertyValue("--hp-sunset").trim() || "#ed7948";
-  const sprites = [false, true].map((selected) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 64;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Regional sprite unavailable");
-    const sprite = { id: selected ? "hp-region-selected" : "hp-region-core", selected, context };
-    map.addImage(sprite.id, drawRegionalSprite(sprite, palette, accent), { pixelRatio: 2 });
+    cached?.accent ||
+    getComputedStyle(map.getContainer()).getPropertyValue("--hp-sunset").trim() ||
+    "#ed7948";
+  let allNew = true;
+  const sprites = [false, true].map((selected): RegionalSprite => {
+    const id = selected ? "hp-region-selected" : "hp-region-core";
+    const sprite = cached?.sprites.find((item) => item.id === id) ?? {
+      id,
+      selected,
+      context: null,
+    };
+    if (map.hasImage(id)) allNew = false;
+    else map.addImage(id, drawRegionalSprite(sprite, palette, accent), { pixelRatio: 2 });
     return sprite;
   });
-  map.addSource(REGION_SOURCE_ID, {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] },
-  });
+  if (!map.getSource(REGION_SOURCE_ID))
+    map.addSource(REGION_SOURCE_ID, {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    });
   // Last symbol layer places first in MapLibre's reverse-order collision pass.
-  map.addLayer(regionalSymbolLayer(palette));
-  regionalSprites.set(map, { sprites, accent, signature: spriteSignature(palette) });
+  if (!map.getLayer(REGION_LAYER_ID)) map.addLayer(regionalSymbolLayer(palette));
+  regionalSprites.set(map, {
+    sprites,
+    accent,
+    // A partial install may already own images with unknown colors. The shared
+    // ready-time appearance pass updates their pixels before exposing the map.
+    signature: allNew ? spriteSignature(palette) : (cached?.signature ?? ""),
+  });
 }
 
 /** Update colors only: no source, layer, sprite ID, disclosure, geometry or marker replacement. */

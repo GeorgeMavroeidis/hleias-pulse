@@ -93,6 +93,9 @@ jobs:
           npm run test:map-cartography
           npm run test:motion
 
+      - name: Test — current discovery and temporal presentation
+        run: npm run test:current-discovery
+
       - name: Test — route previews
         run: npm run test:routing
 

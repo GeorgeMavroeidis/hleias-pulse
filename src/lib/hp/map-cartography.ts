@@ -1,4 +1,5 @@
 import type {
+  ExpressionSpecification,
   FilterSpecification,
   LayerSpecification,
   Map as MapLibreMap,
@@ -6,6 +7,7 @@ import type {
 } from "maplibre-gl";
 import type { ColorScheme } from "../theme";
 import { darkBasemapPaint } from "./map-theme";
+import type { AtmospherePaletteKey } from "./temporal-atmosphere";
 import { removeAdministrativeBoundaries } from "./map-core";
 
 /** Paint tokens are independent of density rules for Phase 6 atmosphere variants.
@@ -37,7 +39,7 @@ export const DAY_MAP_PALETTE: Readonly<MapCartographyPalette> = Object.freeze({
   waterLine: "#7eabb9",
   primaryText: "#302e2a",
   secondaryText: "#68645b",
-  waterText: "#425c68",
+  waterText: "#304d59",
   nature: "#d9dfcd",
   olive: "#879570",
   sand: "#ebe2cf",
@@ -52,41 +54,170 @@ export const DAY_MAP_PALETTE: Readonly<MapCartographyPalette> = Object.freeze({
   majorCasing: "#b99c7b",
 });
 
-/** Phase 2 has one atmosphere. Phase 6 extends this resolver with its supplied clock. */
+export const ATMOSPHERE_MAP_PALETTES: Readonly<
+  Record<AtmospherePaletteKey, Readonly<MapCartographyPalette>>
+> = Object.freeze({
+  day: DAY_MAP_PALETTE,
+  "golden-hour": Object.freeze({
+    ...DAY_MAP_PALETTE,
+    land: "#f3e5d0",
+    water: "#a3bfca",
+    waterLine: "#749ba9",
+    nature: "#d8dbc6",
+    olive: "#87916a",
+    sand: "#ebdbbc",
+    urban: "#e8d8c2",
+    building: "#e4d3bb",
+    buildingOutline: "#cabb9f",
+    minorRoad: "#fff5e5",
+    minorCasing: "#d1c2aa",
+    secondaryRoad: "#eddbb9",
+    secondaryCasing: "#c9b28e",
+    majorRoad: "#e5bf90",
+    majorCasing: "#b7946d",
+  }),
+  evening: Object.freeze({
+    ...DAY_MAP_PALETTE,
+    land: "#e8e1d6",
+    water: "#8eacba",
+    waterLine: "#668d9f",
+    secondaryText: "#5b584f",
+    waterText: "#24404d",
+    nature: "#ccd3c0",
+    olive: "#7c896b",
+    sand: "#dfd4bf",
+    urban: "#d9d2c5",
+    building: "#d3cbbb",
+    buildingOutline: "#beb6a7",
+    minorRoad: "#f7f1e5",
+    minorCasing: "#bfb8ac",
+    secondaryRoad: "#dcd0b5",
+    secondaryCasing: "#b1a58d",
+    majorRoad: "#cfb18e",
+    majorCasing: "#a18b6d",
+  }),
+  "late-night": Object.freeze({
+    ...DAY_MAP_PALETTE,
+    land: "#d3cec4",
+    water: "#7695a3",
+    waterLine: "#52798e",
+    secondaryText: "#55564f",
+    waterText: "#142c36",
+    nature: "#bac6b0",
+    olive: "#738363",
+    sand: "#d0c4ac",
+    urban: "#c4beb2",
+    building: "#beb7a9",
+    buildingOutline: "#a59f94",
+    minorRoad: "#e8e3d9",
+    minorCasing: "#a4a095",
+    secondaryRoad: "#cfc0a4",
+    secondaryCasing: "#978d79",
+    majorRoad: "#bf9e7b",
+    majorCasing: "#8b725c",
+  }),
+});
+
+export const DARK_ATMOSPHERE_MAP_PALETTES: Readonly<
+  Record<AtmospherePaletteKey, Readonly<MapCartographyPalette>>
+> = Object.freeze({
+  day: Object.freeze({
+    land: "#142230",
+    water: "#0b3047",
+    waterLine: "#28536a",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#213c39",
+    olive: "#35554a",
+    sand: "#464638",
+    urban: "#1c2d3c",
+    building: "#334555",
+    buildingOutline: "#425466",
+    minorRoad: "#506575",
+    minorCasing: "#273b4a",
+    secondaryRoad: "#74818a",
+    secondaryCasing: "#354957",
+    majorRoad: "#a28a70",
+    majorCasing: "#4b4b46",
+  }),
+  "golden-hour": Object.freeze({
+    land: "#172531",
+    water: "#103247",
+    waterLine: "#2d5367",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#293e37",
+    olive: "#3e5749",
+    sand: "#514837",
+    urban: "#23303c",
+    building: "#3c4956",
+    buildingOutline: "#4b5867",
+    minorRoad: "#586a76",
+    minorCasing: "#303e4a",
+    secondaryRoad: "#81868a",
+    secondaryCasing: "#404c57",
+    majorRoad: "#b29574",
+    majorCasing: "#575046",
+  }),
+  evening: Object.freeze({
+    land: "#13212f",
+    water: "#0b2b42",
+    waterLine: "#254d63",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#203934",
+    olive: "#325046",
+    sand: "#424136",
+    urban: "#1b2b39",
+    building: "#304151",
+    buildingOutline: "#3e4f61",
+    minorRoad: "#4c606f",
+    minorCasing: "#263746",
+    secondaryRoad: "#6c7b86",
+    secondaryCasing: "#324552",
+    majorRoad: "#98836c",
+    majorCasing: "#464641",
+  }),
+  "late-night": Object.freeze({
+    land: "#101c2a",
+    water: "#09263b",
+    waterLine: "#23465d",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#1d3533",
+    olive: "#2d4942",
+    sand: "#3b3d34",
+    urban: "#182634",
+    building: "#2c3c4b",
+    buildingOutline: "#38485a",
+    minorRoad: "#465867",
+    minorCasing: "#22323f",
+    secondaryRoad: "#657480",
+    secondaryCasing: "#2d3e4c",
+    majorRoad: "#8d7b68",
+    majorCasing: "#3f413d",
+  }),
+});
+
+export const DARK_DAY_MAP_PALETTE = DARK_ATMOSPHERE_MAP_PALETTES.day;
+
 export interface MapAppearance {
   colorScheme: ColorScheme;
-  atmosphere: "day";
+  atmosphere: AtmospherePaletteKey;
 }
 
-export const DARK_DAY_MAP_PALETTE: Readonly<MapCartographyPalette> = Object.freeze({
-  land: "#142230",
-  water: "#0b3047",
-  waterLine: "#28536a",
-  primaryText: "#dce2e5",
-  secondaryText: "#b3bdc8",
-  waterText: "#8ac5dc",
-  nature: "#213c39",
-  olive: "#35554a",
-  sand: "#464638",
-  urban: "#1c2d3c",
-  building: "#334555",
-  buildingOutline: "#425466",
-  minorRoad: "#506575",
-  minorCasing: "#273b4a",
-  secondaryRoad: "#74818a",
-  secondaryCasing: "#354957",
-  majorRoad: "#a28a70",
-  majorCasing: "#4b4b46",
+const MAP_APPEARANCE_PALETTES = Object.freeze({
+  light: ATMOSPHERE_MAP_PALETTES,
+  dark: DARK_ATMOSPHERE_MAP_PALETTES,
 });
 
-const DAY_APPEARANCE_PALETTES = Object.freeze({
-  light: DAY_MAP_PALETTE,
-  dark: DARK_DAY_MAP_PALETTE,
-});
-
-/** ThemeProvider has already resolved System; map appearance adds no theme policy. */
+/** Pure lookup: ThemeProvider supplies scheme, the existing shared clock supplies period. */
 export function resolveMapPalette(appearance: MapAppearance): Readonly<MapCartographyPalette> {
-  return DAY_APPEARANCE_PALETTES[appearance.colorScheme];
+  return MAP_APPEARANCE_PALETTES[appearance.colorScheme][appearance.atmosphere];
 }
 
 // These are the actual Bright IDs inspected on 2026-10-01. Match IDs AND
@@ -411,6 +542,29 @@ const COLOUR_PROPERTIES: readonly MapColourProperty[] = [
   "text-halo-color",
 ];
 
+/** Explicit colors for app-owned regional text; never infers ownership from live styles. */
+export type MapColourUpdate = {
+  layerId: string;
+  property: MapColourProperty;
+  value: string | ExpressionSpecification | null;
+};
+
+export function applyMapColourUpdates(
+  map: Pick<MapLibreMap, "getLayer" | "setPaintProperty">,
+  updates: MapColourUpdate[],
+  duration: number,
+): void {
+  for (const update of updates) {
+    if (!map.getLayer(update.layerId)) continue;
+    map.setPaintProperty(update.layerId, `${update.property}-transition`, { duration, delay: 0 });
+    map.setPaintProperty(
+      update.layerId,
+      update.property as Parameters<MapLibreMap["setPaintProperty"]>[1],
+      update.value as Parameters<MapLibreMap["setPaintProperty"]>[2],
+    );
+  }
+}
+
 /**
  * Compose from a captured, unthemed provider style before app overlays are installed.
  * The pure fallback handles future provider IDs; the Bright ID/type rules then
@@ -450,7 +604,7 @@ export function applyMapAppearance(
 ): void {
   const target = createMapAppearanceStyle(upstream, appearance);
   const originals = new Map(upstream.layers.map((layer) => [layer.id, layer]));
-  const darkPalette = resolveMapPalette({ colorScheme: "dark", atmosphere: "day" });
+  const darkPalette = resolveMapPalette({ colorScheme: "dark", atmosphere: appearance.atmosphere });
   for (const layer of target.layers) {
     if (!map.getLayer(layer.id)) continue;
     const original = originals.get(layer.id);

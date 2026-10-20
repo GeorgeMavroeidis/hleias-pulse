@@ -1,5 +1,9 @@
 import { buildMapRegions, deriveRegionalDiscovery } from "@/lib/hp/regional-discovery";
-import { markerPulseInputFromActivity, deriveMarkerPulseSnapshot } from "@/lib/hp/marker-pulse";
+import {
+  markerPulseInputFromActivity,
+  deriveMarkerPulseSnapshot,
+  excludeHiddenPulseContributors,
+} from "@/lib/hp/marker-pulse";
 import { MARKER_MOTION_STORAGE_KEY } from "@/lib/hp/marker-motion";
 import { useCommentDrafts } from "./use-comment-drafts";
 import {
@@ -11,12 +15,21 @@ import {
 } from "@/lib/hp/comment-drafts";
 import type { SavedContent, SavedTarget } from "@/lib/hp/saved-items";
 import {
+  initialMapDiscoveryState,
+  mapDiscoveryReducer,
+  discoverySheetHeights,
+  type MapCameraSnapshot,
+} from "@/lib/hp/map-discovery-state";
+import { deriveMapDiscoveryContent, type DiscoveryEvent } from "@/lib/hp/map-discovery-content";
+import { createSheetGeometry } from "@/lib/hp/sheet-geometry";
+import {
   lazy,
   Suspense,
   useCallback,
   useEffect,
   useMemo,
   useRef,
+  useReducer,
   useState,
   type Dispatch,
   type FormEvent,
@@ -163,6 +176,7 @@ import { systemClock } from "@/lib/hp/freshness";
 import { contentVisibleToViewer, isPublishedContent, meetPhase } from "@/lib/hp/surface-freshness";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { buildPulseActivitySnapshot } from "@/lib/hp/pulse-activity";
+import { useTemporalAtmosphere } from "./use-temporal-atmosphere";
 import {
   deriveAreaIntelligenceSnapshot,
   type AreaState,
@@ -170,12 +184,8 @@ import {
 } from "@/lib/hp/area-intelligence";
 import {
   DISCOVERY_LENSES,
-  areaNeedsDiscoveryRecommendation,
   deriveDiscoverySnapshot,
-  rankDiscoveryRecommendations,
-  viewportNeedsDiscoveryRecommendation,
   type DiscoveryLens,
-  type DiscoveryRecommendation,
   type DiscoverySnapshot,
 } from "@/lib/hp/discovery";
 import { type StreakState } from "@/lib/hp/meet-store";
@@ -212,7 +222,6 @@ import {
   HP_TRANSITION,
   initialMarkerMotion,
   type ShareTarget,
-  type MapViewSnapshot,
   openStreetMapUrl,
   isTab,
   truncateShareText,
@@ -226,10 +235,10 @@ import {
   DISCOVERY_PLACE_IDS,
 } from "./pulse-shared";
 import { Toast, TopBar, VibeChips, DiscoveryLensRail } from "./PulseTopBar";
-import { MapBottomSheet, type DiscoverySuggestion } from "./MapBottomSheet";
+import { MapBottomSheet } from "./MapBottomSheet";
 import { PulseFeed, MustSeeTodayDeck, LocalDiscoveryCard } from "./PulseFeed";
 import { BottomNav } from "./BottomNav";
-import { useModerationBridge, type UserLabel } from "./use-moderation";
+import { useModeration, useModerationBridge, type UserLabel } from "./use-moderation";
 import { ModerationSheets } from "./ModerationSheets";
 
 // Screens and modals below are not needed to paint the first "map" tab, so they are
@@ -343,26 +352,59 @@ export function PulseApp() {
       ),
     [activitySnapshot, pulseData.places, fetchedAtMs],
   );
-  const markerPulseSnapshot = useMemo(
-    () => deriveMarkerPulseSnapshot(markerPulseInput, nowMs),
-    [markerPulseInput, nowMs],
-  );
   const [refreshFailed, setRefreshFailed] = useState(false);
   const acceptedDataRef = useRef(false);
   const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [tab, setTab] = useState<Tab>("map");
+  const [tab, setActiveTab] = useState<Tab>("map");
+  const temporalAtmosphere = useTemporalAtmosphere(nowMs);
+  const activeTabRef = useRef(tab);
+  activeTabRef.current = tab;
+  const [discoveryState, discoveryDispatch] = useReducer(
+    mapDiscoveryReducer,
+    initialMapDiscoveryState,
+  );
+  const mapCameraCaptureRef = useRef<(() => MapCameraSnapshot | null) | null>(null);
+  const setTab = useCallback(
+    (next: Tab) => {
+      if (tab === "map" && next !== "map")
+        discoveryDispatch({ type: "leaveMap", camera: mapCameraCaptureRef.current?.() ?? null });
+      setActiveTab(next);
+    },
+    [tab],
+  );
+  const selectedAreaId =
+    discoveryState.selection.kind === "idle" ? null : discoveryState.selection.regionId;
+  const activeLens = discoveryState.activeLens;
+  const setActiveLens = useCallback(
+    (lens: DiscoveryLens | null) => discoveryDispatch({ type: "lens", lens }),
+    [],
+  );
+  const mapDiscoveryViewport = discoveryState.viewport;
+  const onDiscoveryViewportChange = useCallback((viewport: MapDiscoveryViewport) => {
+    // The outgoing map remains mounted briefly for its tab exit animation.
+    // Its late moveend must not replace the camera captured at departure.
+    if (activeTabRef.current === "map") discoveryDispatch({ type: "viewport", viewport });
+  }, []);
+  const sheetGeometry = useMemo(() => createSheetGeometry(), []);
+  const [meetFocusEventId, setMeetFocusEventId] = useState<string | null>(null);
+  const moderation = useModeration();
+  const hiddenDiscoveryUsers = useMemo(
+    () => new Set([...moderation.blockedIds, ...moderation.mutedIds]),
+    [moderation.blockedIds, moderation.mutedIds],
+  );
+  const visibleMarkerPulseInput = useMemo(
+    () => excludeHiddenPulseContributors(markerPulseInput, hiddenDiscoveryUsers),
+    [markerPulseInput, hiddenDiscoveryUsers],
+  );
+  const markerPulseSnapshot = useMemo(
+    () => deriveMarkerPulseSnapshot(visibleMarkerPulseInput, nowMs),
+    [visibleMarkerPulseInput, nowMs],
+  );
   const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
-  const [selectedPlaceRecord, setSelectedPlace] = useState<Place | null>(null);
-  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
-  const [mapBackStack, setMapBackStack] = useState<MapViewSnapshot[]>([]);
   const [openPlaceRecord, setOpenPlace] = useState<Place | null>(null);
   const [openPostRecord, setOpenPost] = useState<Post | null>(null);
   const [openRouteRecord, setOpenRoute] = useState<RouteItem | null>(null);
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
-  const [activeLens, setActiveLens] = useState<DiscoveryLens | null>(null);
-  const [mapDiscoveryViewport, setMapDiscoveryViewport] = useState<MapDiscoveryViewport | null>(
-    null,
-  );
   const [query, setQuery] = useState("");
   const [mapAvailable, setMapAvailable] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -435,7 +477,6 @@ export function PulseApp() {
       ? account.userId
       : null;
 
-  const selectedPlace = visibleDetail(selectedPlaceRecord, accountStorageUserId);
   const openPlace = visibleDetail(openPlaceRecord, accountStorageUserId);
   const openPost = visibleDetail(openPostRecord, accountStorageUserId);
   const openRoute = visibleDetail(openRouteRecord, accountStorageUserId);
@@ -499,6 +540,10 @@ export function PulseApp() {
   const vibeChips = pulseData.vibeChips;
 
   const placeById = useMemo(() => new Map(places.map((place) => [place.id, place])), [places]);
+  const selectedPlace =
+    discoveryState.selection.kind === "placeSelected"
+      ? (placeById.get(discoveryState.selection.placeId) ?? null)
+      : null;
   const authorById = useMemo(
     () => new Map(pulseData.authors.map((author) => [author.id, author])),
     [pulseData.authors],
@@ -569,146 +614,57 @@ export function PulseApp() {
     if (target.type === "route") setSavedRoutes((current) => ({ ...current, [target.id]: false }));
   };
 
-  // sheet snap
   const mapBodyRef = useRef<HTMLDivElement>(null);
-  const validMapPlaceIdsRef = useRef<Set<string>>(new Set());
-  const validMapAreaIdsRef = useRef<Set<string>>(new Set());
+  const mapBodyObserverRef = useRef<ResizeObserver | null>(null);
   const [mapAreaH, setMapAreaH] = useState(560);
-  useEffect(() => {
-    if (tab !== "map") return;
-    const el = mapBodyRef.current;
-    if (!el) return;
-    const updateMapAreaHeight = () => {
-      const nextHeight = el.getBoundingClientRect().height;
-      if (nextHeight > 120) setMapAreaH(nextHeight);
-    };
-    const ro = new ResizeObserver(updateMapAreaHeight);
-    ro.observe(el);
-    updateMapAreaHeight();
-    const frame = window.requestAnimationFrame(updateMapAreaHeight);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      ro.disconnect();
-    };
-  }, [tab]);
-  const safeMapAreaH = mapAreaH > 120 ? mapAreaH : 560;
-  const full = Math.round(safeMapAreaH * 0.85);
-  const [idlePeek, setIdlePeek] = useState(72);
-  const selectedPeek = 44;
-  const compactMap = safeMapAreaH < 460;
-  const areaPreview = Math.min(
-    full,
-    Math.min(276, Math.max(compactMap ? 200 : 248, Math.round(safeMapAreaH * 0.34))),
-  );
-  const placePreview = Math.min(
-    full,
-    Math.min(228, Math.max(compactMap ? 184 : 210, Math.round(safeMapAreaH * 0.28))),
-  );
-  const hasMapFocus = Boolean(selectedAreaId);
-  const peek = hasMapFocus ? selectedPeek : idlePeek;
-  const half = hasMapFocus ? (selectedPlace ? placePreview : areaPreview) : idlePeek;
-  const [sheetH, setSheetH] = useState(peek);
-  const previousSheetGeometryRef = useRef({ mapAreaH: safeMapAreaH, peek, half, full });
-  useEffect(() => {
-    const previous = previousSheetGeometryRef.current;
-    setSheetH((currentHeight) => {
-      if (!hasMapFocus) return idlePeek;
-      if (previous.mapAreaH !== safeMapAreaH) {
-        const previousSnaps = [
-          { id: "peek", value: previous.peek },
-          { id: "preview", value: previous.half },
-          { id: "full", value: previous.full },
-        ] as const;
-        const nearest = previousSnaps.reduce((closest, candidate) =>
-          Math.abs(candidate.value - currentHeight) < Math.abs(closest.value - currentHeight)
-            ? candidate
-            : closest,
-        );
-        const remapped = nearest.id === "peek" ? peek : nearest.id === "preview" ? half : full;
-        return Math.min(full, Math.max(peek, remapped));
-      }
-      return Math.min(full, Math.max(peek, currentHeight));
-    });
-    previousSheetGeometryRef.current = { mapAreaH: safeMapAreaH, peek, half, full };
-  }, [full, half, peek, safeMapAreaH, hasMapFocus, idlePeek]);
-  useEffect(() => {
-    if (!hasMapFocus) {
-      setSheetH(idlePeek);
-    }
-  }, [hasMapFocus, idlePeek]);
-
-  const sameMapSnapshot = (a: MapViewSnapshot, b: MapViewSnapshot) =>
-    a.areaId === b.areaId && a.placeId === b.placeId;
-
-  const currentMapSnapshot = (): MapViewSnapshot => ({
-    areaId: selectedAreaId,
-    placeId: selectedPlace?.id ?? null,
-  });
-
-  const rememberMapSnapshot = (next: MapViewSnapshot) => {
-    const current = currentMapSnapshot();
-    if (sameMapSnapshot(current, next)) return;
-
-    setMapBackStack((stack) => {
-      const last = stack[stack.length - 1];
-      if (last && sameMapSnapshot(last, current)) return stack;
-      return [...stack, current].slice(-12);
-    });
-  };
-
-  const applyMapSnapshot = (snapshot: MapViewSnapshot) => {
-    const place = snapshot.placeId ? (findPlace(snapshot.placeId) ?? null) : null;
-    const areaId = place ? getMapAreaIdForPlace(place) : snapshot.areaId;
-    setSelectedAreaId(areaId);
-    setSelectedPlace(place);
-    setSheetH(place ? placePreview : areaId ? areaPreview : idlePeek);
-  };
-
-  const clearMapView = () => {
-    setMapBackStack([]);
-    setSelectedAreaId(null);
-    setSelectedPlace(null);
-    setSheetH(idlePeek);
-  };
-
-  const goBackMapView = () => {
-    const validStack = mapBackStack.filter(
-      (snapshot) =>
-        (!snapshot.areaId || validMapAreaIdsRef.current.has(snapshot.areaId)) &&
-        (!snapshot.placeId || validMapPlaceIdsRef.current.has(snapshot.placeId)),
-    );
-    const previous = validStack[validStack.length - 1];
-    if (!previous) {
-      clearMapView();
+  const [collapsedHeight, setCollapsedHeight] = useState(80);
+  const observeMapBody = useCallback((element: HTMLDivElement | null) => {
+    mapBodyObserverRef.current?.disconnect();
+    mapBodyRef.current = element;
+    if (!element) {
+      mapBodyObserverRef.current = null;
       return;
     }
-
-    setMapBackStack(validStack.slice(0, -1));
-    applyMapSnapshot(previous);
-  };
-
-  const selectAreaPreview = (cluster: MapAreaCluster) => {
-    const next = { areaId: cluster.id, placeId: null };
-    rememberMapSnapshot(next);
-    setSelectedAreaId(cluster.id);
-    setSelectedPlace(null);
-    setSheetH(areaPreview);
-  };
-
-  const selectPlacePreview = (place: Place, remember = true) => {
-    const areaId = getMapAreaIdForPlace(place);
-    if (remember) rememberMapSnapshot({ areaId, placeId: place.id });
-    setSelectedAreaId(areaId);
-    setSelectedPlace(place);
-    setSheetH(placePreview);
-  };
-
-  const selectMapPlacePreview = (place: Place, cluster: MapAreaCluster) => {
-    rememberMapSnapshot({ areaId: cluster.id, placeId: place.id });
-    setSelectedAreaId(cluster.id);
-    setSelectedPlace(place);
-    setSheetH(placePreview);
-  };
+    const measure = () => setMapAreaH(Math.max(1, element.getBoundingClientRect().height));
+    const observer = new ResizeObserver(measure);
+    mapBodyObserverRef.current = observer;
+    observer.observe(element);
+    measure();
+  }, []);
+  const safeMapAreaH = mapAreaH;
+  const sheetHeights = useMemo(
+    () => discoverySheetHeights(safeMapAreaH, collapsedHeight, discoveryState.selection.kind),
+    [safeMapAreaH, collapsedHeight, discoveryState.selection.kind],
+  );
+  const sheetH = sheetHeights[discoveryState.snap];
+  const clearMapView = useCallback(() => discoveryDispatch({ type: "clear" }), []);
+  const goBackMapView = useCallback(() => discoveryDispatch({ type: "back" }), []);
+  const selectAreaPreview = useCallback(
+    (cluster: MapAreaCluster) =>
+      discoveryDispatch({
+        type: "select",
+        selection: { kind: "regionSelected", regionId: cluster.id },
+      }),
+    [],
+  );
+  const selectPlacePreview = useCallback(
+    (place: Place, remember = true) =>
+      discoveryDispatch({
+        type: "select",
+        selection: {
+          kind: "placeSelected",
+          regionId: getMapAreaIdForPlace(place),
+          placeId: place.id,
+        },
+        remember,
+      }),
+    [],
+  );
+  const selectMapPlacePreview = (place: Place, cluster: MapAreaCluster) =>
+    discoveryDispatch({
+      type: "select",
+      selection: { kind: "placeSelected", regionId: cluster.id, placeId: place.id },
+    });
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -943,14 +899,6 @@ export function PulseApp() {
             reconcileCommentGroups(previous, data.culturalEventComments),
           );
           // A capped bootstrap may retain only permission-checked Saved context.
-          setSelectedPlace((current) =>
-            reconcileOpenDetail(
-              current,
-              data.places,
-              savedDetailContextRef.current?.places ?? [],
-              detailViewerUserIdRef.current,
-            ),
-          );
           setOpenPlace((current) =>
             reconcileOpenDetail(
               current,
@@ -1101,7 +1049,6 @@ export function PulseApp() {
     const previousSavedContext = savedDetailContextRef.current;
     savedDetailContextRef.current = null;
     setSavedDetailContext(null);
-    setSelectedPlace((current) => visibleDetail(current, accountStorageUserId));
     setOpenPlace((current) => visibleDetail(current, accountStorageUserId));
     setOpenPost((current) => visibleDetail(current, accountStorageUserId));
     setOpenRoute((current) => visibleDetail(current, accountStorageUserId));
@@ -1314,8 +1261,11 @@ export function PulseApp() {
 
     if (areaParam) {
       setTab("map");
-      setSelectedAreaId(areaParam);
-      setSheetH(areaPreview);
+      discoveryDispatch({
+        type: "select",
+        selection: { kind: "regionSelected", regionId: areaParam },
+        remember: false,
+      });
       return;
     }
 
@@ -1327,11 +1277,7 @@ export function PulseApp() {
         setOpenPlace(null);
         setOpenRoute(null);
         const place = placeById.get(post.placeId);
-        setSelectedPlace(place ?? null);
-        if (place) {
-          setSelectedAreaId(getMapAreaIdForPlace(place));
-          setSheetH(placePreview);
-        }
+        if (place) selectPlacePreview(place, false);
         return;
       }
     }
@@ -1351,15 +1297,13 @@ export function PulseApp() {
       const place = placeById.get(placeId);
       if (place) {
         setTab("map");
-        setSelectedAreaId(getMapAreaIdForPlace(place));
-        setSelectedPlace(place);
-        setSheetH(placePreview);
+        selectPlacePreview(place, false);
         setOpenPlace(place);
         setOpenPost(null);
         setOpenRoute(null);
       }
     }
-  }, [allPosts, areaPreview, dataStatus, placeById, placePreview, placeStoryGroups, routeById]);
+  }, [allPosts, dataStatus, placeById, placeStoryGroups, routeById, selectPlacePreview, setTab]);
 
   const toggleSave = (id: string) => {
     if (account.status !== "ready") {
@@ -1578,9 +1522,7 @@ export function PulseApp() {
       places: [place, ...data.places.filter((existing) => existing.id !== place.id)],
     }));
     setPlaceComments((comments) => ({ ...comments, [place.id]: comments[place.id] ?? [] }));
-    setSelectedAreaId(getMapAreaIdForPlace(place));
-    setSelectedPlace(place);
-    setSheetH(placePreview);
+    selectPlacePreview(place, false);
     setOpenPlace(place);
     setCreateOpen(false);
     setComposerPin(null);
@@ -1959,6 +1901,7 @@ export function PulseApp() {
   };
 
   const startRouteOnMap = (route: RouteItem) => {
+    discoveryDispatch({ type: "frameRoute" });
     setActiveRouteId(route.id);
     setActiveRouteStopIndex(0);
     setOpenRoute(null);
@@ -2050,99 +1993,60 @@ export function PulseApp() {
         new Set(mapPlaces.map((place) => place.id)),
         activeLens,
         discoverySnapshot,
-        markerPulseInput,
+        visibleMarkerPulseInput,
         nowMs,
       ),
-    [mapRegions, mapPlaces, activeLens, discoverySnapshot, markerPulseInput, nowMs],
+    [mapRegions, mapPlaces, activeLens, discoverySnapshot, visibleMarkerPulseInput, nowMs],
   );
   const mapPlaceIdSet = useMemo(() => new Set(mapPlaces.map((place) => place.id)), [mapPlaces]);
   const mapAreaIdSet = useMemo(
     () => new Set(mapClusters.map((cluster) => cluster.id)),
     [mapClusters],
   );
-  validMapPlaceIdsRef.current = mapPlaceIdSet;
-  validMapAreaIdsRef.current = mapAreaIdSet;
-  const selectedCluster = selectedAreaId
-    ? (mapClusters.find((cluster) => cluster.id === selectedAreaId) ?? null)
-    : null;
-  const selectedAreaNeedsRecommendation = Boolean(
-    selectedCluster &&
-    !selectedPlace &&
-    areaNeedsDiscoveryRecommendation(
-      selectedCluster.intelligence,
-      discoverySnapshot.areas[selectedCluster.id],
-      activeLens,
-    ),
-  );
-  const viewportNeedsRecommendation = Boolean(
-    !selectedCluster &&
-    mapDiscoveryViewport &&
-    viewportNeedsDiscoveryRecommendation(
-      mapDiscoveryViewport.visibleAreaIds,
-      activeLens,
+  const discoveryContent = useMemo(
+    () =>
+      deriveMapDiscoveryContent({
+        places: mapPlaces,
+        regions: regionalDiscovery,
+        discovery: discoverySnapshot,
+        viewport: mapDiscoveryViewport,
+        lens: activeLens,
+        meetEvents,
+        culturalEvents,
+        now: nowMs,
+        hiddenUserIds: hiddenDiscoveryUsers,
+      }),
+    [
+      mapPlaces,
+      regionalDiscovery,
       discoverySnapshot,
-      areaIntelligence,
-    ),
-  );
-  const showDiscoveryEmptyState =
-    !query.trim() && (selectedAreaNeedsRecommendation || viewportNeedsRecommendation);
-  const discoverySuggestion = useMemo<DiscoverySuggestion | null>(() => {
-    if (!showDiscoveryEmptyState) return null;
-    const origin = selectedCluster
-      ? { lat: selectedCluster.lat, lng: selectedCluster.lng }
-      : mapDiscoveryViewport?.center;
-    if (!origin) return null;
-
-    const visibleAreas = new Set(mapDiscoveryViewport?.visibleAreaIds ?? []);
-    const candidateClusters = mapClusters.filter(
-      (cluster) => selectedCluster || !visibleAreas.has(cluster.id),
-    );
-    const [recommendation] = rankDiscoveryRecommendations(
-      candidateClusters.map((cluster) => ({
-        areaId: cluster.id,
-        lat: cluster.lat,
-        lng: cluster.lng,
-        intelligence: cluster.intelligence,
-      })),
-      origin,
+      mapDiscoveryViewport,
       activeLens,
-      discoverySnapshot,
-      { excludeAreaId: selectedCluster?.id ?? null, now: nowMs },
-    );
-    if (!recommendation) return null;
-    const cluster = mapClusters.find((item) => item.id === recommendation.areaId);
-    return cluster ? { recommendation, cluster } : null;
-  }, [
-    activeLens,
-    discoverySnapshot,
-    mapClusters,
-    mapDiscoveryViewport,
-    selectedCluster,
-    showDiscoveryEmptyState,
-    nowMs,
-  ]);
+      meetEvents,
+      culturalEvents,
+      nowMs,
+      hiddenDiscoveryUsers,
+    ],
+  );
+  const selectedPlaceMatchesLens =
+    !selectedPlace ||
+    !activeLens ||
+    (discoverySnapshot.places[selectedPlace.id]?.lensRelevance[activeLens] ?? 0) >= 0.35;
+  const openDiscoveryEvent = (event: DiscoveryEvent) => {
+    if (event.kind === "cultural") setOpenCulturalEvent(event.event);
+    else {
+      setMeetFocusEventId(event.event.id);
+      setMeetSubTab("community");
+      setTab("meet");
+    }
+  };
   const availableMapHeight = Math.max(0, safeMapAreaH - sheetH);
   const utilityRailHidden = availableMapHeight < 248;
 
   useEffect(() => {
-    setMapBackStack((stack) => {
-      const valid = stack.filter(
-        (snapshot) =>
-          (!snapshot.areaId || mapAreaIdSet.has(snapshot.areaId)) &&
-          (!snapshot.placeId || mapPlaceIdSet.has(snapshot.placeId)),
-      );
-      return valid.length === stack.length ? stack : valid;
-    });
-
-    const selectedPlaceHidden = Boolean(selectedPlace && !mapPlaceIdSet.has(selectedPlace.id));
-    const selectedAreaHidden = Boolean(selectedAreaId && !mapAreaIdSet.has(selectedAreaId));
-    if (!selectedPlaceHidden && !selectedAreaHidden) return;
-
-    setMapBackStack([]);
-    setSelectedAreaId(null);
-    setSelectedPlace(null);
-    setSheetH(idlePeek);
-  }, [idlePeek, mapAreaIdSet, mapPlaceIdSet, selectedAreaId, selectedPlace]);
+    if (dataStatus === "loading") return;
+    discoveryDispatch({ type: "validate", placeIds: mapPlaceIdSet, regionIds: mapAreaIdSet });
+  }, [dataStatus, mapAreaIdSet, mapPlaceIdSet]);
 
   const filteredPosts = allPosts.filter((post) => {
     const place = findPlace(post.placeId);
@@ -2157,27 +2061,78 @@ export function PulseApp() {
   };
 
   const sel = selectedPlace;
-  const modalOpen = Boolean(
-    openPlace ||
-    openPost ||
-    openRoute ||
+  const higherPriorityModalOpen = Boolean(
     createOpen ||
     storyViewer ||
     profileOpen ||
     authOpen ||
     passwordRecoveryOpen ||
     onboardingOpen ||
-    moderationSheetOpen,
+    moderationSheetOpen ||
+    organizerComposerOpen ||
+    myEventsOpen ||
+    businessPlacesOpen ||
+    dealCodeModal,
   );
+  const modalOpen = Boolean(
+    higherPriorityModalOpen || openPlace || openPost || openRoute || openCulturalEvent,
+  );
+  useEffect(() => {
+    if (tab !== "map") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        appearanceOpen ||
+        showSearch ||
+        higherPriorityModalOpen ||
+        openPost ||
+        openRoute
+      )
+        return;
+      if (openCulturalEvent) setOpenCulturalEvent(null);
+      else if (openPlace) setOpenPlace(null);
+      else if (
+        !modalOpen &&
+        (discoveryState.selection.kind !== "idle" || discoveryState.snap !== "collapsed")
+      ) {
+        goBackMapView();
+        requestAnimationFrame(() =>
+          mapBodyRef.current
+            ?.querySelector<HTMLButtonElement>(".hp-discovery-sheet__summary")
+            ?.focus({ preventScroll: true }),
+        );
+      } else return;
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    tab,
+    appearanceOpen,
+    showSearch,
+    higherPriorityModalOpen,
+    openPost,
+    openRoute,
+    openCulturalEvent,
+    openPlace,
+    modalOpen,
+    discoveryState.selection.kind,
+    discoveryState.snap,
+    goBackMapView,
+  ]);
+
   const renderActiveTab = () => {
     if (tab === "map") {
       return (
         <div
-          ref={mapBodyRef}
+          ref={observeMapBody}
           className="hp-map-stage relative h-full w-full"
           data-utility-rail-hidden={utilityRailHidden ? "true" : "false"}
+          data-atmosphere={temporalAtmosphere.period ?? "unavailable"}
         >
           <SocialMap
+            atmospherePalette={temporalAtmosphere.paletteKey}
             clusters={mapClusters}
             regions={regionalDiscovery}
             markerPulseSnapshot={markerPulseSnapshot}
@@ -2190,18 +2145,28 @@ export function PulseApp() {
             onOpenPlace={setOpenPlace}
             events={events}
             activitySnapshot={activitySnapshot}
-            selectedAreaId={selectedAreaId}
-            selectedPlaceId={sel?.id ?? null}
+            selection={discoveryState.selection}
+            sheetGeometry={sheetGeometry}
+            focusSheetHeights={{
+              region: discoverySheetHeights(safeMapAreaH, collapsedHeight, "regionSelected")
+                .preview,
+              place: discoverySheetHeights(safeMapAreaH, collapsedHeight, "placeSelected").preview,
+            }}
+            initialCamera={discoveryState.camera}
+            routeFrameRevision={discoveryState.routeFrameRevision}
+            cameraCaptureRef={mapCameraCaptureRef}
             activeFilterLabel={activeLens ? t(DISCOVERY_LENS_LABEL[activeLens]) : null}
             activeLens={activeLens}
             discoverySnapshot={discoverySnapshot}
-            onDiscoveryViewportChange={setMapDiscoveryViewport}
+            onDiscoveryViewportChange={onDiscoveryViewportChange}
             storyPlaceIds={storyPlaceIds}
             onSelectArea={selectAreaPreview}
             onSelectPlace={selectMapPlacePreview}
             onResetView={clearMapView}
             onClearSelection={clearMapView}
-            canGoBack={mapBackStack.length > 0}
+            canGoBack={
+              discoveryState.selection.kind !== "idle" || discoveryState.snap !== "collapsed"
+            }
             onBack={goBackMapView}
             bottomOverlayHeight={sheetH}
             availableMapHeight={availableMapHeight}
@@ -2230,29 +2195,36 @@ export function PulseApp() {
             <MapBottomSheet
               key={accountStorageUserId ?? "guest"}
               nowMs={nowMs}
-              previewActivitySnapshot={activitySnapshot}
-              cluster={selectedCluster}
+              atmosphere={temporalAtmosphere}
+              state={discoveryState}
+              content={discoveryContent}
               selectedPlace={sel}
-              events={events}
+              markerPulseSnapshot={markerPulseSnapshot}
+              heights={sheetHeights}
+              geometry={sheetGeometry}
+              onSnap={(snap) => discoveryDispatch({ type: "snap", snap })}
+              onCollapsedHeightMeasured={setCollapsedHeight}
+              onSelectRegion={(regionId) =>
+                discoveryDispatch({
+                  type: "select",
+                  selection: { kind: "regionSelected", regionId },
+                })
+              }
+              onSelectPlace={selectPlacePreview}
+              onClear={clearMapView}
+              onBack={goBackMapView}
+              onOpenEvent={openDiscoveryEvent}
               storyGroups={placeStoryGroups}
               onOpenStory={(placeId) => setStoryViewer({ placeId })}
-              height={sheetH}
-              peek={peek}
-              half={half}
-              full={full}
-              onSetSnap={setSheetH}
-              onIdleHeightMeasured={setIdlePeek}
-              onOpenDetails={(p) => setOpenPlace(p)}
+              onOpenDetails={(place) => setOpenPlace(place)}
               onSavePlace={toggleSave}
               onSharePlace={sharePlace}
               savedPlaceIds={savedIds}
               claimedPlaceIds={pulseData.claimedPlaceIds}
               dealPlaceIds={pulseData.dealPlaceIds}
-              activeLens={activeLens}
-              searchQuery={mapClusters.length === 0 ? query : ""}
-              showDiscoveryEmptyState={showDiscoveryEmptyState}
-              discoverySuggestion={discoverySuggestion}
-              onOpenDiscoverySuggestion={selectAreaPreview}
+              searchQuery={query}
+              dataStatus={dataStatus}
+              selectedPlaceMatchesLens={selectedPlaceMatchesLens}
               onClearLens={() => setActiveLens(null)}
               onClearSearch={() => setQuery("")}
             />
@@ -2383,6 +2355,7 @@ export function PulseApp() {
                 <MeetScreen
                   key={accountStorageUserId ?? "guest"}
                   nowMs={nowMs}
+                  focusEventId={meetFocusEventId}
                   events={meetEvents}
                   rsvp={rsvpMap}
                   findPlace={findPlace}
@@ -2537,7 +2510,7 @@ export function PulseApp() {
                 initial={{ opacity: 0, y: 10, scale: 0.996, filter: "blur(2px)" }}
                 animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
                 exit={{ opacity: 0, y: -8, scale: 0.996, filter: "blur(2px)" }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                transition={HP_TRANSITION.tab}
                 className="absolute inset-0 overflow-hidden bg-hp-bg"
                 style={{
                   backfaceVisibility: "hidden",
