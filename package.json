@@ -67,7 +67,7 @@
     "smoke:comment-drafts": "node --import tsx scripts/smoke-comment-drafts.ts",
     "test:theme": "tsx --test src/lib/theme.test.ts src/lib/hp/map-theme.test.ts",
     "smoke:story-freshness": "node --import tsx scripts/smoke-story-freshness.ts",
-    "test:surfaces": "node --import tsx --test src/lib/hp/surface-freshness.test.ts src/lib/hp/pulse-refresh.test.ts src/lib/hp/activity-data.test.ts src/components/hp/freshness-surfaces.test.tsx",
+    "test:surfaces": "node --import tsx --test src/lib/hp/surface-freshness.test.ts src/lib/hp/pulse-refresh.test.ts src/lib/hp/activity-data.test.ts src/components/hp/freshness-surfaces.test.tsx scripts/meet-refresh-api.test.ts",
     "test:current-discovery": "node --import tsx --test src/lib/hp/map-discovery.test.ts src/lib/hp/map-discovery-content.test.ts src/lib/hp/context-copy.test.ts src/components/hp/MapBottomSheet.test.tsx src/lib/hp/temporal-atmosphere.test.ts src/lib/hp/region-identity.test.tsx src/lib/hp/map-frame.test.ts src/lib/hp/map-location.test.ts src/lib/hp/map-region-layer.test.ts"
   },
   "dependencies": {

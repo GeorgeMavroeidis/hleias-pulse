@@ -49,6 +49,10 @@ scheme; the former three-theme control is superseded.
   appearance adds no timer or fabricated activity evidence.
 - The three existing reliability migrations are retained unchanged. No new
   schema, authentication model or public backend API is introduced.
+- Browser acceptance exposed pending Meets disappearing after refresh. The
+  snapshot now reads the signed-in owner's pending gatherings through existing
+  row permissions, with stable paging. Publication replaces the pending row by
+  ID; successful omission removes it. Guest and other-account views remain scoped.
 
 ## Acceptance and human merge queue
 
