@@ -1,10 +1,24 @@
-import { buildMapRegions, deriveRegionalDiscovery } from "@/lib/hp/regional-discovery";
+import {
+  buildMapRegions,
+  deriveRegionalDiscovery,
+  type MapDiscoveryViewport,
+} from "@/lib/hp/regional-discovery";
+import { areaIdForPlace } from "@/lib/hp/area-catalog";
+import { deriveMapDiscoveryContent, type DiscoveryEvent } from "@/lib/hp/map-discovery-content";
+import {
+  discoverySheetHeights,
+  initialMapDiscoveryState,
+  mapDiscoveryReducer,
+  type MapCameraSnapshot,
+} from "@/lib/hp/map-discovery-state";
+import { createSheetGeometry } from "@/lib/hp/sheet-geometry";
+import { useTemporalAtmosphere } from "./use-temporal-atmosphere";
 import { markerPulseInputFromActivity, deriveMarkerPulseSnapshot } from "@/lib/hp/marker-pulse";
 import { deriveDiscoverySnapshot } from "@/lib/hp/discovery";
 import { useCommentDrafts } from "./use-comment-drafts";
 import { observationLabel } from "@/lib/hp/surface-freshness";
 import type { PlacePulseMetric } from "@/lib/hp/pulse-activity";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   Activity,
   CalendarHeart,
@@ -188,7 +202,27 @@ export function TrafficPreview() {
   const [sceneIndex, setSceneIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [theme, setTheme] = useState<MarkerMotion>("pulse");
-  const [tab, setTab] = useState<NavTab>("map");
+  const [tab, setActiveTab] = useState<NavTab>("map");
+  const [discoveryState, discoveryDispatch] = useReducer(
+    mapDiscoveryReducer,
+    initialMapDiscoveryState,
+  );
+  const mapCameraCaptureRef = useRef<(() => MapCameraSnapshot | null) | null>(null);
+  const activeTabRef = useRef(tab);
+  activeTabRef.current = tab;
+  const setTab = useCallback(
+    (next: NavTab) => {
+      if (tab === "map" && next !== "map")
+        discoveryDispatch({ type: "leaveMap", camera: mapCameraCaptureRef.current?.() ?? null });
+      setActiveTab(next);
+    },
+    [tab],
+  );
+  const onDiscoveryViewportChange = useCallback((viewport: MapDiscoveryViewport) => {
+    if (activeTabRef.current === "map") discoveryDispatch({ type: "viewport", viewport });
+  }, []);
+  const sheetGeometry = useMemo(() => createSheetGeometry(), []);
+  const [meetFocusEventId, setMeetFocusEventId] = useState<string | null>(null);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
   const [savedPlaces, setSavedPlaces] = useState<Record<string, boolean>>({});
@@ -201,27 +235,33 @@ export function TrafficPreview() {
   const [openPlace, setOpenPlace] = useState<Place | null>(null);
   const [mapAvailable, setMapAvailable] = useState(false);
   const [mapHeight, setMapHeight] = useState(560);
-  const [idlePeek, setIdlePeek] = useState(72);
+  const [collapsedHeight, setCollapsedHeight] = useState(72);
   const mapStageRef = useRef<HTMLDivElement>(null);
   const scene = TRAFFIC_SCENES[sceneIndex];
   const sceneSnapshot = useMemo(
     () => buildTrafficPreviewScene(scene.id, clock.anchorMs),
     [scene.id, clock.anchorMs],
   );
-  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
-  const full = Math.round(mapHeight * 0.85);
-  const areaPreview = Math.min(
-    full,
-    Math.min(276, Math.max(mapHeight < 460 ? 200 : 248, Math.round(mapHeight * 0.34))),
+  const temporalAtmosphere = useTemporalAtmosphere(sceneSnapshot.nowMs);
+  const selectedAreaId =
+    discoveryState.selection.kind === "idle" ? null : discoveryState.selection.regionId;
+  const selectedPlaceId =
+    discoveryState.selection.kind === "placeSelected" ? discoveryState.selection.placeId : null;
+  const sheetHeights = useMemo(
+    () => discoverySheetHeights(mapHeight, collapsedHeight, discoveryState.selection.kind),
+    [mapHeight, collapsedHeight, discoveryState.selection.kind],
   );
-  const placePreview = Math.min(
-    full,
-    Math.min(228, Math.max(mapHeight < 460 ? 184 : 210, Math.round(mapHeight * 0.28))),
+  const sheetHeight = sheetHeights[discoveryState.snap];
+  const clearMapView = useCallback(() => discoveryDispatch({ type: "clear" }), []);
+  const goBackMapView = useCallback(() => discoveryDispatch({ type: "back" }), []);
+  const selectPlace = useCallback(
+    (place: Place) =>
+      discoveryDispatch({
+        type: "select",
+        selection: { kind: "placeSelected", regionId: areaIdForPlace(place), placeId: place.id },
+      }),
+    [],
   );
-  const peek = selectedAreaId ? 44 : idlePeek;
-  const half = selectedAreaId ? (selectedPlaceId ? placePreview : areaPreview) : idlePeek;
-  const [sheetHeight, setSheetHeight] = useState(72);
 
   useEffect(() => {
     if (!playing || sceneIndex >= LAST_SCENE_INDEX) return;
@@ -233,17 +273,12 @@ export function TrafficPreview() {
   }, [playing, sceneIndex]);
 
   useEffect(() => {
-    setSelectedAreaId(null);
-    setSelectedPlaceId(null);
-    setSheetHeight(72);
+    discoveryDispatch({ type: "clear" });
+    setMeetFocusEventId(null);
     setStoryPlaceId(null);
     setOpenPost(null);
     setOpenPlace(null);
   }, [sceneIndex]);
-
-  useEffect(() => {
-    if (!selectedAreaId) setSheetHeight(idlePeek);
-  }, [selectedAreaId, idlePeek, sceneIndex]);
 
   useEffect(() => {
     if (tab !== "map") return;
@@ -348,7 +383,6 @@ export function TrafficPreview() {
     [data.posts, data.meetEvents, data.stories, placeById, authorById, sceneSnapshot.nowMs],
   );
   const focusCluster = clusters.find((cluster) => cluster.id === sceneSnapshot.focusAreaId) ?? null;
-  const selectedCluster = clusters.find((cluster) => cluster.id === selectedAreaId) ?? null;
   const selectedPlace = selectedPlaceId ? (findPlace(selectedPlaceId) ?? null) : null;
   const focusPlace = findPlace(sceneSnapshot.focusPlaceId) ?? null;
   const focusArea = areaIntelligence[sceneSnapshot.focusAreaId];
@@ -368,28 +402,50 @@ export function TrafficPreview() {
         }
       : null;
 
+  const discoveryContent = useMemo(
+    () =>
+      deriveMapDiscoveryContent({
+        places: data.places,
+        regions,
+        discovery: discoverySnapshot,
+        viewport: discoveryState.viewport,
+        lens: null,
+        meetEvents: data.meetEvents,
+        culturalEvents: [],
+        now: sceneSnapshot.nowMs,
+      }),
+    [
+      data.places,
+      data.meetEvents,
+      regions,
+      discoverySnapshot,
+      discoveryState.viewport,
+      sceneSnapshot.nowMs,
+    ],
+  );
+  const openDiscoveryEvent = (event: DiscoveryEvent) => {
+    if (event.kind !== "meet") return;
+    setMeetFocusEventId(event.event.id);
+    setTab("meet");
+  };
   const jumpToMap = useCallback(
     (id: string) => {
       const place = findPlace(id);
       if (!place) return;
-      const cluster = clusters.find((candidate) => candidate.places.some((item) => item.id === id));
       setTab("map");
-      setSelectedAreaId(cluster?.id ?? sceneSnapshot.focusAreaId);
-      setSelectedPlaceId(id);
-      setSheetHeight(placePreview);
+      selectPlace(place);
       setOpenPost(null);
       setOpenPlace(null);
       setStoryPlaceId(null);
     },
-    [clusters, findPlace, placePreview, sceneSnapshot.focusAreaId],
+    [findPlace, selectPlace, setTab],
   );
 
   const reset = () => {
     setPlaying(false);
     setSceneIndex(0);
-    setSelectedAreaId(null);
-    setSelectedPlaceId(null);
-    setSheetHeight(idlePeek);
+    discoveryDispatch({ type: "clear" });
+    setMeetFocusEventId(null);
     setStoryPlaceId(null);
     setOpenPost(null);
     setOpenPlace(null);
@@ -535,8 +591,10 @@ export function TrafficPreview() {
                   ref={mapStageRef}
                   className="hp-map-stage relative h-full w-full"
                   data-utility-rail-hidden={mapHeight - sheetHeight < 248 ? "true" : "false"}
+                  data-atmosphere={temporalAtmosphere.period ?? "unavailable"}
                 >
                   <SocialMap
+                    atmospherePalette={temporalAtmosphere.paletteKey}
                     clusters={clusters}
                     regions={regions}
                     markerPulseSnapshot={markerPulseSnapshot}
@@ -547,39 +605,33 @@ export function TrafficPreview() {
                     onOpenPlace={setOpenPlace}
                     events={data.events}
                     activitySnapshot={activitySnapshot}
-                    selectedAreaId={selectedAreaId}
-                    selectedPlaceId={selectedPlaceId}
+                    selection={discoveryState.selection}
+                    sheetGeometry={sheetGeometry}
+                    focusSheetHeights={{
+                      region: discoverySheetHeights(mapHeight, collapsedHeight, "regionSelected")
+                        .preview,
+                      place: discoverySheetHeights(mapHeight, collapsedHeight, "placeSelected")
+                        .preview,
+                    }}
+                    initialCamera={discoveryState.camera}
+                    routeFrameRevision={discoveryState.routeFrameRevision}
+                    cameraCaptureRef={mapCameraCaptureRef}
+                    onDiscoveryViewportChange={onDiscoveryViewportChange}
                     storyPlaceIds={storyPlaceIds}
-                    onSelectArea={(cluster) => {
-                      setSelectedAreaId(cluster.id);
-                      setSelectedPlaceId(null);
-                      setSheetHeight(areaPreview);
-                    }}
-                    onSelectPlace={(place, cluster) => {
-                      setSelectedAreaId(cluster.id);
-                      setSelectedPlaceId(place.id);
-                      setSheetHeight(placePreview);
-                    }}
-                    onResetView={() => {
-                      setSelectedAreaId(null);
-                      setSelectedPlaceId(null);
-                      setSheetHeight(idlePeek);
-                    }}
-                    onClearSelection={() => {
-                      setSelectedAreaId(null);
-                      setSelectedPlaceId(null);
-                      setSheetHeight(idlePeek);
-                    }}
-                    canGoBack={Boolean(selectedAreaId || selectedPlaceId)}
-                    onBack={() => {
-                      if (selectedPlaceId) {
-                        setSelectedPlaceId(null);
-                        setSheetHeight(areaPreview);
-                      } else {
-                        setSelectedAreaId(null);
-                        setSheetHeight(idlePeek);
-                      }
-                    }}
+                    onSelectArea={(cluster) =>
+                      discoveryDispatch({
+                        type: "select",
+                        selection: { kind: "regionSelected", regionId: cluster.id },
+                      })
+                    }
+                    onSelectPlace={selectPlace}
+                    onResetView={clearMapView}
+                    onClearSelection={clearMapView}
+                    canGoBack={
+                      discoveryState.selection.kind !== "idle" ||
+                      discoveryState.snap !== "collapsed"
+                    }
+                    onBack={goBackMapView}
                     bottomOverlayHeight={sheetHeight}
                     availableMapHeight={Math.max(0, mapHeight - sheetHeight)}
                     previewMode
@@ -587,32 +639,38 @@ export function TrafficPreview() {
                   <div className="contents" inert={!mapAvailable} aria-hidden={!mapAvailable}>
                     <MapBottomSheet
                       nowMs={sceneSnapshot.nowMs}
-                      cluster={selectedCluster}
+                      atmosphere={temporalAtmosphere}
+                      state={discoveryState}
+                      content={discoveryContent}
                       selectedPlace={selectedPlace}
-                      events={data.events}
+                      markerPulseSnapshot={markerPulseSnapshot}
+                      heights={sheetHeights}
+                      geometry={sheetGeometry}
+                      onSnap={(snap) => discoveryDispatch({ type: "snap", snap })}
+                      onCollapsedHeightMeasured={setCollapsedHeight}
+                      onSelectRegion={(regionId) =>
+                        discoveryDispatch({
+                          type: "select",
+                          selection: { kind: "regionSelected", regionId },
+                        })
+                      }
+                      onSelectPlace={selectPlace}
+                      onClear={clearMapView}
+                      onBack={goBackMapView}
+                      onOpenEvent={openDiscoveryEvent}
                       storyGroups={storyGroups}
                       onOpenStory={setStoryPlaceId}
-                      height={sheetHeight}
-                      peek={peek}
-                      half={half}
-                      full={full}
-                      onSetSnap={setSheetHeight}
-                      onIdleHeightMeasured={setIdlePeek}
                       onOpenDetails={setOpenPlace}
                       onSavePlace={(id) => setSavedPlaces((old) => ({ ...old, [id]: !old[id] }))}
                       onSharePlace={() => undefined}
                       savedPlaceIds={Object.keys(savedPlaces).filter((id) => savedPlaces[id])}
                       claimedPlaceIds={[]}
                       dealPlaceIds={[]}
-                      activeLens={null}
                       searchQuery=""
-                      showDiscoveryEmptyState={false}
-                      discoverySuggestion={null}
-                      onOpenDiscoverySuggestion={() => undefined}
+                      dataStatus="ready"
+                      selectedPlaceMatchesLens
                       onClearLens={() => undefined}
                       onClearSearch={() => undefined}
-                      previewMode
-                      previewActivitySnapshot={activitySnapshot}
                     />
                   </div>
                 </div>
@@ -648,6 +706,7 @@ export function TrafficPreview() {
               )}
               {tab === "meet" && (
                 <MeetScreen
+                  focusEventId={meetFocusEventId}
                   events={data.meetEvents.map((event) => ({
                     ...event,
                     going: event.going + (rsvp[event.id] === "going" ? 1 : 0),
@@ -830,9 +889,10 @@ export function TrafficPreview() {
             className="hp-traffic-preview__focus"
             onClick={() => {
               setTab("map");
-              setSelectedAreaId(sceneSnapshot.focusAreaId);
-              setSelectedPlaceId(null);
-              setSheetHeight(areaPreview);
+              discoveryDispatch({
+                type: "select",
+                selection: { kind: "regionSelected", regionId: sceneSnapshot.focusAreaId },
+              });
             }}
           >
             <MapIcon size={15} /> Focus area{" "}

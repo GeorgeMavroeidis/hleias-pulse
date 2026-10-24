@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { DAY_MAP_PALETTE, DARK_DAY_MAP_PALETTE } from "./map-cartography";
+import {
+  DAY_MAP_PALETTE,
+  DARK_DAY_MAP_PALETTE,
+  ATMOSPHERE_MAP_PALETTES,
+  DARK_ATMOSPHERE_MAP_PALETTES,
+} from "./map-cartography";
 import { applyRegionalMapPalette, installRegionalLayer, REGION_LAYER_ID } from "./map-region-layer";
 
 type ImageFixture = ImageData & { paints: string[]; geometry: number[][] };
@@ -123,6 +128,20 @@ test("regional palette round trips update existing pixels and labels without rep
     for (const [id, image] of images) assert.deepEqual(image, initial.get(id));
     assert.deepEqual([...sources.entries()], initialSources);
     assert.deepEqual([...layers.entries()], initialLayers);
+    for (const palette of [
+      ...Object.values(ATMOSPHERE_MAP_PALETTES),
+      ...Object.values(DARK_ATMOSPHERE_MAP_PALETTES),
+    ]) {
+      applyRegionalMapPalette(map, palette, 800);
+      for (const [id, image] of images) {
+        assert.deepEqual(image.geometry, initial.get(id)!.geometry);
+        assert.ok(image.paints.includes(`fill:${palette.land}`));
+        assert.ok(image.paints.includes(`stroke:${palette.primaryText}`));
+      }
+      assert.deepEqual([...sources.entries()], initialSources);
+      assert.deepEqual([...layers.entries()], initialLayers);
+    }
+    applyRegionalMapPalette(map, DAY_MAP_PALETTE, 0);
     assert.equal(contexts, 2);
     assert.deepEqual(writes.at(-2), [
       REGION_LAYER_ID,

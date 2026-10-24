@@ -229,6 +229,19 @@ assert.ok(
   mapSource.includes("updatePulseIcon(marker.getElement(), node, hasStory, t, nowMs, language)"),
 );
 assert.ok(mapSource.includes("if (!marker) {"));
+assert.match(mapSource, /if \(node\.kind === "child"\) \{\s+let photo = markerPhotosRef/);
+assert.match(
+  mapSource,
+  /photo\.update\(node\.place\.imageUrl, node\.place\.id === selectedPlaceId\)/,
+);
+assert.match(mapSource, /markerPhotosRef\.current\.get\(id\)\?\.dispose\(\)/);
+assert.match(mapSource, /markerPhotosRef\.current\.forEach\(\(photo\) => photo\.dispose\(\)\)/);
+assert.match(pulseCss, /border: 1\.5px solid var\(--hp-on-media\)/);
+assert.match(pulseCss, /\.hp-pulse-photo \{[\s\S]*?width: 32px;\s+height: 32px;/);
+assert.match(
+  pulseCss,
+  /@media \(prefers-reduced-motion: reduce\) \{\s+\.hp-pulse-shell,\s+\.hp-pulse-preview,\s+\.hp-pulse-photo \{\s+transition: none;/,
+);
 assert.ok(mapSource.includes('anchor: "center"'));
 assert.ok(mapSource.includes('markerShell?.classList.toggle("is-selected", node.selected)'));
 assert.ok(mapSource.includes("markerElement.tabIndex = visibleForInteraction ? 0 : -1"));
@@ -249,7 +262,8 @@ const coreRule = pulseCss.match(/\.hp-pulse-core \{([\s\S]*?)\n\}/)?.[1];
 assert.ok(coreRule && !/animation|transform/.test(coreRule));
 const shell = readFileSync(new URL("../src/components/hp/PulseApp.tsx", import.meta.url), "utf8");
 assert.ok(/markerPulseInputFromActivity\(\s*activitySnapshot/.test(shell));
-assert.ok(shell.includes("deriveMarkerPulseSnapshot(markerPulseInput, nowMs)"));
+assert.ok(shell.includes("excludeHiddenPulseContributors(markerPulseInput, hiddenDiscoveryUsers)"));
+assert.ok(shell.includes("deriveMarkerPulseSnapshot(visibleMarkerPulseInput, nowMs)"));
 assert.equal((shell.match(/new PulseRefreshController\(/g) ?? []).length, 1);
 assert.doesNotMatch(mapSource, /setInterval|setMarkerPulseNow/);
 assert.ok(shell.includes("markerPulseSnapshot={markerPulseSnapshot}"));
@@ -282,4 +296,42 @@ assert.match(
 assert.doesNotMatch(mapSource, /location\.reload|window\.location\.reload|console\.error/);
 console.log(
   "Guarded recovery, source-free local preview, bundled worker and marker teardown contracts passed.",
+);
+
+// Phase selection and atmosphere project onto the reliability-owned map lifecycle.
+assert.match(mapSource, /selection\?: MapSelection/);
+assert.match(mapSource, /discoverySafeMapRect\(/);
+assert.match(mapSource, /sheetGeometry\?\.subscribe\(sync\)/);
+assert.match(mapSource, /const isCurrent = \(\) => active && mapRef\.current === map/);
+assert.match(mapSource, /correctionFrame\.dispose\(\)/);
+assert.match(mapSource, /if \(sheetMotionRef\.current\) return null/);
+assert.match(mapSource, /cameraCaptureRef\.current = capture/);
+assert.match(mapSource, /if \(!map \|\| !mapReady \|\| mapRef\.current !== map\) return null/);
+assert.match(
+  mapSource,
+  /if \(previewMode \|\| !mapHasLoaded \|\| !map \|\| mapRef\.current !== map\) return/,
+);
+assert.match(mapSource, /framedRouteRevisionRef\.current !== routeFrameRevision/);
+assert.match(
+  mapSource,
+  /applyRegionalMapPalette\(session\.map, resolveMapPalette\(appearance\), duration\)/,
+);
+assert.match(
+  mapSource,
+  /if \(mapRef\.current !== session\.map \|\| appearanceSessionRef\.current !== session\) return/,
+);
+assert.match(previewSource, /hp-preview-sea/);
+assert.match(
+  mapSource,
+  /applyPreviewMapPalette\(\s*session\.map,\s*session\.previewLand,\s*resolveMapPalette\(appearance\),\s*duration/,
+);
+assert.doesNotMatch(mapSource, /\.setStyle\(/);
+assert.match(mapSource, /locationRequestRef\.current\?\.cancel\(\)/);
+assert.match(mapSource, /if \(!previewMode && mapReady\) locationRequest\.start/);
+assert.match(mapSource, /aria-busy=\{locationStatus === "pending"\}/);
+assert.match(mapSource, /id="hp-map-location-status"/);
+assert.match(mapSource, /markerElement\.inert = !visibleForInteraction/);
+assert.match(mapSource, /marker\.getElement\(\)\.inert = false/);
+console.log(
+  "Controlled selection, guarded sheet frames, paint-only atmosphere and recoverable location contracts passed.",
 );

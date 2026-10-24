@@ -84,7 +84,12 @@ test("regional symbol layer validates against installed SDK with collision-aware
 
 test("one spatial index preserves every member at all zooms and caches queries/leaves", () => {
   const key = topologyKey(PLACES);
-  assert.equal(topologyKey([...PLACES].reverse().map((p) => ({ ...p, hotness: 999 }))), key);
+  assert.equal(
+    topologyKey(
+      [...PLACES].reverse().map((p) => ({ ...p, hotness: 999, imageUrl: "/changed-photo.jpg" })),
+    ),
+    key,
+  );
   const topology = createMapTopology(key);
   for (let zoom = 8; zoom <= 18; zoom++) {
     const nodes = topology.query(zoom, world);
@@ -410,6 +415,8 @@ function regionalMapFixture(availableContext: boolean) {
   const sources = new Map<string, unknown>();
   const map = {
     getSource: (id: string) => sources.get(id),
+    getLayer: (id: string) => layers.find((layer) => layer.id === id),
+    hasImage: (id: string) => images.includes(id),
     getContainer: () => ({}),
     addImage: (id: string) => images.push(id),
     addSource: (id: string, source: unknown) => sources.set(id, source),

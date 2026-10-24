@@ -4,7 +4,7 @@
   z-index: 0;
   height: 100%;
   width: 100%;
-  background: var(--hp-bg);
+  background: var(--hp-map-land, var(--hp-bg));
   font-family: var(--hp-font-body);
 }
 

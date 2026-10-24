@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { validateStyleMin } from "@maplibre/maplibre-gl-style-spec";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { DAY_MAP_PALETTE, DARK_DAY_MAP_PALETTE } from "./map-cartography";
+import {
+  DAY_MAP_PALETTE,
+  DARK_DAY_MAP_PALETTE,
+  ATMOSPHERE_MAP_PALETTES,
+  DARK_ATMOSPHERE_MAP_PALETTES,
+} from "./map-cartography";
+const allPalettes = [
+  ...Object.values(ATMOSPHERE_MAP_PALETTES),
+  ...Object.values(DARK_ATMOSPHERE_MAP_PALETTES),
+];
 import {
   applyPreviewMapPalette,
   attachLocalPreviewLand,
@@ -28,8 +37,8 @@ class Element {
   }
 }
 
-test("both preview styles validate with only a palette-colored sea and no sources", () => {
-  for (const palette of [DAY_MAP_PALETTE, DARK_DAY_MAP_PALETTE]) {
+test("all eight preview styles validate with only a palette-colored sea and no sources", () => {
+  for (const palette of allPalettes) {
     const style = createLocalPreviewBasemapStyle(palette);
     assert.deepEqual(
       validateStyleMin(style).map((error) => error.message),
@@ -134,6 +143,21 @@ test("preview changes reuse coast geometry, keep sea/SVG colors together, and di
     );
     assert.equal(frames.size, 0);
 
+    for (const palette of allPalettes) {
+      applyPreviewMapPalette(map, land, palette, 800);
+      assert.equal(canvas.children[0], svg);
+      assert.deepEqual(
+        paths.map((path) => path.attributes.get("d")),
+        geometry,
+      );
+      assert.ok(
+        paths.every(
+          (path) =>
+            path.attributes.get("fill") === palette.land &&
+            path.attributes.get("stroke") === palette.olive,
+        ),
+      );
+    }
     applyPreviewMapPalette(map, land, DAY_MAP_PALETTE, 0);
     assert.ok(paths.every((path) => path.attributes.get("fill") === DAY_MAP_PALETTE.land));
     assert.ok(paths.every((path) => path.style.transition === "none"));
