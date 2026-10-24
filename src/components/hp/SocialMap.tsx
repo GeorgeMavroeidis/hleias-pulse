@@ -113,6 +113,7 @@ import {
   type MarkerPulseSnapshot,
 } from "@/lib/hp/marker-pulse";
 import type { TranslationParams } from "@/lib/i18n";
+import { createMarkerPhoto } from "@/lib/hp/marker-photo";
 
 const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
 
@@ -472,6 +473,7 @@ export function SocialMap({
   const maplibreModuleRef = useRef<typeof import("maplibre-gl") | null>(null);
   const markersRef = useRef<Map<string, MapLibreMarker>>(new Map());
   const markerRuntimeRef = useRef<Map<string, MarkerRuntimeState>>(new Map());
+  const markerPhotosRef = useRef(new Map<string, ReturnType<typeof createMarkerPhoto>>());
   const markerExitsRef = useRef(createMarkerExits());
   const previewRegionMarkersRef = useRef<Map<string, MapLibreMarker>>(new Map());
   const renderNodesRef = useRef<Map<string, RenderNode>>(new Map());
@@ -1271,6 +1273,8 @@ export function SocialMap({
       markerExitsRef.current.flush();
       previewRegionMarkersRef.current.forEach((marker) => marker.remove());
       previewRegionMarkersRef.current.clear();
+      markerPhotosRef.current.forEach((photo) => photo.dispose());
+      markerPhotosRef.current.clear();
       markers.forEach((marker) => marker.remove());
       markers.clear();
       markerRuntimes.clear();
@@ -1586,6 +1590,8 @@ export function SocialMap({
       const element = marker.getElement();
       if (element.contains(document.activeElement))
         mapNodeRef.current?.focus({ preventScroll: true });
+      markerPhotosRef.current.get(id)?.dispose();
+      markerPhotosRef.current.delete(id);
       element.inert = true;
       element.style.pointerEvents = "none";
       element.tabIndex = -1;
@@ -1672,6 +1678,16 @@ export function SocialMap({
           markerShell?.classList.toggle("is-selected", node.selected);
         }
 
+        if (node.kind === "child") {
+          let photo = markerPhotosRef.current.get(node.id);
+          if (!photo) {
+            photo = createMarkerPhoto(markerElement);
+            markerPhotosRef.current.set(node.id, photo);
+          }
+          // A one-place region can highlight a child without selecting its place sheet.
+          photo.update(node.place.imageUrl, node.place.id === selectedPlaceId);
+        }
+
         if (created) {
           if (markerElement.__hpClickHandler)
             markerElement.removeEventListener("click", markerElement.__hpClickHandler, true);
@@ -1714,7 +1730,7 @@ export function SocialMap({
       });
     });
     scheduleMarkerViewportSyncRef.current();
-  }, [mapReady, renderNodes, storyPlaceIds, zoom, t, nowMs, language]);
+  }, [mapReady, renderNodes, storyPlaceIds, zoom, t, nowMs, language, selectedPlaceId]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -74,6 +74,54 @@
   outline: none;
 }
 
+/* Only an engaged place loads a photo; its geographic core and hit target stay fixed. */
+.hp-pulse-photo {
+  position: absolute;
+  left: calc(50% - 16px);
+  top: calc(50% - 16px);
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  object-fit: cover;
+  border: 1.5px solid var(--hp-on-media);
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity var(--hp-motion-state) var(--hp-ease-standard);
+}
+.hp-child-marker__shell.has-place-photo .hp-pulse-photo {
+  opacity: 1;
+}
+.hp-child-marker__shell.has-place-photo .hp-pulse-selection-ring {
+  left: calc(50% - 20px);
+  top: calc(50% - 20px);
+  width: 40px;
+  height: 40px;
+  border: 1px solid color-mix(in srgb, var(--hp-sunset) 65%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hp-sunset) 16%, transparent);
+  opacity: 1;
+}
+.hp-pulse-marker:focus-visible .has-place-photo .hp-pulse-selection-ring {
+  border-color: var(--hp-deep);
+}
+.hp-child-marker__shell.has-place-photo :is(.hp-pulse-ring, .hp-pulse-selection-accent) {
+  animation: none !important;
+  opacity: 0 !important;
+  will-change: auto;
+}
+.hp-child-marker__shell.has-place-photo .hp-pulse-event {
+  left: calc(50% - 18px);
+  top: calc(50% - 18px);
+  width: 36px;
+  height: 36px;
+}
+.hp-child-marker__shell.has-place-photo .hp-pulse-story {
+  left: calc(50% + 12px);
+  top: calc(50% + 9px);
+}
+.hp-child-marker__shell.has-place-photo .hp-pulse-label {
+  top: calc(50% + 24px);
+}
+
 .hp-pulse-ring,
 .hp-pulse-selection-accent {
   position: absolute;
@@ -253,7 +301,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .hp-pulse-shell,
-  .hp-pulse-preview {
+  .hp-pulse-preview,
+  .hp-pulse-photo {
     transition: none;
   }
   .hp-pulse-ring,
