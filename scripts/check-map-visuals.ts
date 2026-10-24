@@ -229,6 +229,19 @@ assert.ok(
   mapSource.includes("updatePulseIcon(marker.getElement(), node, hasStory, t, nowMs, language)"),
 );
 assert.ok(mapSource.includes("if (!marker) {"));
+assert.match(mapSource, /if \(node\.kind === "child"\) \{\s+let photo = markerPhotosRef/);
+assert.match(
+  mapSource,
+  /photo\.update\(node\.place\.imageUrl, node\.place\.id === selectedPlaceId\)/,
+);
+assert.match(mapSource, /markerPhotosRef\.current\.get\(id\)\?\.dispose\(\)/);
+assert.match(mapSource, /markerPhotosRef\.current\.forEach\(\(photo\) => photo\.dispose\(\)\)/);
+assert.match(pulseCss, /border: 1\.5px solid var\(--hp-on-media\)/);
+assert.match(pulseCss, /\.hp-pulse-photo \{[\s\S]*?width: 32px;\s+height: 32px;/);
+assert.match(
+  pulseCss,
+  /@media \(prefers-reduced-motion: reduce\) \{\s+\.hp-pulse-shell,\s+\.hp-pulse-preview,\s+\.hp-pulse-photo \{\s+transition: none;/,
+);
 assert.ok(mapSource.includes('anchor: "center"'));
 assert.ok(mapSource.includes('markerShell?.classList.toggle("is-selected", node.selected)'));
 assert.ok(mapSource.includes("markerElement.tabIndex = visibleForInteraction ? 0 : -1"));

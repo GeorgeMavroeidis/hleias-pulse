@@ -53,6 +53,11 @@ contents and the merge procedure. Combined acceptance is required before human
 merges. Account redesign and Trip implementation remain separate work; hosted
 database changes, deployment and historical-worktree cleanup are deferred.
 
+The [final marker pass](docs/final-map-markers.md) is prepared on a separate
+branch above the latest discovery integration: ordinary dots, selected/focused
+place photos and clean dot fallback. Focused browser acceptance is complete;
+review and human integration remain. No further map redesign is queued.
+
 ## Right now
 
 **Stage 1 (REPAIR) is done. We're in Stage 2 (BUILD).**

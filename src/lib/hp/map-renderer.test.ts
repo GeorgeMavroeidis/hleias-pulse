@@ -84,7 +84,12 @@ test("regional symbol layer validates against installed SDK with collision-aware
 
 test("one spatial index preserves every member at all zooms and caches queries/leaves", () => {
   const key = topologyKey(PLACES);
-  assert.equal(topologyKey([...PLACES].reverse().map((p) => ({ ...p, hotness: 999 }))), key);
+  assert.equal(
+    topologyKey(
+      [...PLACES].reverse().map((p) => ({ ...p, hotness: 999, imageUrl: "/changed-photo.jpg" })),
+    ),
+    key,
+  );
   const topology = createMapTopology(key);
   for (let zoom = 8; zoom <= 18; zoom++) {
     const nodes = topology.query(zoom, world);
