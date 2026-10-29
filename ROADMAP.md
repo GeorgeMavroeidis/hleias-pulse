@@ -44,6 +44,80 @@ on `feat/dark-mode` and under review in PR #102. Delivery is the local preview a
 PR; live publication is deferred by the product owner. Preference is device-local;
 no database migration or paid service is needed.
 
+## Proposed direction — sell the app to a public body · ⚠️ not yet agreed
+
+> Proposed by Margaris on `2026-10-29`. **This changes where the project is
+> going, so it needs Mavroeidis's agreement before it changes anything below.**
+> Until then, "Next up" and the stages stand as written.
+
+**The proposal.** Instead of earning from businesses (Deals commission or
+subscription), sell **100% ownership** of the app to a public body: the
+Region of Western Greece (Περιφέρεια Δυτικής Ελλάδας) or the Municipality of
+Pyrgos. Who maintains it after the sale is still open.
+
+**What a sale needs, whoever the buyer is:**
+
+1. **Written agreement between the owners first.** Both maintainers (and anyone
+   else who contributed, e.g. the pitch-deck author) agree to sell and on how
+   the money is split. Nothing else is worth doing before this.
+2. **Clean title to everything being sold.** Find out whose name each account
+   is in (Supabase, Cloudflare, domain, Apple Developer; the iOS bundle id is
+   still `com.theodoros.iliapulse`); confirm every photo and piece of content
+   is ours or licensed; check the licences of what we build on.
+3. **A legal entity that can invoice the public sector.** Tax registration or a
+   company, tax/social-security clearance certificates, e-invoicing. Costs
+   money, so it falls after the February 2027 budget gate. Confirm with an
+   accountant: the direct-award ceiling (believed to be ~€30k excl. VAT; above
+   it means a public tender) and how a one-off sale is taxed.
+4. **A price grounded in something real.** Rough quotes from 2–3 software
+   agencies for building the equivalent app, which is what the buyer will
+   compare us against.
+5. **A clear maintenance answer.** "We'll see" will lose the sale. Offer two
+   options: (A) full handover with written docs and admin training, or (B) sale
+   plus a separate, cancellable maintenance contract. Someone must also
+   moderate user posts. After the sale, the owner is responsible for them.
+6. **Proof of use.** The Pyrgos pilot (50–100 locals, 10–20 businesses) is what
+   turns "an app" into "an app people here use". A sale before it has little
+   to show.
+
+**What desk research found (`2026-10-29`; a few searches, not exhaustive).**
+
+- **The Region already owns a similar app: VisitOlympia**
+  (`visit-olympia.gr`, App Store + Google Play). It was funded by ESPA 2014–2020
+  and launched January 2023. It has a map, routes, events, a business directory
+  and user contributions. **It looks abandoned:** the newest news item is
+  February 2024, the events list is empty, and the business directory still
+  holds a placeholder ("Τίτλος επιχείρησης 1", lorem ipsum). It cuts both ways:
+  the Region can say "we already have one", but it is also the strongest proof
+  that a guide nobody keeps updated dies. That is the problem a locals-fed app
+  solves, **provided the maintenance question has an answer**.
+- **National level:** the Ministry of Tourism is redesigning `visitgreece.gr`
+  (six languages, AI-adapted), per pelop.gr, February 2026.
+- **Municipality of Pyrgos:** a **Tourism Committee** has met since July 2025,
+  chaired by Deputy Mayor for Tourism Alekos Galanopoulos, with hoteliers,
+  traders, taxis and the Municipal Port Fund. A consultancy (Wise Ram) is
+  drafting a Strategic Tourism Development Plan with the Port Fund (Katakolo /
+  cruise passengers). Nothing published mentions an app, but they are planning
+  right now, and there is a named person to approach. Pyrgos already uses
+  `sense.city` (residents reporting problems), so it has adopted an app
+  before.
+- **Funding:** the "Δυτική Ελλάδα 2021–2027" programme is ~€628M, with
+  tourism/culture a priority area and projects tying tourism to "digital
+  experiences" funded in July 2026. **No open call for digital tourism for
+  municipalities was found.** Check `dytikiellada.gr` and Διαύγεια.
+
+**Agent's read (for discussion, not a decision):** the Region looks like an
+unlikely buyer for 100% of the app as it stands. It already owns VisitOlympia,
+the app covers one of its three regional units (Ilia, not Achaia or
+Aitoloakarnania), and user-generated posts plus deals for private businesses
+are liability a public body may not want. The Municipality of Pyrgos, via its
+Tourism Committee, looks like the more realistic first conversation.
+
+**Cheap first steps (no spending):** try VisitOlympia for 15 minutes and list
+what's broken, which becomes a pitch slide · approach the Pyrgos Tourism
+Committee with the pilot as a free partnership, not a sale · in meetings, ask
+what they're trying to fix in tourism before presenting anything.
+
 ## Right now
 
 **Stage 1 (REPAIR) is done. We're in Stage 2 (BUILD).**
@@ -91,8 +165,8 @@ free-tier services. The paid/Apple track starts in February.
    one guarded connection helper (`scripts/lib/pg.ts`) instead of eight
    hand-copied ones. Left over: `smoke:admin`, `smoke:routes` and
    `smoke:verification-guards` still carry their own copy of that block.
-3. **Confirm the web deploy works end to end** — *build artifact verified
-   (2026-09-07), actual live Cloudflare deploy still unverified.* Built
+3. **Confirm the web deploy works end to end** — _build artifact verified
+   (2026-09-07), actual live Cloudflare deploy still unverified._ Built
    `cloudflare-static-dist` fresh off `main` and served it through
    `wrangler dev` (the same static-assets + SPA-fallback runtime Cloudflare
    uses, no account needed to run it locally): onboarding, map, Pulse feed,
@@ -206,6 +280,9 @@ is slow and can't be compressed near the deadline.
 
 ## Open decisions
 
+- [ ] **Sell the app to a public body?** Proposed `2026-10-29`. See
+      "Proposed direction" above. Needs both maintainers' agreement. If agreed,
+      it replaces the billing-model question below.
 - [ ] **Billing model** — flat monthly partnership fee vs. per-redemption cut.
       Blocks the business-facing Stage 2 work.
 - [ ] **Web build** — the budget gate makes it the near-term focus by default
