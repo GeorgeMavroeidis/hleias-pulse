@@ -10,7 +10,6 @@ import {
   Bookmark,
   Share2,
   MapPin,
-  ExternalLink,
   BadgeCheck,
   Gift,
   ChevronUp,
@@ -43,7 +42,8 @@ import {
 import type { SheetGeometry } from "@/lib/hp/sheet-geometry";
 import type { PlaceStoryGroup } from "@/lib/hp/place-stories";
 import { ImageBox } from "./ImageBox";
-import { DISCOVERY_LENS_LABEL, HP_TRANSITION, openStreetMapUrl } from "./pulse-shared";
+import { DirectionsLink } from "./DirectionsLink";
+import { DISCOVERY_LENS_LABEL, HP_TRANSITION } from "./pulse-shared";
 
 export type MapBottomSheetProps = {
   /** The same accepted clock that derived content, marker signals and story groups. */
@@ -612,14 +612,10 @@ function PlaceDiscoveryContent(props: Props & { place: Place }) {
         <button type="button" className="is-primary" onClick={() => props.onOpenDetails(place)}>
           {t("Details")}
         </button>
-        <a
-          href={openStreetMapUrl(place)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
-        >
-          <ExternalLink size={16} />
-        </a>
+        <DirectionsLink
+          destination={{ lat: place.lat, lng: place.lng, label: place.name }}
+          className="px-3"
+        />
         <button
           type="button"
           onClick={() => props.onSharePlace(place)}

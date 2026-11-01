@@ -59,13 +59,20 @@ export async function openExternalNavigation(
         : googleMapsNativeUrl(destination, profile);
     try {
       if (await tryNativeUrl(native)) return;
+    } catch (error) {
+      console.warn("Native navigation handoff failed; trying the web URL.", error);
+    }
+    try {
       // A native probe is asynchronous, so a later window.open may lose the
       // original tap gesture in WKWebView. Let the native launcher open Safari.
       const { AppLauncher } = await import("@capacitor/app-launcher");
       if ((await AppLauncher.openUrl({ url: fallback })).completed) return;
     } catch (error) {
-      console.warn("Native navigation handoff failed; using the web URL.", error);
+      console.warn("Browser navigation handoff failed.", error);
     }
+    // Report a failed native handoff so the UI can offer a fresh HTTPS tap.
+    // Opening a popup after the asynchronous probe can lose the tap gesture.
+    throw new Error("Could not open navigation");
   }
   const openWindow = (
     globalThis as unknown as { open?: (url: string, target: string, features: string) => unknown }
