@@ -718,6 +718,12 @@
   min-height: 44px;
   justify-content: center;
 }
+/* Small enough to sit beside "open on map" on a Pulse card. */
+.hp-add-to-trip--small {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+}
 .hp-add-to-trip.is-added {
   background: color-mix(in srgb, var(--hp-sunset) 12%, transparent);
 }
