@@ -39,6 +39,14 @@ the web build first and the iOS app during the season.
 
 ## Appearance and reliability integration
 
+The [final design review](docs/final-design-review.md) and
+[GitHub inventory #105](https://github.com/GeorgeMavroeidis/hleias-pulse/issues/105)
+now compare current main, assembled #100 (including #103), and the shared
+`margaris/trip-map-pulse` implementation. Existing PRs are grouped and retain
+their dependency chain. Place Directions / Οδηγίες is prepared as a focused
+follow-on to #100. The final visual choice, combined release acceptance and
+human main merges remain open.
+
 The simpler composer (#101) and app-wide Light / Dark / System preferences (#102)
 are merged into main. Appearance remains device-local; live publication is deferred.
 
