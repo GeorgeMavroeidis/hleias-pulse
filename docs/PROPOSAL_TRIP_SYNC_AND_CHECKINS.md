@@ -32,32 +32,32 @@ _when_ someone will be where. Deleting the account deletes the plan (cascade).
 (`savePlan` + `TRIP_PLAN_EVENT`); syncing is one upsert there plus a load on
 sign-in. Merge rule: newer `updated_at` wins.
 
-## 2. Place check-ins and points (`place_checkins`)
+## 2. Verified check-ins and points (extend `user_place_visits`)
 
-**Why.** Replaces the "Έχεις πάει;" card's guess (a place counts as visited if
-you posted there), which Margaris finds inaccurate.
+**What already exists.** `user_place_visits` (`20260827120000`) stores "I have
+been here": `(user_id, place_id)` primary key, `visited_at`, own-rows RLS, and
+the user toggles it from the "I've been here" button in place details. It is
+self-declared — nothing checks the user was there.
 
-| Column          | Type                                    | Notes                                       |
-| --------------- | --------------------------------------- | ------------------------------------------- |
-| `id`            | `uuid` PK                               |                                             |
-| `user_id`       | `uuid` → `auth.users` on delete cascade |                                             |
-| `place_id`      | `text` → `places`                       |                                             |
-| `checked_in_on` | `date` (Ilia calendar day)              | unique `(user_id, place_id, checked_in_on)` |
-| `created_at`    | `timestamptz` default `now()`           |                                             |
+**Proposal: verify, don't duplicate.** Add one column instead of a new table:
 
-**No coordinates are stored.** The phone sends its position once to a Postgres
-function `check_in(place_id, lat, lng)` (`security definer`). The function
-measures the distance to the place and inserts a row only if it is ≤ 150 m.
-The coordinates are used inside the function and then dropped. This keeps
-location precision at "was at this place on this day", per the GDPR guardrail.
+| Column     | Type                             | Notes                                     |
+| ---------- | -------------------------------- | ----------------------------------------- |
+| `verified` | `boolean not null default false` | true only when the phone was ≤ 150 m away |
 
-**RLS.** `select` own rows only. **No `insert` policy** — rows can only come in
-through `check_in()`, so nobody can insert a check-in without the distance test.
-Rate limit inside the function (e.g. ≤ 20 check-ins per user per day).
+- Tighten the existing insert policy to `with check (user_id = auth.uid() and
+verified = false)`, so the manual button keeps working but can never claim
+  a verified visit.
+- New function `check_in(place_id, lat, lng)` (`security definer`): measures
+  the distance to the place and upserts the row with `verified = true` only if
+  it is ≤ 150 m. **The coordinates are used inside the function and dropped —
+  never stored**, keeping location precision at "was at this place", per the
+  GDPR guardrail. Rate-limit inside the function (e.g. ≤ 20 per user per day).
 
-**Points (computed, not stored).** A view or function over `place_checkins`:
-+10 per check-in, +5 if the same user posted a photo at that place that day,
-+bonus for the first check-in in an area. Badges and Deals rewards come later.
+**Points (computed, not stored).** A view or function over verified visits:
++10 per verified place, +5 if the user also posted a photo there, a bonus for
+the first verified place in an area. Badges and Deals rewards come later.
+Unverified "I've been here" rows earn nothing.
 
 **Known weakness.** GPS can be faked. Keep rewards low-value (badges, small
 discounts) until there is a stronger proof (e.g. a QR at the business, which

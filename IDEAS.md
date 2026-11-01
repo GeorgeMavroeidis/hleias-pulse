@@ -28,7 +28,17 @@
   GPS check-in within ~150 m of a place, storing only place + date, never a
   location trail. Points for a visit / a photo / first in an area; rewards are
   badges and Deals. Would replace the "Έχεις πάει;" card's posts-as-visited
-  guess, which Margaris finds inaccurate. Needs a new table + RLS — agree first.
+  guess, which Margaris finds inaccurate. Can build on the existing
+  `user_place_visits` table — see `docs/PROPOSAL_TRIP_SYNC_AND_CHECKINS.md`.
+- **Later — something for locals instead of "Έχεις πάει;" (Margaris,
+  2026-11-01).** The locals-only progress card at the top of Pulse ("4/17
+  ΜΕΡΗ", the north-west and mountain corners) was removed: Margaris did not
+  like it at all. The component (`LocalDiscoveryCard` in `PulseFeed.tsx`) and
+  the "I've been here" button in place details still exist. Think of a
+  different reason for locals to come back and post.
+- **Removed 2026-11-01 — distance on Pulse cards.** "14 χλμ · ~25′" on each
+  card and "nearest first" under Now were tried and taken out (not needed).
+  Distance stays in the Trip screen's near-me bar.
 - **Later — have a local check the area intros (Margaris, 2026-11-01).** The
   one-line intros in `src/lib/hp/region-intros.ts` (16 areas, GR + EN) are
   drafts written from general knowledge. Each shows "· προς έλεγχο" until a

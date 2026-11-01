@@ -232,13 +232,12 @@ import {
   sharePulseTarget,
   readyProfile,
   composerIdentity,
-  DISCOVERY_PLACE_IDS,
 } from "./pulse-shared";
 import { Toast, TopBar, VibeChips, DiscoveryLensRail } from "./PulseTopBar";
 import { EssentialsScreen } from "./EssentialsScreen";
 import type { EssentialsSectionId } from "@/lib/hp/essentials";
 import { MapBottomSheet } from "./MapBottomSheet";
-import { PulseFeed, MustSeeTodayDeck, LocalDiscoveryCard } from "./PulseFeed";
+import { PulseFeed, MustSeeTodayDeck } from "./PulseFeed";
 import { BottomNav } from "./BottomNav";
 import { useModeration, useModerationBridge, type UserLabel } from "./use-moderation";
 import { ModerationSheets } from "./ModerationSheets";
@@ -1228,13 +1227,6 @@ export function PulseApp() {
       routesSaved: account.status === "ready" ? savedRouteIds.length : 0,
     };
   }, [account.status, accountProfileId, allPosts, rsvpMap, savedRouteIds.length]);
-
-  // Discovery progress now comes from the real user_place_visits check-ins
-  // (phase 2), not the v1 posts-as-proxy.
-  const discoveryExploredIds = useMemo(
-    () => DISCOVERY_PLACE_IDS.filter((id) => visitedPlaceIds.includes(id)),
-    [visitedPlaceIds],
-  );
 
   useEffect(() => {
     if (initialShareHandled.current || dataStatus !== "ready" || typeof window === "undefined") {
@@ -2256,16 +2248,8 @@ export function PulseApp() {
       return (
         <div className="relative h-full">
           <div className="h-full overflow-y-auto">
-            {readyProfile(account)?.defaultIdentity === "LOCAL" && (
-              <div className="px-4 pt-3">
-                <LocalDiscoveryCard
-                  places={places}
-                  coveredIds={discoveryExploredIds}
-                  onOpenPlace={setOpenPlace}
-                  onMilestone={() => showToast(t("Five new places — you're really exploring now."))}
-                />
-              </div>
-            )}
+            {/* The locals' "Έχεις πάει;" card was removed on 2026-11-01 (Margaris did not
+                like it); something else for locals is in IDEAS.md → "Later". */}
             <PulseFeed
               nowMs={nowMs}
               posts={filteredPosts}

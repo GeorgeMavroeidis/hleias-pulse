@@ -23,8 +23,6 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
 import { AddToTripButton } from "./AddToTripButton";
-import { distanceLabel, driveMinutes, useNearOrigin } from "@/lib/hp/near-me";
-import { distanceKm } from "@/lib/hp/place-defaults";
 import { SocialMap } from "./SocialMap";
 import { PlaceStoryRail } from "./PlaceStoryRail";
 import { type PlaceStoryGroup } from "@/lib/hp/place-stories";
@@ -99,12 +97,7 @@ export function PulseFeed({
   const filters = previewMode
     ? ["All", "Now", "Tonight", "Weekend", "Local tips"]
     : ["Now", "Tonight", "Weekend", "Local tips"];
-  // "Near me": once the visitor shares where they are (or where they stay), every
-  // card shows how far its place is, and "Now" puts the nearest fresh posts first.
-  const origin = useNearOrigin();
-  const kmTo = (place: Place) =>
-    origin ? distanceKm(origin.lat, origin.lng, place.lat, place.lng) : null;
-  const filteredPosts = posts.filter((post) => {
+  const visiblePosts = posts.filter((post) => {
     const place = findPlace(post.placeId);
     const author = findPostAuthor(post);
     if (!place) return false;
@@ -125,12 +118,6 @@ export function PulseFeed({
     }
     return true;
   });
-  const visiblePosts =
-    origin && filter === "Now"
-      ? [...filteredPosts].sort(
-          (a, b) => (kmTo(findPlace(a.placeId)!) ?? 0) - (kmTo(findPlace(b.placeId)!) ?? 0),
-        )
-      : filteredPosts;
   return (
     <div className="px-4 pb-28 pt-3">
       <LiveTicker nowMs={nowMs} ticks={activityTicks} onOpenPlace={onOpenMap} />
@@ -216,12 +203,6 @@ export function PulseFeed({
                       {p.name}
                     </span>{" "}
                     · {displayPostTime(post, nowMs, language)}
-                    {(() => {
-                      const km = kmTo(p);
-                      return km === null ? null : (
-                        <> · {distanceLabel(km, driveMinutes(km), language)}</>
-                      );
-                    })()}
                   </div>
                 </div>
                 <button
