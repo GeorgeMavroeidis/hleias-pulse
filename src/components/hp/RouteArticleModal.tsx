@@ -23,6 +23,7 @@ import {
 } from "@/lib/hp-model";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
+import { AddToTripButton } from "./AddToTripButton";
 import { openStreetMapUrl } from "./pulse-shared";
 
 export function RouteArticleModal({
@@ -254,17 +255,22 @@ export function RouteArticleModal({
                   >
                     <MapIcon size={13} className="mr-1 inline" /> Map route
                   </button>
+                  {/* Same row as a place sheet: two labelled actions, then icons. */}
+                  <AddToTripButton
+                    kind="route"
+                    id={route.id}
+                    name={route.title}
+                    compact
+                    className="hp-add-to-trip--row flex-1"
+                  />
                   <button
                     type="button"
                     onClick={onSave}
-                    className={`flex-1 rounded-full border border-hp-ink/15 py-3 text-[12px] font-bold ${saved ? "bg-hp-sunset/10 text-hp-sunset" : "text-hp-ink"}`}
+                    aria-pressed={saved}
+                    aria-label={saved ? "Saved" : "Save route"}
+                    className={`grid h-11 w-11 place-items-center rounded-full border border-hp-ink/15 ${saved ? "bg-hp-sunset/10 text-hp-sunset" : "text-hp-ink"}`}
                   >
-                    <Bookmark
-                      size={13}
-                      className="mr-1 inline"
-                      fill={saved ? "currentColor" : "none"}
-                    />{" "}
-                    {saved ? "Saved" : "Save route"}
+                    <Bookmark size={15} fill={saved ? "currentColor" : "none"} />
                   </button>
                   <button
                     type="button"

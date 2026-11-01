@@ -713,6 +713,11 @@
   font-size: 12px;
   font-weight: 700;
 }
+/* Inside a full-height action row (route page) it matches its 44px neighbours. */
+.hp-add-to-trip--row {
+  min-height: 44px;
+  justify-content: center;
+}
 .hp-add-to-trip.is-added {
   background: color-mix(in srgb, var(--hp-sunset) 12%, transparent);
 }
