@@ -43,6 +43,7 @@ import {
 import type { SheetGeometry } from "@/lib/hp/sheet-geometry";
 import type { PlaceStoryGroup } from "@/lib/hp/place-stories";
 import { ImageBox } from "./ImageBox";
+import { AddToTripButton } from "./AddToTripButton";
 import { DISCOVERY_LENS_LABEL, HP_TRANSITION, openStreetMapUrl } from "./pulse-shared";
 
 export type MapBottomSheetProps = {
@@ -605,6 +606,7 @@ function PlaceDiscoveryContent(props: Props & { place: Place }) {
         {place.bestTime && <span>{place.bestTime}</span>}
       </div>
       <div className="hp-discovery-sheet__actions">
+        <AddToTripButton kind="place" id={place.id} name={place.name} />
         <button type="button" onClick={() => props.onSavePlace(place.id)} aria-pressed={saved}>
           <Bookmark size={15} aria-hidden="true" />
           {t(saved ? "Saved" : "Save")}

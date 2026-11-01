@@ -279,6 +279,14 @@ test("a stale selected place prop cannot mount another place's detail/save/share
   assert.ok(!markup.includes("aria-pressed="));
 });
 
+test("a selected place sheet offers Add to my trip before Save and Details", () => {
+  const { markup, t } = render(fixture());
+  const body = text(markup);
+  const trip = body.indexOf(t("Add to my trip"));
+  assert.ok(trip >= 0);
+  assert.ok(trip < body.indexOf(t("Save")) && trip < body.indexOf(t("Details")));
+});
+
 test("a selected place outside a soft lens remains its own controlled target with a clear-lens action", () => {
   const props = fixture();
   const selected = props.selectedPlace!;

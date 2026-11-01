@@ -34,6 +34,7 @@ import {
 import { type PulseData } from "@/lib/hp-api";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
+import { AddToTripButton } from "./AddToTripButton";
 import { ContentMenu } from "./ContentMenu";
 import { useModeration } from "./use-moderation";
 import { type PlaceStoryGroup } from "@/lib/hp/place-stories";
@@ -453,6 +454,7 @@ export function PlaceDetailModal({
               </div>
             </div>
             <div className="sticky bottom-0 flex flex-col gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3 backdrop-blur">
+              <AddToTripButton kind="place" id={place.id} name={place.name} className="w-full" />
               <div className="flex gap-2">
                 <button
                   type="button"

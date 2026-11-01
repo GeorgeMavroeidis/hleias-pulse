@@ -629,6 +629,7 @@
 .hp-discovery-sheet__actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   position: sticky;
   bottom: -1px;
@@ -649,8 +650,34 @@
   font-size: 12px;
   font-weight: 600;
 }
-.hp-discovery-sheet__actions button:nth-child(-n + 2) {
+/* Save and Details share the second row; "Add to my trip" takes the whole first row. */
+.hp-discovery-sheet__actions button:nth-child(-n + 3) {
   flex: 1;
+}
+.hp-discovery-sheet__actions button.hp-add-to-trip {
+  flex: 1 1 100%;
+}
+
+/* "Add to my trip" — sunset accent while not yet added, quiet once it is. */
+.hp-add-to-trip {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  border-radius: 24px;
+  border: 1px solid var(--hp-sunset);
+  background: var(--hp-sunset);
+  color: var(--hp-on-media);
+  font-size: 12px;
+  font-weight: 700;
+}
+.hp-add-to-trip.is-added {
+  background: color-mix(in srgb, var(--hp-sunset) 12%, transparent);
+  color: var(--hp-sunset);
+}
+.hp-discovery-sheet__actions .hp-add-to-trip {
+  border-color: var(--hp-sunset);
 }
 .hp-discovery-sheet__actions .is-primary {
   background: var(--hp-ink);

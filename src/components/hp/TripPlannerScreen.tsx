@@ -21,23 +21,23 @@ import {
   MAX_DAYS,
   MIN_DAYS,
   addItem,
+  DEFAULT_DAYS,
   createPlan,
   dayHours,
   dayItems,
   deck,
   hasItem,
   itemHours,
-  loadPlan,
   moveItem,
   plannedDayCount,
   removeItem,
   resetSkipped,
-  savePlan,
   setDays,
   skip,
   suggestDay,
   type TripPlan,
 } from "@/lib/hp/trip-plan";
+import { useTripPlan } from "./use-trip-plan";
 import {
   ESSENTIALS_CARDS,
   ESSENTIALS_SECTIONS,
@@ -219,17 +219,13 @@ export function TripPlannerScreen({
   onOpenRoute,
 }: Props) {
   const { language, t } = useI18n();
-  const [plan, setPlan] = useState<TripPlan | null>(() =>
-    typeof window === "undefined" ? null : loadPlan(),
-  );
+  const [plan, setPlan] = useTripPlan();
   const [view, setView] = useState<View>("plan");
-  const [draftDays, setDraftDays] = useState(5);
+  const [draftDays, setDraftDays] = useState(DEFAULT_DAYS);
   const [targetDay, setTargetDay] = useState(1);
   const [kept, setKept] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
   const origin = useNearOrigin();
-
-  useEffect(() => savePlan(plan), [plan]);
 
   const placeById = useMemo(() => new Map(places.map((p) => [p.id, p])), [places]);
   const routeById = useMemo(() => new Map(routes.map((r) => [r.id, r])), [routes]);

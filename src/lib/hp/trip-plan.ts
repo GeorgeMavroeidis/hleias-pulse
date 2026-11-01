@@ -14,9 +14,13 @@ import { TYPICAL_VISIT } from "./summaries";
 
 export const MIN_DAYS = 1;
 export const MAX_DAYS = 14;
+/** Trip length offered first, and used when something is added before any plan exists. */
+export const DEFAULT_DAYS = 5;
 /** Above this many planned hours a day is flagged as too full. */
 export const FULL_DAY_HOURS = 8;
 export const STORAGE_KEY = "hp.trip-plan.v1";
+/** Fired on window after every save, so every open screen shows the same plan. */
+export const TRIP_PLAN_EVENT = "hp:trip-plan-changed";
 
 export type TripItem = { kind: "place" | "route"; id: string; day: number };
 
@@ -144,6 +148,23 @@ export function suggestDay(
   return best;
 }
 
+/**
+ * The day with the fewest items, earliest on ties. Used where hours cannot be
+ * worked out (a single place sheet does not hold the full place/route lists).
+ */
+export function emptiestDay(plan: TripPlan) {
+  let best = 1;
+  let bestCount = Infinity;
+  for (let day = 1; day <= plan.days; day++) {
+    const count = dayItems(plan, day).length;
+    if (count < bestCount) {
+      best = day;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
 /** Days with at least one thing planned — drives the progress bar. */
 export function plannedDayCount(plan: TripPlan) {
   return new Set(plan.items.map((item) => item.day)).size;
@@ -209,4 +230,5 @@ export function savePlan(plan: TripPlan | null) {
   } catch {
     // keep going in memory
   }
+  window.dispatchEvent(new Event(TRIP_PLAN_EVENT));
 }

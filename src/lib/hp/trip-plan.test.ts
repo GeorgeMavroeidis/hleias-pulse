@@ -8,6 +8,7 @@ import {
   createPlan,
   dayHours,
   deck,
+  emptiestDay,
   moveItem,
   parsePlan,
   plannedDayCount,
@@ -159,4 +160,15 @@ test("skipped cards can be brought back, and nothing else changes", () => {
     deck(back, places).map((p) => p.id),
     ["beach", "cafe"],
   );
+});
+
+test("emptiestDay picks the day with the fewest items, earliest on ties", () => {
+  let plan = createPlan(3, NOW);
+  assert.equal(emptiestDay(plan), 1);
+  plan = addItem(plan, { kind: "place", id: "beach", day: 1 });
+  assert.equal(emptiestDay(plan), 2);
+  plan = addItem(plan, { kind: "route", id: "r1", day: 2 });
+  assert.equal(emptiestDay(plan), 3);
+  plan = addItem(plan, { kind: "place", id: "cafe", day: 3 });
+  assert.equal(emptiestDay(plan), 1);
 });
