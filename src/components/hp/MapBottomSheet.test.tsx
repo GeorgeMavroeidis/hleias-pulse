@@ -371,3 +371,29 @@ test("overview and selected-region views share the accepted clock, canonical tie
     }
   }
 });
+
+test("a quiet area nudges a local to post, but never a tourist", () => {
+  const props = fixture();
+  const selected = props.state.selection;
+  if (selected.kind !== "placeSelected") throw new Error("fixture selects a place");
+  const row = props.content.regions.get(selected.regionId)!;
+  const quietRow = {
+    ...row,
+    discovery: { ...row.discovery, signal: { ...row.discovery.signal, lastSignalAt: null } },
+  };
+  const regionProps = {
+    ...props,
+    content: { ...props.content, regions: new Map([[selected.regionId, quietRow]]) },
+    state: {
+      ...props.state,
+      selection: { kind: "regionSelected" as const, regionId: selected.regionId },
+    },
+    selectedPlace: null,
+    onPostHere: noop,
+  };
+  const local = render({ ...regionProps, audience: "LOCAL" });
+  assert.ok(text(local.markup).includes(local.t("Nobody has posted here yet.")));
+  assert.ok(text(local.markup).includes(local.t("Post something")));
+  const tourist = render({ ...regionProps, audience: "TOURIST" });
+  assert.ok(!text(tourist.markup).includes(tourist.t("Nobody has posted here yet.")));
+});

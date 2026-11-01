@@ -17,11 +17,24 @@ import {
   ChevronLeft,
   X,
   CalendarDays,
+  Clock,
 } from "lucide-react";
 import type { Place } from "@/lib/hp-model";
 import { useI18n } from "@/lib/i18n";
 import { regionalDescription } from "@/lib/hp/map-region-layer";
 import { regionIntro } from "@/lib/hp/region-intros";
+import {
+  QUIET_AFTER_DAYS,
+  daysSinceLastPost,
+  eventsThisWeek,
+  eventsToday,
+  hasNewSince,
+  lastSeenRegion,
+  markRegionSeen,
+  regionBestTime,
+  type TimeBucket,
+} from "@/lib/hp/region-glance";
+import type { AccountIdentity } from "@/lib/hp-auth";
 import { communityActivityCopy, temporalHeadline } from "@/lib/hp/context-copy";
 import { regionalDescriptorKeys, REGION_IDENTITIES } from "@/lib/hp/region-identity";
 import type { TemporalPresentation } from "@/lib/hp/temporal-atmosphere";
@@ -76,6 +89,10 @@ export type MapBottomSheetProps = {
   searchQuery: string;
   dataStatus: "loading" | "ready" | "error";
   selectedPlaceMatchesLens: boolean;
+  /** Who is looking: locals get "this week" and the quiet-area nudge. Null when signed out. */
+  audience?: AccountIdentity | null;
+  /** Opens the post composer on a place (the local "post something" nudge). */
+  onPostHere?: (placeId: string) => void;
 };
 type Props = MapBottomSheetProps;
 
@@ -464,6 +481,7 @@ function RegionDiscoveryContent(
           )}
         </p>
       )}
+      <RegionGlance key={row.discovery.region.id} {...props} row={row} />
       <p
         className="hp-discovery-sheet__context"
         data-copy-source={
@@ -522,6 +540,89 @@ function RegionDiscoveryContent(
     </>
   );
 }
+const BEST_TIME_LABEL: Record<TimeBucket, string> = {
+  morning: "in the morning",
+  midday: "at midday",
+  afternoon: "in the afternoon",
+  sunset: "at sunset",
+  evening: "in the evening",
+  night: "at night",
+};
+
+/**
+ * One line of "at a glance" facts under a region's intro. Tourists see what's on
+ * today; locals see the week, plus whether anyone has posted since their last
+ * visit — or a nudge to post when the area has gone quiet.
+ */
+function RegionGlance(props: Props & { row: DiscoveryRegionRow }) {
+  const { t } = useI18n();
+  const { row, nowMs } = props;
+  const regionId = row.discovery.region.id;
+  const isLocal = Boolean(props.audience) && props.audience !== "TOURIST";
+  // Read the previous visit once, before this visit is recorded below.
+  const [lastSeen] = useState(() =>
+    typeof window === "undefined" ? null : lastSeenRegion(regionId),
+  );
+  useEffect(() => {
+    if (isLocal) markRegionSeen(regionId, nowMs);
+  }, [isLocal, regionId, nowMs]);
+
+  const events = (isLocal ? eventsThisWeek : eventsToday)(row.events, nowMs).length;
+  const deals = row.places.filter((place) => props.dealPlaceIds.includes(place.id)).length;
+  const bestTime = regionBestTime(row.places);
+  const lastSignalAt = row.discovery.signal.lastSignalAt;
+  const quietDays = daysSinceLastPost(lastSignalAt, nowMs);
+  const isNew = isLocal && hasNewSince(lastSignalAt, lastSeen);
+  const isQuiet = isLocal && !isNew && (quietDays === null || quietDays >= QUIET_AFTER_DAYS);
+  const postPlace = row.places[0];
+
+  if (!events && !deals && !bestTime && !isNew && !isQuiet) return null;
+  return (
+    <div className="hp-discovery-sheet__glance">
+      {(events > 0 || deals > 0 || bestTime) && (
+        <ul>
+          {events > 0 && (
+            <li>
+              <CalendarDays size={13} aria-hidden="true" />
+              {isLocal
+                ? t(events === 1 ? "{n} event this week" : "{n} events this week", { n: events })
+                : t(events === 1 ? "{n} event today" : "{n} events today", { n: events })}
+            </li>
+          )}
+          {deals > 0 && (
+            <li>
+              <Gift size={13} aria-hidden="true" />
+              {t(deals === 1 ? "{n} deal" : "{n} deals", { n: deals })}
+            </li>
+          )}
+          {bestTime && (
+            <li>
+              <Clock size={13} aria-hidden="true" />
+              {t("Best {time}", { time: t(BEST_TIME_LABEL[bestTime]) })}
+            </li>
+          )}
+        </ul>
+      )}
+      {isNew && <p>{t("New posts since your last visit")}</p>}
+      {isQuiet && (
+        <p>
+          {quietDays === null
+            ? t("Nobody has posted here yet.")
+            : t("Nobody has posted here in the last {n} days.", { n: quietDays })}
+          {postPlace && props.onPostHere && (
+            <>
+              {" "}
+              <button type="button" onClick={() => props.onPostHere!(postPlace.id)}>
+                {t("Post something")} →
+              </button>
+            </>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function DiscoveryEvents({
   events,
   onOpen,

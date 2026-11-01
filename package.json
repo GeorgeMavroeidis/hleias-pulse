@@ -46,6 +46,7 @@
     "test:essentials": "tsx --test src/lib/hp/essentials.test.ts",
     "test:summaries": "tsx --test src/lib/hp/summaries.test.ts",
     "test:region-intros": "tsx --test src/lib/hp/region-intros.test.ts",
+    "test:region-glance": "tsx --test src/lib/hp/region-glance.test.ts",
     "test:trip-plan": "tsx --test src/lib/hp/trip-plan.test.ts",
     "test:near-me": "tsx --test src/lib/hp/near-me.test.ts",
     "test:push-security": "tsx --test scripts/push-security.test.ts",

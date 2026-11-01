@@ -450,6 +450,8 @@ export function PulseApp() {
   const [createOpen, setCreateOpen] = useState(false);
   const [composerMode, setComposerMode] = useState<ComposerMode>("post");
   const [composerPin, setComposerPin] = useState<{ lat: number; lng: number } | null>(null);
+  // A place to preselect in the composer (the map's "post something here" nudge).
+  const [composerPlaceId, setComposerPlaceId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   // Mirrors whether a moderation sheet is up, so the shell behind it goes inert
@@ -2239,6 +2241,11 @@ export function PulseApp() {
               selectedPlaceMatchesLens={selectedPlaceMatchesLens}
               onClearLens={() => setActiveLens(null)}
               onClearSearch={() => setQuery("")}
+              audience={readyProfile(account)?.defaultIdentity ?? null}
+              onPostHere={(placeId) => {
+                setComposerPlaceId(placeId);
+                openComposer("post");
+              }}
             />
           </div>
         </div>
@@ -2689,12 +2696,14 @@ export function PulseApp() {
               open={createOpen}
               initialMode={composerMode}
               prefillPlace={composerPin}
+              initialPlaceId={composerPlaceId ?? undefined}
               places={places}
               vibeChips={vibeChips}
               account={account}
               onClose={() => {
                 setCreateOpen(false);
                 setComposerPin(null);
+                setComposerPlaceId(null);
               }}
               onRequireAccount={() => {
                 requireProfile("post");

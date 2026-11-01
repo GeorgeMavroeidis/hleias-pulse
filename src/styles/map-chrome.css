@@ -602,6 +602,38 @@
   font-style: italic;
   color: var(--hp-text-secondary);
 }
+/* Region "at a glance": small facts in one wrapping row, then the local line. */
+.hp-discovery-sheet__glance {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--hp-text-secondary);
+}
+.hp-discovery-sheet__glance ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hp-discovery-sheet__glance li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--hp-border);
+  border-radius: 999px;
+  color: var(--hp-ink);
+}
+.hp-discovery-sheet__glance p {
+  margin: 0;
+}
+.hp-discovery-sheet__glance button {
+  color: var(--hp-sunset);
+  font-weight: 700;
+}
 .hp-discovery-sheet__description {
   margin: 8px 0;
   font-size: 12px;
