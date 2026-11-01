@@ -454,7 +454,7 @@ export function PlaceDetailModal({
               </div>
             </div>
             <div className="sticky bottom-0 flex flex-col gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3 backdrop-blur">
-              <AddToTripButton kind="place" id={place.id} name={place.name} className="w-full" />
+              <AddToTripButton kind="place" id={place.id} name={place.name} />
               <div className="flex gap-2">
                 <button
                   type="button"

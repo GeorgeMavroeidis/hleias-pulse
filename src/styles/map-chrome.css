@@ -629,7 +629,6 @@
 .hp-discovery-sheet__actions {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 6px;
   position: sticky;
   bottom: -1px;
@@ -650,34 +649,31 @@
   font-size: 12px;
   font-weight: 600;
 }
-/* Save and Details share the second row; "Add to my trip" takes the whole first row. */
-.hp-discovery-sheet__actions button:nth-child(-n + 3) {
+.hp-discovery-sheet__actions button:nth-child(-n + 2) {
   flex: 1;
 }
-.hp-discovery-sheet__actions button.hp-add-to-trip {
-  flex: 1 1 100%;
-}
 
-/* "Add to my trip" — sunset accent while not yet added, quiet once it is. */
+/* "Add to my trip": a small outlined chip, always visible, never louder than
+   the place itself. Filled lightly once the place is in the trip. */
 .hp-add-to-trip {
   display: inline-flex;
-  justify-content: center;
+  align-self: flex-start;
   align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  border-radius: 24px;
-  border: 1px solid var(--hp-sunset);
-  background: var(--hp-sunset);
-  color: var(--hp-on-media);
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--hp-sunset) 70%, transparent);
+  background: transparent;
+  color: var(--hp-sunset);
   font-size: 12px;
   font-weight: 700;
 }
 .hp-add-to-trip.is-added {
   background: color-mix(in srgb, var(--hp-sunset) 12%, transparent);
-  color: var(--hp-sunset);
 }
-.hp-discovery-sheet__actions .hp-add-to-trip {
-  border-color: var(--hp-sunset);
+.hp-discovery-sheet__trip {
+  margin-top: 8px;
 }
 .hp-discovery-sheet__actions .is-primary {
   background: var(--hp-ink);

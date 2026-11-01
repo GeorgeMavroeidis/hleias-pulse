@@ -40,7 +40,7 @@ export function AddToTripButton({
       ) : (
         <CalendarPlus size={15} aria-hidden="true" />
       )}
-      {added ? t("In your trip · Day {n}", { n: day }) : t("Add to my trip")}
+      {added ? t("In trip · Day {n}", { n: day }) : t("Add to trip")}
     </button>
   );
 }

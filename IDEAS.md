@@ -19,6 +19,16 @@
 - Village/area identity next to a user's name (e.g. "Local · Πύργος") instead
   of just the generic LOCAL/GUIDE/BUSINESS badge — cheap, free, and a real
   trust signal for tourists. Flagged 2026-09-07.
+- **Later — a trip that follows the user (Margaris, 2026-11-01).** The Trip
+  plan lives only on the device (`localStorage`, `hp.trip-plan.v1`): a new
+  phone or cleared site data loses it. Syncing it needs a table (+ RLS) and a
+  privacy call, because a trip says where someone will be on which day.
+  Decide together before building.
+- **Check-in + exploration points (Margaris, 2026-11-01, liked, needs schema).**
+  GPS check-in within ~150 m of a place, storing only place + date, never a
+  location trail. Points for a visit / a photo / first in an area; rewards are
+  badges and Deals. Would replace the "Έχεις πάει;" card's posts-as-visited
+  guess, which Margaris finds inaccurate. Needs a new table + RLS — agree first.
 
 ## UI / Authenticity polish
 

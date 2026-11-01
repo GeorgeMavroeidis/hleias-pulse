@@ -980,8 +980,8 @@ const EL: Record<string, string> = {
   "Move to day {n}": "Μετακίνηση στη μέρα {n}",
   "Add to day {n}": "Πρόσθεσε στη μέρα {n}",
   // "Add to my trip" on place sheets and route cards
-  "Add to my trip": "Πρόσθεσε στο ταξίδι μου",
-  "In your trip · Day {n}": "Στο ταξίδι σου · Μέρα {n}",
+  "Add to trip": "Πρόσθεσε στο ταξίδι",
+  "In trip · Day {n}": "Ταξίδι · Μέρα {n}",
   "Remove {name} from your trip": "Αφαίρεσε το {name} από το ταξίδι σου",
   "{done} of {total} days planned": "{done} από {total} μέρες έχουν πρόγραμμα",
   "All set!": "Έτοιμο!",

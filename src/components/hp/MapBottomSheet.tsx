@@ -605,8 +605,13 @@ function PlaceDiscoveryContent(props: Props & { place: Place }) {
         {place.budget && <span>{place.budget}</span>}
         {place.bestTime && <span>{place.bestTime}</span>}
       </div>
+      <AddToTripButton
+        kind="place"
+        id={place.id}
+        name={place.name}
+        className="hp-discovery-sheet__trip"
+      />
       <div className="hp-discovery-sheet__actions">
-        <AddToTripButton kind="place" id={place.id} name={place.name} />
         <button type="button" onClick={() => props.onSavePlace(place.id)} aria-pressed={saved}>
           <Bookmark size={15} aria-hidden="true" />
           {t(saved ? "Saved" : "Save")}
