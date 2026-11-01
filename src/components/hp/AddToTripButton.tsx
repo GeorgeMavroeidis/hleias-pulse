@@ -12,11 +12,14 @@ export function AddToTripButton({
   kind,
   id,
   name,
+  compact = false,
   className = "",
 }: {
   kind: TripItem["kind"];
   id: string;
   name: string;
+  /** Short label ("Trip" / "Day 2") for a crowded row of actions. */
+  compact?: boolean;
   className?: string;
 }) {
   const { t } = useI18n();
@@ -32,7 +35,13 @@ export function AddToTripButton({
         toggle();
       }}
       aria-pressed={added}
-      aria-label={added ? t("Remove {name} from your trip", { name }) : undefined}
+      aria-label={
+        added
+          ? t("Remove {name} from your trip", { name })
+          : compact
+            ? t("Add {name} to your trip", { name })
+            : undefined
+      }
       className={`hp-add-to-trip ${added ? "is-added" : ""} ${className}`}
     >
       {added ? (
@@ -40,7 +49,13 @@ export function AddToTripButton({
       ) : (
         <CalendarPlus size={15} aria-hidden="true" />
       )}
-      {added ? t("In trip · Day {n}", { n: day }) : t("Add to trip")}
+      {compact
+        ? added
+          ? t("Day {n}", { n: day })
+          : t("Trip")
+        : added
+          ? t("In trip · Day {n}", { n: day })
+          : t("Add to trip")}
     </button>
   );
 }

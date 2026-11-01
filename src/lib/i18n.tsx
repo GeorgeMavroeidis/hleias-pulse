@@ -983,6 +983,9 @@ const EL: Record<string, string> = {
   "Add to trip": "Πρόσθεσε στο ταξίδι",
   "In trip · Day {n}": "Ταξίδι · Μέρα {n}",
   "Remove {name} from your trip": "Αφαίρεσε το {name} από το ταξίδι σου",
+  "Add {name} to your trip": "Πρόσθεσε το {name} στο ταξίδι σου",
+  // Region intro lines that no local has checked yet
+  "to be checked": "προς έλεγχο",
   "{done} of {total} days planned": "{done} από {total} μέρες έχουν πρόγραμμα",
   "All set!": "Έτοιμο!",
   "Pick with cards": "Διάλεξε με κάρτες",

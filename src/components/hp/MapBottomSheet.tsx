@@ -10,7 +10,6 @@ import {
   Bookmark,
   Share2,
   MapPin,
-  ExternalLink,
   BadgeCheck,
   Gift,
   ChevronUp,
@@ -22,6 +21,7 @@ import {
 import type { Place } from "@/lib/hp-model";
 import { useI18n } from "@/lib/i18n";
 import { regionalDescription } from "@/lib/hp/map-region-layer";
+import { regionIntro } from "@/lib/hp/region-intros";
 import { communityActivityCopy, temporalHeadline } from "@/lib/hp/context-copy";
 import { regionalDescriptorKeys, REGION_IDENTITIES } from "@/lib/hp/region-identity";
 import type { TemporalPresentation } from "@/lib/hp/temporal-atmosphere";
@@ -44,7 +44,7 @@ import type { SheetGeometry } from "@/lib/hp/sheet-geometry";
 import type { PlaceStoryGroup } from "@/lib/hp/place-stories";
 import { ImageBox } from "./ImageBox";
 import { AddToTripButton } from "./AddToTripButton";
-import { DISCOVERY_LENS_LABEL, HP_TRANSITION, openStreetMapUrl } from "./pulse-shared";
+import { DISCOVERY_LENS_LABEL, HP_TRANSITION } from "./pulse-shared";
 
 export type MapBottomSheetProps = {
   /** The same accepted clock that derived content, marker signals and story groups. */
@@ -453,8 +453,17 @@ function RegionDiscoveryContent(
 ) {
   const { t, language } = useI18n();
   const { row } = props;
+  const intro = regionIntro(row.discovery.region.id, language);
   return (
     <>
+      {intro && (
+        <p className="hp-discovery-sheet__intro" data-copy-source="region-intro">
+          {intro.text}
+          {!intro.reviewed && (
+            <span className="hp-discovery-sheet__draft"> · {t("to be checked")}</span>
+          )}
+        </p>
+      )}
       <p
         className="hp-discovery-sheet__context"
         data-copy-source={
@@ -605,28 +614,22 @@ function PlaceDiscoveryContent(props: Props & { place: Place }) {
         {place.budget && <span>{place.budget}</span>}
         {place.bestTime && <span>{place.bestTime}</span>}
       </div>
-      <AddToTripButton
-        kind="place"
-        id={place.id}
-        name={place.name}
-        className="hp-discovery-sheet__trip"
-      />
+      {/* One row, four controls: Trip and Details carry labels; Save and Share are
+          icons. The OpenStreetMap link lives in Details, so it is not repeated here. */}
       <div className="hp-discovery-sheet__actions">
-        <button type="button" onClick={() => props.onSavePlace(place.id)} aria-pressed={saved}>
-          <Bookmark size={15} aria-hidden="true" />
-          {t(saved ? "Saved" : "Save")}
-        </button>
+        <AddToTripButton kind="place" id={place.id} name={place.name} compact />
         <button type="button" className="is-primary" onClick={() => props.onOpenDetails(place)}>
           {t("Details")}
         </button>
-        <a
-          href={openStreetMapUrl(place)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
+        <button
+          type="button"
+          onClick={() => props.onSavePlace(place.id)}
+          aria-pressed={saved}
+          aria-label={t(saved ? "Saved" : "Save")}
+          className={saved ? "is-saved" : ""}
         >
-          <ExternalLink size={16} />
-        </a>
+          <Bookmark size={16} aria-hidden="true" fill={saved ? "currentColor" : "none"} />
+        </button>
         <button
           type="button"
           onClick={() => props.onSharePlace(place)}

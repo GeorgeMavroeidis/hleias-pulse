@@ -590,6 +590,18 @@
   line-height: 1.5;
   color: var(--hp-text-accent);
 }
+/* "What is this area" — the first line of a region sheet. */
+.hp-discovery-sheet__intro {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--hp-ink);
+}
+.hp-discovery-sheet__draft {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--hp-text-secondary);
+}
 .hp-discovery-sheet__description {
   margin: 8px 0;
   font-size: 12px;
@@ -672,8 +684,14 @@
 .hp-add-to-trip.is-added {
   background: color-mix(in srgb, var(--hp-sunset) 12%, transparent);
 }
-.hp-discovery-sheet__trip {
-  margin-top: 8px;
+/* In the sheet's action row it matches its neighbours' height and keeps its accent. */
+.hp-discovery-sheet__actions button.hp-add-to-trip {
+  min-height: 44px;
+  border-color: color-mix(in srgb, var(--hp-sunset) 70%, transparent);
+  justify-content: center;
+}
+.hp-discovery-sheet__actions button.is-saved {
+  color: var(--hp-sunset);
 }
 .hp-discovery-sheet__actions .is-primary {
   background: var(--hp-ink);
