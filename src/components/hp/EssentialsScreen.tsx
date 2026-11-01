@@ -144,7 +144,7 @@ export function EssentialsScreen({
             return (
               <section key={section.id}>
                 <div
-                  className={`mb-2.5 flex items-center gap-3 rounded-3xl bg-gradient-to-br p-3.5 text-hp-paper shadow-[0_10px_22px_-14px_rgba(23,20,17,0.6)] ${SECTION_GRADIENT[section.id]}`}
+                  className={`mb-2.5 flex items-center gap-3 rounded-3xl bg-gradient-to-br p-3.5 text-hp-on-media shadow-[0_10px_22px_-14px_rgba(23,20,17,0.6)] ${SECTION_GRADIENT[section.id]}`}
                 >
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/20 backdrop-blur">
                     <Icon size={22} strokeWidth={2.2} />
@@ -167,7 +167,7 @@ export function EssentialsScreen({
                       onClick={onOpenQuickLook}
                       className="hp-card-lift flex w-full items-center gap-3 rounded-2xl border border-hp-sunset/25 bg-hp-sunset/10 p-3 text-left transition active:scale-[0.99]"
                     >
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hp-sunset text-hp-on-media">
                         <Eye size={16} />
                       </span>
                       <span className="min-w-0 flex-1">

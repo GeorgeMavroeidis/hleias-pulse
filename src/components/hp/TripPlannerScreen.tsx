@@ -84,7 +84,7 @@ function TripHero({
         <ImageBox src={imageUrl} alt="" className="h-full w-full" rounded="rounded-3xl" />
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/10" />
-      <div className="relative flex min-h-[170px] flex-col justify-end p-4 text-hp-paper">
+      <div className="relative flex min-h-[170px] flex-col justify-end p-4 text-hp-on-media">
         <h2 className="text-[26px] font-black leading-[1.05] [text-shadow:0_2px_10px_rgba(0,0,0,0.5)]">
           {title}
         </h2>
@@ -119,7 +119,7 @@ function PracticalTiles({
               key={section.id}
               type="button"
               onClick={() => (isSee ? onOpenQuickLook() : onOpenEssentials(section.id))}
-              className={`relative flex min-h-[112px] flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br p-3.5 text-left text-hp-paper shadow-[0_10px_22px_-14px_rgba(23,20,17,0.6)] transition active:scale-[0.98] ${SECTION_GRADIENT[section.id]} ${isSee ? "col-span-2" : ""}`}
+              className={`relative flex min-h-[112px] flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br p-3.5 text-left text-hp-on-media shadow-[0_10px_22px_-14px_rgba(23,20,17,0.6)] transition active:scale-[0.98] ${SECTION_GRADIENT[section.id]} ${isSee ? "col-span-2" : ""}`}
             >
               {isSee && (
                 <>
@@ -197,7 +197,7 @@ function DayPicker({
             aria-pressed={on}
             className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold transition active:scale-[0.98] ${
               on
-                ? "border-hp-sunset bg-hp-sunset text-hp-paper"
+                ? "border-hp-sunset bg-hp-sunset text-hp-on-media"
                 : "border-hp-ink/10 bg-hp-paper text-hp-ink/70"
             }`}
           >
@@ -269,7 +269,7 @@ export function TripPlannerScreen({
           subtitle={t("Plan your days in a minute")}
         />
         <div className="hp-card-lift rounded-3xl border border-hp-ink/10 bg-hp-paper p-5 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-hp-sunset text-hp-paper">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-hp-sunset text-hp-on-media">
             <CalendarDays size={22} />
           </div>
           <h3 className="text-[17px] font-black text-hp-ink">
@@ -301,7 +301,7 @@ export function TripPlannerScreen({
               setPlan(createPlan(draftDays));
               setView("plan");
             }}
-            className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-paper"
+            className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-on-media"
           >
             {t("Start planning")}
           </button>
@@ -405,7 +405,7 @@ export function TripPlannerScreen({
                     <button
                       type="button"
                       onClick={() => onOpenPlace(top)}
-                      className="absolute inset-x-0 bottom-0 p-4 text-left text-hp-paper"
+                      className="absolute inset-x-0 bottom-0 p-4 text-left text-hp-on-media"
                     >
                       <span className="block text-[22px] font-black leading-tight [text-shadow:0_2px_10px_rgba(0,0,0,0.5)]">
                         {card.title}
@@ -443,7 +443,7 @@ export function TripPlannerScreen({
                   <button
                     type="button"
                     onClick={() => setPlan(resetSkipped(plan))}
-                    className="mt-3 rounded-full bg-hp-sunset px-4 py-2 text-[12.5px] font-bold text-hp-paper"
+                    className="mt-3 rounded-full bg-hp-sunset px-4 py-2 text-[12.5px] font-bold text-hp-on-media"
                   >
                     {t("See them again")}
                   </button>
@@ -475,7 +475,7 @@ export function TripPlannerScreen({
                 type="button"
                 onClick={keepTop}
                 aria-label={t("Keep for day {n}", { n: targetDay })}
-                className="grid h-16 w-16 place-items-center rounded-full bg-hp-sunset text-hp-paper shadow-[0_12px_24px_-8px_rgba(224,106,50,0.8)] transition active:scale-90"
+                className="grid h-16 w-16 place-items-center rounded-full bg-hp-sunset text-hp-on-media shadow-[0_12px_24px_-8px_rgba(224,106,50,0.8)] transition active:scale-90"
               >
                 <Heart size={28} fill="currentColor" />
               </button>
@@ -593,7 +593,7 @@ export function TripPlannerScreen({
         <button
           type="button"
           onClick={openDeck}
-          className="flex min-h-[96px] flex-col items-start justify-between rounded-3xl bg-gradient-to-br from-hp-sunset to-amber-500 p-3.5 text-left text-hp-paper shadow-[0_12px_24px_-14px_rgba(224,106,50,0.9)] transition active:scale-[0.98]"
+          className="flex min-h-[96px] flex-col items-start justify-between rounded-3xl bg-gradient-to-br from-hp-sunset to-amber-500 p-3.5 text-left text-hp-on-media shadow-[0_12px_24px_-14px_rgba(224,106,50,0.9)] transition active:scale-[0.98]"
         >
           <Layers size={22} />
           <span>
@@ -606,7 +606,7 @@ export function TripPlannerScreen({
         <button
           type="button"
           onClick={openRoutes}
-          className="flex min-h-[96px] flex-col items-start justify-between rounded-3xl bg-gradient-to-br from-hp-sea to-hp-deep p-3.5 text-left text-hp-paper shadow-[0_12px_24px_-14px_rgba(14,58,91,0.9)] transition active:scale-[0.98]"
+          className="flex min-h-[96px] flex-col items-start justify-between rounded-3xl bg-gradient-to-br from-hp-sea to-hp-deep p-3.5 text-left text-hp-on-media shadow-[0_12px_24px_-14px_rgba(14,58,91,0.9)] transition active:scale-[0.98]"
         >
           <RouteIcon size={22} />
           <span>
@@ -631,7 +631,7 @@ export function TripPlannerScreen({
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="flex items-center gap-2 text-[14px] font-black text-hp-ink">
                   <span
-                    className={`grid h-7 w-7 place-items-center rounded-full text-[12px] text-hp-paper ${dayColor(day)}`}
+                    className={`grid h-7 w-7 place-items-center rounded-full text-[12px] text-hp-on-media ${dayColor(day)}`}
                   >
                     {day}
                   </span>
@@ -676,7 +676,7 @@ export function TripPlannerScreen({
                             rounded="rounded-lg"
                           />
                           {item.kind === "route" && (
-                            <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+                            <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-hp-sunset text-hp-on-media">
                               <RouteIcon size={9} />
                             </span>
                           )}

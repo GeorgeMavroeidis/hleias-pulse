@@ -89,7 +89,7 @@ export function NearMeBar({ places }: { places: Place[] }) {
   }
 
   return (
-    <div className="mb-3 rounded-3xl bg-gradient-to-br from-hp-sea to-hp-deep p-3.5 text-hp-paper">
+    <div className="mb-3 rounded-3xl bg-gradient-to-br from-hp-sea to-hp-deep p-3.5 text-hp-on-media">
       <p className="text-[14px] font-black leading-tight">{t("What is close to you?")}</p>
       <p className="mt-0.5 text-[11.5px] font-semibold opacity-90">
         {t("We show distance and drive time. Your location stays on your phone.")}

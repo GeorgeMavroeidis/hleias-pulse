@@ -103,7 +103,7 @@ export function PhotoTile({
       />
       <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
       {badge && <span className="absolute right-2 top-2">{badge}</span>}
-      <span className="absolute inset-x-0 bottom-0 p-2.5 text-hp-paper">
+      <span className="absolute inset-x-0 bottom-0 p-2.5 text-hp-on-media">
         <span className="block text-[13.5px] font-black leading-tight [text-shadow:0_1px_6px_rgba(0,0,0,0.45)] line-clamp-2">
           {title}
         </span>
@@ -301,7 +301,7 @@ export function QuickLookScreen({ onBack, places, routes, onOpenPlace, onOpenRou
                   .join(" · ")}
                 onOpen={() => onOpenRoute(route)}
                 badge={
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-hp-sunset text-hp-paper">
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-hp-sunset text-hp-on-media">
                     <RouteIcon size={13} />
                   </span>
                 }
