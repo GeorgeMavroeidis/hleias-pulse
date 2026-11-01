@@ -349,6 +349,38 @@ export function MustSeeTodayDeck({
     return [...pinned, ...ranked].slice(0, DECK_SIZE);
   }, [places]);
 
+  // A one-row carousel that steps left → right on its own and wraps to the start.
+  // Any touch or scroll by the user pauses it for a while, so it never fights a
+  // swipe. Under reduced motion it still steps, but jumps instead of sliding.
+  const trackRef = useRef<HTMLDivElement>(null);
+  const pausedUntilRef = useRef(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const cardStep = (track: HTMLDivElement) => {
+    const cards = track.children as HTMLCollectionOf<HTMLElement>;
+    return cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : track.clientWidth;
+  };
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || mustSee.length < 2) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setInterval(() => {
+      if (Date.now() < pausedUntilRef.current || document.hidden) return;
+      const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 4;
+      const next = atEnd ? 0 : Math.round(track.scrollLeft / cardStep(track)) + 1;
+      track.scrollTo({ left: next * cardStep(track), behavior: reduced ? "auto" : "smooth" });
+    }, 3500);
+    return () => window.clearInterval(timer);
+  }, [mustSee.length]);
+  const pauseCarousel = () => {
+    pausedUntilRef.current = Date.now() + 8000;
+  };
+  const syncActiveIndex = () => {
+    const track = trackRef.current;
+    if (!track) return;
+    const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 4;
+    setActiveIndex(atEnd ? mustSee.length - 1 : Math.round(track.scrollLeft / cardStep(track)));
+  };
+
   if (mustSee.length === 0) return null;
 
   return (
@@ -362,19 +394,26 @@ export function MustSeeTodayDeck({
           {t("A quick first look for visitors — the spots to begin with.")}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div
+        ref={trackRef}
+        onPointerDown={pauseCarousel}
+        onWheel={pauseCarousel}
+        onFocus={pauseCarousel}
+        onScroll={syncActiveIndex}
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {mustSee.map((place) => (
           <button
             key={place.id}
             type="button"
             onClick={() => onOpenPlace(place)}
             aria-label={t("Open {place}", { place: place.name })}
-            className="overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
+            className="w-[44%] shrink-0 snap-start overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
           >
             <ImageBox
               src={place.imageUrl}
               alt={place.name}
-              className="h-28 w-full"
+              className="h-24 w-full"
               rounded="rounded-none"
             />
             <div className="p-2">
@@ -388,6 +427,16 @@ export function MustSeeTodayDeck({
               <div className="text-[10px] text-hp-muted">{place.area}</div>
             </div>
           </button>
+        ))}
+      </div>
+      <div className="flex justify-center gap-1.5" aria-hidden="true">
+        {mustSee.map((place, index) => (
+          <span
+            key={place.id}
+            className={`h-1.5 rounded-full transition-all ${
+              index === activeIndex ? "w-4 bg-hp-sunset" : "w-1.5 bg-hp-ink/20"
+            }`}
+          />
         ))}
       </div>
     </section>
