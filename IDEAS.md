@@ -29,6 +29,24 @@
   location trail. Points for a visit / a photo / first in an area; rewards are
   badges and Deals. Would replace the "Έχεις πάει;" card's posts-as-visited
   guess, which Margaris finds inaccurate. Needs a new table + RLS — agree first.
+- **Later — have a local check the area intros (Margaris, 2026-11-01).** The
+  one-line intros in `src/lib/hp/region-intros.ts` (16 areas, GR + EN) are
+  drafts written from general knowledge. Each shows "· προς έλεγχο" until a
+  local reads it and its `reviewed` flag is set to `true`. Do this before any
+  real user sees them.
+- **Later — directions and drive time (Margaris, 2026-11-01, undecided).**
+  Options weighed: (1) a "Directions" button that opens Google Maps with the
+  place as destination — free, no key, real roads and traffic (recommended);
+  (2) in-app drive time via the existing openrouteservice Edge Function — free
+  tier has a daily cap, and it is Mavroeidis's setup; (3) embedded Google Maps
+  — costs money, ruled out by the no-spending rule until Feb 2027. A
+  straight-line "~25΄" estimate is possible meanwhile, labelled approximate.
+- **Still to build from the 2026-11-01 plan.** Region sheet, step 2 — show
+  what's on today (events/deals) and the best time to visit; small
+  tourist/local differences (local: what's new since last visit, events this
+  week, "nobody has posted here in 2 weeks"). Step 3 — Pulse as "what's
+  happening now, near me", with "see on map" / "add to trip" on each card.
+  Routes — "add this route to Day N" from the route's own page.
 
 ## UI / Authenticity polish
 
