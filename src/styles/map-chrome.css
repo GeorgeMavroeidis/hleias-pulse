@@ -240,6 +240,33 @@
   font-weight: 600;
 }
 
+/* Trip: raised, filled centre button; it carries its own emphasis, so no
+   active underline. */
+.hp-bottom-nav-trip.is-active::before {
+  display: none;
+}
+
+.hp-bottom-nav-trip-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-top: -20px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--hp-sunset);
+  color: var(--hp-paper);
+  box-shadow: 0 0 0 4px var(--hp-paper);
+  transition: transform 150ms ease;
+}
+
+.hp-bottom-nav-trip.is-active .hp-bottom-nav-trip-icon {
+  transform: scale(1.05);
+}
+
+.hp-bottom-nav-trip.is-active .hp-bottom-nav-label {
+  color: var(--hp-sunset);
+}
+
 .hp-map-sheet {
   border-top: 1px solid var(--hp-border);
   border-radius: var(--hp-radius-surface) var(--hp-radius-surface) 0 0;

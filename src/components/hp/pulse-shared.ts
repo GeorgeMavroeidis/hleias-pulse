@@ -17,8 +17,17 @@ import { type AreaState, type SignalQuality } from "@/lib/hp/area-intelligence";
 import { type DiscoveryLens } from "@/lib/hp/discovery";
 import { readMarkerMotionPreference, type MarkerMotion } from "@/lib/hp/marker-motion";
 
-export type Tab = "map" | "pulse" | "routes" | "meet" | "saved" | "deals";
-export type NavTab = Exclude<Tab, "saved" | "deals">;
+export type Tab =
+  | "map"
+  | "pulse"
+  | "routes"
+  | "meet"
+  | "saved"
+  | "deals"
+  | "essentials"
+  | "quicklook"
+  | "trip";
+export type NavTab = Exclude<Tab, "saved" | "deals" | "essentials" | "quicklook" | "trip">;
 export type MeetSubTab = "community" | "events";
 export type ComposerMode = "post" | "place" | "story" | "event" | "question";
 export type { MarkerMotion } from "@/lib/hp/marker-motion";
@@ -112,7 +121,10 @@ export const isTab = (value: string | null): value is Tab =>
   value === "routes" ||
   value === "meet" ||
   value === "saved" ||
-  value === "deals";
+  value === "deals" ||
+  value === "essentials" ||
+  value === "quicklook" ||
+  value === "trip";
 
 export const truncateShareText = (text: string) =>
   text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;

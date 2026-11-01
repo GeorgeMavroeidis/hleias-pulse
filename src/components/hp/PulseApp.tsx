@@ -235,6 +235,8 @@ import {
   DISCOVERY_PLACE_IDS,
 } from "./pulse-shared";
 import { Toast, TopBar, VibeChips, DiscoveryLensRail } from "./PulseTopBar";
+import { EssentialsScreen } from "./EssentialsScreen";
+import type { EssentialsSectionId } from "@/lib/hp/essentials";
 import { MapBottomSheet } from "./MapBottomSheet";
 import { PulseFeed, MustSeeTodayDeck, LocalDiscoveryCard } from "./PulseFeed";
 import { BottomNav } from "./BottomNav";
@@ -258,6 +260,15 @@ const SavedScreen = lazy(() =>
 const DealsScreen = lazy(() =>
   import("./DealsScreen").then((module) => ({ default: module.DealsScreen })),
 );
+const QuickLookScreen = lazy(() =>
+  import("./QuickLookScreen").then((module) => ({ default: module.QuickLookScreen })),
+);
+const TripPlannerScreen = lazy(() =>
+  import("./TripPlannerScreen").then((module) => ({ default: module.TripPlannerScreen })),
+);
+// Essentials is imported eagerly, unlike the other screens: it is the screen
+// a visitor with no signal most needs, so it must not depend on fetching a
+// lazy chunk. It is small (static content, no data loading).
 const MeetScreen = lazy(() =>
   import("./MeetScreen").then((module) => ({ default: module.MeetScreen })),
 );
@@ -400,6 +411,7 @@ export function PulseApp() {
     () => deriveMarkerPulseSnapshot(visibleMarkerPulseInput, nowMs),
     [visibleMarkerPulseInput, nowMs],
   );
+  const [essentialsSection, setEssentialsSection] = useState<EssentialsSectionId | "all">("all");
   const [meetSubTab, setMeetSubTab] = useState<MeetSubTab>("community");
   const [openPlaceRecord, setOpenPlace] = useState<Place | null>(null);
   const [openPostRecord, setOpenPost] = useState<Post | null>(null);
@@ -2397,6 +2409,53 @@ export function PulseApp() {
       );
     }
 
+    if (tab === "essentials") {
+      return (
+        <EssentialsScreen
+          // Re-mount when the opened section changes so the chip follows the tile.
+          key={essentialsSection}
+          initialSection={essentialsSection}
+          showDrafts={Boolean(adminRole)}
+          onBack={() => setTab("trip")}
+          onOpenQuickLook={() => setTab("quicklook")}
+        />
+      );
+    }
+
+    if (tab === "trip") {
+      return (
+        <Suspense fallback={null}>
+          <TripPlannerScreen
+            // The team sees unverified drafts; visitors only see checked cards.
+            showDrafts={Boolean(adminRole)}
+            onOpenEssentials={(section) => {
+              setEssentialsSection(section);
+              setTab("essentials");
+            }}
+            onOpenQuickLook={() => setTab("quicklook")}
+            places={places}
+            routes={routes}
+            onOpenPlace={setOpenPlace}
+            onOpenRoute={setOpenRoute}
+          />
+        </Suspense>
+      );
+    }
+
+    if (tab === "quicklook") {
+      return (
+        <Suspense fallback={null}>
+          <QuickLookScreen
+            onBack={() => setTab("trip")}
+            places={places}
+            routes={routes}
+            onOpenPlace={setOpenPlace}
+            onOpenRoute={setOpenRoute}
+          />
+        </Suspense>
+      );
+    }
+
     return (
       <div className="h-full overflow-y-auto">
         <Suspense fallback={null}>
@@ -2451,7 +2510,7 @@ export function PulseApp() {
           />
           {tab === "map" ? (
             <DiscoveryLensRail active={activeLens} onChange={setActiveLens} />
-          ) : (
+          ) : tab === "trip" || tab === "essentials" || tab === "quicklook" ? null : (
             <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
           )}
 
@@ -2524,7 +2583,7 @@ export function PulseApp() {
             </AnimatePresence>
           </div>
 
-          <BottomNav tab={tab} setTab={setTab} />
+          <BottomNav tab={tab} setTab={setTab} onOpenTrip={() => setTab("trip")} />
         </div>
 
         {placeDetailEverOpened && (
