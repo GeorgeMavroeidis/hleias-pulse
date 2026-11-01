@@ -773,7 +773,7 @@ const EL: Record<string, string> = {
   "My events": "Οι εκδηλώσεις μου",
   "Changes saved": "Οι αλλαγές αποθηκεύτηκαν",
   "Submitting…": "Υποβολή…",
-  // Tourist "Must-see today" deck (top of the Routes tab)
+  // "Must-see today" carousel (top of the Routes tab)
   "Must-see today": "Πρέπει να δεις σήμερα",
   "A quick first look for visitors — the spots to begin with.":
     "Μια πρώτη ματιά για επισκέπτες — τα σημεία για να ξεκινήσεις.",

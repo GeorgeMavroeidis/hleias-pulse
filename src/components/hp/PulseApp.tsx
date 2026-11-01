@@ -2323,7 +2323,7 @@ export function PulseApp() {
                 ]),
               )}
               findAuthor={findAuthor}
-              showMustSee={readyProfile(account)?.defaultIdentity === "TOURIST"}
+              showMustSee
               places={places}
               onOpenPlace={setOpenPlace}
             />

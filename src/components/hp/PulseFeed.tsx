@@ -9,6 +9,8 @@ import {
   Share2,
   MapPin,
   HelpCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   typeColor,
@@ -314,7 +316,7 @@ export function PulseFeed({
 // architecture. See HANDOFF.md > Known Limitations.
 const TEMP_FEATURED_PLACE_IDS = ["ancient-olympia"];
 
-// Shown only to Tourist identities, at the top of the Routes tab. Places only —
+// Shown to everyone at the top of the Routes tab. Places only —
 // route recommendations are already covered by the Routes tab's own "What we
 // recommend" (curated) section, so this deck deliberately does not repeat them.
 export function MustSeeTodayDeck({
@@ -359,17 +361,34 @@ export function MustSeeTodayDeck({
     const cards = track.children as HTMLCollectionOf<HTMLElement>;
     return cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : track.clientWidth;
   };
-  useEffect(() => {
+  // Moves one card forward (wrapping to the start) or back (wrapping to the end).
+  const stepCarousel = (direction: 1 | -1) => {
     const track = trackRef.current;
-    if (!track || mustSee.length < 2) return;
+    if (!track) return;
+    const step = cardStep(track);
+    const lastStart = track.scrollWidth - track.clientWidth;
+    const current = Math.round(track.scrollLeft / step);
+    const atEnd = track.scrollLeft >= lastStart - 4;
+    const left =
+      direction === 1
+        ? atEnd
+          ? 0
+          : (current + 1) * step
+        : track.scrollLeft <= 4
+          ? lastStart
+          : (current - 1) * step;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    track.scrollTo({ left, behavior: reduced ? "auto" : "smooth" });
+  };
+  useEffect(() => {
+    if (mustSee.length < 2) return;
     const timer = window.setInterval(() => {
       if (Date.now() < pausedUntilRef.current || document.hidden) return;
-      const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 4;
-      const next = atEnd ? 0 : Math.round(track.scrollLeft / cardStep(track)) + 1;
-      track.scrollTo({ left: next * cardStep(track), behavior: reduced ? "auto" : "smooth" });
+      stepCarousel(1);
     }, 3500);
     return () => window.clearInterval(timer);
+    // stepCarousel only reads the ref, so it never needs to restart the timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mustSee.length]);
   const pauseCarousel = () => {
     pausedUntilRef.current = Date.now() + 8000;
@@ -385,19 +404,41 @@ export function MustSeeTodayDeck({
 
   return (
     <section className="mb-6 flex flex-col gap-3">
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-          {language === "GR" ? `${mustSee.length} επιλογές` : `${mustSee.length} picks`}
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+            {language === "GR" ? `${mustSee.length} επιλογές` : `${mustSee.length} picks`}
+          </div>
+          <h3 className="text-[17px] font-black text-hp-ink">{t("Must-see today")}</h3>
+          <p className="text-[12px] text-hp-muted">
+            {t("A quick first look for visitors — the spots to begin with.")}
+          </p>
         </div>
-        <h3 className="text-[17px] font-black text-hp-ink">{t("Must-see today")}</h3>
-        <p className="text-[12px] text-hp-muted">
-          {t("A quick first look for visitors — the spots to begin with.")}
-        </p>
+        {/* Arrows for mouse users, who cannot swipe the row. */}
+        <div className="flex shrink-0 gap-1.5">
+          {([-1, 1] as const).map((direction) => (
+            <button
+              key={direction}
+              type="button"
+              onClick={() => {
+                pauseCarousel();
+                stepCarousel(direction);
+              }}
+              aria-label={direction === 1 ? t("Next") : t("Previous")}
+              className="grid h-8 w-8 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
+            >
+              {direction === 1 ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            </button>
+          ))}
+        </div>
       </div>
       <div
         ref={trackRef}
         onPointerDown={pauseCarousel}
-        onWheel={pauseCarousel}
+        onWheel={(event) => {
+          // Scrolling the page past the row is not "using" the carousel.
+          if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) pauseCarousel();
+        }}
         onFocus={pauseCarousel}
         onScroll={syncActiveIndex}
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
