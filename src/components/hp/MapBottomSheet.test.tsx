@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider, useI18n, type TranslationParams } from "@/lib/i18n";
 import { MapBottomSheet, type MapBottomSheetProps } from "./MapBottomSheet";
 import { communityActivityCopy } from "@/lib/hp/context-copy";
+import { googleMapsDirectionsUrl } from "@/lib/hp/route-navigation";
 import {
   deriveMapDiscoveryContent,
   formatDiscoveryEventDate,
@@ -277,6 +278,19 @@ test("a stale selected place prop cannot mount another place's detail/save/share
   assert.ok(!markup.includes(`aria-label="${t("Share {place}", { place: other.name })}"`));
   assert.ok(!text(markup).includes(t("Details")));
   assert.ok(!markup.includes("aria-pressed="));
+  assert.ok(!markup.includes("google.com/maps/dir"));
+});
+
+test("the selected-place sheet directs guests to that place's actual coordinates", () => {
+  const props = fixture();
+  const place = props.selectedPlace!;
+  const { markup } = render(props);
+  const href = googleMapsDirectionsUrl(
+    { lat: place.lat, lng: place.lng, label: place.name },
+    "driving-car",
+  );
+  assert.ok(markup.includes(`href="${href.replaceAll("&", "&amp;")}"`));
+  assert.ok(markup.includes("Google Maps"));
 });
 
 test("a selected place sheet offers Trip, Details, Save and Share in one row", () => {

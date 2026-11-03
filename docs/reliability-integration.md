@@ -1,5 +1,20 @@
 # Reliability and map-design integration
 
+## Review update — 2 November 2026
+
+The [current review and recommendation](final-design-review.md) and
+[GitHub tracker #105](https://github.com/GeorgeMavroeidis/hleias-pulse/issues/105)
+supersede outdated availability/status notes below. #100 now includes #103's
+selected-marker photos at `cf9257e`; main is `befd263` after documentation-only
+#104. Trip/Essentials/Quick look are shared on `margaris/trip-map-pulse` at
+`b0ffc28`, containing #100 plus further changes. They remain a separate review
+candidate, with remote code/Smoke validation outstanding. Existing PRs retain
+their bases and historical evidence. New comparison and Directions work uses
+fresh checkouts and preserves the relocated primary and old worktree records.
+
+The remaining sections record the earlier integration preparation and its
+acceptance requirements. They do not establish final release acceptance.
+
 This preparation uses main `b13daaf97aef9a0857862afb322e442e1b5d73d0`, which already
 includes the simpler composer (#101) and Light/Dark/System appearance (#102).
 Existing PRs and their history are retained through ordinary merge commits.
@@ -99,7 +114,7 @@ dirty/reference worktrees and Phase 1–7 references until replacement is verifi
 Update the inventory after the human merge queue, rather than treating open PRs as
 merged work.
 
-Account redesign and the local Trip implementations remain a separate queue:
-first put each intended implementation into shared Git, then review its scope and
-integration. Neither is included here. Production deployment, hosted migrations
+Account redesign remains a separate queue. The now-shared Trip implementation
+has its own comparison and validation requirements before integration; it is not
+silently added to the reliability chain. Production deployment, hosted migrations
 and paid work remain outside this preparation.

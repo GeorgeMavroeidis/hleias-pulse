@@ -14,6 +14,9 @@ export type TranslationParams = Record<string, string | number>;
 const STORAGE_KEY = "ilia-pulse-language";
 
 const EL: Record<string, string> = {
+  "Directions to {place} in Google Maps": "Οδηγίες προς {place} στο Google Maps",
+  "Could not open the app. Tap Directions to open Google Maps in your browser.":
+    "Δεν άνοιξε η εφαρμογή. Πάτησε Οδηγίες για να ανοίξεις το Google Maps στο πρόγραμμα περιήγησης.",
   "Finding your location…": "Αναζήτηση τοποθεσίας…",
   "Location found": "Η τοποθεσία βρέθηκε",
   "Location access is off. Allow it in your browser settings, then try again.":

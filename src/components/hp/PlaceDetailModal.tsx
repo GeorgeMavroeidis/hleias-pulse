@@ -35,6 +35,7 @@ import { type PulseData } from "@/lib/hp-api";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
 import { AddToTripButton } from "./AddToTripButton";
+import { DirectionsLink } from "./DirectionsLink";
 import { ContentMenu } from "./ContentMenu";
 import { useModeration } from "./use-moderation";
 import { type PlaceStoryGroup } from "@/lib/hp/place-stories";
@@ -473,7 +474,7 @@ export function PlaceDetailModal({
                   {t("I've been here")}
                 </button>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -484,6 +485,10 @@ export function PlaceDetailModal({
                 >
                   Map
                 </button>
+                <DirectionsLink
+                  destination={{ lat: place.lat, lng: place.lng, label: place.name }}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-full border border-hp-ink/15 px-3 py-3 text-[12px] font-bold text-hp-ink"
+                />
                 <a
                   href={openStreetMapUrl(place)}
                   target="_blank"

@@ -57,6 +57,7 @@ import type { SheetGeometry } from "@/lib/hp/sheet-geometry";
 import type { PlaceStoryGroup } from "@/lib/hp/place-stories";
 import { ImageBox } from "./ImageBox";
 import { AddToTripButton } from "./AddToTripButton";
+import { DirectionsLink } from "./DirectionsLink";
 import { DISCOVERY_LENS_LABEL, HP_TRANSITION } from "./pulse-shared";
 
 export type MapBottomSheetProps = {
@@ -715,7 +716,7 @@ function PlaceDiscoveryContent(props: Props & { place: Place }) {
         {place.budget && <span>{place.budget}</span>}
         {place.bestTime && <span>{place.bestTime}</span>}
       </div>
-      {/* One row, four controls: Trip and Details carry labels; Save and Share are
+      {/* One row: Trip, Details and Directions carry labels; Save and Share are
           icons. The OpenStreetMap link lives in Details, so it is not repeated here. */}
       <div className="hp-discovery-sheet__actions">
         <AddToTripButton kind="place" id={place.id} name={place.name} compact />
@@ -731,6 +732,10 @@ function PlaceDiscoveryContent(props: Props & { place: Place }) {
         >
           <Bookmark size={16} aria-hidden="true" fill={saved ? "currentColor" : "none"} />
         </button>
+        <DirectionsLink
+          destination={{ lat: place.lat, lng: place.lng, label: place.name }}
+          className="px-3"
+        />
         <button
           type="button"
           onClick={() => props.onSharePlace(place)}
