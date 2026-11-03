@@ -267,3 +267,56 @@ h3 {
     transform: translateY(0);
   }
 }
+
+/* Must-see strip. Still and swipeable by default; it only glides when the viewer
+   has not asked for reduced motion. Hover or a held finger pauses it so a card can
+   be tapped, and keyboard focus returns it to the still row so the card stays in view. */
+.hp-marquee {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hp-marquee::-webkit-scrollbar {
+  display: none;
+}
+.hp-marquee__track {
+  display: flex;
+  width: max-content;
+}
+.hp-marquee__group {
+  display: flex;
+  flex-shrink: 0;
+  gap: 12px;
+  padding-right: 12px;
+}
+.hp-marquee__group[aria-hidden="true"] {
+  display: none;
+}
+.hp-marquee__card {
+  flex-shrink: 0;
+  width: 176px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hp-marquee:not(:has(:focus-visible)) {
+    overflow-x: clip;
+    mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+  }
+  .hp-marquee:not(:has(:focus-visible)) .hp-marquee__group[aria-hidden="true"] {
+    display: flex;
+  }
+  .hp-marquee:not(:has(:focus-visible)) .hp-marquee__track {
+    animation: hp-marquee-slide var(--hp-marquee-duration) linear infinite;
+  }
+  .hp-marquee:active .hp-marquee__track {
+    animation-play-state: paused;
+  }
+  @media (hover: hover) {
+    .hp-marquee:hover .hp-marquee__track {
+      animation-play-state: paused;
+    }
+  }
+}
+@keyframes hp-marquee-slide {
+  to {
+    transform: translate3d(calc(-100% / var(--hp-marquee-copies)), 0, 0);
+  }
+}

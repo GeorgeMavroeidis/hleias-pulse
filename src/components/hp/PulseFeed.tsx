@@ -1,5 +1,5 @@
 import { DISCOVERY_PLACE_IDS, DISCOVERY_MILESTONE } from "./pulse-shared";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import {
   Map as MapIcon,
@@ -9,8 +9,6 @@ import {
   Share2,
   MapPin,
   HelpCircle,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import {
   typeColor,
@@ -363,134 +361,69 @@ export function MustSeeTodayDeck({
     return [...pinned, ...ranked].slice(0, DECK_SIZE);
   }, [places]);
 
-  // A one-row carousel that steps left → right on its own and wraps to the start.
-  // Any touch or scroll by the user pauses it for a while, so it never fights a
-  // swipe. Under reduced motion it still steps, but jumps instead of sliding.
-  const trackRef = useRef<HTMLDivElement>(null);
-  const pausedUntilRef = useRef(0);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const cardStep = (track: HTMLDivElement) => {
-    const cards = track.children as HTMLCollectionOf<HTMLElement>;
-    return cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : track.clientWidth;
-  };
-  // Moves one card forward (wrapping to the start) or back (wrapping to the end).
-  const stepCarousel = (direction: 1 | -1) => {
-    const track = trackRef.current;
-    if (!track) return;
-    const step = cardStep(track);
-    const lastStart = track.scrollWidth - track.clientWidth;
-    const current = Math.round(track.scrollLeft / step);
-    const atEnd = track.scrollLeft >= lastStart - 4;
-    const left =
-      direction === 1
-        ? atEnd
-          ? 0
-          : (current + 1) * step
-        : track.scrollLeft <= 4
-          ? lastStart
-          : (current - 1) * step;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    track.scrollTo({ left, behavior: reduced ? "auto" : "smooth" });
-  };
-  useEffect(() => {
-    if (mustSee.length < 2) return;
-    const timer = window.setInterval(() => {
-      if (Date.now() < pausedUntilRef.current || document.hidden) return;
-      stepCarousel(1);
-    }, 3500);
-    return () => window.clearInterval(timer);
-    // stepCarousel only reads the ref, so it never needs to restart the timer.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mustSee.length]);
-  const pauseCarousel = () => {
-    pausedUntilRef.current = Date.now() + 8000;
-  };
-  const syncActiveIndex = () => {
-    const track = trackRef.current;
-    if (!track) return;
-    const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 4;
-    setActiveIndex(atEnd ? mustSee.length - 1 : Math.round(track.scrollLeft / cardStep(track)));
-  };
-
   if (mustSee.length === 0) return null;
+
+  // A row that glides without ever stopping, like a "our partners" strip: the list
+  // is repeated and the row slides by exactly one repeat, so the loop has no seam.
+  // Only the first copy is reachable by screen readers and keyboard. The motion
+  // itself lives in CSS (.hp-marquee), including the still row for reduced motion.
+  const copies = mustSee.length < 2 ? 1 : Math.max(3, Math.ceil(18 / mustSee.length));
 
   return (
     <section className="mb-6 flex flex-col gap-3">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-            {language === "GR" ? `${mustSee.length} επιλογές` : `${mustSee.length} picks`}
-          </div>
-          <h3 className="text-[17px] font-black text-hp-ink">{t("Must-see today")}</h3>
-          <p className="text-[12px] text-hp-muted">
-            {t("A quick first look for visitors — the spots to begin with.")}
-          </p>
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+          {language === "GR" ? `${mustSee.length} επιλογές` : `${mustSee.length} picks`}
         </div>
-        {/* Arrows for mouse users, who cannot swipe the row. */}
-        <div className="flex shrink-0 gap-1.5">
-          {([-1, 1] as const).map((direction) => (
-            <button
-              key={direction}
-              type="button"
-              onClick={() => {
-                pauseCarousel();
-                stepCarousel(direction);
-              }}
-              aria-label={direction === 1 ? t("Next") : t("Previous")}
-              className="grid h-8 w-8 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-            >
-              {direction === 1 ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            </button>
+        <h3 className="text-[17px] font-black text-hp-ink">{t("Must-see today")}</h3>
+        <p className="text-[12px] text-hp-muted">
+          {t("A quick first look for visitors — the spots to begin with.")}
+        </p>
+      </div>
+      <div className="hp-marquee">
+        <div
+          className="hp-marquee__track"
+          style={
+            {
+              "--hp-marquee-copies": copies,
+              "--hp-marquee-duration": `${mustSee.length * 7}s`,
+            } as CSSProperties
+          }
+        >
+          {Array.from({ length: copies }, (_, copy) => (
+            <div key={copy} className="hp-marquee__group" aria-hidden={copy > 0 || undefined}>
+              {mustSee.map((place) => (
+                <button
+                  key={place.id}
+                  type="button"
+                  tabIndex={copy > 0 ? -1 : undefined}
+                  onClick={() => onOpenPlace(place)}
+                  aria-label={t("Open {place}", { place: place.name })}
+                  className="hp-marquee__card overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
+                >
+                  <ImageBox
+                    src={place.imageUrl}
+                    alt={place.name}
+                    className="h-24 w-full"
+                    rounded="rounded-none"
+                  />
+                  <div className="p-2">
+                    <div
+                      className="text-[10px] font-bold uppercase tracking-wider"
+                      style={{ color: typeColor[place.type] }}
+                    >
+                      {place.type}
+                    </div>
+                    <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">
+                      {place.name}
+                    </div>
+                    <div className="text-[10px] text-hp-muted">{place.area}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
-      </div>
-      <div
-        ref={trackRef}
-        onPointerDown={pauseCarousel}
-        onWheel={(event) => {
-          // Scrolling the page past the row is not "using" the carousel.
-          if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) pauseCarousel();
-        }}
-        onFocus={pauseCarousel}
-        onScroll={syncActiveIndex}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {mustSee.map((place) => (
-          <button
-            key={place.id}
-            type="button"
-            onClick={() => onOpenPlace(place)}
-            aria-label={t("Open {place}", { place: place.name })}
-            className="w-[44%] shrink-0 snap-start overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
-          >
-            <ImageBox
-              src={place.imageUrl}
-              alt={place.name}
-              className="h-24 w-full"
-              rounded="rounded-none"
-            />
-            <div className="p-2">
-              <div
-                className="text-[10px] font-bold uppercase tracking-wider"
-                style={{ color: typeColor[place.type] }}
-              >
-                {place.type}
-              </div>
-              <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">{place.name}</div>
-              <div className="text-[10px] text-hp-muted">{place.area}</div>
-            </div>
-          </button>
-        ))}
-      </div>
-      <div className="flex justify-center gap-1.5" aria-hidden="true">
-        {mustSee.map((place, index) => (
-          <span
-            key={place.id}
-            className={`h-1.5 rounded-full transition-all ${
-              index === activeIndex ? "w-4 bg-hp-sunset" : "w-1.5 bg-hp-ink/20"
-            }`}
-          />
-        ))}
       </div>
     </section>
   );
