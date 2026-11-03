@@ -366,7 +366,7 @@ export function MustSeeTodayDeck({
   // A row that glides without ever stopping, like a "our partners" strip: the list
   // is repeated and the row slides by exactly one repeat, so the loop has no seam.
   // Only the first copy is reachable by screen readers and keyboard. The motion
-  // itself lives in CSS (.hp-marquee), including the still row for reduced motion.
+  // itself lives in CSS (.hp-marquee).
   const copies = mustSee.length < 2 ? 1 : Math.max(3, Math.ceil(18 / mustSee.length));
 
   return (

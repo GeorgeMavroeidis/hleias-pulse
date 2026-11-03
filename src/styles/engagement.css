@@ -268,19 +268,31 @@ h3 {
   }
 }
 
-/* Must-see strip. Still and swipeable by default; it only glides when the viewer
-   has not asked for reduced motion. Hover or a held finger pauses it so a card can
-   be tapped, and keyboard focus returns it to the still row so the card stays in view. */
+/* Must-see strip. It glides for everyone, including viewers with reduced motion
+   turned on (a product decision, so the !important overrides utilities.css): it is
+   slow, stays in one row, and hover or a held finger pauses it so a card can be
+   tapped. Keyboard focus swaps it for a still row so the focused card stays in view. */
 .hp-marquee {
+  overflow-x: clip;
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+}
+.hp-marquee:has(:focus-visible) {
   overflow-x: auto;
+  mask-image: none;
   scrollbar-width: none;
 }
-.hp-marquee::-webkit-scrollbar {
+.hp-marquee:has(:focus-visible)::-webkit-scrollbar {
   display: none;
 }
 .hp-marquee__track {
   display: flex;
   width: max-content;
+  animation: hp-marquee-slide linear;
+  animation-duration: var(--hp-marquee-duration) !important;
+  animation-iteration-count: infinite !important;
+}
+.hp-marquee:has(:focus-visible) .hp-marquee__track {
+  animation: none !important;
 }
 .hp-marquee__group {
   display: flex;
@@ -288,31 +300,19 @@ h3 {
   gap: 12px;
   padding-right: 12px;
 }
-.hp-marquee__group[aria-hidden="true"] {
+.hp-marquee:has(:focus-visible) .hp-marquee__group[aria-hidden="true"] {
   display: none;
 }
 .hp-marquee__card {
   flex-shrink: 0;
   width: 176px;
 }
-@media (prefers-reduced-motion: no-preference) {
-  .hp-marquee:not(:has(:focus-visible)) {
-    overflow-x: clip;
-    mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
-  }
-  .hp-marquee:not(:has(:focus-visible)) .hp-marquee__group[aria-hidden="true"] {
-    display: flex;
-  }
-  .hp-marquee:not(:has(:focus-visible)) .hp-marquee__track {
-    animation: hp-marquee-slide var(--hp-marquee-duration) linear infinite;
-  }
-  .hp-marquee:active .hp-marquee__track {
+.hp-marquee:active .hp-marquee__track {
+  animation-play-state: paused;
+}
+@media (hover: hover) {
+  .hp-marquee:hover .hp-marquee__track {
     animation-play-state: paused;
-  }
-  @media (hover: hover) {
-    .hp-marquee:hover .hp-marquee__track {
-      animation-play-state: paused;
-    }
   }
 }
 @keyframes hp-marquee-slide {
