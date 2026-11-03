@@ -7,7 +7,9 @@ import {
   type RouteItem,
   type StoryItem,
 } from "./hp-model";
+import type { CommentTarget } from "./hp/comment-drafts";
 import type { CreateMeetInput, MeetEvent, RsvpStatus } from "./hp/meet-types";
+import { requireFutureMeetStart } from "./hp/meet-time";
 import type { StreakState } from "./hp/meet-store";
 import { initialsAvatarDataUri } from "./hp/avatar";
 import { parseRouteGeometry } from "./hp/route-preview";
@@ -31,6 +33,7 @@ import {
 } from "./hp/business-types";
 import { supabase } from "./supabase/client";
 import type { Database } from "./supabase/database.types";
+import { savedTargetsFromRows, type SavedContent, type SavedTarget } from "./hp/saved-items";
 
 type TableRow<TableName extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][TableName]["Row"];
@@ -38,6 +41,8 @@ type TableRow<TableName extends keyof Database["public"]["Tables"]> =
 type AuthorRow = Pick<TableRow<"authors">, "id" | "name" | "type" | "avatar_url">;
 type CommentRow = Pick<
   TableRow<"comments">,
+  | "id"
+  | "moderation_status"
   | "author_name"
   | "text"
   | "place_id"
@@ -99,6 +104,7 @@ type PostRow = Pick<
   | "likes_count"
   | "image_url"
   | "created_at"
+  | "moderation_status"
 >;
 type RouteRow = Pick<
   TableRow<"routes">,
@@ -141,6 +147,7 @@ type LiveStoryRow = Pick<
   | "parking"
   | "condition"
   | "created_at"
+  | "moderation_status"
 >;
 type MeetEventRow = Pick<
   TableRow<"meet_events">,
@@ -166,6 +173,7 @@ type MeetEventRow = Pick<
   | "hot"
   | "attendee_avatar_urls"
   | "created_at"
+  | "moderation_status"
 >;
 type CulturalEventRow = Pick<
   TableRow<"cultural_events">,
@@ -263,15 +271,15 @@ interface PulseDealRow {
 }
 
 const COMMENT_RETURN_COLUMNS =
-  "author_name,text,place_id,post_id,route_id,cultural_event_id,user_id,profile_id,posting_identity,author_kind,created_at";
+  "id,moderation_status,author_name,text,place_id,post_id,route_id,cultural_event_id,user_id,profile_id,posting_identity,author_kind,created_at";
 const PLACE_RETURN_COLUMNS =
   "id,name,greek_name,type,area,x,y,lat,lng,pulse,mood,crowd,budget,best_time,tags,short,image_url,hotness,comment_count,recent_post_count,status,user_id,profile_id,created_by_identity,moderation_status";
 const POST_RETURN_COLUMNS =
-  "id,author_id,author_kind,user_id,profile_id,posting_identity,place_id,kind,display_time,text,tags,likes_count,image_url,created_at";
+  "id,author_id,author_kind,user_id,profile_id,posting_identity,place_id,kind,display_time,text,tags,likes_count,image_url,created_at,moderation_status";
 const STORY_RETURN_COLUMNS =
-  "id,label,place_id,user_id,profile_id,kind,author_name,author_type,author_avatar_url,media_url,caption,expires_after_hours,crowd,parking,condition,created_at";
+  "id,label,place_id,user_id,profile_id,kind,author_name,author_type,author_avatar_url,media_url,caption,expires_after_hours,crowd,parking,condition,created_at,moderation_status";
 const MEET_EVENT_RETURN_COLUMNS =
-  "id,place_id,user_id,profile_id,title,host_name,host_avatar_url,host_type,starts_at,duration_min,category,vibe,price,capacity,description,cover_url,tags,going_count,maybe_count,hot,attendee_avatar_urls,created_at";
+  "id,place_id,user_id,profile_id,title,host_name,host_avatar_url,host_type,starts_at,duration_min,category,vibe,price,capacity,description,cover_url,tags,going_count,maybe_count,hot,attendee_avatar_urls,created_at,moderation_status";
 const CULTURAL_EVENT_RETURN_COLUMNS =
   "id,title,greek_title,event_type,venue_name,area,place_id,lat,lng,event_date,organizer_name,organizer_id,description_el,description_en,poster_url,ticket_url,is_past_event,is_official,likes_count,moderation_status,user_id,created_at";
 const ORGANIZER_RETURN_COLUMNS = "id,display_name,bio,verification_status";
@@ -279,13 +287,6 @@ const BUSINESS_RETURN_COLUMNS =
   "id,display_name,bio,contact_phone,contact_email,verification_status";
 const PLACE_BUSINESS_PROFILE_RETURN_COLUMNS =
   "id,place_id,business_id,status,hours_text,phone,website_url,menu_url,photos,deal_text,deal_active";
-
-type SavedTarget =
-  | { type: "place"; id: string }
-  | { type: "post"; id: string }
-  | { type: "route"; id: string };
-
-type CommentTarget = SavedTarget | { type: "cultural_event"; id: string };
 
 export interface PulseData {
   authors: Author[];
@@ -304,7 +305,7 @@ export interface PulseData {
   placeComments: Record<string, Comment[]>;
   routeComments: Record<string, Comment[]>;
   culturalEventComments: Record<string, Comment[]>;
-  source: "supabase";
+  source: "supabase" | "preview";
 }
 
 // One active static deal, denormalised for the browsable Deals screen. The
@@ -558,6 +559,8 @@ function meetHostType(value: string | null | undefined): MeetEvent["hostType"] {
 
 function mapComment(row: CommentRow): Comment {
   return {
+    id: row.id,
+    moderationStatus: row.moderation_status,
     author: row.author_name,
     text: row.text,
     createdAt: row.created_at ?? null,
@@ -623,6 +626,7 @@ function mapPlace(row: PlaceRow, avatarsByPlace: Record<string, PlaceAvatarRow[]
 
 function mapPost(row: PostRow, commentsByPost: Record<string, Comment[]>): Post {
   return {
+    moderationStatus: row.moderation_status ?? "published",
     id: row.id,
     authorId: row.author_id,
     placeId: row.place_id,
@@ -672,6 +676,7 @@ function mapStory(row: LiveStoryRow): StoryItem {
       : undefined;
 
   return {
+    moderationStatus: row.moderation_status ?? "published",
     id: row.id,
     label: row.label,
     placeId: row.place_id,
@@ -691,6 +696,7 @@ function mapStory(row: LiveStoryRow): StoryItem {
 
 function mapMeetEvent(row: MeetEventRow, place?: Place): MeetEvent {
   return {
+    moderationStatus: row.moderation_status ?? "published",
     id: row.id,
     title: row.title,
     placeId: row.place_id,
@@ -909,25 +915,64 @@ function mapPointFromLatLng(lat: number, lng: number) {
   };
 }
 
+async function fetchPublishedCommentRows(): Promise<CommentRow[]> {
+  const rowsById = new Map<string, CommentRow>();
+  const batchSize = 1000;
+  for (let offset = 0; ; offset += batchSize) {
+    const result = await assertSupabase()
+      .from("comments")
+      .select(COMMENT_RETURN_COLUMNS)
+      .eq("moderation_status", "published")
+      .order("sort_order")
+      .order("id")
+      .range(offset, offset + batchSize - 1);
+    if (result.error) throw result.error;
+    // Publication between offset pages can repeat a row. Keep the later observation
+    // authoritative before grouping comments into the initial public snapshot.
+    for (const row of result.data ?? []) rowsById.set(row.id, row);
+    if ((result.data?.length ?? 0) < batchSize) return [...rowsById.values()];
+  }
+}
+
+async function fetchOwnPendingMeetRows(): Promise<MeetEventRow[]> {
+  const client = assertSupabase();
+  const { data, error } = await client.auth.getSession();
+  if (error) throw error;
+  const userId = data.session?.user.id;
+  if (!userId) return [];
+  const rows = new Map<string, MeetEventRow>();
+  const batchSize = 1000;
+  for (let offset = 0; ; offset += batchSize) {
+    // Bootstrap contains public gatherings only. Re-read the owner's pending
+    // rows under RLS so refresh preserves them and moderation can remove them.
+    const result = await client
+      .from("meet_events")
+      .select(MEET_EVENT_RETURN_COLUMNS)
+      .eq("user_id", userId)
+      .eq("moderation_status", "pending")
+      .order("created_at")
+      .order("id")
+      .range(offset, offset + batchSize - 1);
+    if (result.error) throw result.error;
+    for (const row of result.data ?? []) {
+      if (row.user_id === userId && row.moderation_status === "pending") rows.set(row.id, row);
+    }
+    if ((result.data?.length ?? 0) < batchSize) return [...rows.values()];
+  }
+}
+
 async function fetchPulseData(): Promise<PulseData> {
   const client = assertSupabase();
 
-  // Keep the small pool of evergreen editorial stories cycling (see
-  // 20260907130000_loop_generic_stories.sql) before reading the bootstrap, so
-  // an expired one is already refreshed by the time it's fetched below.
-  // Best-effort: a failure here shouldn't block the rest of the app loading.
-  const refreshResult = await client.rpc("refresh_generic_stories");
-  if (refreshResult.error) {
-    console.warn("Could not refresh generic stories.", refreshResult.error);
-  }
-
-  const [result, routePreviewResult] = await Promise.all([
+  const [result, routePreviewResult, commentRows, ownPendingMeets] = await Promise.all([
     client.rpc("get_pulse_bootstrap"),
     client
       .from("routes")
       .select(
         "id,routing_profile,route_geometry,route_distance_m,route_duration_s,route_input_hash,route_generated_at",
       ),
+    fetchPublishedCommentRows(),
+    fetchOwnPendingMeetRows(),
   ]);
   if (result.error) throw result.error;
   // Deploys remain readable during the brief migration/code rollout window.
@@ -956,7 +1001,8 @@ async function fetchPulseData(): Promise<PulseData> {
     deals: [],
   }) as unknown as PulseBootstrapPayload;
 
-  const commentRows = data.comments ?? [];
+  // Bootstrap historically omits row IDs and moderation state. Read the RLS-protected
+  // published rows explicitly so private acknowledgements can reconcile by ID.
   const comments = commentRows.map(mapComment);
   const commentsByPost = groupBy(comments, (_, index) => commentRows[index]?.post_id ?? null);
   const commentsByPlace = groupBy(comments, (_, index) => commentRows[index]?.place_id ?? null);
@@ -980,9 +1026,13 @@ async function fetchPulseData(): Promise<PulseData> {
     places,
     posts: (data.posts ?? []).map((post) => mapPost(post, commentsByPost)),
     events: (data.events ?? []).map(mapEvent),
-    meetEvents: (data.meet_events ?? []).map((event) =>
-      mapMeetEvent(event, placeById.get(event.place_id)),
-    ),
+    // A publication observed by bootstrap supersedes a pending read of the same
+    // ID, including when moderation happens between the two requests.
+    meetEvents: [
+      ...new Map(
+        [...ownPendingMeets, ...(data.meet_events ?? [])].map((event) => [event.id, event]),
+      ).values(),
+    ].map((event) => mapMeetEvent(event, placeById.get(event.place_id))),
     culturalEvents: (data.cultural_events ?? []).map(mapCulturalEvent),
     routes: (data.routes ?? []).map((route) => {
       const preview = routePreviewById.get(route.id);
@@ -1019,13 +1069,16 @@ async function fetchPulseData(): Promise<PulseData> {
   return pulseData;
 }
 
-export async function loadPulseData(): Promise<PulseData> {
-  if (!pulseDataRequest) {
-    pulseDataRequest = fetchPulseData().finally(() => {
-      pulseDataRequest = null;
-    });
+export async function loadPulseData(options: { force?: boolean } = {}): Promise<PulseData> {
+  if (!pulseDataRequest || options.force) {
+    const request = fetchPulseData();
+    pulseDataRequest = request;
+    void request
+      .finally(() => {
+        if (pulseDataRequest === request) pulseDataRequest = null;
+      })
+      .catch(() => undefined);
   }
-
   return pulseDataRequest;
 }
 
@@ -1152,6 +1205,203 @@ export async function loadPulseUserState(): Promise<PulseUserState> {
     visitedPlaceIds:
       (placeVisitsResult.data as PlaceVisitRow[] | null)?.map((item) => item.place_id) ?? [],
     streak: computeStreak(activityDays),
+  };
+}
+
+// Page even ID-filtered reads: a saved discussion can exceed PostgREST's row
+// cap. Bounded ID batches also keep the request URL usable for large lists.
+async function readSavedPages<T>(
+  read: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  keyFor: (row: T) => string,
+): Promise<T[]> {
+  const rows = new Map<string, T>();
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const result = await read(from, from + pageSize - 1);
+    if (result.error) throw result.error;
+    for (const row of result.data ?? []) rows.set(keyFor(row), row);
+    if ((result.data?.length ?? 0) < pageSize) return [...rows.values()];
+  }
+}
+
+async function readSavedTargetRows<T>(
+  ids: string[],
+  read: (
+    batch: string[],
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  keyFor: (row: T) => string,
+): Promise<T[]> {
+  const rows: T[] = [];
+  const batchSize = 100;
+  for (let index = 0; index < ids.length; index += batchSize) {
+    const batch = ids.slice(index, index + batchSize);
+    rows.push(...(await readSavedPages((from, to) => read(batch, from, to), keyFor)));
+  }
+  return rows;
+}
+
+/** Resolve bookmarks by their stored IDs, independently of the capped feed.
+ * Every read uses the ordinary signed-in client, so current row permissions
+ * apply to the target and to the context needed to open its detail screen.
+ * Failed reads throw; only a successful missing-row read means unavailable.
+ */
+export async function loadSavedItems(expectedUserId?: string | null): Promise<SavedContent> {
+  const client = assertSupabase();
+  const userId = await ensurePulseUserId();
+  if (expectedUserId !== undefined && userId !== expectedUserId) throw new AuthRequiredError();
+  const saved = await readSavedPages(
+    (from, to) =>
+      client
+        .from("saved_items")
+        .select("id,target_type,place_id,post_id,route_id")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    (row) => row.id,
+  );
+  const targets = savedTargetsFromRows(saved);
+  const ids = (type: SavedTarget["type"]) =>
+    targets.filter((target) => target.type === type).map((target) => target.id);
+  const postIds = ids("post");
+  const routeIds = ids("route");
+  const [postRows, routeRows, stops] = await Promise.all([
+    readSavedTargetRows<PostRow>(
+      postIds,
+      (batch, from, to) =>
+        client
+          .from("posts")
+          .select(POST_RETURN_COLUMNS)
+          .in("id", batch)
+          .order("id")
+          .range(from, to),
+      (row) => row.id,
+    ),
+    readSavedTargetRows<RouteRow>(
+      routeIds,
+      (batch, from, to) =>
+        client
+          .from("routes")
+          .select(
+            "id,title,author_id,lede,duration,budget,tags,image_url,comment_count,saves_count,routing_profile,route_geometry,route_distance_m,route_duration_s,route_input_hash,route_generated_at",
+          )
+          .in("id", batch)
+          .order("id")
+          .range(from, to),
+      (row) => row.id,
+    ),
+    readSavedTargetRows<RouteStopRow>(
+      routeIds,
+      (batch, from, to) =>
+        client
+          .from("route_stops")
+          .select("route_id,position,display_time,place_id,title,body")
+          .in("route_id", batch)
+          .order("route_id")
+          .order("position")
+          .range(from, to),
+      (row) => JSON.stringify([row.route_id, row.position]),
+    ),
+  ]);
+  const placeIds = [
+    ...new Set([
+      ...ids("place"),
+      ...postRows.map((post) => post.place_id),
+      ...stops.map((stop) => stop.place_id),
+    ]),
+  ];
+  const authorIds = [
+    ...new Set([
+      ...postRows.map((post) => post.author_id),
+      ...routeRows.map((route) => route.author_id),
+    ]),
+  ];
+  const profileIds = [
+    ...new Set(postRows.map((post) => post.profile_id).filter((id): id is string => Boolean(id))),
+  ];
+  const commentsFor = (column: "post_id" | "place_id" | "route_id", targetIds: string[]) =>
+    readSavedTargetRows<CommentRow>(
+      targetIds,
+      (batch, from, to) =>
+        client
+          .from("comments")
+          .select(COMMENT_RETURN_COLUMNS)
+          .in(column, batch)
+          .order("created_at")
+          .order("id")
+          .range(from, to),
+      (row) => row.id,
+    );
+  const [placeRows, authors, profiles, postComments, placeComments, routeComments] =
+    await Promise.all([
+      readSavedTargetRows<PlaceRow>(
+        placeIds,
+        (batch, from, to) =>
+          client
+            .from("places")
+            .select(PLACE_RETURN_COLUMNS)
+            .in("id", batch)
+            .order("id")
+            .range(from, to),
+        (row) => row.id,
+      ),
+      readSavedTargetRows<AuthorRow>(
+        authorIds,
+        (batch, from, to) =>
+          client
+            .from("authors")
+            .select("id,name,type,avatar_url")
+            .in("id", batch)
+            .order("id")
+            .range(from, to),
+        (row) => row.id,
+      ),
+      readSavedTargetRows<ProfileRow>(
+        profileIds,
+        (batch, from, to) =>
+          client
+            .from("profiles")
+            .select(
+              "id,handle,display_name,avatar_url,avatar_path,default_identity,home_area,profile_completed_at",
+            )
+            .in("id", batch)
+            .order("id")
+            .range(from, to),
+        (row) => row.id,
+      ),
+      commentsFor("post_id", postIds),
+      commentsFor("place_id", placeIds),
+      commentsFor("route_id", routeIds),
+    ]);
+  // A session change midway through the multi-request read must not deliver
+  // the previous account's private bookmarks to the next account's screen.
+  if ((await currentPulseUserId()) !== userId) throw new AuthRequiredError();
+  const commentsByPost = groupBy(
+    postComments.map(mapComment),
+    (_, index) => postComments[index]?.post_id ?? null,
+  );
+  return {
+    targets,
+    places: placeRows.map((place) => mapPlace(place, {})),
+    posts: postRows.map((post) => mapPost(post, commentsByPost)),
+    routes: routeRows.map((route) =>
+      mapRoute(
+        route,
+        groupBy(stops, (stop) => stop.route_id),
+      ),
+    ),
+    authors: authors.map(mapAuthor),
+    profiles: profiles.map(mapProfile),
+    placeComments: groupBy(
+      placeComments.map(mapComment),
+      (_, index) => placeComments[index]?.place_id ?? null,
+    ),
+    routeComments: groupBy(
+      routeComments.map(mapComment),
+      (_, index) => routeComments[index]?.route_id ?? null,
+    ),
   };
 }
 
@@ -1395,6 +1645,8 @@ export async function setPulseMeetRsvp(
 }
 
 export async function createPulseMeetEvent(input: CreatePulseMeetEventInput): Promise<MeetEvent> {
+  const startsAt = requireFutureMeetStart(input.happensAt);
+  if (!input.place?.id?.trim()) throw new Error("Choose a valid place for the gathering.");
   const client = assertSupabase();
   const userId = await ensurePulseUserId();
   const id = `user-meet-${Date.now().toString(36)}-${randomIdSuffix()}`;
@@ -1410,7 +1662,7 @@ export async function createPulseMeetEvent(input: CreatePulseMeetEventInput): Pr
       host_name: input.hostName,
       host_avatar_url: input.hostAvatarUrl,
       host_type: meetHostType(input.hostType),
-      starts_at: input.happensAt,
+      starts_at: startsAt,
       duration_min: 120,
       category: meetCategory(input.category),
       vibe: input.vibe,
@@ -1908,17 +2160,47 @@ export async function recordPulseActivityDay(): Promise<StreakState> {
   return computeStreak(days);
 }
 
+function isCommentAuthenticationFailure(error: unknown): boolean {
+  if (isAuthRequiredError(error)) return true;
+  if (!error || typeof error !== "object") return false;
+  const failure = error as { name?: string; code?: string; status?: number };
+  return (
+    failure.status === 401 ||
+    failure.name === "AuthSessionMissingError" ||
+    [
+      "PGRST301",
+      "PGRST303",
+      "bad_jwt",
+      "refresh_token_not_found",
+      "refresh_token_already_used",
+      "session_not_found",
+    ].includes(failure.code ?? "")
+  );
+}
+
 export async function addPulseComment(
   target: CommentTarget,
   text: string,
   options: {
+    expectedUserId?: string;
     profileId?: string | null;
     authorName?: string;
     identity?: Author["type"];
   } = {},
 ): Promise<Comment> {
   const client = assertSupabase();
-  const userId = await ensurePulseUserId();
+  let userId: string;
+  try {
+    userId = await ensurePulseUserId();
+  } catch (error) {
+    if (isCommentAuthenticationFailure(error)) throw new AuthRequiredError();
+    throw error;
+  }
+  if (options.expectedUserId && options.expectedUserId !== userId) {
+    throw new AuthRequiredError("Your account changed. Review your draft before sending again.");
+  }
+  const normalizedText = text.trim();
+  if (!normalizedText) throw new Error("Comment text is required.");
   const identity = authorType(options.identity);
 
   const result = await client
@@ -1932,20 +2214,28 @@ export async function addPulseComment(
       profile_id: options.profileId ?? null,
       posting_identity: identity,
       author_kind: "user",
-      text,
+      text: normalizedText,
       moderation_status: "pending",
       sort_order: Math.floor(Date.now() / 1000),
     })
     .select(COMMENT_RETURN_COLUMNS)
     .single();
 
-  if (result.error) throw result.error;
+  if (result.error) {
+    if (isCommentAuthenticationFailure(result.error)) throw new AuthRequiredError();
+    throw result.error;
+  }
   return mapComment(result.data);
 }
 
-export async function setSavedItem(target: SavedTarget, saved: boolean) {
+export async function setSavedItem(
+  target: SavedTarget,
+  saved: boolean,
+  expectedUserId?: string | null,
+) {
   const client = assertSupabase();
   const userId = await ensurePulseUserId();
+  if (expectedUserId !== undefined && userId !== expectedUserId) throw new AuthRequiredError();
   const column = savedTargetColumn(target);
 
   if (!saved) {

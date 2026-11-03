@@ -1,5 +1,5 @@
 import { DISCOVERY_PLACE_IDS, DISCOVERY_MILESTONE } from "./pulse-shared";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import {
   Map as MapIcon,
@@ -20,6 +20,7 @@ import {
 } from "@/lib/hp-model";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
+import { AddToTripButton } from "./AddToTripButton";
 import { SocialMap } from "./SocialMap";
 import { PlaceStoryRail } from "./PlaceStoryRail";
 import { type PlaceStoryGroup } from "@/lib/hp/place-stories";
@@ -28,6 +29,14 @@ import { TrendingHero } from "./TrendingHero";
 import { buildActivityTicks } from "@/lib/hp/activity-data";
 import { ContentMenu } from "./ContentMenu";
 import { useModeration } from "./use-moderation";
+import type { MeetEvent } from "@/lib/hp/meet-types";
+import type { StoryItem } from "@/lib/hp-model";
+import type { PulseActivitySnapshot } from "@/lib/hp/pulse-activity";
+import {
+  isPublishedContent,
+  observationLabel,
+  postQualifiesTonight,
+} from "@/lib/hp/surface-freshness";
 import { displayPostTime, isRecentlyPosted } from "@/lib/hp/post-time";
 
 export function PulseFeed({
@@ -35,6 +44,9 @@ export function PulseFeed({
   storyGroups,
   activityTicks,
   trendingPlace,
+  activitySnapshot = {},
+  meetEvents = [],
+  stories = [],
   onOpenStory,
   likes,
   postLikes,
@@ -49,11 +61,16 @@ export function PulseFeed({
   findPlace,
   findAuthor,
   findPostAuthor,
+  previewMode = false,
+  nowMs = Date.now(),
 }: {
   posts: Post[];
   storyGroups: PlaceStoryGroup[];
   activityTicks: ReturnType<typeof buildActivityTicks>;
   trendingPlace: Place | null;
+  activitySnapshot?: PulseActivitySnapshot;
+  meetEvents?: MeetEvent[];
+  stories?: StoryItem[];
   onOpenStory: (placeId: string) => void;
   likes: Record<string, boolean>;
   postLikes: Record<string, number>;
@@ -64,36 +81,28 @@ export function PulseFeed({
   onOpenPost: (p: Post) => void;
   onOpenMap: (id: string) => void;
   onShare: (post: Post) => void;
-  onTrendingGoing: (place: Place) => void;
+  onTrendingGoing: (event: MeetEvent) => void;
   findPlace: (id: string) => Place | undefined;
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
+  /** Keep moderation and external sharing actions out of the local simulation. */
+  previewMode?: boolean;
+  nowMs?: number;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const moderation = useModeration();
-  const [filter, setFilter] = useState("Now");
-  const filters = ["Now", "Tonight", "Weekend", "Local tips"];
+  const [filter, setFilter] = useState(previewMode ? "All" : "Now");
+  const filters = previewMode
+    ? ["All", "Now", "Tonight", "Weekend", "Local tips"]
+    : ["Now", "Tonight", "Weekend", "Local tips"];
   const visiblePosts = posts.filter((post) => {
     const place = findPlace(post.placeId);
     const author = findPostAuthor(post);
     if (!place) return false;
     // Blocked authors are filtered server-side; muted ones are hidden here.
     if (moderation.isHidden(post.userId)) return false;
-    if (filter === "Now") {
-      return (
-        place.status === "busy" ||
-        place.status === "popular" ||
-        post.kind === "event" ||
-        isRecentlyPosted(post) ||
-        post.tags.some((tag) => ["live", "now", "packed", "busy"].includes(tag))
-      );
-    }
-    if (filter === "Tonight") {
-      return (
-        post.time.toLowerCase().includes("tonight") ||
-        post.tags.some((tag) => ["after", "night", "dj", "sunset"].includes(tag))
-      );
-    }
+    if (filter === "Now") return isPublishedContent(post) && isRecentlyPosted(post, nowMs);
+    if (filter === "Tonight") return postQualifiesTonight(post, meetEvents, nowMs);
     if (filter === "Weekend") {
       return place.tags.some((tag) => ["beach", "roadtrip", "village", "nature"].includes(tag));
     }
@@ -109,7 +118,7 @@ export function PulseFeed({
   });
   return (
     <div className="px-4 pb-28 pt-3">
-      <LiveTicker ticks={activityTicks} onOpenPlace={onOpenMap} />
+      <LiveTicker nowMs={nowMs} ticks={activityTicks} onOpenPlace={onOpenMap} />
       <PlaceStoryRail groups={storyGroups} onOpen={onOpenStory} />
 
       {/* Filter tabs */}
@@ -130,9 +139,13 @@ export function PulseFeed({
       {trendingPlace && (
         <TrendingHero
           place={trendingPlace}
-          index={0}
+          metric={activitySnapshot[trendingPlace.id]}
+          events={meetEvents}
+          stories={stories}
+          nowMs={nowMs}
           onOpen={(place) => onOpenMap(place.id)}
           onGoing={onTrendingGoing}
+          previewMode={previewMode}
         />
       )}
 
@@ -183,7 +196,11 @@ export function PulseFeed({
                     )}
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-hp-muted">
-                    <MapPin size={9} /> {p.name} · {displayPostTime(post)}
+                    <MapPin size={9} />{" "}
+                    <span title={observationLabel(post.createdAt, nowMs, language).exact}>
+                      {p.name}
+                    </span>{" "}
+                    · {displayPostTime(post, nowMs, language)}
                   </div>
                 </div>
                 <button
@@ -194,16 +211,18 @@ export function PulseFeed({
                 >
                   <Bookmark size={16} fill={sv ? "currentColor" : "none"} />
                 </button>
-                <ContentMenu
-                  target={{
-                    type: "post",
-                    id: post.id,
-                    authorUserId: post.userId,
-                    authorName: a.name,
-                    authorAvatarUrl: a.avatarUrl,
-                    summary: post.text,
-                  }}
-                />
+                {!previewMode && (
+                  <ContentMenu
+                    target={{
+                      type: "post",
+                      id: post.id,
+                      authorUserId: post.userId,
+                      authorName: a.name,
+                      authorAvatarUrl: a.avatarUrl,
+                      summary: post.text,
+                    }}
+                  />
+                )}
               </div>
 
               <button
@@ -260,20 +279,33 @@ export function PulseFeed({
                           })
                       : commentCount}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onShare(post)}
-                    aria-label={t("Share post")}
-                    className="inline-flex items-center"
-                  >
-                    <Share2 size={15} className="text-hp-ink/50" />
-                  </button>
+                  {!previewMode && (
+                    <button
+                      type="button"
+                      onClick={() => onShare(post)}
+                      aria-label={t("Share post")}
+                      className="inline-flex items-center"
+                    >
+                      <Share2 size={15} className="text-hp-ink/50" />
+                    </button>
+                  )}
+                  {!previewMode && (
+                    <AddToTripButton
+                      kind="place"
+                      id={p.id}
+                      name={p.name}
+                      compact
+                      className="hp-add-to-trip--small ml-auto"
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => onOpenMap(p.id)}
-                    className="ml-auto inline-flex items-center gap-1 rounded-full border border-hp-ink/10 px-2.5 py-1 text-[11px] font-semibold"
+                    aria-label={t("open on map")}
+                    className={`${previewMode ? "ml-auto " : ""}inline-flex min-h-[28px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-hp-ink/10 px-2.5 text-[11px] font-semibold`}
                   >
-                    <MapIcon size={12} /> {t("open on map")}
+                    {/* Short label so Trip and Map fit on one line beside likes and comments. */}
+                    <MapIcon size={12} /> {t("Map")}
                   </button>
                 </div>
               </div>
@@ -294,7 +326,7 @@ export function PulseFeed({
 // architecture. See HANDOFF.md > Known Limitations.
 const TEMP_FEATURED_PLACE_IDS = ["ancient-olympia"];
 
-// Shown only to Tourist identities, at the top of the Routes tab. Places only —
+// Shown to everyone at the top of the Routes tab. Places only —
 // route recommendations are already covered by the Routes tab's own "What we
 // recommend" (curated) section, so this deck deliberately does not repeat them.
 export function MustSeeTodayDeck({
@@ -331,6 +363,12 @@ export function MustSeeTodayDeck({
 
   if (mustSee.length === 0) return null;
 
+  // A row that glides without ever stopping, like a "our partners" strip: the list
+  // is repeated and the row slides by exactly one repeat, so the loop has no seam.
+  // Only the first copy is reachable by screen readers and keyboard. The motion
+  // itself lives in CSS (.hp-marquee).
+  const copies = mustSee.length < 2 ? 1 : Math.max(3, Math.ceil(18 / mustSee.length));
+
   return (
     <section className="mb-6 flex flex-col gap-3">
       <div>
@@ -342,33 +380,50 @@ export function MustSeeTodayDeck({
           {t("A quick first look for visitors — the spots to begin with.")}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {mustSee.map((place) => (
-          <button
-            key={place.id}
-            type="button"
-            onClick={() => onOpenPlace(place)}
-            aria-label={t("Open {place}", { place: place.name })}
-            className="overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
-          >
-            <ImageBox
-              src={place.imageUrl}
-              alt={place.name}
-              className="h-28 w-full"
-              rounded="rounded-none"
-            />
-            <div className="p-2">
-              <div
-                className="text-[10px] font-bold uppercase tracking-wider"
-                style={{ color: typeColor[place.type] }}
-              >
-                {place.type}
-              </div>
-              <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">{place.name}</div>
-              <div className="text-[10px] text-hp-muted">{place.area}</div>
+      <div className="hp-marquee">
+        <div
+          className="hp-marquee__track"
+          style={
+            {
+              "--hp-marquee-copies": copies,
+              "--hp-marquee-duration": `${mustSee.length * 7}s`,
+            } as CSSProperties
+          }
+        >
+          {Array.from({ length: copies }, (_, copy) => (
+            <div key={copy} className="hp-marquee__group" aria-hidden={copy > 0 || undefined}>
+              {mustSee.map((place) => (
+                <button
+                  key={place.id}
+                  type="button"
+                  tabIndex={copy > 0 ? -1 : undefined}
+                  onClick={() => onOpenPlace(place)}
+                  aria-label={t("Open {place}", { place: place.name })}
+                  className="hp-marquee__card overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
+                >
+                  <ImageBox
+                    src={place.imageUrl}
+                    alt={place.name}
+                    className="h-24 w-full"
+                    rounded="rounded-none"
+                  />
+                  <div className="p-2">
+                    <div
+                      className="text-[10px] font-bold uppercase tracking-wider"
+                      style={{ color: typeColor[place.type] }}
+                    >
+                      {place.type}
+                    </div>
+                    <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">
+                      {place.name}
+                    </div>
+                    <div className="text-[10px] text-hp-muted">{place.area}</div>
+                  </div>
+                </button>
+              ))}
             </div>
-          </button>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );

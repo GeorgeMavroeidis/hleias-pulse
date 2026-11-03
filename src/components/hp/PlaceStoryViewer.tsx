@@ -20,6 +20,8 @@ import {
   type PlaceStory,
   type PlaceStoryGroup,
 } from "@/lib/hp/place-stories";
+import { evaluateFreshness } from "@/lib/hp/freshness";
+import { observationLabel } from "@/lib/hp/surface-freshness";
 import { useI18n } from "@/lib/i18n";
 
 interface Props {
@@ -33,6 +35,8 @@ interface Props {
   onShare: (story: PlaceStory, group: PlaceStoryGroup) => void;
   onToggleSave?: (placeId: string) => void;
   savedPlaceIds?: string[];
+  previewMode?: boolean;
+  nowMs?: number;
 }
 
 const HOLD_TO_PAUSE_MS = 320;
@@ -107,7 +111,7 @@ function StoryProgressBar({
 }
 
 /* ---------- author chip ---------- */
-function AuthorChip({ story }: { story: PlaceStory }) {
+function AuthorChip({ story, nowMs }: { story: PlaceStory; nowMs: number }) {
   const { language, t } = useI18n();
   const color = STORY_AUTHOR_COLOR[story.authorType];
   return (
@@ -130,8 +134,11 @@ function AuthorChip({ story }: { story: PlaceStory }) {
             {t(STORY_AUTHOR_LABEL[story.authorType])}
           </span>
         </div>
-        <div className="text-[10px] font-semibold text-white/70">
-          {formatStoryTime(story.minutesAgo, story.createdAt, language)} ·{" "}
+        <div
+          title={observationLabel(story.createdAt, nowMs, language).exact}
+          className="text-[10px] font-semibold text-white/70"
+        >
+          {formatStoryTime(story.minutesAgo, story.createdAt, language, nowMs)} ·{" "}
           {t(STORY_KIND_LABEL[story.kind])}
         </div>
       </div>
@@ -140,8 +147,10 @@ function AuthorChip({ story }: { story: PlaceStory }) {
 }
 
 /* ---------- report chips (crowd / parking / condition) ---------- */
-function ReportChips({ story }: { story: PlaceStory }) {
+function ReportChips({ story, nowMs }: { story: PlaceStory; nowMs: number }) {
   const { t } = useI18n();
+  if (!story.currentReport || !evaluateFreshness({ observedAt: story.createdAt, nowMs }).isCurrent)
+    return null;
   const report = story.report;
   if (!report) return null;
   const chips: { label: string; value: string }[] = [];
@@ -239,10 +248,29 @@ export function PlaceStoryViewer({
   onShare,
   onToggleSave,
   savedPlaceIds = [],
+  previewMode = false,
+  nowMs = Date.now(),
 }: Props) {
   const { language, t } = useI18n();
   const reducedMotion = useReducedMotion();
-  const [viewerGroups] = useState(() => groups);
+  const [viewerOrder] = useState(() =>
+    groups.map((group) => ({
+      placeId: group.placeId,
+      storyIds: group.stories.map((story) => story.id),
+    })),
+  );
+  const viewerGroups = useMemo(
+    () =>
+      viewerOrder.flatMap((original) => {
+        const current = groups.find((group) => group.placeId === original.placeId);
+        if (!current) return [];
+        const stories = original.storyIds.flatMap((id) =>
+          current.stories.filter((story) => story.id === id),
+        );
+        return stories.length ? [{ ...current, stories }] : [];
+      }),
+    [groups, viewerOrder],
+  );
   const initialGroup = useMemo(() => {
     const idx = Math.max(
       0,
@@ -266,6 +294,10 @@ export function PlaceStoryViewer({
   const [transitionDirection, setTransitionDirection] = useState(1);
 
   const group = viewerGroups[groupIndex];
+  useEffect(() => {
+    if (group && storyIndex >= group.stories.length)
+      setStoryIndex(Math.max(0, group.stories.length - 1));
+  }, [group, storyIndex]);
   const story = group?.stories[storyIndex];
 
   // Keep index bounds safe even if the viewer opens with stale or empty story data.
@@ -280,10 +312,13 @@ export function PlaceStoryViewer({
     }
   }, [groupIndex, onClose, viewerGroups.length]);
 
-  // Mark the active story seen.
+  // A seen-state rerender must not restart this effect or its active story.
+  const markSeenRef = useRef(markSeen);
+  markSeenRef.current = markSeen;
+  const activeStoryId = story?.id;
   useEffect(() => {
-    if (story) markSeen([story.id]);
-  }, [story, markSeen]);
+    if (activeStoryId) markSeenRef.current([activeStoryId]);
+  }, [activeStoryId]);
 
   const goToGroup = useCallback(
     (nextGroupIndex: number, storyPos: number, direction: number) => {
@@ -595,14 +630,14 @@ export function PlaceStoryViewer({
             {!atEnd && (
               <div className="absolute inset-x-0 bottom-0 z-[7] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10">
                 <div className="mb-3">
-                  <AuthorChip story={story} />
+                  <AuthorChip story={story} nowMs={nowMs} />
                 </div>
                 {story.caption && (
                   <p className="mb-2.5 text-[14px] font-medium leading-snug text-white">
                     {story.caption}
                   </p>
                 )}
-                <ReportChips story={story} />
+                <ReportChips story={story} nowMs={nowMs} />
 
                 {/* action row */}
                 <div className="mt-3 flex items-center gap-2">
@@ -638,28 +673,32 @@ export function PlaceStoryViewer({
                       <Bookmark size={15} fill={saved ? "currentColor" : "none"} />
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => onShare(story, group)}
-                    aria-label={language === "GR" ? "Κοινοποίηση story" : "Share story"}
-                    className="grid h-10 w-10 place-items-center rounded-full border border-white/30 text-white backdrop-blur-sm"
-                  >
-                    <Share2 size={15} />
-                  </button>
-                  <ContentMenu
-                    tone="light"
-                    placement="above"
-                    onOpenChange={setMenuOpen}
-                    className="[&>button]:h-10 [&>button]:w-10"
-                    target={{
-                      type: "story",
-                      id: story.id,
-                      authorUserId: story.userId,
-                      authorName: story.authorName,
-                      authorAvatarUrl: story.authorAvatarUrl,
-                      summary: story.caption || group.placeName,
-                    }}
-                  />
+                  {!previewMode && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onShare(story, group)}
+                        aria-label={language === "GR" ? "Κοινοποίηση story" : "Share story"}
+                        className="grid h-10 w-10 place-items-center rounded-full border border-white/30 text-white backdrop-blur-sm"
+                      >
+                        <Share2 size={15} />
+                      </button>
+                      <ContentMenu
+                        tone="light"
+                        placement="above"
+                        onOpenChange={setMenuOpen}
+                        className="[&>button]:h-10 [&>button]:w-10"
+                        target={{
+                          type: "story",
+                          id: story.id,
+                          authorUserId: story.userId,
+                          authorName: story.authorName,
+                          authorAvatarUrl: story.authorAvatarUrl,
+                          summary: story.caption || group.placeName,
+                        }}
+                      />
+                    </>
+                  )}
                 </div>
                 <p className="mt-2 text-center text-[9px] font-medium text-white/40">
                   {language === "GR"

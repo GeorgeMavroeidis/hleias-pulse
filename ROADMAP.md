@@ -37,12 +37,34 @@ the web build first and the iOS app during the season.
 
 ---
 
-## Appearance improvement — in progress
+## Appearance and reliability integration
 
-App-wide Light / Dark / System preferences and matching map colors are implemented
-on `feat/dark-mode` and under review in PR #102. Delivery is the local preview and
-PR; live publication is deferred by the product owner. Preference is device-local;
-no database migration or paid service is needed.
+The [final design review](docs/final-design-review.md) and
+[GitHub inventory #105](https://github.com/GeorgeMavroeidis/hleias-pulse/issues/105)
+now compare current main, assembled #100 (including #103), and the shared
+`margaris/trip-map-pulse` implementation. Existing PRs are grouped and retain
+their dependency chain. Place Directions / Οδηγίες is prepared as a focused
+follow-on to #100. The final visual choice, combined release acceptance and
+human main merges remain open.
+
+The simpler composer (#101) and app-wide Light / Dark / System preferences (#102)
+are merged into main. Appearance remains device-local; live publication is deferred.
+
+The existing reliability and map-design PRs are being consolidated in order,
+preserving those changes. The final integration combines explicit place selection,
+Athens Meet-time validation, comment drafts, recovery and shared freshness, compact
+markers, Pulse / Calm motion, discovery sheets and a single appearance/atmosphere
+map palette. Dark stays navy across time periods; Light retains its temporal colors.
+
+See [the integration handoff](docs/reliability-integration.md) for branch/worktree
+contents and the merge procedure. Combined acceptance is required before human
+merges. Account redesign and Trip implementation remain separate work; hosted
+database changes, deployment and historical-worktree cleanup are deferred.
+
+The [final marker pass](docs/final-map-markers.md) is prepared on a separate
+branch above the latest discovery integration: ordinary dots, selected/focused
+place photos and clean dot fallback. Focused browser acceptance is complete;
+review and human integration remain. No further map redesign is queued.
 
 ## Proposed direction — sell the app to a public body · ⚠️ not yet agreed
 

@@ -1,81 +1,4 @@
-/* Map overlays: reduced motion, story ring, ping, user dot, route, pin, night. */
-
-@media (prefers-reduced-motion: reduce) {
-  :is(.hp-marker-core, .hp-marker-field, .hp-marker-wave, .hp-marker-sweep),
-  .hp-marker-wave::before,
-  .hp-marker-wave::after,
-  .hp-marker-core::after {
-    animation: none !important;
-    will-change: auto !important;
-  }
-
-  :is(
-      .hp-app-shell[data-marker-animation-theme="calm"] :where(.hp-real-map),
-      .hp-animation-theme-option[data-theme-preview="calm"]
-    )
-    .hp-marker-field {
-    opacity: 0.52;
-    transform: scale(1.04);
-  }
-
-  :is(
-      .hp-app-shell[data-marker-animation-theme="calm"] :where(.hp-real-map),
-      .hp-animation-theme-option[data-theme-preview="calm"]
-    )
-    .is-selected
-    .hp-marker-field {
-    opacity: 0.64;
-  }
-
-  :is(
-      .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
-      .hp-animation-theme-option[data-theme-preview="pulse"]
-    )
-    .hp-marker-wave::before {
-    opacity: 0.72;
-    transform: scale(1.18);
-  }
-
-  :is(
-      .hp-app-shell[data-marker-animation-theme="pulse"] :where(.hp-real-map),
-      .hp-animation-theme-option[data-theme-preview="pulse"]
-    )
-    .hp-marker-wave::after {
-    opacity: 0.48;
-    transform: scale(1.4);
-  }
-
-  :is(
-      .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
-      .hp-animation-theme-option[data-theme-preview="signal"]
-    )
-    .hp-marker-wave::before {
-    opacity: 0.7;
-    transform: scale(1.18);
-  }
-
-  :is(
-      .hp-app-shell[data-marker-animation-theme="signal"] :where(.hp-real-map),
-      .hp-animation-theme-option[data-theme-preview="signal"]
-    )
-    .hp-marker-sweep {
-    opacity: 0.75;
-    transform: rotate(-42deg);
-  }
-}
-
-.hp-child-marker__story-ring {
-  position: absolute;
-  inset: -0.5rem;
-  z-index: 0;
-  border-radius: 9999px;
-  border: 2px solid transparent;
-  background:
-    linear-gradient(var(--hp-paper), var(--hp-paper)) padding-box,
-    linear-gradient(135deg, #f0a85f 0%, #9b6fe6 100%) border-box;
-  opacity: var(--hp-map-rich);
-  transition: opacity 90ms linear;
-}
+/* Existing user, route, pin and dormant night overlays. */
 
 .hp-user-dot {
   position: relative;
@@ -148,18 +71,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hp-area-marker__shell,
-  .hp-child-marker__shell,
-  .hp-area-marker__collage,
-  .hp-child-marker__media,
-  .hp-area-marker__copy,
-  .hp-child-marker__copy,
-  .hp-area-marker__status,
-  .hp-child-marker__status,
-  .hp-area-marker__avatars,
-  .hp-child-marker__avatars {
-    transition: none;
-  }
   .hp-live-ping,
   .hp-user-dot::after,
   .hp-real-map .hp-route-line,

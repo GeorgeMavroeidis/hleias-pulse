@@ -9,6 +9,7 @@ export default tseslint.config(
   {
     ignores: [
       "cloudflare-static-dist",
+      "local-test-dist",
       "dist",
       ".output",
       ".tanstack",

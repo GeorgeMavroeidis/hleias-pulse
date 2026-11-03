@@ -27,14 +27,6 @@
   scrollbar-width: none;
 }
 
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--hp-sunset) !important;
-  outline-offset: 2px !important;
-}
-
 @media (pointer: coarse) {
   input,
   textarea,
@@ -53,4 +45,11 @@ select:focus-visible {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.hp-image-reveal {
+  transition: opacity var(--hp-motion-content) var(--hp-ease-out);
+}
+.hp-image-loading {
+  background: color-mix(in srgb, var(--hp-ink) 6%, transparent);
 }

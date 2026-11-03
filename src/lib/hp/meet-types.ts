@@ -19,6 +19,7 @@ export type MeetCategory =
 export type RsvpStatus = "going" | "maybe";
 
 export interface MeetEvent {
+  moderationStatus?: string;
   id: string;
   title: string;
   placeId: string;

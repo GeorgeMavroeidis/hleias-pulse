@@ -1,4 +1,5 @@
 import { MustSeeTodayDeck } from "./PulseFeed";
+import { AddToTripButton } from "./AddToTripButton";
 import { Capacitor } from "@capacitor/core";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
@@ -59,13 +60,13 @@ function RouteCard({
   onOpenRoute: (route: RouteItem) => void;
 }) {
   return (
-    <motion.button
-      type="button"
+    // An article, not a button: it holds two controls ("Read route" and "Add to
+    // my trip"). Tapping anywhere else on the card still opens the route.
+    <motion.article
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={() => onOpenRoute(route)}
-      aria-label={`Read route ${route.title}`}
-      className="overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper text-left"
+      className="cursor-pointer overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper text-left"
     >
       <div className="relative">
         <ImageBox
@@ -131,11 +132,22 @@ function RouteCard({
             </span>
           </span>
         </div>
-        <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-hp-ink px-4 py-2 text-[12px] font-bold text-hp-paper">
-          Read route
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenRoute(route);
+            }}
+            aria-label={`Read route ${route.title}`}
+            className="inline-flex min-h-[40px] items-center gap-1 rounded-full bg-hp-ink px-4 text-[12px] font-bold text-hp-paper"
+          >
+            Read route
+          </button>
+          <AddToTripButton kind="route" id={route.id} name={route.title} className="px-4" />
         </div>
       </div>
-    </motion.button>
+    </motion.article>
   );
 }
 

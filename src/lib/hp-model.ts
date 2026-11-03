@@ -20,6 +20,8 @@ export interface Author {
 }
 
 export interface Comment {
+  id?: string;
+  moderationStatus?: string;
   author: string;
   text: string;
   createdAt?: string | null;
@@ -59,6 +61,7 @@ export interface Place {
 }
 
 export interface Post {
+  moderationStatus?: string;
   id: string;
   authorId: string;
   placeId: string;
@@ -121,6 +124,7 @@ export interface RouteItem {
 }
 
 export interface StoryItem {
+  moderationStatus?: string;
   id: string;
   label: string;
   placeId: string;

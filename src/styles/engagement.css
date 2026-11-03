@@ -220,6 +220,9 @@
   --hp-paper: #211b3a;
   --hp-ink: #f3ecdc;
   --hp-muted: #a79fc4;
+  --hp-text-secondary: #c5bcb0;
+  --hp-text-accent: #ffb68c;
+  --hp-focus-color: var(--hp-sea);
 }
 .hp-app-shell.is-night .hp-real-map .maplibregl-canvas {
   filter: invert(1) hue-rotate(180deg) brightness(0.92) saturate(0.7);
@@ -265,25 +268,55 @@ h3 {
   }
 }
 
-/* TopBar "Deals" pill: a subtle, periodic attention pulse — a soft sunset
-   glow plus a micro-bounce that rests for most of the cycle, so it draws
-   the eye toward offers without nagging. */
-.hp-deals-pill {
-  animation: hp-deals-pulse 3.4s ease-in-out infinite;
+/* Must-see strip. It glides for everyone, including viewers with reduced motion
+   turned on (a product decision, so the !important overrides utilities.css): it is
+   slow, stays in one row, and hover or a held finger pauses it so a card can be
+   tapped. Keyboard focus swaps it for a still row so the focused card stays in view. */
+.hp-marquee {
+  overflow-x: clip;
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
 }
-@keyframes hp-deals-pulse {
-  0%,
-  68%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--hp-sunset) 0%, transparent);
+.hp-marquee:has(:focus-visible) {
+  overflow-x: auto;
+  mask-image: none;
+  scrollbar-width: none;
+}
+.hp-marquee:has(:focus-visible)::-webkit-scrollbar {
+  display: none;
+}
+.hp-marquee__track {
+  display: flex;
+  width: max-content;
+  animation: hp-marquee-slide linear;
+  animation-duration: var(--hp-marquee-duration) !important;
+  animation-iteration-count: infinite !important;
+}
+.hp-marquee:has(:focus-visible) .hp-marquee__track {
+  animation: none !important;
+}
+.hp-marquee__group {
+  display: flex;
+  flex-shrink: 0;
+  gap: 12px;
+  padding-right: 12px;
+}
+.hp-marquee:has(:focus-visible) .hp-marquee__group[aria-hidden="true"] {
+  display: none;
+}
+.hp-marquee__card {
+  flex-shrink: 0;
+  width: 176px;
+}
+.hp-marquee:active .hp-marquee__track {
+  animation-play-state: paused;
+}
+@media (hover: hover) {
+  .hp-marquee:hover .hp-marquee__track {
+    animation-play-state: paused;
   }
-  78% {
-    transform: scale(1.06);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--hp-sunset) 22%, transparent);
-  }
-  88% {
-    transform: scale(0.99);
-    box-shadow: 0 0 0 7px color-mix(in srgb, var(--hp-sunset) 0%, transparent);
+}
+@keyframes hp-marquee-slide {
+  to {
+    transform: translate3d(calc(-100% / var(--hp-marquee-copies)), 0, 0);
   }
 }

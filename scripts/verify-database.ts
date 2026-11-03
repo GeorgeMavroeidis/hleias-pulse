@@ -217,7 +217,10 @@ async function runSmoke(script: string) {
 for (const script of [
   "smoke:auth-profile",
   "smoke:post-write",
+  "smoke:comment-drafts",
   "smoke:live-surfaces",
+  "smoke:meet-time",
+  "smoke:story-freshness",
   "smoke:moderation",
   "smoke:block-enforcement",
   "smoke:deal-race",
@@ -226,6 +229,7 @@ for (const script of [
   "smoke:routes",
   "smoke:route-preview",
   "smoke:saved-items",
+  "smoke:seed-comments",
   "smoke:push-security",
 ])
   await runSmoke(script);

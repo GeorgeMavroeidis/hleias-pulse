@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarHeart,
@@ -20,6 +20,7 @@ import {
   type MeetEvent,
   type RsvpStatus,
 } from "@/lib/hp/meet-types";
+import { meetPhase } from "@/lib/hp/surface-freshness";
 import { EventCard } from "./EventCard";
 import { useModeration } from "./use-moderation";
 import { useI18n } from "@/lib/i18n";
@@ -38,31 +39,41 @@ const CATEGORY_ICONS: Record<MeetCategory, LucideIcon> = {
 };
 
 interface Props {
+  focusEventId?: string | null;
   events: MeetEvent[];
   rsvp: Record<string, RsvpStatus>;
   findPlace: (id: string) => Place | undefined;
   onToggleRsvp: (event: MeetEvent, next: RsvpStatus) => void;
   onOpenPlace: (placeId: string) => void;
   onCreate: () => void;
+  previewMode?: boolean;
+  nowMs?: number;
 }
 
 export function MeetScreen({
+  focusEventId,
   events,
   rsvp,
   findPlace,
   onToggleRsvp,
   onOpenPlace,
   onCreate,
+  previewMode = false,
+  nowMs = Date.now(),
 }: Props) {
   const { t } = useI18n();
   const moderation = useModeration();
   const [filter, setFilter] = useState<Filter>("all");
+  const focusedEventRef = useRef<HTMLDivElement>(null);
+  const focusedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    focusedIdRef.current = null;
+    if (focusEventId) setFilter("all");
+  }, [focusEventId]);
 
   const filtered = useMemo(() => {
-    const now = Date.now();
     return (
       events
-        .filter((e) => +new Date(e.happensAt) >= now - 60 * 60 * 1000) // hide long-past
         // Blocked hosts are filtered server-side; muted ones are hidden here.
         .filter((e) => !moderation.isHidden(e.userId))
         .filter((e) => {
@@ -70,9 +81,26 @@ export function MeetScreen({
           if (filter === "mine") return rsvp[e.id] === "going" || rsvp[e.id] === "maybe";
           return e.category === filter;
         })
-        .sort((a, b) => +new Date(a.happensAt) - +new Date(b.happensAt))
+        .sort(
+          (a, b) =>
+            Number(meetPhase(a, nowMs) === "ended") - Number(meetPhase(b, nowMs) === "ended") ||
+            +new Date(a.happensAt) - +new Date(b.happensAt),
+        )
     );
-  }, [events, filter, moderation, rsvp]);
+  }, [events, filter, moderation, rsvp, nowMs]);
+
+  useEffect(() => {
+    if (!focusEventId || filter !== "all" || focusedIdRef.current === focusEventId) return;
+    if (!focusedEventRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      const target = focusedEventRef.current;
+      if (!target || target.dataset.discoveryEvent !== focusEventId) return;
+      target.scrollIntoView({ block: "center", behavior: "instant" });
+      target.focus({ preventScroll: true });
+      focusedIdRef.current = focusEventId;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusEventId, filter, filtered]);
 
   const mineCount = events.filter((e) => rsvp[e.id]).length;
 
@@ -143,14 +171,27 @@ export function MeetScreen({
           <div className="flex flex-col gap-3.5">
             <AnimatePresence initial={false}>
               {filtered.map((event) => (
-                <EventCard
+                <div
                   key={event.id}
-                  event={event}
-                  placeName={findPlace(event.placeId)?.name ?? "Ilia"}
-                  status={rsvp[event.id] ?? null}
-                  onToggle={onToggleRsvp}
-                  onOpenPlace={onOpenPlace}
-                />
+                  ref={event.id === focusEventId ? focusedEventRef : undefined}
+                  tabIndex={event.id === focusEventId ? -1 : undefined}
+                  data-discovery-event={event.id}
+                  className={
+                    event.id === focusEventId
+                      ? "rounded-2xl focus:outline-2 focus:outline-hp-sunset"
+                      : undefined
+                  }
+                >
+                  <EventCard
+                    event={event}
+                    placeName={findPlace(event.placeId)?.name ?? "Ilia"}
+                    status={rsvp[event.id] ?? null}
+                    onToggle={onToggleRsvp}
+                    onOpenPlace={onOpenPlace}
+                    previewMode={previewMode}
+                    nowMs={nowMs}
+                  />
+                </div>
               ))}
             </AnimatePresence>
           </div>
@@ -158,18 +199,20 @@ export function MeetScreen({
       </div>
 
       {/* Host FAB */}
-      <motion.button
-        type="button"
-        whileTap={{ scale: 0.92 }}
-        initial={{ opacity: 0, scale: 0.86, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        onClick={onCreate}
-        className="absolute right-4 bottom-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-hp-sunset px-4 py-3 text-hp-paper shadow-[0_12px_28px_rgba(224,106,50,0.45)]"
-        aria-label={t("Host a gathering")}
-      >
-        <Plus size={18} strokeWidth={2.6} />
-        <span className="text-[13px] font-black">{t("Host")}</span>
-      </motion.button>
+      {!previewMode && (
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.92 }}
+          initial={{ opacity: 0, scale: 0.86, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          onClick={onCreate}
+          className="absolute right-4 bottom-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-hp-sunset px-4 py-3 text-hp-paper shadow-[0_12px_28px_rgba(224,106,50,0.45)]"
+          aria-label={t("Host a gathering")}
+        >
+          <Plus size={18} strokeWidth={2.6} />
+          <span className="text-[13px] font-black">{t("Host")}</span>
+        </motion.button>
+      )}
     </div>
   );
 }

@@ -1,16 +1,17 @@
 import { useTheme } from "@/lib/theme-provider";
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Search, Check, Gift, Palette } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Search, Check, Gift, Palette, X } from "lucide-react";
 import { type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 import { AccountBubble } from "./AuthAccountSheets";
 import { DISCOVERY_LENSES, type DiscoveryLens } from "@/lib/hp/discovery";
 import {
-  type MarkerAnimationTheme,
+  type MarkerMotion,
   DISCOVERY_LENS_LABEL,
   HP_TRANSITION,
-  MARKER_ANIMATION_THEMES,
+  MARKER_MOTION_OPTIONS,
 } from "./pulse-shared";
 
 export function Toast({ msg }: { msg: string | null }) {
@@ -37,8 +38,8 @@ interface TopBarProps {
   query: string;
   setQuery: (query: string) => void;
   onSetLanguage: (language: "GR" | "EN") => void;
-  animationTheme: MarkerAnimationTheme;
-  onSetAnimationTheme: (theme: MarkerAnimationTheme) => void;
+  markerMotion: MarkerMotion;
+  onSetMarkerMotion: (theme: MarkerMotion) => void;
   appearanceOpen: boolean;
   setAppearanceOpen: Dispatch<SetStateAction<boolean>>;
   showSearch: boolean;
@@ -53,8 +54,8 @@ export function TopBar({
   query,
   setQuery,
   onSetLanguage,
-  animationTheme,
-  onSetAnimationTheme,
+  markerMotion,
+  onSetMarkerMotion,
   appearanceOpen,
   setAppearanceOpen,
   showSearch,
@@ -65,12 +66,13 @@ export function TopBar({
   onOpenDeals,
 }: TopBarProps) {
   const { language, t } = useI18n();
+  const reducedMotion = useReducedMotion();
   const { preference, setPreference } = useTheme();
   const searchActive = showSearch || query.trim().length > 0;
-  const activeAnimationTheme =
-    MARKER_ANIMATION_THEMES.find((theme) => theme.id === animationTheme) ??
-    MARKER_ANIMATION_THEMES[0];
+  const activeMarkerMotion =
+    MARKER_MOTION_OPTIONS.find((theme) => theme.id === markerMotion) ?? MARKER_MOTION_OPTIONS[0];
   const appearanceButtonRef = useRef<HTMLButtonElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
   const appearanceMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,6 +91,8 @@ export function TopBar({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
       setAppearanceOpen(false);
       appearanceButtonRef.current?.focus();
     };
@@ -102,65 +106,70 @@ export function TopBar({
   }, [appearanceOpen, setAppearanceOpen]);
 
   return (
-    <div className="relative z-[60] border-b border-hp-ink/10 bg-hp-paper/95">
-      <div className="hp-safe-px flex items-center justify-between pt-2.5">
-        <div className="flex items-center gap-2.5" aria-label="ΗΛΕΙΑ PULSE">
+    <div className="hp-topbar relative z-[60]">
+      <div className="hp-topbar-row hp-safe-px">
+        <div className="hp-topbar-brand" aria-label="ΗΛΕΙΑ PULSE">
           <img
             src="/brand/ilia-pulse-logo.png"
             alt=""
             width={38}
             height={38}
             aria-hidden="true"
-            className="h-10 w-10 rounded-xl bg-hp-paper object-contain"
+            className="hp-topbar-logo"
           />
           <div className="hp-brand leading-[0.85]">
             <div className="text-[14px] font-black tracking-[0.04em] text-hp-ink">ΗΛΕΙΑ</div>
             <div className="text-[14px] font-black tracking-[0.18em] text-hp-sunset">PULSE</div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="hp-topbar-actions">
           <button
             type="button"
             onClick={onOpenDeals}
-            className="hp-deals-pill inline-flex items-center gap-1 rounded-full border border-hp-sunset/30 bg-hp-sunset/10 px-2.5 py-1.5 text-[11px] font-bold text-hp-sunset"
+            className="hp-deals-action"
             aria-label={t("Open deals")}
           >
-            <Gift size={13} strokeWidth={2.6} />
-            {t("Deals")}
+            <Gift size={17} strokeWidth={2} aria-hidden="true" />
+            <span className="hp-deals-action-label">{t("Deals")}</span>
           </button>
-          <button
+          <Button
+            variant="hpGhost"
+            size="hpIcon"
+            ref={searchButtonRef}
             type="button"
             onClick={() => {
               setAppearanceOpen(false);
               setShowSearch((s) => !s);
             }}
-            className={`hp-icon-button hp-topbar-search h-9 w-9 ${searchActive ? "is-active" : ""} ${query.trim() ? "has-query" : ""}`}
+            className={`hp-topbar-search ${searchActive ? "is-active" : ""} ${query.trim() ? "has-query" : ""}`}
             aria-label={t(showSearch ? "Close search" : "Open search")}
             aria-expanded={showSearch}
             aria-pressed={searchActive}
           >
-            <Search size={16} strokeWidth={2.2} />
-          </button>
-          <button
+            <Search size={18} strokeWidth={2} aria-hidden="true" />
+          </Button>
+          <Button
+            variant="hpGhost"
+            size="hpIcon"
             ref={appearanceButtonRef}
             type="button"
             onClick={() => {
               setShowSearch(false);
               setAppearanceOpen((open) => !open);
             }}
-            className={`hp-icon-button hp-appearance-trigger h-9 w-9 ${appearanceOpen ? "is-active" : ""}`}
+            className={`hp-appearance-trigger ${appearanceOpen ? "is-active" : ""}`}
             aria-label={t(appearanceOpen ? "Close appearance menu" : "Open appearance menu")}
             aria-expanded={appearanceOpen}
             aria-controls="hp-appearance-menu"
-            data-active-theme={animationTheme}
+            data-marker-motion={markerMotion}
           >
-            <Palette size={16} strokeWidth={2.2} />
-          </button>
+            <Palette size={18} strokeWidth={2} aria-hidden="true" />
+          </Button>
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
-      <div className="hp-safe-px pb-1.5 pt-0.5">
-        <p className="text-[12px] text-hp-muted">{t("Local spots, routes, and tips.")}</p>
+      <div className="hp-topbar-subtitle hp-safe-px">
+        <p className="hp-topbar-subtitle-copy">{t("Local spots, routes, and tips.")}</p>
       </div>
       <AnimatePresence>
         {appearanceOpen && (
@@ -172,7 +181,7 @@ export function TopBar({
             initial={{ opacity: 0, y: -4, scale: 0.99 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -3, scale: 0.99 }}
-            transition={HP_TRANSITION.state}
+            transition={reducedMotion ? { duration: 0 } : HP_TRANSITION.state}
             className="hp-appearance-menu"
           >
             <fieldset className="hp-appearance-section hp-color-scheme">
@@ -213,35 +222,35 @@ export function TopBar({
 
             <div className="hp-appearance-section">
               <div className="hp-appearance-section-heading">
-                <span className="hp-appearance-label">{t("Marker animation")}</span>
+                <span className="hp-appearance-label">{t("Marker motion")}</span>
                 <span className="hp-animation-theme-current" aria-live="polite">
-                  {t("Current: {theme}", { theme: activeAnimationTheme.label })}
+                  {t("Current: {theme}", { theme: activeMarkerMotion.label })}
                 </span>
               </div>
               <div
                 className="hp-animation-theme-options"
                 role="radiogroup"
-                aria-label={t("Marker animation")}
+                aria-label={t("Marker motion")}
               >
-                {MARKER_ANIMATION_THEMES.map((theme) => {
-                  const selected = animationTheme === theme.id;
+                {MARKER_MOTION_OPTIONS.map((theme) => {
+                  const selected = markerMotion === theme.id;
                   return (
                     <button
                       key={theme.id}
                       type="button"
                       role="radio"
                       aria-checked={selected}
-                      onClick={() => onSetAnimationTheme(theme.id)}
+                      onClick={() => onSetMarkerMotion(theme.id)}
                       className="hp-animation-theme-option"
-                      data-theme-preview={theme.id}
+                      data-marker-motion={theme.id}
                     >
-                      <span className="hp-animation-theme-preview is-pulse-hot" aria-hidden="true">
-                        <span className="hp-marker-effects">
-                          <span className="hp-marker-field" />
-                          <span className="hp-marker-wave" />
-                          <span className="hp-marker-sweep" />
-                        </span>
-                        <span className="hp-marker-core hp-animation-theme-preview__core" />
+                      <span
+                        className="hp-pulse-preview"
+                        data-pulse-level="active"
+                        aria-hidden="true"
+                      >
+                        <span className="hp-pulse-ring" />
+                        <span className="hp-pulse-core" />
                       </span>
                       <span className="hp-animation-theme-copy">
                         <strong>{theme.label}</strong>
@@ -264,10 +273,10 @@ export function TopBar({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={HP_TRANSITION.state}
+            transition={reducedMotion ? { duration: 0 } : HP_TRANSITION.state}
             className="hp-safe-px overflow-hidden"
           >
-            <div className="hp-search-field mb-2 flex items-center gap-2 rounded-full border border-hp-ink/10 px-3 py-2">
+            <div className="hp-search-field mb-2 flex items-center gap-2 px-3 py-2">
               <Search size={14} className="text-hp-muted" />
               <input
                 name="hp-search"
@@ -286,6 +295,32 @@ export function TopBar({
           </motion.div>
         )}
       </AnimatePresence>
+      {query.trim() && (
+        <div
+          className="hp-safe-px flex min-w-0 items-center gap-2 pb-2"
+          role="group"
+          aria-label={t("Active search")}
+        >
+          <span
+            className="min-w-0 truncate rounded-full bg-hp-ink/5 px-3 py-1.5 text-[12px] text-hp-ink"
+            title={query}
+          >
+            {t("Search: {query}", { query })}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              searchButtonRef.current?.focus();
+            }}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-hp-ink/15 px-2.5 py-2 text-[11px] font-bold text-hp-ink"
+            aria-label={t("Clear search")}
+          >
+            <X size={12} aria-hidden="true" />
+            {t("Clear search")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -330,7 +365,7 @@ export function DiscoveryLensRail({
   const { t } = useI18n();
   return (
     <div
-      className="hp-discovery-lens-rail hp-no-scrollbar hp-safe-px flex gap-2 overflow-x-auto border-b border-hp-ink/10 bg-hp-paper py-2"
+      className="hp-discovery-lens-rail hp-no-scrollbar hp-safe-px"
       role="group"
       aria-label={t("Map discovery lenses")}
     >
@@ -342,7 +377,7 @@ export function DiscoveryLensRail({
             type="button"
             onClick={() => onChange(selected ? null : lens)}
             aria-pressed={selected}
-            className={`hp-chip hp-discovery-lens shrink-0 text-[12px] ${selected ? "is-active" : ""}`}
+            className={`hp-discovery-lens ${selected ? "is-active" : ""}`}
           >
             {t(DISCOVERY_LENS_LABEL[lens])}
           </button>

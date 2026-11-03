@@ -15,12 +15,22 @@ import { type PulseAccountProfile, type PulseAccountState } from "@/lib/hp-auth"
 import { type PlaceStory } from "@/lib/hp/place-stories";
 import { type AreaState, type SignalQuality } from "@/lib/hp/area-intelligence";
 import { type DiscoveryLens } from "@/lib/hp/discovery";
+import { readMarkerMotionPreference, type MarkerMotion } from "@/lib/hp/marker-motion";
 
-export type Tab = "map" | "pulse" | "routes" | "meet" | "saved" | "deals";
-export type NavTab = Exclude<Tab, "saved" | "deals">;
+export type Tab =
+  | "map"
+  | "pulse"
+  | "routes"
+  | "meet"
+  | "saved"
+  | "deals"
+  | "essentials"
+  | "quicklook"
+  | "trip";
+export type NavTab = Exclude<Tab, "saved" | "deals" | "essentials" | "quicklook" | "trip">;
 export type MeetSubTab = "community" | "events";
 export type ComposerMode = "post" | "place" | "story" | "event" | "question";
-export type MarkerAnimationTheme = "calm" | "pulse" | "signal";
+export type { MarkerMotion } from "@/lib/hp/marker-motion";
 export type CreateStoryInput = {
   placeId: string;
   caption: string;
@@ -76,45 +86,17 @@ export const TAB_ITEMS: { id: NavTab; label: string; Icon: LucideIcon }[] = [
   { id: "routes", label: "Routes", Icon: RouteIcon },
   { id: "meet", label: "Meet", Icon: CalendarHeart },
 ];
-export const HP_EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
-export const HP_EASE_STANDARD: [number, number, number, number] = [0.2, 0.8, 0.2, 1];
-export const HP_TRANSITION = {
-  press: { duration: 0.08, ease: HP_EASE_STANDARD },
-  micro: { duration: 0.12, ease: HP_EASE_STANDARD },
-  state: { duration: 0.16, ease: HP_EASE_STANDARD },
-  panel: { duration: 0.24, ease: HP_EASE_OUT },
-  spatial: { duration: 0.32, ease: HP_EASE_OUT },
-  tab: { duration: 0.18, ease: HP_EASE_OUT },
-  sheetContent: { duration: 0.19, ease: HP_EASE_OUT },
-} as const;
-export const MARKER_ANIMATION_THEME_STORAGE_KEY = "hp.marker-animation-theme.v1";
-export const MARKER_ANIMATION_THEMES: {
-  id: MarkerAnimationTheme;
-  label: string;
-  description: string;
-}[] = [
-  {
-    id: "pulse",
-    label: "Pulse Coast",
-    description: "Coral and amber ripples with a lively heartbeat.",
-  },
-  {
-    id: "signal",
-    label: "Night Signal",
-    description: "Violet and cyan signals with a pulsing core.",
-  },
-  {
-    id: "calm",
-    label: "Aegean Calm",
-    description: "Aqua light and a slow, calm breath.",
-  },
+export { HP_EASE_OUT, HP_EASE_STANDARD, HP_TRANSITION } from "@/lib/hp/motion";
+export const MARKER_MOTION_OPTIONS: { id: MarkerMotion; label: string; description: string }[] = [
+  { id: "pulse", label: "Pulse", description: "Restrained rings for recent community activity." },
+  { id: "calm", label: "Calm", description: "The same Pulse identity, with slower motion." },
 ];
 
-export function initialMarkerAnimationTheme(): MarkerAnimationTheme {
-  if (typeof window === "undefined") return "pulse";
+export function initialMarkerMotion(): MarkerMotion {
   try {
-    const stored = window.localStorage.getItem(MARKER_ANIMATION_THEME_STORAGE_KEY);
-    return stored === "calm" || stored === "signal" || stored === "pulse" ? stored : "pulse";
+    return readMarkerMotionPreference(
+      typeof window === "undefined" ? undefined : window.localStorage,
+    );
   } catch {
     return "pulse";
   }
@@ -139,7 +121,10 @@ export const isTab = (value: string | null): value is Tab =>
   value === "routes" ||
   value === "meet" ||
   value === "saved" ||
-  value === "deals";
+  value === "deals" ||
+  value === "essentials" ||
+  value === "quicklook" ||
+  value === "trip";
 
 export const truncateShareText = (text: string) =>
   text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;

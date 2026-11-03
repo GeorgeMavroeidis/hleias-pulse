@@ -19,6 +19,44 @@
 - Village/area identity next to a user's name (e.g. "Local · Πύργος") instead
   of just the generic LOCAL/GUIDE/BUSINESS badge — cheap, free, and a real
   trust signal for tourists. Flagged 2026-09-07.
+- **Later — a trip that follows the user (Margaris, 2026-11-01).** The Trip
+  plan lives only on the device (`localStorage`, `hp.trip-plan.v1`): a new
+  phone or cleared site data loses it. Syncing it needs a table (+ RLS) and a
+  privacy call, because a trip says where someone will be on which day.
+  Decide together before building.
+- **Check-in + exploration points (Margaris, 2026-11-01, liked, needs schema).**
+  GPS check-in within ~150 m of a place, storing only place + date, never a
+  location trail. Points for a visit / a photo / first in an area; rewards are
+  badges and Deals. Would replace the "Έχεις πάει;" card's posts-as-visited
+  guess, which Margaris finds inaccurate. Can build on the existing
+  `user_place_visits` table — see `docs/PROPOSAL_TRIP_SYNC_AND_CHECKINS.md`.
+- **Later — something for locals instead of "Έχεις πάει;" (Margaris,
+  2026-11-01).** The locals-only progress card at the top of Pulse ("4/17
+  ΜΕΡΗ", the north-west and mountain corners) was removed: Margaris did not
+  like it at all. The component (`LocalDiscoveryCard` in `PulseFeed.tsx`) and
+  the "I've been here" button in place details still exist. Think of a
+  different reason for locals to come back and post.
+- **Removed 2026-11-01 — distance on Pulse cards.** "14 χλμ · ~25′" on each
+  card and "nearest first" under Now were tried and taken out (not needed).
+  Distance stays in the Trip screen's near-me bar.
+- **Later — have a local check the area intros (Margaris, 2026-11-01).** The
+  one-line intros in `src/lib/hp/region-intros.ts` (16 areas, GR + EN) are
+  drafts written from general knowledge. Each shows "· προς έλεγχο" until a
+  local reads it and its `reviewed` flag is set to `true`. Do this before any
+  real user sees them.
+- **Later — directions and drive time (Margaris, 2026-11-01, undecided).**
+  Options weighed: (1) a "Directions" button that opens Google Maps with the
+  place as destination — free, no key, real roads and traffic (recommended);
+  (2) in-app drive time via the existing openrouteservice Edge Function — free
+  tier has a daily cap, and it is Mavroeidis's setup; (3) embedded Google Maps
+  — costs money, ruled out by the no-spending rule until Feb 2027. A
+  straight-line "~25΄" estimate is possible meanwhile, labelled approximate.
+- **Still to build from the 2026-11-01 plan.** Region sheet, step 2 — show
+  what's on today (events/deals) and the best time to visit; small
+  tourist/local differences (local: what's new since last visit, events this
+  week, "nobody has posted here in 2 weeks"). Step 3 — Pulse as "what's
+  happening now, near me", with "see on map" / "add to trip" on each card.
+  Routes — "add this route to Day N" from the route's own page.
 
 ## UI / Authenticity polish
 

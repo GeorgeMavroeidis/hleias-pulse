@@ -15,6 +15,7 @@ import {
 const ThemeContext = createContext<{
   preference: ThemePreference;
   colorScheme: ColorScheme;
+  ready: boolean;
   setPreference: (preference: ThemePreference) => void;
 } | null>(null);
 
@@ -69,7 +70,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setPreferenceState(next);
   };
   return (
-    <ThemeContext.Provider value={{ preference, colorScheme, setPreference }}>
+    <ThemeContext.Provider value={{ preference, colorScheme, ready, setPreference }}>
       {children}
     </ThemeContext.Provider>
   );

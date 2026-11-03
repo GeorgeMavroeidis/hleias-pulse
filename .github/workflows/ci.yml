@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/local-traffic-preview, "feat/reliability-*"]
   push:
     branches: [main]
 
@@ -52,29 +52,64 @@ jobs:
       - name: Test — area intelligence
         run: npm run test:intelligence
 
+      - name: Test — freshness and traffic preview
+        run: npm run test:freshness
+
+      - name: Test — creation and Athens Meet times
+        run: npm run test:creation
+
+      - name: Test — comment drafts (offline)
+        run: npm run test:comment-drafts
+
       - name: Test — appearance and map theme
         run: npm run test:theme
+
+      - name: Test — truthful surfaces and refresh
+        run: npm run test:surfaces
 
       - name: Test — discovery
         run: npm run test:discovery
 
+      - name: Test — local browser isolation
+        run: npm run test:local-browser
+
+      - name: Test — search, Deals and Saved recovery
+        run: npm run test:recovery
       - name: Test — place form defaults
         run: npm run test:place-defaults
 
       - name: Test — push security
         run: npm run test:push-security
 
+      - name: Test — map recovery
+        run: npm run test:map-recovery
+
       - name: Test — map visuals
         run: npm run test:map-visuals
 
+      - name: Test — current map evidence and foundation
+        run: |
+          npm run test:current-map
+          npm run test:map-cartography
+          npm run test:motion
+
+      - name: Test — current discovery and temporal presentation
+        run: npm run test:current-discovery
+
       - name: Test — route previews
         run: npm run test:routing
+
+      - name: Test — Google Maps directions
+        run: npm run test:directions
 
       # The secret-scanning rules themselves. Added after a narrowing of the
       # postgres-url rule silently stopped flagging any password containing
       # `$`, `{` or `}` — which Supabase-generated passwords routinely do.
       - name: Test — secret scanning rules
         run: npm run test:secrets
+
+      - name: Test — synthetic comment removal
+        run: npm run test:seed-comments
 
       - name: Build
         run: npm run build

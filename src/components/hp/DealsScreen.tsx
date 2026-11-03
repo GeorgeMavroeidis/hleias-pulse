@@ -10,6 +10,9 @@ interface Props {
   deals: PulseDeal[];
   places: Place[];
   onOpenPlace: (place: Place) => void;
+  status: "loading" | "ready" | "error";
+  onRetry: () => void;
+  onBrowsePlaces: () => void;
 }
 
 type Row = { deal: PulseDeal; place: Place };
@@ -17,7 +20,14 @@ type Row = { deal: PulseDeal; place: Place };
 // v1 Discovery layer: every active static deal, grouped by area (the data is
 // already sorted area-then-name), so a user never has to hunt the map pin by
 // pin. The first card reads as a "featured" (taller) coupon.
-export function DealsScreen({ deals, places, onOpenPlace }: Props) {
+export function DealsScreen({
+  deals,
+  places,
+  onOpenPlace,
+  status,
+  onRetry,
+  onBrowsePlaces,
+}: Props) {
   const { language, t } = useI18n();
 
   const rows = useMemo<Row[]>(() => {
@@ -53,7 +63,7 @@ export function DealsScreen({ deals, places, onOpenPlace }: Props) {
           </p>
           <div className="mt-1 flex items-end justify-between">
             <h2 className="text-3xl font-black leading-none text-hp-ink">{t("Deals")}</h2>
-            {rows.length > 0 && (
+            {status === "ready" && rows.length > 0 && (
               <span className="hp-num pb-1 text-[13px] font-bold text-hp-sunset">
                 {t("{n} active", { n: rows.length })}
               </span>
@@ -62,15 +72,50 @@ export function DealsScreen({ deals, places, onOpenPlace }: Props) {
           <div className="mt-1.5 h-[1.5px] bg-hp-ink" />
         </header>
 
-        {rows.length === 0 ? (
+        {status !== "ready" || rows.length === 0 ? (
           <div className="hp-card-lift mt-8 rounded-3xl border border-hp-ink/10 bg-hp-paper p-8 text-center">
             <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-hp-sunset text-hp-paper">
               <Sparkles size={20} />
             </div>
-            <h3 className="text-[15px] font-black text-hp-ink">{t("No active deals")}</h3>
+            <h3
+              role={status === "error" ? "alert" : "status"}
+              className="text-[15px] font-black text-hp-ink"
+            >
+              {t(
+                status === "loading"
+                  ? "Loading offers…"
+                  : status === "error"
+                    ? "Could not load offers"
+                    : "No active offers right now",
+              )}
+            </h3>
             <p className="mx-auto mt-1 max-w-[16rem] text-[12px] text-hp-muted">
-              {t("Check back soon — local businesses add deals here.")}
+              {t(
+                status === "error"
+                  ? "Try again or explore local places."
+                  : status === "loading"
+                    ? "Checking the latest available offers."
+                    : "Explore local places while there are no offers.",
+              )}
             </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {status === "error" && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="rounded-full bg-hp-ink px-4 py-2 text-xs font-bold text-hp-paper"
+                >
+                  {t("Retry")}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onBrowsePlaces}
+                className="rounded-full border border-hp-ink/15 px-4 py-2 text-xs font-bold text-hp-ink"
+              >
+                {t("Browse places")}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="hp-stagger flex flex-col gap-4">

@@ -5,7 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 
 import { readServiceRoleKey, readSupabaseClientConfig } from "./lib/env";
 import { cleanupAll } from "./lib/cleanup";
-import { loadPulseUserState, setSavedItem } from "../src/lib/hp-api";
+import { loadPulseUserState, loadSavedItems, setSavedItem } from "../src/lib/hp-api";
+import { savedTargetAvailable } from "../src/lib/hp/saved-items";
 import { supabase } from "../src/lib/supabase/client";
 
 if (process.env.HLEIAS_LOCAL_ONLY !== "1") {
@@ -27,6 +28,7 @@ async function main() {
   const password = `Smoke-${randomUUID()}-Aa1!`;
   const emails = [0, 1].map((index) => `smoke-saved-${index}-${suffix}@example.invalid`);
   const userIds: string[] = [];
+  const fixturePostId = `saved-recovery-${suffix}`;
   let testFailure: unknown;
 
   async function signIn(index: number) {
@@ -48,7 +50,11 @@ async function main() {
   try {
     const [places, posts, routes] = await Promise.all([
       admin.from("places").select("id").eq("moderation_status", "published").limit(2),
-      admin.from("posts").select("id").eq("moderation_status", "published").limit(1),
+      admin
+        .from("posts")
+        .select("id,author_id,image_url")
+        .eq("moderation_status", "published")
+        .limit(1),
       admin.from("routes").select("id").limit(1),
     ]);
     assertOk("read places", places.error);
@@ -78,6 +84,29 @@ async function main() {
       userIds.push(created.data.user.id);
     }
 
+    // Use a disposable post owned by the other account so hiding it really
+    // removes permission for the saver, while preserving the private bookmark.
+    assertOk(
+      "create saved recovery fixture",
+      (
+        await admin.from("posts").insert({
+          id: fixturePostId,
+          author_id: posts.data![0].author_id,
+          user_id: userIds[1],
+          profile_id: userIds[1],
+          author_kind: "user",
+          place_id: targets[0].id,
+          kind: "tip",
+          display_time: "2000-01-01",
+          created_at: "2000-01-01T00:00:00Z",
+          text: "Fictional local Saved recovery fixture.",
+          image_url: posts.data![0].image_url,
+          moderation_status: "published",
+        })
+      ).error,
+    );
+    targets[1].id = fixturePostId;
+
     await signIn(0);
     for (const target of targets) {
       await setSavedItem(target, true);
@@ -96,6 +125,70 @@ async function main() {
     assert(state.savedPlaceIds.includes(targets[0].id), "Saved place missing from app state.");
     assert.equal(state.savedPosts[targets[1].id], true, "Saved post missing from app state.");
     assert.equal(state.savedRoutes[targets[2].id], true, "Saved route missing from app state.");
+
+    let resolved = await loadSavedItems();
+    assert.equal(resolved.targets.length, 3);
+    for (const target of targets)
+      assert(
+        savedTargetAvailable(target, resolved),
+        `${target.type} did not resolve by stored ID.`,
+      );
+    assert.equal(resolved.posts[0]?.text, "Fictional local Saved recovery fixture.");
+    assert(
+      resolved.places.some((place) => place.id === resolved.posts[0]?.placeId),
+      "Saved post is missing its permission-checked place context.",
+    );
+    assert(
+      resolved.routes[0]?.stops.every((stop) =>
+        resolved.places.some((place) => place.id === stop.placeId),
+      ),
+      "Saved route is missing its permission-checked stops.",
+    );
+    assertOk(
+      "hide saved fixture",
+      (await admin.from("posts").update({ moderation_status: "hidden" }).eq("id", fixturePostId))
+        .error,
+    );
+    resolved = await loadSavedItems();
+    assert.equal(resolved.targets.length, 3, "An unavailable target erased its bookmark.");
+    assert.equal(resolved.posts.length, 0, "Stored-ID resolution bypassed row permissions.");
+    assert.equal(savedTargetAvailable(targets[1], resolved), false);
+    assertOk(
+      "restore saved fixture",
+      (await admin.from("posts").update({ moderation_status: "published" }).eq("id", fixturePostId))
+        .error,
+    );
+
+    // Exercise the real resolver's error propagation at both the bookmark
+    // read and target/context reads. No failed read may look like no saves.
+    const originalFetch = globalThis.fetch;
+    for (const failedTable of ["saved_items", "posts", "places"]) {
+      let intercepted = false;
+      globalThis.fetch = async (input, init) => {
+        const requestUrl = new URL(
+          typeof input === "string" ? input : input instanceof URL ? input : input.url,
+        );
+        assert.equal(
+          requestUrl.origin,
+          new URL(url).origin,
+          "Saved recovery attempted a non-local destination.",
+        );
+        if (requestUrl.pathname === `/rest/v1/${failedTable}`) {
+          intercepted = true;
+          return new Response(
+            JSON.stringify({ message: "Injected local read failure", code: "LOCAL_TEST_FAILURE" }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return originalFetch(input, init);
+      };
+      try {
+        await assert.rejects(loadSavedItems(), { message: "Injected local read failure" });
+        assert(intercepted, `Resolver did not read ${failedTable}.`);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    }
 
     await supabase.auth.signOut();
     await signIn(1);
@@ -139,6 +232,14 @@ async function main() {
     await cleanupAll(
       [
         ["sign out", async () => assertOk("sign out", (await supabase.auth.signOut()).error)],
+        [
+          "delete saved recovery fixture",
+          async () =>
+            assertOk(
+              "delete saved recovery fixture",
+              (await admin.from("posts").delete().eq("id", fixturePostId)).error,
+            ),
+        ],
         ...userIds.map(
           (userId) =>
             [

@@ -1,0 +1,627 @@
+import type {
+  ExpressionSpecification,
+  FilterSpecification,
+  LayerSpecification,
+  Map as MapLibreMap,
+  StyleSpecification,
+} from "maplibre-gl";
+import type { ColorScheme } from "../theme";
+import { darkBasemapPaint } from "./map-theme";
+import type { AtmospherePaletteKey } from "./temporal-atmosphere";
+import { removeAdministrativeBoundaries } from "./map-core";
+
+/** Paint tokens are independent of density rules for Phase 6 atmosphere variants.
+ * Keep glyphs/sprites/sources stable: a full style swap would remove app overlays. */
+export interface MapCartographyPalette {
+  land: string;
+  water: string;
+  waterLine: string;
+  primaryText: string;
+  secondaryText: string;
+  waterText: string;
+  nature: string;
+  olive: string;
+  sand: string;
+  urban: string;
+  building: string;
+  buildingOutline: string;
+  minorRoad: string;
+  minorCasing: string;
+  secondaryRoad: string;
+  secondaryCasing: string;
+  majorRoad: string;
+  majorCasing: string;
+}
+
+export const DAY_MAP_PALETTE: Readonly<MapCartographyPalette> = Object.freeze({
+  land: "#f6f0e6",
+  water: "#a8c5ce",
+  waterLine: "#7eabb9",
+  primaryText: "#302e2a",
+  secondaryText: "#68645b",
+  waterText: "#304d59",
+  nature: "#d9dfcd",
+  olive: "#879570",
+  sand: "#ebe2cf",
+  urban: "#e7e0d4",
+  building: "#e3dccf",
+  buildingOutline: "#cfc6b8",
+  minorRoad: "#fffaf2",
+  minorCasing: "#d4ccc0",
+  secondaryRoad: "#eadfc8",
+  secondaryCasing: "#cabda4",
+  majorRoad: "#e3c69f",
+  majorCasing: "#b99c7b",
+});
+
+export const ATMOSPHERE_MAP_PALETTES: Readonly<
+  Record<AtmospherePaletteKey, Readonly<MapCartographyPalette>>
+> = Object.freeze({
+  day: DAY_MAP_PALETTE,
+  "golden-hour": Object.freeze({
+    ...DAY_MAP_PALETTE,
+    land: "#f3e5d0",
+    water: "#a3bfca",
+    waterLine: "#749ba9",
+    nature: "#d8dbc6",
+    olive: "#87916a",
+    sand: "#ebdbbc",
+    urban: "#e8d8c2",
+    building: "#e4d3bb",
+    buildingOutline: "#cabb9f",
+    minorRoad: "#fff5e5",
+    minorCasing: "#d1c2aa",
+    secondaryRoad: "#eddbb9",
+    secondaryCasing: "#c9b28e",
+    majorRoad: "#e5bf90",
+    majorCasing: "#b7946d",
+  }),
+  evening: Object.freeze({
+    ...DAY_MAP_PALETTE,
+    land: "#e8e1d6",
+    water: "#8eacba",
+    waterLine: "#668d9f",
+    secondaryText: "#5b584f",
+    waterText: "#24404d",
+    nature: "#ccd3c0",
+    olive: "#7c896b",
+    sand: "#dfd4bf",
+    urban: "#d9d2c5",
+    building: "#d3cbbb",
+    buildingOutline: "#beb6a7",
+    minorRoad: "#f7f1e5",
+    minorCasing: "#bfb8ac",
+    secondaryRoad: "#dcd0b5",
+    secondaryCasing: "#b1a58d",
+    majorRoad: "#cfb18e",
+    majorCasing: "#a18b6d",
+  }),
+  "late-night": Object.freeze({
+    ...DAY_MAP_PALETTE,
+    land: "#d3cec4",
+    water: "#7695a3",
+    waterLine: "#52798e",
+    secondaryText: "#55564f",
+    waterText: "#142c36",
+    nature: "#bac6b0",
+    olive: "#738363",
+    sand: "#d0c4ac",
+    urban: "#c4beb2",
+    building: "#beb7a9",
+    buildingOutline: "#a59f94",
+    minorRoad: "#e8e3d9",
+    minorCasing: "#a4a095",
+    secondaryRoad: "#cfc0a4",
+    secondaryCasing: "#978d79",
+    majorRoad: "#bf9e7b",
+    majorCasing: "#8b725c",
+  }),
+});
+
+export const DARK_ATMOSPHERE_MAP_PALETTES: Readonly<
+  Record<AtmospherePaletteKey, Readonly<MapCartographyPalette>>
+> = Object.freeze({
+  day: Object.freeze({
+    land: "#142230",
+    water: "#0b3047",
+    waterLine: "#28536a",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#213c39",
+    olive: "#35554a",
+    sand: "#464638",
+    urban: "#1c2d3c",
+    building: "#334555",
+    buildingOutline: "#425466",
+    minorRoad: "#506575",
+    minorCasing: "#273b4a",
+    secondaryRoad: "#74818a",
+    secondaryCasing: "#354957",
+    majorRoad: "#a28a70",
+    majorCasing: "#4b4b46",
+  }),
+  "golden-hour": Object.freeze({
+    land: "#172531",
+    water: "#103247",
+    waterLine: "#2d5367",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#293e37",
+    olive: "#3e5749",
+    sand: "#514837",
+    urban: "#23303c",
+    building: "#3c4956",
+    buildingOutline: "#4b5867",
+    minorRoad: "#586a76",
+    minorCasing: "#303e4a",
+    secondaryRoad: "#81868a",
+    secondaryCasing: "#404c57",
+    majorRoad: "#b29574",
+    majorCasing: "#575046",
+  }),
+  evening: Object.freeze({
+    land: "#13212f",
+    water: "#0b2b42",
+    waterLine: "#254d63",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#203934",
+    olive: "#325046",
+    sand: "#424136",
+    urban: "#1b2b39",
+    building: "#304151",
+    buildingOutline: "#3e4f61",
+    minorRoad: "#4c606f",
+    minorCasing: "#263746",
+    secondaryRoad: "#6c7b86",
+    secondaryCasing: "#324552",
+    majorRoad: "#98836c",
+    majorCasing: "#464641",
+  }),
+  "late-night": Object.freeze({
+    land: "#101c2a",
+    water: "#09263b",
+    waterLine: "#23465d",
+    primaryText: "#dce2e5",
+    secondaryText: "#b3bdc8",
+    waterText: "#8ac5dc",
+    nature: "#1d3533",
+    olive: "#2d4942",
+    sand: "#3b3d34",
+    urban: "#182634",
+    building: "#2c3c4b",
+    buildingOutline: "#38485a",
+    minorRoad: "#465867",
+    minorCasing: "#22323f",
+    secondaryRoad: "#657480",
+    secondaryCasing: "#2d3e4c",
+    majorRoad: "#8d7b68",
+    majorCasing: "#3f413d",
+  }),
+});
+
+export const DARK_DAY_MAP_PALETTE = DARK_ATMOSPHERE_MAP_PALETTES.day;
+
+export interface MapAppearance {
+  colorScheme: ColorScheme;
+  atmosphere: AtmospherePaletteKey;
+}
+
+const MAP_APPEARANCE_PALETTES = Object.freeze({
+  light: ATMOSPHERE_MAP_PALETTES,
+  dark: DARK_ATMOSPHERE_MAP_PALETTES,
+});
+
+/** Pure lookup: ThemeProvider supplies scheme, the existing shared clock supplies period. */
+export function resolveMapPalette(appearance: MapAppearance): Readonly<MapCartographyPalette> {
+  return MAP_APPEARANCE_PALETTES[appearance.colorScheme][appearance.atmosphere];
+}
+
+// These are the actual Bright IDs inspected on 2026-10-01. Match IDs AND
+// types; do not recolor an upstream layer merely because its name looks similar.
+const ROAD_PARTS = [
+  "service-track",
+  "motorway-link",
+  "minor",
+  "link",
+  "secondary-tertiary",
+  "trunk-primary",
+  "primary",
+  "trunk",
+  "motorway",
+  "path",
+];
+const ROAD_IDS = new Set(
+  ["highway", "tunnel", "bridge"].flatMap((prefix) =>
+    ROAD_PARTS.flatMap((part) => [`${prefix}-${part}`, `${prefix}-${part}-casing`]),
+  ),
+);
+const RAIL_IDS = new Set([
+  "railway",
+  "railway-hatching",
+  "railway-transit",
+  "railway-transit-hatching",
+  "railway-service",
+  "railway-service-hatching",
+  "tunnel-railway",
+  "bridge-railway",
+  "bridge-railway-hatching",
+  "cablecar",
+  "cablecar-dash",
+]);
+const WATERWAY_IDS = new Set([
+  "waterway_tunnel",
+  "waterway-other",
+  "waterway-other-intermittent",
+  "waterway-stream-canal",
+  "waterway-stream-canal-intermittent",
+  "waterway-river",
+  "waterway-river-intermittent",
+]);
+const URBAN_IDS = new Set([
+  "landuse-residential",
+  "landuse-suburb",
+  "landuse-commercial",
+  "landuse-industrial",
+  "landuse-hospital",
+  "landuse-school",
+  "landuse-railway",
+]);
+const SETTLEMENT_IDS = new Set([
+  "label_city",
+  "label_city_capital",
+  "label_town",
+  "label_village",
+  "label_other",
+  "label_state",
+  "label_country_1",
+  "label_country_2",
+  "label_country_3",
+]);
+const WATER_LABEL_IDS = new Set([
+  "waterway_line_label",
+  "water_name_point_label",
+  "water_name_line_label",
+]);
+const ROAD_LABEL_IDS = new Set(["highway-name-path", "highway-name-minor", "highway-name-major"]);
+const POI_IDS = new Set(["poi_r1", "poi_r7", "poi_r20"]);
+const SHIELD_IDS = new Set([
+  "highway-shield-non-us",
+  "highway-shield-us-interstate",
+  "road_shield_us",
+]);
+const ORIENTATION_POIS: FilterSpecification = [
+  "match",
+  ["get", "class"],
+  ["hospital", "museum", "castle", "monument", "park"],
+  true,
+  false,
+];
+const TRANSIT_POIS: FilterSpecification = [
+  "any",
+  ["==", ["get", "class"], "airport"],
+  ["all", ["==", ["get", "class"], "bus"], ["==", ["get", "subclass"], "bus_station"]],
+  [
+    "all",
+    ["match", ["get", "class"], ["rail", "railway"], true, false],
+    ["match", ["get", "subclass"], ["station", "halt"], true, false],
+  ],
+];
+
+function restrictFilter(
+  original: FilterSpecification | undefined,
+  restriction: FilterSpecification,
+): FilterSpecification {
+  if (
+    Array.isArray(original) &&
+    original[0] === "all" &&
+    JSON.stringify(original.at(-1)) === JSON.stringify(restriction)
+  )
+    return original;
+  // Bright uses expression filters; preserve its complete rank/geometry/network predicate.
+  return original ? (["all", original, restriction] as FilterSpecification) : restriction;
+}
+
+function styleLayer(
+  layer: LayerSpecification,
+  p: Readonly<MapCartographyPalette>,
+): LayerSpecification {
+  const id = layer.id;
+  if (layer.type === "background" && id === "background") {
+    return { ...layer, paint: { ...layer.paint, "background-color": p.land } };
+  }
+  if (layer.type === "fill") {
+    if (id === "water" || id === "water-intermittent") {
+      return { ...layer, paint: { ...layer.paint, "fill-color": p.water } };
+    }
+    if (URBAN_IDS.has(id)) {
+      return { ...layer, paint: { ...layer.paint, "fill-color": p.urban, "fill-opacity": 0.28 } };
+    }
+    if (["park", "landcover-grass", "landcover-grass-park", "landuse-cemetery"].includes(id)) {
+      return {
+        ...layer,
+        paint: {
+          ...layer.paint,
+          "fill-color": p.nature,
+          "fill-opacity": id === "park" ? 0.5 : 0.65,
+        },
+      };
+    }
+    if (id === "landcover-wood") {
+      return {
+        ...layer,
+        paint: {
+          ...layer.paint,
+          "fill-color": p.olive,
+          "fill-opacity": 0.18,
+          "fill-outline-color": "transparent",
+        },
+      };
+    }
+    if (["landcover-glacier", "landcover-ice-shelf", "landcover-sand"].includes(id)) {
+      return {
+        ...layer,
+        paint: { ...layer.paint, "fill-color": id === "landcover-sand" ? p.sand : p.minorRoad },
+      };
+    }
+    if (id === "building" || id === "building-top") {
+      return {
+        ...layer,
+        paint: {
+          ...layer.paint,
+          "fill-color": p.building,
+          ...(id === "building-top" ? { "fill-outline-color": p.buildingOutline } : {}),
+        },
+      };
+    }
+    if (["aeroway-area", "road_area_pier", "highway-area"].includes(id)) {
+      return { ...layer, paint: { ...layer.paint, "fill-color": p.minorRoad } };
+    }
+  }
+  if (layer.type === "line") {
+    if (ROAD_IDS.has(id)) {
+      const casing = id.endsWith("-casing");
+      // Generic link layers contain multiple classes: color from actual data.
+      const color: NonNullable<typeof layer.paint>["line-color"] = /-path(?:-casing)?$/.test(id)
+        ? casing
+          ? p.land
+          : p.minorCasing
+        : /-link(?:-casing)?$/.test(id)
+          ? [
+              "match",
+              ["get", "class"],
+              ["motorway", "trunk", "primary"],
+              casing ? p.majorCasing : p.majorRoad,
+              casing ? p.secondaryCasing : p.secondaryRoad,
+            ]
+          : /motorway|trunk|primary/.test(id)
+            ? casing
+              ? p.majorCasing
+              : p.majorRoad
+            : /secondary|tertiary/.test(id)
+              ? casing
+                ? p.secondaryCasing
+                : p.secondaryRoad
+              : casing
+                ? p.minorCasing
+                : p.minorRoad;
+      return {
+        ...layer,
+        paint: {
+          ...layer.paint,
+          "line-color": color,
+        },
+      };
+    }
+    let color: string | undefined;
+    if (WATERWAY_IDS.has(id) || id === "ferry") color = p.waterLine;
+    else if (RAIL_IDS.has(id)) color = p.minorCasing;
+    else if (id === "road_pier") color = p.minorRoad;
+    else if (["aeroway-taxiway", "aeroway-runway"].includes(id)) color = p.minorRoad;
+    else if (["aeroway-taxiway-casing", "aeroway-runway-casing"].includes(id))
+      color = p.minorCasing;
+    if (color) return { ...layer, paint: { ...layer.paint, "line-color": color } };
+  }
+  if (layer.type === "symbol") {
+    if (SETTLEMENT_IDS.has(id)) {
+      const prominent = ["label_city", "label_city_capital", "label_town"].includes(id);
+      return {
+        ...layer,
+        ...(id === "label_other" ? { minzoom: Math.max(layer.minzoom ?? 0, 13) } : {}),
+        layout: {
+          ...layer.layout,
+          ...(prominent ? { "text-font": ["Noto Sans Bold"] } : {}),
+          ...(id === "label_city"
+            ? { "text-size": ["interpolate", ["linear"], ["zoom"], 8, 15, 14, 20] }
+            : {}),
+          ...(id === "label_town"
+            ? { "text-size": ["interpolate", ["linear"], ["zoom"], 8, 13, 14, 16] }
+            : {}),
+          ...(id === "label_village"
+            ? { "text-size": ["interpolate", ["linear"], ["zoom"], 9, 11, 14, 13] }
+            : {}),
+          ...(id === "label_other" ? { "text-transform": "none", "text-letter-spacing": 0 } : {}),
+        },
+        paint: {
+          ...layer.paint,
+          "text-color": prominent ? p.primaryText : p.secondaryText,
+          "text-halo-color": p.land,
+          "text-halo-width": 1.2,
+          "text-halo-blur": 0.3,
+        },
+      };
+    }
+    if (POI_IDS.has(id) || id === "poi_transit" || id === "airport") {
+      return {
+        ...layer,
+        ...(POI_IDS.has(id) ? { filter: restrictFilter(layer.filter, ORIENTATION_POIS) } : {}),
+        ...(id === "poi_transit"
+          ? {
+              // Bright's class "rail" misses sampled provider class "railway".
+              filter: TRANSIT_POIS,
+              minzoom: Math.max(layer.minzoom ?? 0, 13),
+              layout: {
+                ...layer.layout,
+                "icon-image": ["match", ["get", "class"], "railway", "rail", ["get", "class"]],
+              },
+            }
+          : {}),
+        paint: {
+          ...layer.paint,
+          "text-color": p.secondaryText,
+          "text-halo-color": p.land,
+          "text-halo-width": 1,
+          "text-halo-blur": 0.3,
+        },
+      };
+    }
+    if (WATER_LABEL_IDS.has(id) || ROAD_LABEL_IDS.has(id) || SHIELD_IDS.has(id)) {
+      const water = WATER_LABEL_IDS.has(id);
+      const shield = SHIELD_IDS.has(id);
+      return {
+        ...layer,
+        ...(id === "highway-name-minor" ? { minzoom: Math.max(layer.minzoom ?? 0, 16) } : {}),
+        ...(id === "highway-name-path" ? { minzoom: Math.max(layer.minzoom ?? 0, 17) } : {}),
+        ...(shield
+          ? {
+              minzoom: Math.max(layer.minzoom ?? 0, 11),
+              filter: restrictFilter(layer.filter, [
+                "match",
+                ["get", "class"],
+                ["motorway", "trunk", "primary"],
+                true,
+                false,
+              ]),
+              layout: { ...layer.layout, "symbol-spacing": 450 },
+            }
+          : {}),
+        paint: {
+          ...layer.paint,
+          "text-color": water ? p.waterText : p.secondaryText,
+          "text-halo-color": water ? p.water : p.land,
+          "text-halo-width": shield ? 0 : 1,
+          "text-halo-blur": 0.3,
+        },
+      };
+    }
+  }
+  return layer;
+}
+
+/** Pure, one-time transform. Never call from move/zoom/filter/selection effects. */
+export function createIliaMapStyle(
+  upstream: StyleSpecification,
+  palette: Readonly<MapCartographyPalette> = DAY_MAP_PALETTE,
+): StyleSpecification {
+  const boundaryFree = removeAdministrativeBoundaries(upstream);
+  return {
+    ...boundaryFree,
+    layers: boundaryFree.layers.map((layer) => styleLayer(layer, palette)),
+  };
+}
+
+type MapColourProperty =
+  | "background-color"
+  | "fill-color"
+  | "fill-outline-color"
+  | "fill-extrusion-color"
+  | "line-color"
+  | "text-color"
+  | "text-halo-color";
+
+const COLOUR_PROPERTIES: readonly MapColourProperty[] = [
+  "background-color",
+  "fill-color",
+  "fill-outline-color",
+  "fill-extrusion-color",
+  "line-color",
+  "text-color",
+  "text-halo-color",
+];
+
+/** Explicit colors for app-owned regional text; never infers ownership from live styles. */
+export type MapColourUpdate = {
+  layerId: string;
+  property: MapColourProperty;
+  value: string | ExpressionSpecification | null;
+};
+
+export function applyMapColourUpdates(
+  map: Pick<MapLibreMap, "getLayer" | "setPaintProperty">,
+  updates: MapColourUpdate[],
+  duration: number,
+): void {
+  for (const update of updates) {
+    if (!map.getLayer(update.layerId)) continue;
+    map.setPaintProperty(update.layerId, `${update.property}-transition`, { duration, delay: 0 });
+    map.setPaintProperty(
+      update.layerId,
+      update.property as Parameters<MapLibreMap["setPaintProperty"]>[1],
+      update.value as Parameters<MapLibreMap["setPaintProperty"]>[2],
+    );
+  }
+}
+
+/**
+ * Compose from a captured, unthemed provider style before app overlays are installed.
+ * The pure fallback handles future provider IDs; the Bright ID/type rules then
+ * restore the reviewed hierarchy and apply Phase 2's one-time density/layout rules.
+ */
+export function createMapAppearanceStyle(
+  upstream: StyleSpecification,
+  appearance: MapAppearance,
+): StyleSpecification {
+  const palette = resolveMapPalette(appearance);
+  if (appearance.colorScheme === "light") return createIliaMapStyle(upstream, palette);
+  const darkStyle: StyleSpecification = {
+    ...upstream,
+    layers: upstream.layers.map((layer) => {
+      const fallback = darkBasemapPaint(layer, palette);
+      if (Object.keys(fallback).length === 0) return layer;
+      return {
+        ...layer,
+        paint: { ...("paint" in layer ? layer.paint : {}), ...fallback },
+      } as LayerSpecification;
+    }),
+  };
+  return createIliaMapStyle(darkStyle, palette);
+}
+
+/**
+ * The caller retains the same unthemed provider template used at initialization.
+ * Never use map.getStyle() here: its themed colors cannot restore Light originals.
+ * Only existing provider IDs and color paint/transition fields are written. App
+ * sources/layers, layout, geometry, camera, selection and markers remain untouched.
+ */
+export function applyMapAppearance(
+  map: Pick<MapLibreMap, "getLayer" | "setPaintProperty">,
+  upstream: StyleSpecification,
+  appearance: MapAppearance,
+  duration: number,
+): void {
+  const target = createMapAppearanceStyle(upstream, appearance);
+  const originals = new Map(upstream.layers.map((layer) => [layer.id, layer]));
+  const darkPalette = resolveMapPalette({ colorScheme: "dark", atmosphere: appearance.atmosphere });
+  for (const layer of target.layers) {
+    if (!map.getLayer(layer.id)) continue;
+    const original = originals.get(layer.id);
+    if (!original) continue;
+    // Dark fallback may add text colors or an extrusion color absent from Light.
+    // Include those properties on every update so returning to Light writes null.
+    const darkPaint = darkBasemapPaint(original, darkPalette);
+    const paint =
+      "paint" in layer ? (layer.paint as Record<string, unknown> | undefined) : undefined;
+    for (const property of COLOUR_PROPERTIES) {
+      if (!(property in darkPaint) && !Object.hasOwn(paint ?? {}, property)) continue;
+      map.setPaintProperty(layer.id, `${property}-transition`, { duration, delay: 0 });
+      map.setPaintProperty(
+        layer.id,
+        property as Parameters<MapLibreMap["setPaintProperty"]>[1],
+        (paint?.[property] ?? null) as Parameters<MapLibreMap["setPaintProperty"]>[2],
+      );
+    }
+  }
+}

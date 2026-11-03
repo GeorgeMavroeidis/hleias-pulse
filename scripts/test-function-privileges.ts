@@ -55,6 +55,7 @@ const pushWorkerRpc: Record<string, string[]> = {
   "prepare_push_delivery(target_delivery_id uuid, target_claim_token uuid)": worker,
 };
 const internal = new Set([
+  "enforce_meet_future_start()",
   "enforce_push_subscription_endpoint()",
   "enforce_push_subscription_limit()",
   "enqueue_published_question_answer()",
@@ -165,7 +166,9 @@ async function main() {
       if (row.schema === "private" && internal.has(name)) {
         assert.equal(
           row.definer,
-          name !== "set_updated_at()" && name !== "is_allowed_push_endpoint(candidate text)",
+          name !== "set_updated_at()" &&
+            name !== "is_allowed_push_endpoint(candidate text)" &&
+            name !== "enforce_meet_future_start()",
           `SECURITY mode: ${name}`,
         );
       }

@@ -1,4 +1,6 @@
-import { useState, type ReactNode } from "react";
+import type { CommentDraftBinding } from "@/lib/hp/comment-drafts";
+import { CommentComposer, CommentReviewStatus } from "./CommentComposer";
+import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bookmark,
@@ -32,11 +34,15 @@ import {
 import { type PulseData } from "@/lib/hp-api";
 import { useI18n } from "@/lib/i18n";
 import { ImageBox } from "./ImageBox";
+import { AddToTripButton } from "./AddToTripButton";
+import { DirectionsLink } from "./DirectionsLink";
 import { ContentMenu } from "./ContentMenu";
 import { useModeration } from "./use-moderation";
 import { type PlaceStoryGroup } from "@/lib/hp/place-stories";
 import type { PlaceBusinessProfile } from "@/lib/hp/business-types";
 import { openStreetMapUrl } from "./pulse-shared";
+import type { PlacePulseMetric } from "@/lib/hp/pulse-activity";
+import { observationLabel } from "@/lib/hp/surface-freshness";
 import { displayPostTime } from "@/lib/hp/post-time";
 
 export function PlaceDetailModal({
@@ -51,7 +57,7 @@ export function PlaceDetailModal({
   onOpenMap,
   onShare,
   comments,
-  onComment,
+  commentDraft,
   findAuthor,
   findPostAuthor,
   storyGroups,
@@ -61,7 +67,11 @@ export function PlaceDetailModal({
   onClaimPlace,
   onGetDealCode,
   gettingDealCode,
+  nowMs = Date.now(),
+  activityMetric,
 }: {
+  nowMs?: number;
+  activityMetric?: PlacePulseMetric;
   place: Place | null;
   events: PulseData["events"];
   onClose: () => void;
@@ -73,7 +83,7 @@ export function PlaceDetailModal({
   onOpenMap: (id: string) => void;
   onShare: (place: Place) => void;
   comments: Comment[];
-  onComment: (id: string, text: string) => void;
+  commentDraft?: CommentDraftBinding;
   findAuthor: (id: string) => Author;
   findPostAuthor: (post: Post) => Author;
   storyGroups: PlaceStoryGroup[];
@@ -84,10 +94,9 @@ export function PlaceDetailModal({
   onGetDealCode: () => void;
   gettingDealCode: boolean;
 }) {
-  const [commentText, setCommentText] = useState("");
   const { language, t } = useI18n();
-  const eventCount = place ? events.filter((event) => event.placeId === place.id).length : 0;
-  const noteCount = place ? place.commentCount + comments.length : 0;
+  const eventCount = activityMetric?.eventCount ?? 0;
+  const noteCount = activityMetric?.commentCount ?? 0;
   const hasBusinessDetail = Boolean(
     businessProfile &&
     ((businessProfile.dealActive && businessProfile.dealText) ||
@@ -224,14 +233,21 @@ export function PlaceDetailModal({
                 ))}
               </div>
               <PlaceStats
-                postsToday={place.recentPostCount}
+                postsToday={activityMetric?.postCount ?? 0}
                 eventsTonight={eventCount}
                 notes={noteCount}
-                crowd={place.crowd}
+                crowd=""
                 budget={place.budget}
                 bestTime={place.bestTime}
                 mood={place.mood}
               />
+
+              <p
+                title={observationLabel(activityMetric?.lastSignalAt, nowMs, language).exact}
+                className="mt-2 text-xs text-hp-muted"
+              >
+                {observationLabel(activityMetric?.lastSignalAt, nowMs, language).relative}
+              </p>
 
               {hasBusinessDetail && <div className="hp-pd-rule" />}
 
@@ -345,12 +361,12 @@ export function PlaceDetailModal({
 
               <div className="mt-5">
                 <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-hp-muted">
-                  Recent posts
+                  {t("Posts at this place")}
                 </h3>
                 <div className="flex flex-col gap-2">
                   {visiblePosts.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-hp-ink/10 p-4 text-center text-[12px] text-hp-muted">
-                      No recent posts here yet. Be first.
+                      {t("No posts at this place yet.")}
                     </div>
                   )}
                   {visiblePosts.map((p) => {
@@ -376,8 +392,11 @@ export function PlaceDetailModal({
                           >
                             {a.type}
                           </span>
-                          <span className="ml-auto text-[10px] text-hp-muted">
-                            {displayPostTime(p)}
+                          <span
+                            title={observationLabel(p.createdAt, nowMs, language).exact}
+                            className="ml-auto text-[10px] text-hp-muted"
+                          >
+                            {displayPostTime(p, nowMs, language)}
                           </span>
                           <ContentMenu
                             className="-my-1"
@@ -404,43 +423,31 @@ export function PlaceDetailModal({
                 >
                   {language === "GR" ? "Γρήγορο σχόλιο" : "Quick comment"}
                 </label>
-                <div className="mt-2 flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
-                  <input
-                    id={`place-detail-comment-${place.id}`}
-                    name={`place-detail-comment-${place.id}`}
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    autoComplete="off"
+                <div className="mt-2">
+                  <CommentComposer
+                    binding={commentDraft}
+                    inputId={`place-detail-comment-${place.id}`}
+                    label={language === "GR" ? "Γρήγορο σχόλιο" : "Quick comment"}
                     placeholder={t("Add a local note…")}
-                    className="w-full bg-transparent text-[12px] outline-none placeholder:text-hp-muted"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && commentText.trim()) {
-                        onComment(place.id, commentText.trim());
-                        setCommentText("");
-                      }
-                    }}
+                    submitLabel={t("Post comment")}
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (commentText.trim()) {
-                        onComment(place.id, commentText.trim());
-                        setCommentText("");
-                      }
-                    }}
-                    className="grid h-7 w-7 place-items-center rounded-full bg-hp-ink text-hp-paper disabled:opacity-40"
-                    disabled={!commentText.trim()}
-                    aria-label={`Post comment on ${place.name}`}
-                  >
-                    <Send size={12} />
-                  </button>
                 </div>
                 {comments.length > 0 && (
                   <div className="mt-3 flex flex-col gap-2">
                     {comments.slice(-3).map((c, i) => (
-                      <div key={i} className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]">
+                      <div
+                        key={c.id ?? i}
+                        className="rounded-2xl bg-hp-ink/5 px-3 py-2 text-[12px]"
+                      >
                         <span className="font-bold text-hp-ink">{c.author}</span>{" "}
                         <span className="text-hp-ink/80">{c.text}</span>
+                        <CommentReviewStatus comment={c} />
+                        <span
+                          title={observationLabel(c.createdAt, nowMs, language).exact}
+                          className="mt-1 block text-[10px] text-hp-muted"
+                        >
+                          {observationLabel(c.createdAt, nowMs, language).relative}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -448,6 +455,7 @@ export function PlaceDetailModal({
               </div>
             </div>
             <div className="sticky bottom-0 flex flex-col gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3 backdrop-blur">
+              <AddToTripButton kind="place" id={place.id} name={place.name} />
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -466,7 +474,7 @@ export function PlaceDetailModal({
                   {t("I've been here")}
                 </button>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -477,6 +485,10 @@ export function PlaceDetailModal({
                 >
                   Map
                 </button>
+                <DirectionsLink
+                  destination={{ lat: place.lat, lng: place.lng, label: place.name }}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-full border border-hp-ink/15 px-3 py-3 text-[12px] font-bold text-hp-ink"
+                />
                 <a
                   href={openStreetMapUrl(place)}
                   target="_blank"
@@ -529,7 +541,7 @@ function PlaceStats({
     clauses.push(
       <span key="posts">
         <MessageCircle strokeWidth={2.2} />
-        <b>{postsToday}</b> {t("posts today")}
+        <b>{postsToday}</b> {t("recent posts")}
       </span>,
     );
   }
@@ -537,7 +549,7 @@ function PlaceStats({
     clauses.push(
       <span key="events">
         <CalendarHeart strokeWidth={2.2} />
-        <b>{eventsTonight}</b> {t("events tonight")}
+        <b>{eventsTonight}</b> {t("recent announcements")}
       </span>,
     );
   }
@@ -545,7 +557,7 @@ function PlaceStats({
     clauses.push(
       <span key="notes">
         <ListChecks strokeWidth={2.2} />
-        <b>{notes}</b> {t("local notes")}
+        <b>{notes}</b> {t("recent comments")}
       </span>,
     );
   }
@@ -596,7 +608,7 @@ function PlaceStats({
                         node,
                       ],
                 )
-              : t("Quiet here right now")}
+              : t("No recent reports")}
           </p>
           {descriptors.length > 0 && (
             <div className="hp-pd-desc">

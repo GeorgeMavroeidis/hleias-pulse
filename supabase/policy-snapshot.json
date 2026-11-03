@@ -7631,19 +7631,13 @@
       "definitionLines": [
         "CREATE OR REPLACE FUNCTION public.refresh_generic_stories()",
         " RETURNS void",
-        " LANGUAGE sql",
+        " LANGUAGE plpgsql",
         " SECURITY DEFINER",
         " SET search_path TO ''",
         "AS $function$",
-        "  update public.stories",
-        "  set created_at = now()",
-        "  where id = any (array[",
-        "    'story-kourouta', 'story-kourouta-sunbeds', 'story-katakolo', 'story-olympia',",
-        "    'story-foloi', 'story-kyllini', 'story-zacharo', 'story-andritsaina',",
-        "    'story-kakovatos', 'story-kaiafas', 'story-chlemoutsi'",
-        "  ])",
-        "    and expires_after_hours is not null",
-        "    and created_at <= now() - make_interval(hours => expires_after_hours);",
+        "begin",
+        "  return;",
+        "end;",
         "$function$"
       ]
     },
@@ -7901,6 +7895,45 @@
     }
   ],
   "privateFunctions": [
+    {
+      "signature": "private.enforce_meet_future_start()",
+      "kind": "function",
+      "arguments": "",
+      "owner": "postgres",
+      "securityDefiner": false,
+      "searchPath": "\"\"",
+      "executeGrants": [
+        {
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "grantable": false,
+          "privilege": "EXECUTE"
+        }
+      ],
+      "definitionLines": [
+        "CREATE OR REPLACE FUNCTION private.enforce_meet_future_start()",
+        " RETURNS trigger",
+        " LANGUAGE plpgsql",
+        " SET search_path TO ''",
+        "AS $function$",
+        "begin",
+        "  if new.user_id is not null then",
+        "    if tg_op = 'INSERT' then",
+        "      if not pg_catalog.isfinite(new.starts_at) or new.starts_at <= pg_catalog.clock_timestamp() then",
+        "        raise exception 'Meet start must be in the future.' using errcode = '22023';",
+        "      end if;",
+        "    elsif new.starts_at is distinct from old.starts_at",
+        "       or new.user_id is distinct from old.user_id then",
+        "      if not pg_catalog.isfinite(new.starts_at) or new.starts_at <= pg_catalog.clock_timestamp() then",
+        "        raise exception 'Meet start must be in the future.' using errcode = '22023';",
+        "      end if;",
+        "    end if;",
+        "  end if;",
+        "  return new;",
+        "end;",
+        "$function$"
+      ]
+    },
     {
       "signature": "private.enforce_push_subscription_endpoint()",
       "kind": "function",

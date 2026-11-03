@@ -1,38 +1,73 @@
 import type { LayerSpecification, StyleSpecification, Map as MapLibreMap } from "maplibre-gl";
 import type { ColorScheme } from "../theme";
 
+/** The subset needed by the provider fallback; cartography supplies its resolved palette. */
+export interface DarkBasemapPalette {
+  land: string;
+  water: string;
+  waterLine: string;
+  nature: string;
+  building: string;
+  urban: string;
+  majorRoad: string;
+  minorCasing: string;
+  minorRoad: string;
+  waterText: string;
+  primaryText: string;
+}
+
+const DEFAULT_DARK_BASEMAP_PALETTE: Readonly<DarkBasemapPalette> = Object.freeze({
+  land: "#142230",
+  water: "#0b3047",
+  waterLine: "#28536a",
+  nature: "#213c39",
+  building: "#334555",
+  urban: "#1c2d3c",
+  majorRoad: "#a28a70",
+  minorCasing: "#273b4a",
+  minorRoad: "#506575",
+  waterText: "#8ac5dc",
+  primaryText: "#dce2e5",
+});
+
 /** Only basemap paint changes: source IDs, geometry, layout and app overlays stay intact. */
-export function darkBasemapPaint(layer: LayerSpecification): Record<string, string> {
+export function darkBasemapPaint(
+  layer: LayerSpecification,
+  palette: Readonly<DarkBasemapPalette> = DEFAULT_DARK_BASEMAP_PALETTE,
+): Record<string, string> {
   const name = `${layer.id} ${"source-layer" in layer ? layer["source-layer"] : ""}`.toLowerCase();
   const water = /water|ocean/.test(name);
   const green = /park|wood|forest|landcover|grass/.test(name);
   switch (layer.type) {
     case "background":
-      return { "background-color": "#142230" };
+      return { "background-color": palette.land };
     case "fill":
       return {
         "fill-color": water
-          ? "#0b3047"
+          ? palette.water
           : green
-            ? "#213c39"
+            ? palette.nature
             : /building/.test(name)
-              ? "#334555"
-              : "#1c2d3c",
+              ? palette.building
+              : palette.urban,
       };
     case "fill-extrusion":
-      return { "fill-extrusion-color": "#334555" };
+      return { "fill-extrusion-color": palette.building };
     case "line":
       return {
         "line-color": water
-          ? "#28536a"
+          ? palette.waterLine
           : /motorway|trunk/.test(name)
-            ? "#a28a70"
+            ? palette.majorRoad
             : /casing|rail/.test(name)
-              ? "#273b4a"
-              : "#506575",
+              ? palette.minorCasing
+              : palette.minorRoad,
       };
     case "symbol":
-      return { "text-color": water ? "#8ac5dc" : "#dce2e5", "text-halo-color": "#142230" };
+      return {
+        "text-color": water ? palette.waterText : palette.primaryText,
+        "text-halo-color": palette.land,
+      };
     default:
       return {};
   }

@@ -4,6 +4,20 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { parseThemePreference, resolveColorScheme } from "./theme";
 
+test("server rendering exposes unresolved appearance without consulting browser state", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { ThemeProvider, useTheme } = await import("./theme-provider");
+  function Readiness() {
+    const { ready, colorScheme } = useTheme();
+    return createElement("output", { "data-ready": String(ready) }, colorScheme);
+  }
+  const html = renderToStaticMarkup(
+    createElement(ThemeProvider, { children: createElement(Readiness) }),
+  );
+  assert.equal(html, '<output data-ready="false">light</output>');
+});
+
 const bootstrap = readFileSync(new URL("../../public/theme-init.js", import.meta.url), "utf8");
 for (const stored of [null, "invalid", "system", "light", "dark"]) {
   for (const systemDark of [false, true]) {

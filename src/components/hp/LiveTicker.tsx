@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Radio } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
+import { observationLabel } from "@/lib/hp/surface-freshness";
+import { evaluateFreshness } from "@/lib/hp/freshness";
 import type { ActivityTick } from "@/lib/hp/activity-data";
 
 interface Props {
   ticks: ActivityTick[];
+  nowMs: number;
   onOpenPlace?: (placeId: string) => void;
 }
 
@@ -13,7 +17,11 @@ interface Props {
  * item plus a scrollable tail. This is the refresh-bait element — the variable
  * reward that makes people come back.
  */
-export function LiveTicker({ ticks, onOpenPlace }: Props) {
+export function LiveTicker({ ticks: incomingTicks, onOpenPlace, nowMs }: Props) {
+  const { t, language } = useI18n();
+  const ticks = incomingTicks.filter(
+    (tick) => evaluateFreshness({ observedAt: tick.observedAt, nowMs }).isCurrent,
+  );
   const [spotlight, setSpotlight] = useState(0);
   const timer = useRef<number | null>(null);
 
@@ -53,11 +61,14 @@ export function LiveTicker({ ticks, onOpenPlace }: Props) {
               className="min-w-0"
             >
               <p className="truncate text-[12.5px] font-bold leading-tight text-hp-ink">
-                <span className="text-hp-sunset">●</span> {head.who} {head.verb}
+                <span className="text-hp-sunset">●</span> {head.who} {t(head.verb)}
                 <span className="text-hp-ink/55"> · {head.at}</span>
               </p>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-hp-muted">
-                {head.minutesAgo < 1 ? "just now" : `${head.minutesAgo}m ago`} · live
+              <p
+                title={observationLabel(head.observedAt, nowMs, language).exact}
+                className="text-[10px] font-semibold uppercase tracking-wide text-hp-muted"
+              >
+                {observationLabel(head.observedAt, nowMs, language).relative} · {t("Live")}
               </p>
             </motion.div>
           </AnimatePresence>
@@ -72,21 +83,21 @@ export function LiveTicker({ ticks, onOpenPlace }: Props) {
 
       {/* Tail */}
       <div className="hp-no-scrollbar mt-2 flex gap-2 overflow-x-auto px-4 pb-1">
-        {ticks.map((t) => (
+        {ticks.map((tick) => (
           <button
-            key={t.id}
+            key={tick.id}
             type="button"
-            onClick={() => onOpenPlace?.(t.placeId)}
+            onClick={() => onOpenPlace?.(tick.placeId)}
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-hp-ink/10 bg-hp-paper px-2.5 py-1.5 text-[11px] shadow-sm transition active:scale-95"
           >
             <img
-              src={t.avatar}
+              src={tick.avatar}
               alt=""
               className="h-4 w-4 rounded-full object-cover"
               loading="lazy"
             />
-            <span className="font-bold text-hp-ink">{t.who}</span>
-            <span className="text-hp-muted">{t.verb}</span>
+            <span className="font-bold text-hp-ink">{tick.who}</span>
+            <span className="text-hp-muted">{t(tick.verb)}</span>
             <span className="font-semibold text-hp-deep">·</span>
           </button>
         ))}
