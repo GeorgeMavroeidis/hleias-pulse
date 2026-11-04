@@ -142,10 +142,10 @@ import { ImageBox } from "./ImageBox";
 import {
   buildAreaClusters,
   getMapAreaIdForPlace,
+  SocialMap,
   type MapAreaCluster,
   type MapDiscoveryViewport,
 } from "./SocialMap";
-import { ExploreScreen } from "./explore/ExploreScreen";
 import { PlaceStoryRail } from "./PlaceStoryRail";
 import {
   buildPlaceStoryGroups,
@@ -233,9 +233,10 @@ import {
   readyProfile,
   composerIdentity,
 } from "./pulse-shared";
-import { Toast, TopBar } from "./PulseTopBar";
+import { Toast, TopBar, VibeChips, DiscoveryLensRail } from "./PulseTopBar";
 import { EssentialsScreen } from "./EssentialsScreen";
 import type { EssentialsSectionId } from "@/lib/hp/essentials";
+import { MapBottomSheet } from "./MapBottomSheet";
 import { PulseFeed, MustSeeTodayDeck } from "./PulseFeed";
 import { BottomNav } from "./BottomNav";
 import { useModeration, useModerationBridge, type UserLabel } from "./use-moderation";
@@ -2133,50 +2134,53 @@ export function PulseApp() {
         <div
           ref={observeMapBody}
           className="hp-map-stage relative h-full w-full"
+          data-utility-rail-hidden={utilityRailHidden ? "true" : "false"}
           data-atmosphere={temporalAtmosphere.period ?? "unavailable"}
         >
-          <ExploreScreen
-            places={places}
-            mapPlaces={mapPlaces}
+          <SocialMap
+            atmospherePalette={temporalAtmosphere.paletteKey}
             clusters={mapClusters}
-            posts={allPosts}
-            storyGroups={placeStoryGroups}
-            storyPlaceIds={storyPlaceIds}
-            selection={discoveryState.selection}
-            activeLens={activeLens}
-            onLensChange={setActiveLens}
-            discoverySnapshot={discoverySnapshot}
+            regions={regionalDiscovery}
             markerPulseSnapshot={markerPulseSnapshot}
-            query={query}
-            setQuery={setQuery}
-            savedIds={savedIds}
-            onToggleSave={toggleSave}
-            onShare={sharePlace}
-            onSelectArea={selectAreaPreview}
-            onSelectPlace={(place) => selectPlacePreview(place)}
-            onClear={clearMapView}
-            onBack={goBackMapView}
+            nowMs={nowMs}
+            totalPlaceCount={places.length}
+            onAvailabilityChange={setMapAvailable}
+            searchQuery={query}
+            onClearSearch={() => setQuery("")}
+            onRefreshPlaces={() => void refreshPulseData()}
             onOpenPlace={setOpenPlace}
-            onOpenStory={(placeId) => setStoryViewer({ placeId })}
+            events={events}
+            activitySnapshot={activitySnapshot}
+            selection={discoveryState.selection}
+            sheetGeometry={sheetGeometry}
+            focusSheetHeights={{
+              region: discoverySheetHeights(safeMapAreaH, collapsedHeight, "regionSelected")
+                .preview,
+              place: discoverySheetHeights(safeMapAreaH, collapsedHeight, "placeSelected").preview,
+            }}
+            initialCamera={discoveryState.camera}
+            routeFrameRevision={discoveryState.routeFrameRevision}
+            cameraCaptureRef={mapCameraCaptureRef}
+            activeFilterLabel={activeLens ? t(DISCOVERY_LENS_LABEL[activeLens]) : null}
+            activeLens={activeLens}
+            discoverySnapshot={discoverySnapshot}
+            onDiscoveryViewportChange={onDiscoveryViewportChange}
+            storyPlaceIds={storyPlaceIds}
+            onSelectArea={selectAreaPreview}
+            onSelectPlace={selectMapPlacePreview}
+            onResetView={clearMapView}
+            onClearSelection={clearMapView}
+            canGoBack={
+              discoveryState.selection.kind !== "idle" || discoveryState.snap !== "collapsed"
+            }
+            onBack={goBackMapView}
+            bottomOverlayHeight={sheetH}
+            availableMapHeight={availableMapHeight}
+            routePreview={activeRoutePreview}
             onMapLongPress={(lat, lng) => {
               openComposer("place", { lat, lng });
               showToast(t("Drop a new spot"));
             }}
-            onAvailabilityChange={setMapAvailable}
-            initialCamera={discoveryState.camera}
-            cameraCaptureRef={mapCameraCaptureRef}
-            routePreview={activeRoutePreview}
-            routeFrameRevision={discoveryState.routeFrameRevision}
-            atmospherePalette={temporalAtmosphere.paletteKey}
-            account={account}
-            onOpenAccount={() => setProfileOpen(true)}
-            onOpenAuth={() => setAuthOpen(true)}
-            onOpenDeals={() => setTab("deals")}
-            markerMotion={markerMotion}
-            onSetMarkerMotion={updateMarkerMotion}
-            onSetLanguage={setAppLanguage}
-            onToast={showToast}
-            nowMs={nowMs}
           />
           <div className="contents" inert={!mapAvailable} aria-hidden={!mapAvailable}>
             <AnimatePresence>
@@ -2194,6 +2198,47 @@ export function PulseApp() {
                 </Suspense>
               )}
             </AnimatePresence>
+            <MapBottomSheet
+              key={accountStorageUserId ?? "guest"}
+              nowMs={nowMs}
+              atmosphere={temporalAtmosphere}
+              state={discoveryState}
+              content={discoveryContent}
+              selectedPlace={sel}
+              markerPulseSnapshot={markerPulseSnapshot}
+              heights={sheetHeights}
+              geometry={sheetGeometry}
+              onSnap={(snap) => discoveryDispatch({ type: "snap", snap })}
+              onCollapsedHeightMeasured={setCollapsedHeight}
+              onSelectRegion={(regionId) =>
+                discoveryDispatch({
+                  type: "select",
+                  selection: { kind: "regionSelected", regionId },
+                })
+              }
+              onSelectPlace={selectPlacePreview}
+              onClear={clearMapView}
+              onBack={goBackMapView}
+              onOpenEvent={openDiscoveryEvent}
+              storyGroups={placeStoryGroups}
+              onOpenStory={(placeId) => setStoryViewer({ placeId })}
+              onOpenDetails={(place) => setOpenPlace(place)}
+              onSavePlace={toggleSave}
+              onSharePlace={sharePlace}
+              savedPlaceIds={savedIds}
+              claimedPlaceIds={pulseData.claimedPlaceIds}
+              dealPlaceIds={pulseData.dealPlaceIds}
+              searchQuery={query}
+              dataStatus={dataStatus}
+              selectedPlaceMatchesLens={selectedPlaceMatchesLens}
+              onClearLens={() => setActiveLens(null)}
+              onClearSearch={() => setQuery("")}
+              audience={readyProfile(account)?.defaultIdentity ?? null}
+              onPostHere={(placeId) => {
+                setComposerPlaceId(placeId);
+                openComposer("post");
+              }}
+            />
           </div>
         </div>
       );
@@ -2233,7 +2278,6 @@ export function PulseApp() {
               findPlace={findPlace}
               findAuthor={findAuthor}
               findPostAuthor={findPostAuthor}
-              onCreatePost={places.length > 0 ? () => openComposer("post") : undefined}
             />
           </div>
           {places.length > 0 && (
@@ -2282,8 +2326,7 @@ export function PulseApp() {
     if (tab === "meet") {
       return (
         <div className="flex h-full flex-col">
-          <h2 className="hp-screen-title shrink-0 px-4 pt-4">{t("Meet")}</h2>
-          <div className="hp-segmented mx-4 mb-1 mt-4 shrink-0" role="group" aria-label={t("Meet")}>
+          <div className="flex shrink-0 gap-1.5 px-4 pt-3">
             {(
               [
                 { id: "community" as MeetSubTab, label: t("Community"), Icon: CalendarHeart },
@@ -2297,9 +2340,13 @@ export function PulseApp() {
                   type="button"
                   onClick={() => setMeetSubTab(id)}
                   aria-pressed={active}
-                  className="hp-segmented__option"
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-2xl border py-2 text-[12.5px] font-bold transition active:scale-[0.98] ${
+                    active
+                      ? "border-hp-ink bg-hp-ink text-hp-paper"
+                      : "border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+                  }`}
                 >
-                  <Icon size={15} strokeWidth={2.2} aria-hidden="true" />
+                  <Icon size={14} strokeWidth={2.6} />
                   {label}
                 </button>
               );
@@ -2431,39 +2478,38 @@ export function PulseApp() {
       <div
         className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10"
         data-marker-motion={markerMotion}
-        data-tab={tab}
       >
         <div
-          className="relative flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col"
           inert={modalOpen ? true : undefined}
           aria-hidden={modalOpen ? true : undefined}
         >
-          {/* The map draws its own floating chrome; every other tab keeps the bar. */}
-          {tab !== "map" && (
-            <TopBar
-              query={query}
-              setQuery={setQuery}
-              onSetLanguage={setAppLanguage}
-              markerMotion={markerMotion}
-              onSetMarkerMotion={updateMarkerMotion}
-              appearanceOpen={appearanceOpen}
-              setAppearanceOpen={setAppearanceOpen}
-              showSearch={showSearch}
-              setShowSearch={setShowSearch}
-              account={account}
-              onOpenAccount={() => setProfileOpen(true)}
-              onOpenAuth={() => setAuthOpen(true)}
-              onOpenDeals={() => setTab("deals")}
-            />
+          <TopBar
+            query={query}
+            setQuery={setQuery}
+            onSetLanguage={setAppLanguage}
+            markerMotion={markerMotion}
+            onSetMarkerMotion={updateMarkerMotion}
+            appearanceOpen={appearanceOpen}
+            setAppearanceOpen={setAppearanceOpen}
+            showSearch={showSearch}
+            setShowSearch={setShowSearch}
+            account={account}
+            onOpenAccount={() => setProfileOpen(true)}
+            onOpenAuth={() => setAuthOpen(true)}
+            onOpenDeals={() => setTab("deals")}
+          />
+          {tab === "map" ? (
+            <DiscoveryLensRail active={activeLens} onChange={setActiveLens} />
+          ) : tab === "trip" || tab === "essentials" || tab === "quicklook" ? null : (
+            <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
           )}
-          {/* The global vibe-chip row was removed in the 2026-11 redesign: it only
-              filtered the Pulse feed, which keeps its own filter row. */}
 
           <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
             {refreshFailed && dataStatus === "ready" && (
               <div
                 role="status"
-                className={`absolute inset-x-4 ${tab === "map" ? "hp-map-status" : "top-4"} z-[60] rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-xs`}
+                className="absolute inset-x-4 top-4 z-[60] rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-xs"
               >
                 {t("Could not refresh. Showing earlier data.")}{" "}
                 {fetchedAtMs && (
@@ -2489,7 +2535,7 @@ export function PulseApp() {
               <div
                 role={dataStatus === "error" ? "alert" : "status"}
                 aria-live="polite"
-                className={`absolute inset-x-4 ${tab === "map" ? "hp-map-status" : "top-4"} z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur`}
+                className="absolute inset-x-4 top-4 z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur"
               >
                 <span>
                   {t(
@@ -2528,12 +2574,7 @@ export function PulseApp() {
             </AnimatePresence>
           </div>
 
-          <BottomNav
-            tab={tab}
-            setTab={setTab}
-            onOpenTrip={() => setTab("trip")}
-            floating={tab === "map"}
-          />
+          <BottomNav tab={tab} setTab={setTab} onOpenTrip={() => setTab("trip")} />
         </div>
 
         {placeDetailEverOpened && (

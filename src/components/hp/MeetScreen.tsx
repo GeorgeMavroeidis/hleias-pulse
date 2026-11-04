@@ -22,8 +22,6 @@ import {
 } from "@/lib/hp/meet-types";
 import { meetPhase } from "@/lib/hp/surface-freshness";
 import { EventCard } from "./EventCard";
-import { ImageBox } from "./ImageBox";
-import { formatMeetDateTime, formatMeetWhen } from "@/lib/hp/meet-time";
 import { useModeration } from "./use-moderation";
 import { useI18n } from "@/lib/i18n";
 
@@ -105,10 +103,6 @@ export function MeetScreen({
   }, [focusEventId, filter, filtered]);
 
   const mineCount = events.filter((e) => rsvp[e.id]).length;
-  // Finished gatherings stay visible (they are the community's history), but as a
-  // quiet "Earlier" list under what is still ahead, never as cards you can't use.
-  const upcoming = filtered.filter((e) => meetPhase(e, nowMs) !== "ended");
-  const earlier = filtered.filter((e) => meetPhase(e, nowMs) === "ended");
 
   const chips: { id: Filter; label: string; Icon?: LucideIcon }[] = [
     { id: "all", label: t("All") },
@@ -122,60 +116,61 @@ export function MeetScreen({
 
   return (
     <div className="relative h-full">
-      <div className="h-full overflow-y-auto overscroll-contain px-4 pb-32 pt-4">
+      <div className="h-full overflow-y-auto overscroll-contain px-4 pb-32 pt-3">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="grid h-9 w-9 place-items-center rounded-2xl bg-hp-sunset/15 text-hp-sunset">
+            <CalendarHeart size={18} />
+          </span>
+          <div>
+            <h2 className="text-2xl font-black leading-none text-hp-ink">{t("Meet")}</h2>
+            <p className="mt-0.5 text-[11.5px] text-hp-muted">
+              {t("Gatherings & plans — say you're in.")}
+            </p>
+          </div>
+        </div>
+
         {/* Filter chips */}
-        <div className="hp-pill-row mb-5">
+        <div className="hp-no-scrollbar -mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4">
           {chips.map((c) => {
+            const active = filter === c.id;
             const Icon = c.Icon;
             return (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => setFilter(c.id)}
-                aria-pressed={filter === c.id}
-                className="hp-pill"
+                aria-pressed={active}
+                className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[11.5px] font-bold transition active:scale-95 ${
+                  active
+                    ? "bg-hp-ink text-hp-paper"
+                    : "border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+                }`}
               >
-                {Icon ? <Icon size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
+                {Icon ? <Icon size={12} strokeWidth={2.6} /> : null}
                 {c.label}
               </button>
             );
           })}
         </div>
 
-        {upcoming.length === 0 && (
-          <div className="fd-empty">
-            <span className="fd-empty__icon" aria-hidden="true">
-              <Sparkles size={22} strokeWidth={1.9} />
-            </span>
-            <strong>
-              {t(
-                filter === "mine"
-                  ? "Nothing planned yet"
-                  : filter === "all"
-                    ? "Nothing coming up yet"
-                    : "No gatherings here",
-              )}
-            </strong>
-            <p>
-              {filter === "mine" || filter === "all"
+        {filtered.length === 0 ? (
+          <div className="mt-10 rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
+            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-hp-sunset/10 text-hp-sunset">
+              <Sparkles size={20} />
+            </div>
+            <h3 className="text-[15px] font-bold text-hp-ink">
+              {t(filter === "mine" ? "Nothing planned yet" : "No gatherings here")}
+            </h3>
+            <p className="mx-auto mt-1 max-w-[16rem] text-[12px] text-hp-muted">
+              {filter === "mine"
                 ? t("RSVP to something, or host your own — a swim, a coffee, a panigyri.")
                 : t("Be the first to host something in this vibe.")}
             </p>
-            {!previewMode && (
-              <div className="fd-empty__actions">
-                <button type="button" className="fd-button fd-button--primary" onClick={onCreate}>
-                  <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
-                  {t("Host a gathering")}
-                </button>
-              </div>
-            )}
           </div>
-        )}
-
-        {upcoming.length > 0 && (
-          <div className="flex flex-col gap-6">
+        ) : (
+          <div className="flex flex-col gap-3.5">
             <AnimatePresence initial={false}>
-              {upcoming.map((event) => (
+              {filtered.map((event) => (
                 <div
                   key={event.id}
                   ref={event.id === focusEventId ? focusedEventRef : undefined}
@@ -183,7 +178,7 @@ export function MeetScreen({
                   data-discovery-event={event.id}
                   className={
                     event.id === focusEventId
-                      ? "rounded-[22px] focus:outline-2 focus:outline-hp-sunset"
+                      ? "rounded-2xl focus:outline-2 focus:outline-hp-sunset"
                       : undefined
                   }
                 >
@@ -201,92 +196,23 @@ export function MeetScreen({
             </AnimatePresence>
           </div>
         )}
-
-        {earlier.length > 0 && (
-          <section className="mt-9">
-            <h3 className="hp-section-title mb-2">
-              {t("Earlier")}
-              <small>{earlier.length}</small>
-            </h3>
-            <ul className="divide-y divide-[var(--hp-border)]">
-              {earlier.map((event) => (
-                <li key={event.id}>
-                  <div
-                    ref={event.id === focusEventId ? focusedEventRef : undefined}
-                    tabIndex={event.id === focusEventId ? -1 : undefined}
-                    data-discovery-event={event.id}
-                  >
-                    <PastEventRow
-                      event={event}
-                      placeName={findPlace(event.placeId)?.name ?? "Ilia"}
-                      onOpenPlace={onOpenPlace}
-                      nowMs={nowMs}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
       </div>
 
-      {/* Host FAB — the empty state carries its own button, so only one shows. */}
-      {!previewMode && upcoming.length > 0 && (
+      {/* Host FAB */}
+      {!previewMode && (
         <motion.button
           type="button"
           whileTap={{ scale: 0.92 }}
           initial={{ opacity: 0, scale: 0.86, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           onClick={onCreate}
-          className="absolute right-4 bottom-4 z-40 inline-flex h-12 items-center gap-1.5 rounded-full bg-hp-sunset pl-4 pr-5 text-white shadow-[0_10px_24px_-6px_color-mix(in_srgb,var(--hp-sunset)_60%,transparent)]"
+          className="absolute right-4 bottom-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-hp-sunset px-4 py-3 text-hp-paper shadow-[0_12px_28px_rgba(224,106,50,0.45)]"
           aria-label={t("Host a gathering")}
         >
-          <Plus size={19} strokeWidth={2.4} aria-hidden="true" />
-          <span className="text-[15px] font-semibold">{t("Host")}</span>
+          <Plus size={18} strokeWidth={2.6} />
+          <span className="text-[13px] font-black">{t("Host")}</span>
         </motion.button>
       )}
     </div>
-  );
-}
-
-/** A finished gathering: one quiet row — when, where, how many went. */
-function PastEventRow({
-  event,
-  placeName,
-  onOpenPlace,
-  nowMs,
-}: {
-  event: MeetEvent;
-  placeName: string;
-  onOpenPlace: (placeId: string) => void;
-  nowMs: number;
-}) {
-  const { language, t } = useI18n();
-  return (
-    <button
-      type="button"
-      onClick={() => onOpenPlace(event.placeId)}
-      className="flex w-full items-center gap-3 py-3 text-left active:opacity-70"
-      aria-label={t("Open {place}", { place: placeName })}
-    >
-      <ImageBox
-        src={event.coverUrl}
-        alt=""
-        className="h-14 w-14 shrink-0 overflow-hidden rounded-xl"
-        rounded="rounded-xl"
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-semibold text-hp-ink">{event.title}</span>
-        <span
-          className="block truncate text-[13px] text-hp-muted"
-          title={formatMeetDateTime(event.happensAt, language)}
-        >
-          {placeName} · {formatMeetWhen(event.happensAt, language, nowMs)}
-        </span>
-      </span>
-      <span className="shrink-0 text-right text-[12.5px] font-medium text-hp-muted">
-        {t("{n} went", { n: event.going })}
-      </span>
-    </button>
   );
 }

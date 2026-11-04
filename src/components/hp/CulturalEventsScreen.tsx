@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Drama, Music2, PartyPopper, Plus, Sparkles, type LucideIcon } from "lucide-react";
+import { Drama, Music2, PartyPopper, Plus, Sparkles, Ticket, type LucideIcon } from "lucide-react";
 import {
   CULTURAL_EVENTS_STRINGS,
   CULTURAL_EVENT_TYPES,
@@ -72,19 +72,36 @@ export function CulturalEventsScreen({
 
   return (
     <div className="relative h-full">
-      <div className="h-full overflow-y-auto overscroll-contain px-4 pb-32 pt-4">
-        <div className="hp-pill-row mb-5">
+      <div className="h-full overflow-y-auto overscroll-contain px-4 pb-32 pt-3">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="grid h-9 w-9 place-items-center rounded-2xl bg-hp-sunset/15 text-hp-sunset">
+            <Ticket size={18} />
+          </span>
+          <div>
+            <h2 className="text-2xl font-black leading-none text-hp-ink">
+              {tr(lang, s.screenTitle)}
+            </h2>
+            <p className="mt-0.5 text-[11.5px] text-hp-muted">{tr(lang, s.screenSubtitle)}</p>
+          </div>
+        </div>
+
+        <div className="hp-no-scrollbar -mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4">
           {chips.map((c) => {
+            const active = filter === c.id;
             const Icon = c.Icon;
             return (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => setFilter(c.id)}
-                aria-pressed={filter === c.id}
-                className="hp-pill"
+                aria-pressed={active}
+                className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[11.5px] font-bold transition active:scale-95 ${
+                  active
+                    ? "bg-hp-ink text-hp-paper"
+                    : "border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+                }`}
               >
-                {Icon ? <Icon size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
+                {Icon ? <Icon size={12} strokeWidth={2.6} /> : null}
                 {c.label}
               </button>
             );
@@ -92,15 +109,17 @@ export function CulturalEventsScreen({
         </div>
 
         {filtered.length === 0 ? (
-          <div className="fd-empty">
-            <span className="fd-empty__icon" aria-hidden="true">
-              <Sparkles size={22} strokeWidth={1.9} />
-            </span>
-            <strong>{tr(lang, s.emptyTitle)}</strong>
-            <p>{tr(lang, s.emptyBody)}</p>
+          <div className="mt-10 rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
+            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-hp-sunset/10 text-hp-sunset">
+              <Sparkles size={20} />
+            </div>
+            <h3 className="text-[15px] font-bold text-hp-ink">{tr(lang, s.emptyTitle)}</h3>
+            <p className="mx-auto mt-1 max-w-[16rem] text-[12px] text-hp-muted">
+              {tr(lang, s.emptyBody)}
+            </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3.5">
             <AnimatePresence initial={false}>
               {filtered.map((event) => (
                 <CulturalEventCard

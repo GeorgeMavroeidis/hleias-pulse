@@ -13,7 +13,7 @@
   var root = document.documentElement;
   root.classList.toggle("dark", dark);
   root.style.colorScheme = dark ? "dark" : "light";
-  root.style.backgroundColor = dark ? "#000000" : "#ffffff";
+  root.style.backgroundColor = dark ? "#101c2a" : "#f6f0e6";
   var meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#000000" : "#ffffff");
+  if (meta) meta.setAttribute("content", dark ? "#101c2a" : "#f6f0e6");
 })();

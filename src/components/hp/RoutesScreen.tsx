@@ -4,12 +4,18 @@ import { Capacitor } from "@capacitor/core";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Bookmark, X, MessageCircle, Clock, Wallet, Navigation } from "lucide-react";
-import { type Author, type Place, type Comment, type RouteItem } from "@/lib/hp-model";
+import {
+  authorTypeColor,
+  type Author,
+  type Place,
+  type Comment,
+  type RouteItem,
+} from "@/lib/hp-model";
 import { useI18n } from "@/lib/i18n";
 import type { NavigationProvider } from "@/lib/hp/route-navigation";
 import { formatRouteDistance, formatRouteDuration } from "@/lib/hp/route-preview";
 import { ImageBox } from "./ImageBox";
-import { AUTHOR_ROLE_LABEL, ROUTE_FILTERS, roleKey, type RouteFilter } from "./pulse-shared";
+import { ROUTE_FILTERS, type RouteFilter } from "./pulse-shared";
 
 function routeMatchesQuery(route: RouteItem, author: Author, query: string) {
   if (!query.trim()) return true;
@@ -53,8 +59,6 @@ function RouteCard({
   commentCount: number;
   onOpenRoute: (route: RouteItem) => void;
 }) {
-  const { t } = useI18n();
-  const role = roleKey(author.type);
   return (
     // An article, not a button: it holds two controls ("Read route" and "Add to
     // my trip"). Tapping anywhere else on the card still opens the route.
@@ -62,61 +66,72 @@ function RouteCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={() => onOpenRoute(route)}
-      className="cursor-pointer text-left"
+      className="cursor-pointer overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper text-left"
     >
-      <div className="relative overflow-hidden rounded-[22px] shadow-[var(--hp-shadow-card)]">
+      <div className="relative">
         <ImageBox
           src={route.imageUrl}
           alt={route.title}
-          className="aspect-[16/10] w-full"
+          className="h-48 w-full"
           rounded="rounded-none"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" />
-        <div className="absolute bottom-3.5 left-4 right-4 text-hp-on-media">
-          <h3 className="text-[21px] font-bold leading-[1.12] tracking-[-0.025em]">
-            {route.title}
-          </h3>
-          <p className="mt-1 flex items-center gap-2.5 text-[12.5px] font-medium text-white/85">
-            <span className="inline-flex items-center gap-1">
-              <Clock size={12} strokeWidth={2.2} aria-hidden="true" />
-              {route.duration}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Wallet size={12} strokeWidth={2.2} aria-hidden="true" />
-              {route.budget}
-            </span>
-            <span>{t("{n} stops", { n: route.stops.length })}</span>
-          </p>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute bottom-2 left-3 right-3 text-hp-on-media">
+          <div className="mb-1 flex gap-1.5">
+            {route.tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full bg-hp-raised/25 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider backdrop-blur"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+          <h3 className="text-xl font-black leading-tight">{route.title}</h3>
         </div>
       </div>
-      <div className="px-1 pt-3">
-        <div className="flex items-center gap-2.5">
+      <div className="p-3.5">
+        <div className="flex items-center gap-2">
           <img
             src={author.avatarUrl}
-            alt=""
+            alt={author.name}
             width={28}
             height={28}
-            className="h-7 w-7 rounded-full object-cover shadow-[0_0_0_0.5px_var(--hp-border)]"
+            className="h-7 w-7 rounded-full border border-hp-ink/10 object-cover"
             loading="lazy"
           />
-          <div className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-hp-ink">
-            {author.name}{" "}
-            <span className="font-medium text-hp-muted">
-              · {t(AUTHOR_ROLE_LABEL[role] ?? "Local")}
-            </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-bold text-hp-ink">{author.name}</div>
+            <div
+              className="text-[10px] font-bold uppercase tracking-wider"
+              style={{ color: authorTypeColor[author.type] }}
+            >
+              {author.type}
+            </div>
           </div>
-          <span className="inline-flex items-center gap-2.5 text-[12.5px] font-medium text-hp-muted">
-            <span className="inline-flex items-center gap-1">
-              <MessageCircle size={13} strokeWidth={2} aria-hidden="true" />
+        </div>
+        <p className="mt-2 text-[13px] leading-snug text-hp-ink/85">{route.lede}</p>
+        <div className="mt-2.5 flex items-center gap-3 text-[11px] text-hp-muted">
+          <span className="inline-flex items-center gap-1">
+            <Clock size={11} />
+            {route.duration}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Wallet size={11} />
+            {route.budget}
+          </span>
+          <span>{route.stops.length} stops</span>
+          <span className="ml-auto inline-flex items-center gap-2">
+            <span className="inline-flex items-center gap-0.5">
+              <MessageCircle size={11} />
               {commentCount}
             </span>
-            <span className={`inline-flex items-center gap-1 ${saved ? "text-hp-sunset" : ""}`}>
-              <Bookmark size={13} strokeWidth={2} aria-hidden="true" />
+            <span className={`inline-flex items-center gap-0.5 ${saved ? "text-hp-sunset" : ""}`}>
+              <Bookmark size={11} />
               {route.saves + (saved ? 1 : 0)}
             </span>
           </span>
         </div>
-        <p className="mt-2 line-clamp-2 text-[14px] leading-snug text-hp-ink/80">{route.lede}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -124,10 +139,10 @@ function RouteCard({
               event.stopPropagation();
               onOpenRoute(route);
             }}
-            aria-label={t("Read route {route}", { route: route.title })}
-            className="inline-flex h-10 items-center rounded-full bg-hp-ink px-4 text-[13.5px] font-semibold text-hp-bg active:scale-95"
+            aria-label={`Read route ${route.title}`}
+            className="inline-flex min-h-[40px] items-center gap-1 rounded-full bg-hp-ink px-4 text-[12px] font-bold text-hp-paper"
           >
-            {t("Read route")}
+            Read route
           </button>
           <AddToTripButton kind="route" id={route.id} name={route.title} className="px-4" />
         </div>
@@ -156,11 +171,13 @@ function RouteSection({
   if (routes.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-5">
-      <h3 className="hp-section-title">
-        {title}
-        <small>{eyebrow}</small>
-      </h3>
+    <section className="flex flex-col gap-3">
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
+          {eyebrow}
+        </div>
+        <h3 className="text-[17px] font-black text-hp-ink">{title}</h3>
+      </div>
       {routes.map((route) => {
         const author = findAuthor(route.authorId);
         const saved = savedRoutes[route.id];
@@ -218,17 +235,15 @@ export function RoutesScreen({
   );
 
   return (
-    <div className="px-4 pb-28 pt-4">
-      <h2 className="hp-screen-title mb-5">{t("Routes")}</h2>
+    <div className="px-4 pb-28 pt-3">
+      <h2 className="mb-1 text-2xl font-black text-hp-ink">{t("Routes")}</h2>
+      <p className="mb-4 text-[12px] text-hp-muted">
+        {t("Curated local routes with practical stops.")}
+      </p>
       {showMustSee && <MustSeeTodayDeck places={places} onOpenPlace={onOpenPlace} />}
-      <div className="mb-6 flex flex-col gap-3">
-        <label className="flex h-11 items-center gap-2 rounded-xl bg-hp-fill px-3.5">
-          <Search
-            size={16}
-            strokeWidth={2.2}
-            className="shrink-0 text-hp-muted"
-            aria-hidden="true"
-          />
+      <div className="mb-3 rounded-2xl border border-hp-ink/10 bg-hp-raised/60 p-2.5">
+        <div className="flex items-center gap-2 rounded-full border border-hp-ink/10 bg-hp-paper px-3 py-2">
+          <Search size={13} className="text-hp-muted" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -236,27 +251,38 @@ export function RoutesScreen({
             aria-label={t("Search routes")}
             autoComplete="off"
             placeholder={t("Search routes, budget, area...")}
-            className="w-full bg-transparent text-[15px] outline-none placeholder:text-hp-muted"
+            className="w-full bg-transparent text-[13px] outline-none placeholder:text-hp-muted"
           />
-        </label>
-        <div className="hp-pill-row">
-          {ROUTE_FILTERS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => setFilter(option)}
-              aria-pressed={filter === option}
-              className="hp-pill"
-            >
-              {t(option)}
-            </button>
-          ))}
+        </div>
+        <div className="hp-no-scrollbar -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1">
+          {ROUTE_FILTERS.map((option) => {
+            const active = filter === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setFilter(option)}
+                aria-pressed={active}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold ${
+                  active
+                    ? "bg-hp-ink text-hp-paper"
+                    : "border border-hp-ink/10 bg-hp-paper text-hp-ink/70"
+                }`}
+              >
+                {t(option)}
+              </button>
+            );
+          })}
         </div>
       </div>
-      <div className="flex flex-col gap-9">
+      <div className="flex flex-col gap-6">
         <RouteSection
           title={language === "GR" ? "Οι προτάσεις μας" : "What we recommend"}
-          eyebrow={String(recommendedRoutes.length)}
+          eyebrow={
+            language === "GR"
+              ? `${recommendedRoutes.length} επιλεγμένες`
+              : `${recommendedRoutes.length} curated`
+          }
           routes={recommendedRoutes}
           savedRoutes={savedRoutes}
           routeComments={routeComments}
@@ -265,7 +291,11 @@ export function RoutesScreen({
         />
         <RouteSection
           title={language === "GR" ? "Προτείνουν οι ντόπιοι" : "Locals recommend"}
-          eyebrow={String(localRoutes.length)}
+          eyebrow={
+            language === "GR"
+              ? `${localRoutes.length} από την κοινότητα`
+              : `${localRoutes.length} community`
+          }
           routes={localRoutes}
           savedRoutes={savedRoutes}
           routeComments={routeComments}
@@ -273,9 +303,11 @@ export function RoutesScreen({
           onOpenRoute={onOpenRoute}
         />
         {visibleRoutes.length === 0 && (
-          <div className="fd-empty">
-            <strong>{t("No routes match")}</strong>
-            <p>{t("Try another filter or search term.")}</p>
+          <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-hp-paper/60 p-8 text-center">
+            <h3 className="text-[15px] font-bold text-hp-ink">{t("No routes match")}</h3>
+            <p className="mt-1 text-[12px] text-hp-muted">
+              {t("Try another filter or search term.")}
+            </p>
           </div>
         )}
       </div>

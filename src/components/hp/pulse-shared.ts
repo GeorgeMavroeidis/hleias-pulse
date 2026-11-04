@@ -281,29 +281,3 @@ export const DISCOVERY_PLACE_IDS = [
 ];
 
 export const DISCOVERY_MILESTONE = 5;
-
-/** Place types in the reader's language (the data keeps the English key). */
-export const PLACE_TYPE_LABEL: Record<string, string> = {
-  beach: "Beach",
-  culture: "Culture",
-  nature: "Nature",
-  food: "Food",
-  local: "Local spot",
-  village: "Village",
-  night: "Night",
-  sunset: "Sunset",
-};
-
-export const AUTHOR_ROLE_LABEL: Record<string, string> = {
-  LOCAL: "Local",
-  TOURIST: "Visitor",
-  GUIDE: "Guide",
-  BUSINESS: "Business",
-  EDITOR: "Editor",
-};
-
-/** Author types can be compound ("LOCAL_EDITOR"); the badge names the first role. */
-export function roleKey(type: string) {
-  const known = Object.keys(AUTHOR_ROLE_LABEL);
-  return known.find((key) => type === key) ?? known.find((key) => type.includes(key)) ?? "LOCAL";
-}

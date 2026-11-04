@@ -70,10 +70,6 @@ jobs:
       - name: Test — discovery
         run: npm run test:discovery
 
-      - name: Test — explore map media and ranking
-
-        run: npm run test:explore
-
       - name: Test — local browser isolation
         run: npm run test:local-browser
 

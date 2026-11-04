@@ -2,7 +2,6 @@
 
 @theme inline {
   --color-hp-raised: var(--hp-raised);
-  --color-hp-fill: var(--hp-fill);
   --color-hp-on-media: var(--hp-on-media);
   --color-hp-bg: var(--hp-bg);
   --color-hp-paper: var(--hp-paper);
