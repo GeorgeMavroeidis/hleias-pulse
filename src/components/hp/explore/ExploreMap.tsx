@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref, type RefObject } from "react";
 import type {
+  ExpressionSpecification,
   ErrorEvent as MapLibreErrorEvent,
   GeoJSONSource,
   Map as MapLibreMap,
@@ -110,8 +111,34 @@ async function loadProviderBasemap(signal: AbortSignal): Promise<StyleSpecificat
   return (await response.json()) as StyleSpecification;
 }
 
+/**
+ * One language per basemap label ("Πύργος", not "Pyrgos Πύργος"), and no village
+ * names at region scale: there, the photo markers name the places that matter.
+ */
+function applyBasemapLabels(map: MapLibreMap, language: "GR" | "EN") {
+  const name = (
+    language === "GR"
+      ? ["coalesce", ["get", "name:el"], ["get", "name:nonlatin"], ["get", "name"]]
+      : ["coalesce", ["get", "name:en"], ["get", "name:latin"], ["get", "name"]]
+  ) as ExpressionSpecification;
+  for (const layer of map.getStyle().layers) {
+    if (layer.type !== "symbol" || layer.id.startsWith("hp-")) continue;
+    const field = map.getLayoutProperty(layer.id, "text-field");
+    if (!field || !JSON.stringify(field).includes("name:nonlatin")) continue;
+    map.setLayoutProperty(layer.id, "text-field", name);
+  }
+  for (const [id, minzoom] of [
+    ["label_village", 11.5],
+    ["label_other", 12.5],
+  ] as const) {
+    if (map.getLayer(id)) map.setLayerZoomRange(id, minzoom, 24);
+  }
+}
+
 export function ExploreMap(props: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const languageRef = useRef(language);
+  languageRef.current = language;
   const propsRef = useRef(props);
   propsRef.current = props;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -593,6 +620,7 @@ export function ExploreMap(props: Props) {
             instance.setPaintProperty(layer.id, "text-opacity", 0.62);
             instance.setPaintProperty(layer.id, "icon-opacity", 0.45);
           }
+          applyBasemapLabels(instance, languageRef.current);
           // Start the credits as a small (i); one tap expands them.
           container
             ?.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact-show")
@@ -682,6 +710,11 @@ export function ExploreMap(props: Props) {
       if (ref.current) ref.current = null;
     };
   }, [props.cameraCaptureRef]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (mapReady && map) applyBasemapLabels(map, language);
+  }, [mapReady, language]);
 
   // Appearance follows Light/Dark and the time of day without rebuilding the map.
   const { colorScheme, atmosphere } = props.appearance;

@@ -363,3 +363,18 @@ export function placeBloom(
   near.forEach((group) => group.items.slice(1).forEach(add));
   return { halo, far };
 }
+
+/**
+ * An area's name in the reader's language: curated areas go through the
+ * dictionary; a one-place area takes that place's Greek name.
+ */
+export function areaDisplayName(
+  area: { id: string; name: string; places: { greekName?: string; name: string }[] },
+  language: "GR" | "EN",
+  t: (key: string) => string,
+) {
+  if (language !== "GR") return area.name;
+  const solo = area.id.startsWith("solo-") ? area.places[0] : undefined;
+  if (solo?.greekName) return solo.greekName;
+  return t(area.name);
+}

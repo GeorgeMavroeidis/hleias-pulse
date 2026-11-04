@@ -107,6 +107,7 @@ test("Now feed never admits old event posts through display time, tags or busy p
       findAuthor={() => data.authors[0]}
       findPostAuthor={() => data.authors[0]}
       nowMs={NOW}
+      initialFilter="Now"
     />,
   );
   assert.doesNotMatch(html, /OLD_SENTINEL/);

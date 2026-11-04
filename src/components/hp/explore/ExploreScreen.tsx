@@ -32,6 +32,7 @@ import {
   rankPlaces,
   placeBloom,
   type ExploreMedia,
+  areaDisplayName,
 } from "@/lib/hp/explore-media";
 import type { MarkerMotion } from "../pulse-shared";
 import { ExploreChrome } from "./ExploreChrome";
@@ -260,7 +261,7 @@ export function ExploreScreen(props: Props) {
     mode === "search"
       ? t("Results for “{query}”", { query: query.trim() })
       : mode === "area" && selectedArea
-        ? selectedArea.name
+        ? areaDisplayName(selectedArea, language, t)
         : t("Explore Ilia");
   const sky = props.nowMs !== undefined ? iliaSky(props.nowMs) : null;
   const skyText = sky?.sun
@@ -286,7 +287,7 @@ export function ExploreScreen(props: Props) {
       const matches = areaMatchesLens(area, activeLens, discoverySnapshot);
       return {
         id: area.id,
-        name: area.name,
+        name: areaDisplayName(area, language, t),
         count: area.places.length,
         cover: cover.imageUrl,
         behind,

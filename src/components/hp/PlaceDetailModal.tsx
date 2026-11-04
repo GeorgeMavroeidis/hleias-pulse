@@ -192,7 +192,7 @@ export function PlaceDetailModal({
                   {language === "GR" && place.greekName ? place.greekName : place.name}
                 </h2>
                 <p>
-                  {language === "GR" && place.greekName ? place.name : place.greekName} ·{" "}
+                  {language === "EN" && place.greekName ? `${place.greekName} · ` : ""}
                   {place.area}
                 </p>
                 {businessProfile && (
@@ -282,12 +282,15 @@ export function PlaceDetailModal({
                 mood={place.mood}
               />
 
-              <p
-                title={observationLabel(activityMetric?.lastSignalAt, nowMs, language).exact}
-                className="mt-2 text-xs text-hp-muted"
-              >
-                {observationLabel(activityMetric?.lastSignalAt, nowMs, language).relative}
-              </p>
+              {/* Only a known time is worth a line; "unknown" is not information. */}
+              {activityMetric?.lastSignalAt && (
+                <p
+                  title={observationLabel(activityMetric.lastSignalAt, nowMs, language).exact}
+                  className="mt-2 text-[12.5px] text-hp-muted"
+                >
+                  {observationLabel(activityMetric.lastSignalAt, nowMs, language).relative}
+                </p>
+              )}
 
               {hasBusinessDetail && <div className="hp-pd-rule" />}
 
@@ -516,29 +519,35 @@ export function PlaceDetailModal({
                   </div>
                 )}
               </div>
-            </div>
-            <div className="sticky bottom-0 flex items-center gap-2 border-t border-hp-ink/10 bg-hp-paper/90 p-3 backdrop-blur-xl">
-              <div className="min-w-0 flex-1">
-                <AddToTripButton kind="place" id={place.id} name={place.name} />
-              </div>
-              <button
-                type="button"
-                onClick={() => onToggleVisited(place.id)}
-                aria-pressed={visited}
-                className={`inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-bold ${visited ? "bg-hp-sunset/12 text-hp-sunset" : "bg-hp-ink/5 text-hp-ink"}`}
-              >
-                <Check size={15} strokeWidth={visited ? 3 : 2.4} />
-                {t("I've been here")}
-              </button>
               <a
                 href={openStreetMapUrl(place)}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
+                className="mt-6 inline-flex items-center gap-1.5 text-[13px] font-medium text-hp-muted"
               >
-                <ExternalLink size={15} />
+                <ExternalLink size={14} aria-hidden="true" />
+                OpenStreetMap
               </a>
+            </div>
+            <div className="hp-pd-footer sticky bottom-0 grid grid-cols-2 gap-2 p-3">
+              <div className="min-w-0">
+                <AddToTripButton
+                  kind="place"
+                  id={place.id}
+                  name={place.name}
+                  className="hp-add-to-trip--row w-full"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => onToggleVisited(place.id)}
+                aria-pressed={visited}
+                className={`inline-flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold ${visited ? "bg-hp-olive/15 text-hp-olive" : "bg-hp-fill text-hp-ink"}`}
+              >
+                <Check size={16} strokeWidth={visited ? 3 : 2.2} aria-hidden="true" />
+                <span className="truncate">{t("I've been here")}</span>
+              </button>
             </div>
           </motion.div>
         </motion.div>
@@ -723,20 +732,20 @@ function PlaceStats({
     <>
       {hasStats && (
         <div className="hp-pd-stats">
-          <p className="hp-pd-byline">
-            {clauses.length > 0
-              ? clauses.flatMap((node, i) =>
-                  i === 0
-                    ? [node]
-                    : [
-                        <span key={`sep-${i}`} className="hp-pd-sep">
-                          ·
-                        </span>,
-                        node,
-                      ],
-                )
-              : t("No recent reports")}
-          </p>
+          {clauses.length > 0 && (
+            <p className="hp-pd-byline">
+              {clauses.flatMap((node, i) =>
+                i === 0
+                  ? [node]
+                  : [
+                      <span key={`sep-${i}`} className="hp-pd-sep">
+                        ·
+                      </span>,
+                      node,
+                    ],
+              )}
+            </p>
+          )}
           {descriptors.length > 0 && (
             <div className="hp-pd-desc">
               {descriptors.map((d) => (

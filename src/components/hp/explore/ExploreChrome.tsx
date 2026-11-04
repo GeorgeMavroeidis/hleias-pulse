@@ -3,8 +3,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Coffee,
   Gift,
+  Globe,
   Music2,
-  Palette,
   Search,
   TreePalm,
   Users,
@@ -200,7 +200,7 @@ export function ExploreChrome({
                 onClick={onOpenDeals}
                 aria-label={t("Open deals")}
               >
-                <Gift size={18} strokeWidth={2} aria-hidden="true" />
+                <Gift size={19} strokeWidth={1.9} aria-hidden="true" />
               </button>
               <button
                 ref={appearanceButtonRef}
@@ -212,7 +212,7 @@ export function ExploreChrome({
                 aria-expanded={appearanceOpen}
                 aria-controls="xp-appearance-menu"
               >
-                <Palette size={18} strokeWidth={2} aria-hidden="true" />
+                <Globe size={19} strokeWidth={1.9} aria-hidden="true" />
               </button>
             </>
           )}

@@ -4,7 +4,7 @@ import { ArrowUpRight, Bookmark, ChevronLeft, Images, Share2 } from "lucide-reac
 import type { Place } from "@/lib/hp-model";
 import type { MapAreaCluster } from "@/lib/hp/map-clusters";
 import type { PlaceStoryGroup } from "@/lib/hp/place-stories";
-import { thumbnailUrl } from "@/lib/hp/explore-media";
+import { thumbnailUrl, areaDisplayName } from "@/lib/hp/explore-media";
 import { useI18n } from "@/lib/i18n";
 import { DirectionsLink } from "../DirectionsLink";
 import { typeIconSvg } from "./explore-markers";
@@ -209,7 +209,7 @@ export function ExploreCarousel({
                   className="xp-card__hit"
                   onClick={() => onActivate(item)}
                   aria-label={t("Explore {area}, {count} places", {
-                    area: area.name,
+                    area: areaDisplayName(area, language, t),
                     count: area.places.length,
                   })}
                 />
@@ -224,7 +224,7 @@ export function ExploreCarousel({
                   </span>
                 </span>
                 <span className="xp-card__copy">
-                  <strong>{area.name}</strong>
+                  <strong>{areaDisplayName(area, language, t)}</strong>
                   <span className="xp-card__meta">
                     {avatars.length > 0 && (
                       <span className="xp-faces" aria-hidden="true">

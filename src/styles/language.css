@@ -3,78 +3,42 @@
  *
  * Unlayered on purpose: Tailwind utilities live in a cascade layer, so these
  * rules settle the long tail of per-component choices (8px type, 900 weights,
- * a border around every card) without rewriting thirty components by hand.
+ * a border around every card) without rewriting every component by hand.
  * Element and pattern selectors only; no colours are forced on text, so
  * anything over a photo keeps its own contrast.
  */
 
-/* ---- texture ---------------------------------------------------------------- */
-
-.hp-app-shell::after {
-  position: absolute;
-  inset: 0;
-  z-index: 300;
-  content: "";
-  background-image: var(--hp-grain);
-  background-size: 160px 160px;
-  opacity: 0.55;
-  pointer-events: none;
-  mix-blend-mode: multiply;
-}
-
-.dark .hp-app-shell::after {
-  opacity: 0.35;
-  mix-blend-mode: screen;
-}
-
 ::selection {
-  background: color-mix(in srgb, var(--hp-sunset) 26%, transparent);
+  background: color-mix(in srgb, var(--hp-sunset) 24%, transparent);
 }
 
-/* ---- type ------------------------------------------------------------------- */
+/* ---- type -------------------------------------------------------------------
+   One family (SF Pro on Apple devices, Inter elsewhere). Hierarchy comes from
+   size and weight: bold, tight titles over calm, readable body text. */
 
 h1,
 h2,
 .hp-display {
   font-family: var(--hp-font-display);
-  font-weight: 600;
-  letter-spacing: -0.018em;
-  line-height: 1.06;
-}
-
-h3:is(
-  .text-lg,
-  .text-xl,
-  .text-2xl,
-  .text-\[16px\],
-  .text-\[17px\],
-  .text-\[18px\],
-  .text-\[20px\],
-  .text-\[22px\],
-  .text-\[24px\],
-  .text-\[26px\]
-) {
-  font-family: var(--hp-font-display);
-  font-weight: 600;
-  letter-spacing: -0.012em;
+  font-weight: 700;
+  letter-spacing: -0.024em;
   line-height: 1.1;
 }
 
-h1.font-black,
-h2.font-black,
-h3.font-black {
-  font-weight: 600;
+h3 {
+  font-family: var(--hp-font-display);
+  letter-spacing: -0.014em;
 }
 
 /* 900 shouts; a confident bold speaks. */
 .font-black {
-  font-weight: 760;
+  font-weight: 700;
 }
 
-/* Eyebrow labels stay, but as quiet editorial small caps. */
+/* Eyebrow labels stay, but quiet: smaller tracking, no extra weight. */
 .uppercase:is(.tracking-wider, .tracking-widest, .tracking-wide) {
-  letter-spacing: 0.08em;
-  font-weight: 650;
+  letter-spacing: 0.04em;
+  font-weight: 600;
 }
 
 /* Nothing in a premium app is set in 8px type. */
@@ -102,22 +66,91 @@ h3.font-black {
 }
 
 .rounded-3xl {
-  border-radius: 26px;
+  border-radius: 22px;
 }
 
 /* Outline pills become soft fills: fewer lines on screen. */
 .rounded-full.border:is(.border-hp-ink\/10, .border-hp-ink\/15):not(:focus-visible) {
   border-color: transparent;
-  background-color: color-mix(in srgb, var(--hp-ink) 6%, transparent);
+  background-color: var(--hp-fill);
 }
 
 .border-dashed {
-  border-color: color-mix(in srgb, var(--hp-ink) 16%, transparent);
+  border-color: color-mix(in srgb, var(--hp-ink) 14%, transparent);
 }
 
-/* Photos sit a touch warmer and softer, like prints. */
-img.object-cover {
-  image-rendering: auto;
+/* One chip style for the whole app: a soft fill, ink when chosen. */
+.hp-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 17px;
+  background: var(--hp-fill);
+  color: var(--hp-ink);
+  font: 600 13.5px/1 var(--hp-font-body);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 120ms ease;
+}
+
+.hp-pill svg {
+  opacity: 0.75;
+}
+
+.hp-pill[aria-pressed="true"] {
+  background: var(--hp-ink);
+  color: var(--hp-bg);
+}
+
+.hp-pill[aria-pressed="true"] svg {
+  opacity: 1;
+}
+
+.hp-pill:active {
+  transform: scale(0.95);
+}
+
+.hp-pill-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 -16px;
+  padding: 0 16px;
+  scrollbar-width: none;
+}
+
+.hp-pill-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* Screen titles: the iOS large title — one per screen, nothing stacked under it. */
+.hp-screen-title {
+  color: var(--hp-ink);
+  font: 700 30px/1.08 var(--hp-font-display);
+  letter-spacing: -0.03em;
+}
+
+.hp-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--hp-ink);
+  font: 700 20px/1.15 var(--hp-font-display);
+  letter-spacing: -0.022em;
+}
+
+.hp-section-title small {
+  color: var(--hp-text-secondary);
+  font: 500 14px/1 var(--hp-font-body);
+  letter-spacing: 0;
 }
 
 /* Pressed things give way slightly. */

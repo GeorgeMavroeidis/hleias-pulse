@@ -1,9 +1,8 @@
 import { useTheme } from "@/lib/theme-provider";
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Search, Check, Gift, Palette, X, Sunrise, Sunset } from "lucide-react";
+import { Search, Check, Gift, Globe, X, Sunrise, Sunset } from "lucide-react";
 import { formatCountdown, iliaSky, iliaTime } from "@/lib/hp/sky";
-import type { TemporalPeriod } from "@/lib/hp/temporal-atmosphere";
 import { type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -50,12 +49,9 @@ interface TopBarProps {
   onOpenAccount: () => void;
   onOpenAuth: () => void;
   onOpenDeals: () => void;
-  /** The shared clock and Ilia's light: the header's sky follows them. */
-  nowMs?: number;
-  period?: TemporalPeriod | null;
 }
 
-/** "Καλησπέρα · 18:42 · Ηλιοβασίλεμα σε 38′" — what the light is doing in Ilia now. */
+/** "Ηλιοβασίλεμα σε 38′" — what the light is doing in Ilia now (the map overview). */
 export function SkyLine({ nowMs, className = "" }: { nowMs: number; className?: string }) {
   const { language, t } = useI18n();
   const sky = iliaSky(nowMs);
@@ -92,8 +88,6 @@ export function TopBar({
   onOpenAccount,
   onOpenAuth,
   onOpenDeals,
-  nowMs,
-  period = null,
 }: TopBarProps) {
   const { language, t } = useI18n();
   const reducedMotion = useReducedMotion();
@@ -133,32 +127,15 @@ export function TopBar({
   }, [appearanceOpen, setAppearanceOpen]);
 
   return (
-    <div className="hp-topbar hp-sky relative z-[60]" data-period={period ?? "unavailable"}>
+    <div className="hp-topbar relative z-[60]">
       <div className="hp-topbar-row hp-safe-px">
         <div className="hp-topbar-brand" aria-label="ΗΛΕΙΑ PULSE">
-          <img
-            src="/brand/ilia-pulse-logo.png"
-            alt=""
-            width={38}
-            height={38}
-            aria-hidden="true"
-            className="hp-topbar-logo"
-          />
           <span className="hp-wordmark" aria-hidden="true">
             <span className="hp-wordmark__name">Ηλεία</span>
             <span className="hp-wordmark__pulse">pulse</span>
           </span>
         </div>
         <div className="hp-topbar-actions">
-          <button
-            type="button"
-            onClick={onOpenDeals}
-            className="hp-deals-action"
-            aria-label={t("Open deals")}
-          >
-            <Gift size={17} strokeWidth={2} aria-hidden="true" />
-            <span className="hp-deals-action-label">{t("Deals")}</span>
-          </button>
           <Button
             variant="hpGhost"
             size="hpIcon"
@@ -173,8 +150,17 @@ export function TopBar({
             aria-expanded={showSearch}
             aria-pressed={searchActive}
           >
-            <Search size={18} strokeWidth={2} aria-hidden="true" />
+            <Search size={21} strokeWidth={1.9} aria-hidden="true" />
           </Button>
+          <button
+            type="button"
+            onClick={onOpenDeals}
+            className="hp-deals-action"
+            aria-label={t("Open deals")}
+          >
+            <Gift size={21} strokeWidth={1.8} aria-hidden="true" />
+            <span className="hp-deals-action-label">{t("Deals")}</span>
+          </button>
           <Button
             variant="hpGhost"
             size="hpIcon"
@@ -190,12 +176,11 @@ export function TopBar({
             aria-controls="hp-appearance-menu"
             data-marker-motion={markerMotion}
           >
-            <Palette size={18} strokeWidth={2} aria-hidden="true" />
+            <Globe size={21} strokeWidth={1.8} aria-hidden="true" />
           </Button>
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
-      {nowMs !== undefined && <SkyLine nowMs={nowMs} className="hp-safe-px" />}
       <AnimatePresence>
         {appearanceOpen && (
           <motion.div

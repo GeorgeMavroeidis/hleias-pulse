@@ -2233,6 +2233,7 @@ export function PulseApp() {
               findPlace={findPlace}
               findAuthor={findAuthor}
               findPostAuthor={findPostAuthor}
+              onCreatePost={places.length > 0 ? () => openComposer("post") : undefined}
             />
           </div>
           {places.length > 0 && (
@@ -2281,7 +2282,8 @@ export function PulseApp() {
     if (tab === "meet") {
       return (
         <div className="flex h-full flex-col">
-          <div className="hp-segmented mx-4 mt-3 shrink-0" role="group" aria-label={t("Meet")}>
+          <h2 className="hp-screen-title shrink-0 px-4 pt-4">{t("Meet")}</h2>
+          <div className="hp-segmented mx-4 mb-1 mt-4 shrink-0" role="group" aria-label={t("Meet")}>
             {(
               [
                 { id: "community" as MeetSubTab, label: t("Community"), Icon: CalendarHeart },
@@ -2452,8 +2454,6 @@ export function PulseApp() {
               onOpenAccount={() => setProfileOpen(true)}
               onOpenAuth={() => setAuthOpen(true)}
               onOpenDeals={() => setTab("deals")}
-              nowMs={nowMs}
-              period={temporalAtmosphere.period}
             />
           )}
           {/* The global vibe-chip row was removed in the 2026-11 redesign: it only

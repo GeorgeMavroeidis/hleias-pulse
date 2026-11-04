@@ -1,14 +1,22 @@
-import { DISCOVERY_PLACE_IDS, DISCOVERY_MILESTONE } from "./pulse-shared";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { motion } from "framer-motion";
+import {
+  AUTHOR_ROLE_LABEL,
+  DISCOVERY_MILESTONE,
+  DISCOVERY_PLACE_IDS,
+  PLACE_TYPE_LABEL,
+  roleKey,
+} from "./pulse-shared";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Map as MapIcon,
+  BadgeCheck,
   Bookmark,
   Heart,
   MessageCircle,
-  Share2,
+  Send,
   MapPin,
   HelpCircle,
+  Sparkles,
 } from "lucide-react";
 import {
   typeColor,
@@ -63,6 +71,8 @@ export function PulseFeed({
   findPostAuthor,
   previewMode = false,
   nowMs = Date.now(),
+  initialFilter = "All",
+  onCreatePost,
 }: {
   posts: Post[];
   storyGroups: PlaceStoryGroup[];
@@ -88,13 +98,14 @@ export function PulseFeed({
   /** Keep moderation and external sharing actions out of the local simulation. */
   previewMode?: boolean;
   nowMs?: number;
+  /** The feed opens on everything, newest first; "Now" is one tap away. */
+  initialFilter?: FeedFilter;
+  onCreatePost?: () => void;
 }) {
   const { t, language } = useI18n();
   const moderation = useModeration();
-  const [filter, setFilter] = useState(previewMode ? "All" : "Now");
-  const filters = previewMode
-    ? ["All", "Now", "Tonight", "Weekend", "Local tips"]
-    : ["Now", "Tonight", "Weekend", "Local tips"];
+  const [filter, setFilter] = useState<FeedFilter>(initialFilter);
+  const filters = FEED_FILTERS;
   const visiblePosts = posts.filter((post) => {
     const place = findPlace(post.placeId);
     const author = findPostAuthor(post);
@@ -152,7 +163,33 @@ export function PulseFeed({
       <div className="fd-stream">
         {visiblePosts.length === 0 && (
           <div className="fd-empty">
-            <p>{t("No posts match this filter yet.")}</p>
+            <span className="fd-empty__icon" aria-hidden="true">
+              <Sparkles size={22} strokeWidth={1.9} />
+            </span>
+            <strong>{t(filter === "Now" ? "Quiet right now" : "Nothing here yet")}</strong>
+            <p>
+              {t(
+                filter === "Now"
+                  ? "No one has posted in the last few hours. See what locals shared earlier."
+                  : "No posts match this filter yet.",
+              )}
+            </p>
+            <div className="fd-empty__actions">
+              {filter !== "All" && (
+                <button type="button" className="fd-button" onClick={() => setFilter("All")}>
+                  {t("See all posts")}
+                </button>
+              )}
+              {onCreatePost && !previewMode && (
+                <button
+                  type="button"
+                  className="fd-button fd-button--primary"
+                  onClick={onCreatePost}
+                >
+                  {t("Share a spot")}
+                </button>
+              )}
+            </div>
           </div>
         )}
         {visiblePosts.map((post) => {
@@ -176,8 +213,8 @@ export function PulseFeed({
                 <img
                   src={a.avatarUrl}
                   alt=""
-                  width={38}
-                  height={38}
+                  width={36}
+                  height={36}
                   className="fd-avatar"
                   data-role={a.type}
                   loading="lazy"
@@ -185,8 +222,11 @@ export function PulseFeed({
                 <div className="fd-post__who">
                   <p className="fd-post__name">
                     <span>{a.name}</span>
-                    <span className="fd-role" data-role={a.type}>
-                      {t(AUTHOR_ROLE_LABEL[a.type] ?? "Local")}
+                    <span className="fd-role" data-role={roleKey(a.type)}>
+                      {(roleKey(a.type) === "LOCAL" || roleKey(a.type) === "GUIDE") && (
+                        <BadgeCheck size={14} strokeWidth={2.2} aria-hidden="true" />
+                      )}
+                      {t(AUTHOR_ROLE_LABEL[roleKey(a.type)] ?? "Local")}
                     </span>
                   </p>
                   <button
@@ -197,10 +237,6 @@ export function PulseFeed({
                   >
                     <MapPin size={12} strokeWidth={2.2} aria-hidden="true" />
                     <span>{placeName}</span>
-                    <span aria-hidden="true">·</span>
-                    <span title={observationLabel(post.createdAt, nowMs, language).exact}>
-                      {displayPostTime(post, nowMs, language)}
-                    </span>
                   </button>
                 </div>
                 {!previewMode && (
@@ -217,11 +253,12 @@ export function PulseFeed({
                 )}
               </header>
 
-              <button
-                type="button"
-                onClick={() => onOpenPost(post)}
-                className="fd-post__media"
-                aria-label={`Open post about ${p.name}`}
+              <FeedPhoto
+                label={t("Open post about {place}", { place: placeName })}
+                onOpen={() => onOpenPost(post)}
+                onDoubleTap={() => {
+                  if (!liked) toggleLike(post.id);
+                }}
               >
                 <ImageBox
                   src={post.imageUrl}
@@ -234,7 +271,7 @@ export function PulseFeed({
                     <HelpCircle size={13} strokeWidth={2.4} aria-hidden="true" /> {t("Question")}
                   </span>
                 )}
-              </button>
+              </FeedPhoto>
 
               <div className="fd-post__actions">
                 <button
@@ -244,7 +281,7 @@ export function PulseFeed({
                   data-on={liked ? "true" : "false"}
                   aria-label={t(liked ? "Unlike post" : "Like post")}
                 >
-                  <Heart size={22} strokeWidth={1.9} fill={liked ? "currentColor" : "none"} />
+                  <Heart size={24} strokeWidth={1.8} fill={liked ? "currentColor" : "none"} />
                   <span>{lc}</span>
                 </button>
                 <button
@@ -253,7 +290,7 @@ export function PulseFeed({
                   className="fd-act"
                   aria-label={t("Open comments")}
                 >
-                  <MessageCircle size={22} strokeWidth={1.9} />
+                  <MessageCircle size={23} strokeWidth={1.8} />
                   <span>
                     {post.kind === "question"
                       ? commentCount === 0
@@ -271,7 +308,7 @@ export function PulseFeed({
                     aria-label={t("Share post")}
                     className="fd-act"
                   >
-                    <Share2 size={21} strokeWidth={1.9} />
+                    <Send size={22} strokeWidth={1.8} />
                   </button>
                 )}
                 <span className="fd-post__spacer" />
@@ -288,10 +325,11 @@ export function PulseFeed({
                   type="button"
                   onClick={() => toggleSavePost(post.id)}
                   className="fd-act"
+                  data-kind="save"
                   data-on={sv ? "true" : "false"}
                   aria-label={t(sv ? "Unsave post" : "Save post")}
                 >
-                  <Bookmark size={21} strokeWidth={1.9} fill={sv ? "currentColor" : "none"} />
+                  <Bookmark size={23} strokeWidth={1.8} fill={sv ? "currentColor" : "none"} />
                 </button>
               </div>
 
@@ -309,6 +347,12 @@ export function PulseFeed({
                     {post.tags.map((tag) => `#${tag}`).join("  ")}
                   </span>
                 )}
+                <span
+                  className="fd-post__time"
+                  title={observationLabel(post.createdAt, nowMs, language).exact}
+                >
+                  {displayPostTime(post, nowMs, language)}
+                </span>
               </button>
             </motion.article>
           );
@@ -318,13 +362,77 @@ export function PulseFeed({
   );
 }
 
-const AUTHOR_ROLE_LABEL: Record<string, string> = {
-  LOCAL: "Local",
-  TOURIST: "Visitor",
-  GUIDE: "Guide",
-  BUSINESS: "Business",
-  EDITOR: "Editor",
-};
+export const FEED_FILTERS = ["All", "Now", "Tonight", "Weekend", "Local tips"] as const;
+export type FeedFilter = (typeof FEED_FILTERS)[number];
+
+/** Tap opens the post; double-tap likes it with a heart that blooms over the photo. */
+function FeedPhoto({
+  label,
+  onOpen,
+  onDoubleTap,
+  children,
+}: {
+  label: string;
+  onOpen: () => void;
+  onDoubleTap: () => void;
+  children: ReactNode;
+}) {
+  const lastTap = useRef(0);
+  const openTimer = useRef<number | null>(null);
+  const burstTimer = useRef<number | null>(null);
+  const [burst, setBurst] = useState<number | null>(null);
+  useEffect(
+    () => () => {
+      if (openTimer.current !== null) window.clearTimeout(openTimer.current);
+      if (burstTimer.current !== null) window.clearTimeout(burstTimer.current);
+    },
+    [],
+  );
+  return (
+    <button
+      type="button"
+      className="fd-post__media"
+      aria-label={label}
+      onClick={(event) => {
+        // Keyboard activation has no double-tap: open straight away.
+        if (event.detail === 0) return onOpen();
+        const now = event.timeStamp;
+        if (now - lastTap.current < 300) {
+          lastTap.current = 0;
+          if (openTimer.current !== null) window.clearTimeout(openTimer.current);
+          openTimer.current = null;
+          onDoubleTap();
+          setBurst(now);
+          if (burstTimer.current !== null) window.clearTimeout(burstTimer.current);
+          burstTimer.current = window.setTimeout(() => setBurst(null), 820);
+          return;
+        }
+        lastTap.current = now;
+        openTimer.current = window.setTimeout(() => {
+          openTimer.current = null;
+          onOpen();
+        }, 300);
+      }}
+    >
+      {children}
+      <AnimatePresence>
+        {burst !== null && (
+          <motion.span
+            key={burst}
+            className="fd-burst"
+            aria-hidden="true"
+            initial={{ opacity: 0, scale: 0.3 }}
+            animate={{ opacity: 1, scale: [0.3, 1.18, 1] }}
+            exit={{ opacity: 0, scale: 1.25 }}
+            transition={{ duration: 0.42, ease: [0.34, 1.4, 0.5, 1] }}
+          >
+            <Heart size={104} strokeWidth={0} fill="currentColor" />
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  );
+}
 
 /* ============== "Must-see today" deck (Tourist orientation, Routes tab) ============== */
 // TEMP stopgap until a real `places.featured` flag exists (phase 2). Hotness
@@ -379,16 +487,8 @@ export function MustSeeTodayDeck({
   const copies = mustSee.length < 2 ? 1 : Math.max(3, Math.ceil(18 / mustSee.length));
 
   return (
-    <section className="mb-6 flex flex-col gap-3">
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-          {language === "GR" ? `${mustSee.length} επιλογές` : `${mustSee.length} picks`}
-        </div>
-        <h3 className="text-[17px] font-black text-hp-ink">{t("Must-see today")}</h3>
-        <p className="text-[12px] text-hp-muted">
-          {t("A quick first look for visitors — the spots to begin with.")}
-        </p>
-      </div>
+    <section className="mb-8 flex flex-col gap-3">
+      <h3 className="hp-section-title">{t("Must-see today")}</h3>
       <div className="hp-marquee">
         <div
           className="hp-marquee__track"
@@ -408,26 +508,29 @@ export function MustSeeTodayDeck({
                   tabIndex={copy > 0 ? -1 : undefined}
                   onClick={() => onOpenPlace(place)}
                   aria-label={t("Open {place}", { place: place.name })}
-                  className="hp-marquee__card overflow-hidden rounded-2xl border border-hp-ink/10 bg-hp-paper text-left"
+                  className="hp-marquee__card text-left"
                 >
-                  <ImageBox
-                    src={place.imageUrl}
-                    alt={place.name}
-                    className="h-24 w-full"
-                    rounded="rounded-none"
-                  />
-                  <div className="p-2">
-                    <div
-                      className="text-[10px] font-bold uppercase tracking-wider"
-                      style={{ color: typeColor[place.type] }}
-                    >
-                      {place.type}
-                    </div>
-                    <div className="line-clamp-1 text-[12px] font-bold text-hp-ink">
-                      {place.name}
-                    </div>
-                    <div className="text-[10px] text-hp-muted">{place.area}</div>
-                  </div>
+                  <span className="block overflow-hidden rounded-2xl shadow-[var(--hp-shadow-card)]">
+                    <ImageBox
+                      src={place.imageUrl}
+                      alt={place.name}
+                      className="aspect-[4/5] w-full"
+                      rounded="rounded-none"
+                    />
+                  </span>
+                  <span className="mt-2 block truncate px-0.5 text-[14px] font-semibold text-hp-ink">
+                    {language === "GR" && place.greekName ? place.greekName : place.name}
+                  </span>
+                  <span className="flex items-center gap-1.5 px-0.5 text-[12.5px] text-hp-muted">
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: typeColor[place.type] }}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">
+                      {t(PLACE_TYPE_LABEL[place.type] ?? place.area)}
+                    </span>
+                  </span>
                 </button>
               ))}
             </div>

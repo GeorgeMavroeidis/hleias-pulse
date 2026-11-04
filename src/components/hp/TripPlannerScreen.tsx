@@ -106,9 +106,7 @@ function PracticalTiles({
   const counts = sectionCounts(ESSENTIALS_CARDS, REGION, showDrafts);
   return (
     <section className="mt-6">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-hp-muted">
-        {t("Good to know")}
-      </p>
+      <p className="hp-section-title mb-3">{t("Good to know")}</p>
       <div className="grid grid-cols-2 gap-2.5">
         {ESSENTIALS_SECTIONS.map((section) => {
           const Icon = SECTION_ICONS[section.id];
@@ -265,7 +263,7 @@ export function TripPlannerScreen({
           subtitle={t("Plan your days in a minute")}
         />
         <div className="hp-card-lift rounded-3xl border border-hp-ink/10 bg-hp-paper p-5 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-hp-sunset text-hp-on-media">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-hp-sunset/12 text-hp-sunset">
             <CalendarDays size={22} />
           </div>
           <h3 className="text-[17px] font-black text-hp-ink">
@@ -297,7 +295,7 @@ export function TripPlannerScreen({
               setPlan(createPlan(draftDays));
               setView("plan");
             }}
-            className="mt-5 w-full rounded-full bg-hp-sunset py-3 text-[13px] font-bold text-hp-on-media"
+            className="mt-5 h-12 w-full rounded-full bg-hp-sunset text-[15px] font-semibold text-white active:scale-[0.98]"
           >
             {t("Start planning")}
           </button>

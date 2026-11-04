@@ -1791,84 +1791,61 @@
   font-weight: 650;
 }
 
-/* Mood chips: lighter, no shadow — they float, they do not shout. */
+/* Mood chips: compact glass capsules — they float, they do not shout. */
 .xp-lens.xp-glass {
-  height: 32px;
+  height: 34px;
+  padding: 0 13px;
   box-shadow:
     inset 0 0 0 0.5px var(--hp-glass-edge),
-    0 0 0 0.5px var(--hp-glass-hairline);
-  font-size: 13px;
-  font-weight: 560;
+    0 0 0 0.5px var(--hp-glass-hairline),
+    0 2px 8px rgb(0 0 0 / 0.06);
+  font: 600 13.5px/1 var(--hp-font-body);
+  letter-spacing: -0.005em;
 }
 
 .xp-lens svg {
-  opacity: 0.7;
+  width: 15px;
+  height: 15px;
+  opacity: 0.75;
 }
 
-/* The carousel rises out of a soft wash of the canvas instead of a hard pill. */
-.xp-carousel::before {
-  position: absolute;
-  inset: -70px 0 calc(-1 * var(--xp-nav-clearance, 92px)) 0;
-  z-index: -1;
-  content: "";
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--hp-bg) 92%, transparent) 0%,
-    color-mix(in srgb, var(--hp-bg) 70%, transparent) 55%,
-    transparent 100%
-  );
-  pointer-events: none;
+.xp-lens[aria-pressed="true"].xp-glass {
+  background: var(--hp-ink);
+  color: var(--hp-bg);
 }
 
-.xp-carousel__title.xp-glass {
-  height: auto;
-  padding: 0 4px;
-  background: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: none;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-}
-
+/* The carousel heading: one legible glass capsule, never text loose on the map. */
 .xp-carousel__title strong {
-  font: 600 21px/1.05 var(--hp-font-display);
-  letter-spacing: -0.02em;
+  font: 700 15px/1 var(--hp-font-display);
+  letter-spacing: -0.015em;
 }
 
 .xp-carousel__title span {
   color: var(--hp-text-secondary);
-  font: italic 500 14px/1 var(--hp-font-display);
+  font: 550 13px/1 var(--hp-font-body);
 }
 
-.xp-carousel__back.xp-glass {
-  align-self: center;
+.xp-carousel__title span::before {
+  margin-right: 8px;
+  content: "·";
 }
 
 .xp-chip {
   font-weight: 600;
 }
 
-.xp-carousel::before {
-  inset: -110px 0 calc(-1 * var(--xp-nav-clearance, 92px)) 0;
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--hp-bg) 96%, transparent) 0%,
-    color-mix(in srgb, var(--hp-bg) 88%, transparent) 50%,
-    color-mix(in srgb, var(--hp-bg) 40%, transparent) 78%,
-    transparent 100%
-  );
-}
-
-.xp-carousel__title strong,
-.xp-carousel__title span {
-  text-shadow:
-    0 0 10px var(--hp-bg),
-    0 0 18px var(--hp-bg);
-}
-
+/* Crowded at this zoom: a small dot that grows back into a photo as you zoom in. */
 .xp-area[data-collapsed="true"] .xp-area__stack {
-  transform: scale(0.3);
-  opacity: 0.85;
+  transform: scale(0.22);
+}
+
+.xp-area[data-collapsed="true"] .xp-area__photo {
+  border-width: 10px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hp-ink) 72%, var(--hp-bg));
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+}
+
+.xp-area[data-collapsed="true"] .xp-area__photo img {
+  opacity: 0;
 }
