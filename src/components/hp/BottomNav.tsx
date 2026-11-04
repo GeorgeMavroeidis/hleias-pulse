@@ -9,11 +9,14 @@ export function BottomNav({
   tab,
   setTab,
   onOpenTrip,
+  floating = false,
 }: {
   tab: Tab;
   setTab: (t: NavTab) => void;
   /** Shows the centre Trip button. Omitted where there is no planner (the preview). */
   onOpenTrip?: () => void;
+  /** Over the map: a glass capsule floating above the map instead of a bar below it. */
+  floating?: boolean;
 }) {
   const { t } = useI18n();
   const left = TAB_ITEMS.slice(0, 2);
@@ -41,7 +44,10 @@ export function BottomNav({
   };
 
   return (
-    <nav className="hp-bottom-nav relative z-50 shrink-0" aria-label={t("Main navigation")}>
+    <nav
+      className={`hp-bottom-nav z-50 shrink-0 ${floating ? "hp-bottom-nav--floating" : "relative"}`}
+      aria-label={t("Main navigation")}
+    >
       <div className={`grid ${onOpenTrip ? "grid-cols-5" : "grid-cols-4"} items-end`}>
         {left.map(renderTab)}
 

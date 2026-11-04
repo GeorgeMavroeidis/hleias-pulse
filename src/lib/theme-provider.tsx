@@ -45,7 +45,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     const root = document.documentElement;
-    const background = colorScheme === "dark" ? "#101c2a" : "#f6f0e6";
+    const background = colorScheme === "dark" ? "#0b0c0e" : "#f4f3ef";
     root.classList.toggle("dark", colorScheme === "dark");
     root.style.colorScheme = colorScheme;
     root.style.backgroundColor = background;

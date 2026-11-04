@@ -66,19 +66,38 @@
   --hp-space-4: 1rem;
   --hp-space-6: 1.5rem;
   --hp-space-8: 2rem;
-  --hp-radius-control: 0.5rem;
-  --hp-radius-card: 0.75rem;
-  --hp-radius-surface: 1.5rem;
+  --hp-radius-control: 0.75rem;
+  --hp-radius-card: 1.125rem;
+  --hp-radius-surface: 1.75rem;
   --hp-control-target: 44px;
   --hp-type-control: 0.875rem;
   --hp-type-meta: 0.75rem;
-  --hp-type-title: 1rem;
-  --hp-text-secondary: #746c61;
-  --hp-text-accent: #ad471f;
-  --hp-focus-color: var(--hp-deep);
-  --hp-shadow-control: 0 2px 8px rgb(23 20 17 / 0.07);
-  --hp-shadow-sheet: 0 -3px 16px rgb(23 20 17 / 0.07);
-  --hp-shadow-popover: 0 6px 24px rgb(23 20 17 / 0.12);
+  --hp-type-title: 1.0625rem;
+  --hp-text-secondary: #6b6b73;
+  --hp-text-accent: #c9401c;
+  --hp-focus-color: var(--hp-sunset);
+  /* Layered shadows: a tight contact shadow plus a soft ambient one. */
+  --hp-shadow-control: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 14px rgb(0 0 0 / 0.07);
+  --hp-shadow-float: 0 2px 6px rgb(0 0 0 / 0.07), 0 14px 36px rgb(0 0 0 / 0.14);
+  --hp-shadow-sheet: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -16px 48px rgb(0 0 0 / 0.12);
+  --hp-shadow-popover: 0 4px 12px rgb(0 0 0 / 0.08), 0 22px 48px rgb(0 0 0 / 0.16);
+  /* Glass: translucent surfaces that float over the map and photos. */
+  --hp-glass: rgb(255 255 255 / 0.76);
+  --hp-glass-strong: rgb(255 255 255 / 0.92);
+  --hp-glass-edge: rgb(255 255 255 / 0.65);
+  --hp-glass-hairline: rgb(0 0 0 / 0.07);
+  --hp-glass-blur: saturate(180%) blur(20px);
+  /* The one gradient: reserved for live things (stories, live places). */
+  --hp-story-ring: conic-gradient(
+    from 210deg,
+    #ffc247,
+    #ff5b35 28%,
+    #f0386b 52%,
+    #8b5cf6 78%,
+    #ffc247
+  );
+  --hp-live: #ff3b5c;
+  --hp-photo-frame: #ffffff;
   --hp-safe-left: max(var(--hp-space-4), env(safe-area-inset-left, 0px));
   --hp-safe-right: max(var(--hp-space-4), env(safe-area-inset-right, 0px));
   --hp-motion-state: 160ms;
@@ -88,23 +107,27 @@
   --hp-motion-selection: 650ms;
   --hp-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --hp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --hp-font-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* SF Pro on Apple devices (the native feel), Inter everywhere else. Both cover Greek. */
+  --hp-font-body:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
   --hp-font-display:
-    "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  /* Ηλεία Pulse palette */
-  --hp-bg: #f6f0e6;
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  /* Ηλεία Pulse palette — neutral canvas so photos carry the colour. */
+  --hp-bg: #f4f3ef;
   --hp-raised: #ffffff;
-  --hp-on-media: #fff8ec;
-  --hp-paper: #fff8ec;
-  --hp-ink: #171411;
-  --hp-muted: #7c7468;
-  --hp-sea: #7fc8de;
-  --hp-deep: #0e3a5b;
-  --hp-olive: #667a3d;
-  --hp-sunset: #e06a32;
-  --hp-night: #241b3d;
-  --hp-purple: #7a4dd8;
-  --hp-border: rgba(23, 20, 17, 0.1);
+  --hp-on-media: #ffffff;
+  --hp-paper: #ffffff;
+  --hp-ink: #121214;
+  --hp-muted: #6b6b73;
+  --hp-sea: #1f9bd1;
+  --hp-deep: #0c3550;
+  --hp-olive: #5c7a3a;
+  --hp-sunset: #ff5b35;
+  --hp-night: #17132b;
+  --hp-purple: #7b5cfa;
+  --hp-border: rgb(18 18 20 / 0.08);
 
   --background: var(--hp-bg);
   --foreground: var(--hp-ink);
@@ -112,16 +135,16 @@
   --card-foreground: var(--hp-ink);
   --popover: var(--hp-paper);
   --popover-foreground: var(--hp-ink);
-  --primary: var(--hp-deep);
+  --primary: var(--hp-ink);
   --primary-foreground: var(--hp-paper);
-  --secondary: #ece4d4;
+  --secondary: #efeeea;
   --secondary-foreground: var(--hp-ink);
-  --muted: #ece4d4;
+  --muted: #efeeea;
   --muted-foreground: var(--hp-muted);
   --accent: var(--hp-sunset);
-  --accent-foreground: var(--hp-paper);
+  --accent-foreground: #ffffff;
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: #fff8ec;
+  --destructive-foreground: #ffffff;
   --border: var(--hp-border);
   --input: var(--hp-border);
   --ring: var(--hp-sunset);
@@ -142,25 +165,36 @@
 
 .dark {
   --hp-text-secondary: var(--hp-muted);
-  --hp-text-accent: var(--hp-sunset);
-  --hp-bg: #101c2a;
-  --hp-paper: #192a3b;
-  --hp-ink: #f6f0e6;
-  --hp-muted: #b3bdc8;
-  --hp-sea: #8bd5e8;
-  --hp-deep: #91cce9;
-  --hp-olive: #b5cb8b;
-  --hp-sunset: #ff9b66;
-  --hp-purple: #bd9aef;
-  --hp-border: rgb(246 240 230 / 16%);
-  --hp-raised: #24394d;
+  --hp-text-accent: #ff8f70;
+  --hp-bg: #0b0c0e;
+  --hp-paper: #151618;
+  --hp-ink: #f4f4f6;
+  --hp-muted: #9b9ba4;
+  --hp-sea: #5ac8fa;
+  --hp-deep: #8dcbf2;
+  --hp-olive: #a9c98a;
+  --hp-sunset: #ff6b47;
+  --hp-purple: #b7a3ff;
+  --hp-border: rgb(255 255 255 / 0.09);
+  --hp-raised: #1e1f23;
+  --hp-on-media: #ffffff;
+  --hp-shadow-control: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 14px rgb(0 0 0 / 0.32);
+  --hp-shadow-float: 0 2px 6px rgb(0 0 0 / 0.4), 0 16px 40px rgb(0 0 0 / 0.5);
+  --hp-shadow-sheet: 0 -1px 0 rgb(255 255 255 / 0.05), 0 -16px 48px rgb(0 0 0 / 0.55);
+  --hp-shadow-popover: 0 4px 12px rgb(0 0 0 / 0.45), 0 22px 48px rgb(0 0 0 / 0.55);
+  --hp-glass: rgb(26 27 31 / 0.72);
+  --hp-glass-strong: rgb(26 27 31 / 0.9);
+  --hp-glass-edge: rgb(255 255 255 / 0.1);
+  --hp-glass-hairline: rgb(0 0 0 / 0.5);
+  --hp-live: #ff4d6a;
+  --hp-photo-frame: #f4f4f6;
   --background: var(--hp-bg);
   --foreground: var(--hp-ink);
   --card: var(--hp-paper);
   --card-foreground: var(--hp-ink);
   --popover: var(--hp-paper);
   --popover-foreground: var(--hp-ink);
-  --primary: var(--hp-deep);
+  --primary: var(--hp-ink);
   --primary-foreground: var(--hp-bg);
   --secondary: var(--hp-raised);
   --secondary-foreground: var(--hp-ink);

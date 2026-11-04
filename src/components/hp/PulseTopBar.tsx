@@ -67,10 +67,7 @@ export function TopBar({
 }: TopBarProps) {
   const { language, t } = useI18n();
   const reducedMotion = useReducedMotion();
-  const { preference, setPreference } = useTheme();
   const searchActive = showSearch || query.trim().length > 0;
-  const activeMarkerMotion =
-    MARKER_MOTION_OPTIONS.find((theme) => theme.id === markerMotion) ?? MARKER_MOTION_OPTIONS[0];
   const appearanceButtonRef = useRef<HTMLButtonElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const appearanceMenuRef = useRef<HTMLDivElement>(null);
@@ -168,9 +165,6 @@ export function TopBar({
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
-      <div className="hp-topbar-subtitle hp-safe-px">
-        <p className="hp-topbar-subtitle-copy">{t("Local spots, routes, and tips.")}</p>
-      </div>
       <AnimatePresence>
         {appearanceOpen && (
           <motion.div
@@ -184,86 +178,11 @@ export function TopBar({
             transition={reducedMotion ? { duration: 0 } : HP_TRANSITION.state}
             className="hp-appearance-menu"
           >
-            <fieldset className="hp-appearance-section hp-color-scheme">
-              <legend className="hp-appearance-label">{t("Color scheme")}</legend>
-              <div className="hp-appearance-language">
-                {(["light", "dark", "system"] as const).map((option) => (
-                  <label key={option} className="hp-color-scheme-option">
-                    <input
-                      type="radio"
-                      name="color-scheme"
-                      value={option}
-                      checked={preference === option}
-                      onChange={() => setPreference(option)}
-                    />
-                    <span>
-                      {t(option === "light" ? "Light" : option === "dark" ? "Dark" : "System")}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <div className="hp-appearance-section">
-              <span className="hp-appearance-label">{t("Language")}</span>
-              <div className="hp-appearance-language" role="group" aria-label={t("Language")}>
-                {(["GR", "EN"] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => onSetLanguage(option)}
-                    className="hp-appearance-language-option"
-                    aria-pressed={language === option}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="hp-appearance-section">
-              <div className="hp-appearance-section-heading">
-                <span className="hp-appearance-label">{t("Marker motion")}</span>
-                <span className="hp-animation-theme-current" aria-live="polite">
-                  {t("Current: {theme}", { theme: activeMarkerMotion.label })}
-                </span>
-              </div>
-              <div
-                className="hp-animation-theme-options"
-                role="radiogroup"
-                aria-label={t("Marker motion")}
-              >
-                {MARKER_MOTION_OPTIONS.map((theme) => {
-                  const selected = markerMotion === theme.id;
-                  return (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => onSetMarkerMotion(theme.id)}
-                      className="hp-animation-theme-option"
-                      data-marker-motion={theme.id}
-                    >
-                      <span
-                        className="hp-pulse-preview"
-                        data-pulse-level="active"
-                        aria-hidden="true"
-                      >
-                        <span className="hp-pulse-ring" />
-                        <span className="hp-pulse-core" />
-                      </span>
-                      <span className="hp-animation-theme-copy">
-                        <strong>{theme.label}</strong>
-                        <small>{t(theme.description)}</small>
-                      </span>
-                      <span className="hp-animation-theme-check" aria-hidden="true">
-                        {selected && <Check size={15} strokeWidth={2.7} />}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <AppearanceMenuContent
+              markerMotion={markerMotion}
+              onSetMarkerMotion={onSetMarkerMotion}
+              onSetLanguage={onSetLanguage}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -322,6 +241,100 @@ export function TopBar({
         </div>
       )}
     </div>
+  );
+}
+
+/** Color scheme, language and marker motion — shared by the top bar and the map chrome. */
+export function AppearanceMenuContent({
+  markerMotion,
+  onSetMarkerMotion,
+  onSetLanguage,
+}: {
+  markerMotion: MarkerMotion;
+  onSetMarkerMotion: (theme: MarkerMotion) => void;
+  onSetLanguage: (language: "GR" | "EN") => void;
+}) {
+  const { language, t } = useI18n();
+  const { preference, setPreference } = useTheme();
+  const activeMarkerMotion =
+    MARKER_MOTION_OPTIONS.find((theme) => theme.id === markerMotion) ?? MARKER_MOTION_OPTIONS[0];
+  return (
+    <>
+      <fieldset className="hp-appearance-section hp-color-scheme">
+        <legend className="hp-appearance-label">{t("Color scheme")}</legend>
+        <div className="hp-appearance-language">
+          {(["light", "dark", "system"] as const).map((option) => (
+            <label key={option} className="hp-color-scheme-option">
+              <input
+                type="radio"
+                name="color-scheme"
+                value={option}
+                checked={preference === option}
+                onChange={() => setPreference(option)}
+              />
+              <span>{t(option === "light" ? "Light" : option === "dark" ? "Dark" : "System")}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="hp-appearance-section">
+        <span className="hp-appearance-label">{t("Language")}</span>
+        <div className="hp-appearance-language" role="group" aria-label={t("Language")}>
+          {(["GR", "EN"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onSetLanguage(option)}
+              className="hp-appearance-language-option"
+              aria-pressed={language === option}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="hp-appearance-section">
+        <div className="hp-appearance-section-heading">
+          <span className="hp-appearance-label">{t("Marker motion")}</span>
+          <span className="hp-animation-theme-current" aria-live="polite">
+            {t("Current: {theme}", { theme: activeMarkerMotion.label })}
+          </span>
+        </div>
+        <div
+          className="hp-animation-theme-options"
+          role="radiogroup"
+          aria-label={t("Marker motion")}
+        >
+          {MARKER_MOTION_OPTIONS.map((theme) => {
+            const selected = markerMotion === theme.id;
+            return (
+              <button
+                key={theme.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => onSetMarkerMotion(theme.id)}
+                className="hp-animation-theme-option"
+                data-marker-motion={theme.id}
+              >
+                <span className="hp-pulse-preview" data-pulse-level="active" aria-hidden="true">
+                  <span className="hp-pulse-ring" />
+                  <span className="hp-pulse-core" />
+                </span>
+                <span className="hp-animation-theme-copy">
+                  <strong>{theme.label}</strong>
+                  <small>{t(theme.description)}</small>
+                </span>
+                <span className="hp-animation-theme-check" aria-hidden="true">
+                  {selected && <Check size={15} strokeWidth={2.7} />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
   );
 }
 

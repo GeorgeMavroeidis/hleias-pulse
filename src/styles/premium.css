@@ -1,0 +1,479 @@
+/*
+ * App-wide refinement layer, loaded last so it can settle older one-off rules
+ * without rewriting them: one type scale, glass navigation, quieter chips.
+ */
+
+body {
+  font-feature-settings: "kern", "liga", "calt";
+  letter-spacing: -0.005em;
+}
+
+.hp-brand,
+h1,
+h2,
+h3 {
+  font-family: var(--hp-font-display);
+  letter-spacing: -0.02em;
+}
+
+/* ---- bottom navigation ----------------------------------------------------- */
+
+.hp-bottom-nav {
+  border-top: 0.5px solid var(--hp-border);
+  background: color-mix(in srgb, var(--hp-paper) 86%, transparent);
+  -webkit-backdrop-filter: var(--hp-glass-blur);
+  backdrop-filter: var(--hp-glass-blur);
+  padding-top: 4px;
+}
+
+.hp-bottom-nav-item {
+  min-height: 52px;
+  gap: 3px;
+  color: var(--hp-text-secondary);
+  transition: color 160ms ease;
+}
+
+.hp-bottom-nav-item.is-active {
+  color: var(--hp-ink);
+}
+
+.hp-bottom-nav-item.is-active::before {
+  display: none;
+}
+
+.hp-bottom-nav-icon {
+  position: relative;
+  display: grid;
+  width: 46px;
+  height: 28px;
+  place-items: center;
+  border-radius: 14px;
+  transition:
+    background 220ms ease,
+    transform 220ms cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+.hp-bottom-nav-item.is-active .hp-bottom-nav-icon {
+  background: color-mix(in srgb, var(--hp-ink) 8%, transparent);
+}
+
+.hp-bottom-nav-item:active .hp-bottom-nav-icon {
+  transform: scale(0.9);
+}
+
+.hp-bottom-nav-label {
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0;
+}
+
+.hp-bottom-nav-item.is-active .hp-bottom-nav-label {
+  font-weight: 700;
+}
+
+.hp-bottom-nav-trip-icon {
+  width: 46px;
+  height: 46px;
+  margin-top: -14px;
+  background: var(--hp-ink);
+  color: var(--hp-paper);
+  box-shadow:
+    0 0 0 3px var(--hp-paper),
+    0 8px 20px rgb(0 0 0 / 0.22);
+}
+
+.hp-bottom-nav-trip.is-active .hp-bottom-nav-trip-icon {
+  background: var(--hp-sunset);
+  color: #fff;
+}
+
+.hp-bottom-nav-trip.is-active .hp-bottom-nav-label {
+  color: var(--hp-ink);
+}
+
+/* Over the map the bar floats as a glass capsule, so the map runs edge to edge. */
+.hp-bottom-nav--floating {
+  position: absolute;
+  right: 10px;
+  bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  left: 10px;
+  border: 0;
+  border-radius: 28px;
+  background: var(--hp-glass);
+  box-shadow:
+    inset 0 0 0 0.5px var(--hp-glass-edge),
+    0 0 0 0.5px var(--hp-glass-hairline),
+    var(--hp-shadow-float);
+  padding: 4px 6px;
+}
+
+.hp-bottom-nav--floating .hp-bottom-nav-item {
+  min-height: 54px;
+}
+
+.hp-bottom-nav--floating .hp-bottom-nav-trip-icon {
+  margin-top: 0;
+  width: 40px;
+  height: 40px;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.22);
+}
+
+.hp-app-shell[data-tab="map"] {
+  --xp-nav-clearance: calc(64px + max(10px, env(safe-area-inset-bottom, 0px)) + 10px);
+  padding-top: 0;
+}
+
+/* ---- top bar (feed, routes, meet) ------------------------------------------- */
+
+.hp-topbar {
+  background: color-mix(in srgb, var(--hp-paper) 90%, transparent);
+  -webkit-backdrop-filter: var(--hp-glass-blur);
+  backdrop-filter: var(--hp-glass-blur);
+  box-shadow: 0 0.5px 0 var(--hp-border);
+}
+
+.hp-topbar-row {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.hp-topbar-logo {
+  width: 30px;
+  height: 34px;
+}
+
+.hp-topbar-actions .hp-topbar-search,
+.hp-topbar-actions .hp-appearance-trigger {
+  border-radius: 50%;
+}
+
+.hp-deals-action {
+  border-radius: 999px;
+  padding: 0 12px;
+  background: color-mix(in srgb, var(--hp-sunset) 12%, transparent);
+  color: var(--hp-text-accent);
+  font-weight: 700;
+}
+
+.hp-search-field {
+  border: 0;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--hp-ink) 6%, transparent);
+}
+
+/* ---- chips ------------------------------------------------------------------- */
+
+.hp-chip {
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hp-ink) 6%, transparent);
+  color: var(--hp-ink);
+  font-weight: 600;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.hp-chip.is-active {
+  background: var(--hp-ink);
+  color: var(--hp-paper);
+}
+
+/* ---- popovers ----------------------------------------------------------------- */
+
+.hp-appearance-menu {
+  border: 0;
+  border-radius: 22px;
+  background: var(--hp-glass-strong);
+  -webkit-backdrop-filter: var(--hp-glass-blur);
+  backdrop-filter: var(--hp-glass-blur);
+  box-shadow:
+    0 0 0 0.5px var(--hp-glass-hairline),
+    var(--hp-shadow-popover);
+}
+
+/* ---- place detail ---------------------------------------------------------------- */
+
+.hp-place-detail-sheet {
+  border-radius: 28px 28px 0 0;
+  box-shadow: var(--hp-shadow-sheet);
+}
+
+.pd-gallery {
+  position: relative;
+  height: min(58vh, 430px);
+  background: #000;
+}
+
+.pd-gallery__track {
+  display: flex;
+  height: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.pd-gallery__slide {
+  position: relative;
+  flex: 0 0 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: none;
+  scroll-snap-align: center;
+}
+
+.pd-gallery__slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pd-gallery__badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  background: rgb(0 0 0 / 0.34);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  font: 650 11.5px/1 var(--hp-font-body);
+}
+
+.pd-gallery__badge[data-kind="story"] {
+  background: linear-gradient(95deg, #ff5b35, #f0386b);
+}
+
+.pd-gallery__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgb(0 0 0 / 0.28) 0%,
+    transparent 28%,
+    transparent 52%,
+    rgb(0 0 0 / 0.78) 100%
+  );
+  pointer-events: none;
+}
+
+.pd-gallery__dots {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  display: flex;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.28);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.pd-gallery__dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.5);
+  transition:
+    width 240ms ease,
+    background 240ms ease;
+}
+
+.pd-gallery__dots span[data-active="true"] {
+  width: 16px;
+  background: #fff;
+}
+
+.pd-gallery__credit {
+  position: absolute;
+  right: 12px;
+  bottom: 40px;
+  max-width: 60%;
+  overflow: hidden;
+  color: rgb(255 255 255 / 0.7);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.pd-title {
+  position: absolute;
+  right: 18px;
+  bottom: 34px;
+  left: 18px;
+  color: #fff;
+  pointer-events: none;
+}
+
+.pd-title h2 {
+  font: 800 30px/1.05 var(--hp-font-display);
+  letter-spacing: -0.03em;
+  text-shadow: 0 2px 16px rgb(0 0 0 / 0.3);
+}
+
+.pd-title p {
+  margin-top: 6px;
+  color: rgb(255 255 255 / 0.85);
+  font: 520 14px/1.3 var(--hp-font-body);
+}
+
+.pd-glass-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.32);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  color: #fff;
+}
+
+.pd-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 14px 16px 6px;
+}
+
+.pd-action {
+  display: flex;
+  min-height: 62px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--hp-ink) 5%, transparent);
+  color: var(--hp-ink);
+  font: 650 12px/1.1 var(--hp-font-body);
+  text-decoration: none;
+  transition: transform 120ms ease;
+}
+
+.pd-action:active {
+  transform: scale(0.95);
+}
+
+.pd-action[data-on="true"] {
+  background: color-mix(in srgb, var(--hp-sunset) 14%, transparent);
+  color: var(--hp-text-accent);
+}
+
+.pd-action--primary {
+  background: var(--hp-ink);
+  color: var(--hp-paper);
+}
+
+.pd-action > span[role="status"] {
+  display: none;
+}
+
+.pd-stories {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 12px 16px 4px;
+}
+
+.pd-story {
+  display: grid;
+  flex: none;
+  justify-items: center;
+  gap: 5px;
+  width: 68px;
+  border: 0;
+  background: none;
+  color: var(--hp-ink);
+  font: 600 11px/1.2 var(--hp-font-body);
+}
+
+.pd-story__ring {
+  width: 64px;
+  height: 64px;
+  padding: 2.5px;
+  border-radius: 50%;
+  background: var(--hp-story-ring);
+}
+
+.pd-story__ring img {
+  width: 100%;
+  height: 100%;
+  border: 2.5px solid var(--hp-paper);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.pd-moments {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.pd-moments button {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  background: color-mix(in srgb, var(--hp-ink) 6%, transparent);
+}
+
+.pd-moments img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms ease;
+}
+
+.pd-moments button:active img {
+  transform: scale(1.06);
+}
+
+.pd-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 22px 0 10px;
+  color: var(--hp-ink);
+  font: 750 17px/1.2 var(--hp-font-display);
+  letter-spacing: -0.015em;
+}
+
+.pd-section-title small {
+  color: var(--hp-text-secondary);
+  font: 550 12.5px/1 var(--hp-font-body);
+}
+
+/* Data status banners clear the floating map chrome. */
+.hp-map-status {
+  top: calc(env(safe-area-inset-top, 0px) + 116px);
+}
+
+/* One row: brand left, actions right — never a second line of buttons. */
+.hp-topbar-row,
+.hp-topbar-actions {
+  flex-wrap: nowrap;
+}
+
+.hp-topbar-actions {
+  gap: 2px;
+}
+
+.hp-deals-action {
+  min-height: 36px;
+  height: 36px;
+}

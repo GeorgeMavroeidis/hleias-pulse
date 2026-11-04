@@ -44,6 +44,10 @@ import { openStreetMapUrl } from "./pulse-shared";
 import type { PlacePulseMetric } from "@/lib/hp/pulse-activity";
 import { observationLabel } from "@/lib/hp/surface-freshness";
 import { displayPostTime } from "@/lib/hp/post-time";
+import { useCommonsPhotos } from "@/lib/hp/commons-photos";
+import { placeGallery, thumbnailUrl, type ExploreMedia } from "@/lib/hp/explore-media";
+import { useState } from "react";
+import { Map as MapIcon } from "lucide-react";
 
 export function PlaceDetailModal({
   place,
@@ -112,6 +116,20 @@ export function PlaceDetailModal({
     : [];
   // Blocked authors are filtered server-side; muted ones are hidden here.
   const visiblePosts = posts.filter((post) => !moderation.isHidden(post.userId));
+  const commons = useCommonsPhotos(place);
+  const storyGroup = place
+    ? (storyGroups.find((group) => group.placeId === place.id) ?? null)
+    : null;
+  const gallery = place
+    ? placeGallery(place, {
+        posts: visiblePosts,
+        storyGroup,
+        businessPhotos: businessProfile?.photos ?? [],
+        commons,
+        limit: 30,
+      })
+    : [];
+  const moments = visiblePosts.filter((post) => post.imageUrl?.trim()).slice(0, 9);
 
   return (
     <AnimatePresence>
@@ -139,14 +157,12 @@ export function PlaceDetailModal({
             className="hp-place-detail-sheet absolute inset-x-0 bottom-0 max-w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-hp-paper"
           >
             <div className="relative">
-              <ImageBox
-                src={place.imageUrl}
-                alt={place.name}
-                className="h-64 w-full"
-                rounded="rounded-none"
+              <PlaceGallery
+                items={gallery}
+                placeName={place.name}
+                onOpenStory={() => onOpenStory(place.id)}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent" />
-              <div className="absolute right-3 top-3 flex items-center gap-1.5">
+              <div className="absolute right-3 top-3 flex items-center gap-2">
                 <ContentMenu
                   tone="light"
                   target={{
@@ -159,25 +175,28 @@ export function PlaceDetailModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-hp-paper/95 text-hp-ink"
+                  className="pd-glass-button"
                   aria-label={t("Close")}
                 >
-                  <X size={16} />
+                  <X size={17} strokeWidth={2.4} />
                 </button>
               </div>
-              <div className="absolute bottom-3 left-4 right-4 text-hp-on-media">
+              <div className="pd-title">
                 <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                  style={{ background: typeColor[place.type] }}
+                  className="inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-bold text-white"
+                  style={{ background: "rgb(0 0 0 / 0.32)", backdropFilter: "blur(10px)" }}
                 >
-                  {place.type}
+                  {t(PLACE_TYPE_LABEL[place.type] ?? "Local spot")}
                 </span>
-                <h2 className="mt-2 text-2xl font-black">{place.name}</h2>
-                <p className="text-[12px] opacity-85">
-                  {place.greekName} · {place.area}
+                <h2 className="mt-2">
+                  {language === "GR" && place.greekName ? place.greekName : place.name}
+                </h2>
+                <p>
+                  {language === "GR" && place.greekName ? place.name : place.greekName} ·{" "}
+                  {place.area}
                 </p>
                 {businessProfile && (
-                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-hp-paper/95 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-hp-sunset">
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-hp-sunset">
                     <BadgeCheck size={12} />
                     {businessProfile.businessName
                       ? t("Managed by {name}", { name: businessProfile.businessName })
@@ -186,38 +205,59 @@ export function PlaceDetailModal({
                 )}
               </div>
             </div>
+            <div className="pd-actions">
+              <DirectionsLink
+                destination={{ lat: place.lat, lng: place.lng, label: place.name }}
+                className="pd-action pd-action--primary"
+              />
+              <button
+                type="button"
+                className="pd-action"
+                data-on={saved ? "true" : "false"}
+                aria-pressed={saved}
+                onClick={() => onSave(place.id)}
+              >
+                <Bookmark size={18} strokeWidth={2.2} fill={saved ? "currentColor" : "none"} />
+                {t(saved ? "Saved" : "Save")}
+              </button>
+              <button
+                type="button"
+                className="pd-action"
+                onClick={() => onShare(place)}
+                aria-label={t("Share {place}", { place: place.name })}
+              >
+                <Share2 size={18} strokeWidth={2.2} />
+                {t("Share")}
+              </button>
+              <button
+                type="button"
+                className="pd-action"
+                onClick={() => {
+                  onClose();
+                  onOpenMap(place.id);
+                }}
+              >
+                <MapIcon size={18} strokeWidth={2.2} />
+                {t("Map")}
+              </button>
+            </div>
             {placeStories.length > 0 && (
-              <div className="border-b border-hp-ink/10 px-4 py-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-hp-muted">
-                    Place stories · {placeStories.length}
-                  </span>
+              <div className="pd-stories hp-no-scrollbar" role="list" aria-label={t("Stories")}>
+                {placeStories.map((story) => (
                   <button
+                    key={story.id}
                     type="button"
+                    role="listitem"
+                    className="pd-story"
                     onClick={() => onOpenStory(place.id)}
-                    className="text-[10px] font-bold text-hp-sunset"
+                    aria-label={t("Open stories from {place}", { place: place.name })}
                   >
-                    Play all
+                    <span className="pd-story__ring">
+                      <img src={thumbnailUrl(story.mediaUrl, 250)} alt="" loading="lazy" />
+                    </span>
+                    <span className="max-w-full truncate">{story.authorName}</span>
                   </button>
-                </div>
-                <div className="hp-no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
-                  {placeStories.map((story) => (
-                    <button
-                      key={story.id}
-                      type="button"
-                      onClick={() => onOpenStory(place.id)}
-                      aria-label={t("Open stories from {place}", { place: place.name })}
-                      className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-xl border border-hp-ink/10"
-                    >
-                      <ImageBox
-                        src={story.mediaUrl}
-                        alt=""
-                        className="h-full w-full"
-                        rounded="rounded-xl"
-                      />
-                    </button>
-                  ))}
-                </div>
+                ))}
               </div>
             )}
             <div className="p-4 pb-32">
@@ -359,10 +399,32 @@ export function PlaceDetailModal({
                 </button>
               )}
 
+              {moments.length > 0 && (
+                <>
+                  <h3 className="pd-section-title">
+                    {t("Moments")}
+                    <small>{t("{count} photos", { count: moments.length })}</small>
+                  </h3>
+                  <div className="pd-moments">
+                    {moments.map((post) => (
+                      <button
+                        key={post.id}
+                        type="button"
+                        aria-label={post.text}
+                        onClick={() =>
+                          document
+                            .getElementById(`pd-post-${post.id}`)
+                            ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                        }
+                      >
+                        <img src={thumbnailUrl(post.imageUrl, 330)} alt="" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
               <div className="mt-5">
-                <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-hp-muted">
-                  {t("Posts at this place")}
-                </h3>
+                <h3 className="pd-section-title">{t("Posts at this place")}</h3>
                 <div className="flex flex-col gap-2">
                   {visiblePosts.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-hp-ink/10 p-4 text-center text-[12px] text-hp-muted">
@@ -374,6 +436,7 @@ export function PlaceDetailModal({
                     return (
                       <div
                         key={p.id}
+                        id={`pd-post-${p.id}`}
                         className="rounded-2xl border border-hp-ink/10 bg-hp-paper p-3"
                       >
                         <div className="flex items-center gap-2">
@@ -454,59 +517,28 @@ export function PlaceDetailModal({
                 )}
               </div>
             </div>
-            <div className="sticky bottom-0 flex flex-col gap-2 border-t border-hp-ink/10 bg-hp-paper/95 p-3 backdrop-blur">
-              <AddToTripButton kind="place" id={place.id} name={place.name} />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => onSave(place.id)}
-                  className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${saved ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
-                >
-                  <Bookmark size={13} className="mr-1 inline" /> {saved ? "Saved" : "Save"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onToggleVisited(place.id)}
-                  aria-pressed={visited}
-                  className={`flex-1 rounded-full border py-3 text-[12px] font-bold ${visited ? "border-hp-sunset bg-hp-sunset/10 text-hp-sunset" : "border-hp-ink/15 text-hp-ink"}`}
-                >
-                  <Check size={13} strokeWidth={visited ? 3 : 2.4} className="mr-1 inline" />{" "}
-                  {t("I've been here")}
-                </button>
+            <div className="sticky bottom-0 flex items-center gap-2 border-t border-hp-ink/10 bg-hp-paper/90 p-3 backdrop-blur-xl">
+              <div className="min-w-0 flex-1">
+                <AddToTripButton kind="place" id={place.id} name={place.name} />
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenMap(place.id);
-                  }}
-                  className="flex-1 rounded-full bg-hp-ink py-3 text-[12px] font-bold text-hp-paper"
-                >
-                  Map
-                </button>
-                <DirectionsLink
-                  destination={{ lat: place.lat, lng: place.lng, label: place.name }}
-                  className="flex flex-1 items-center justify-center gap-1 rounded-full border border-hp-ink/15 px-3 py-3 text-[12px] font-bold text-hp-ink"
-                />
-                <a
-                  href={openStreetMapUrl(place)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
-                  className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                >
-                  <ExternalLink size={14} />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => onShare(place)}
-                  className="grid h-12 w-12 place-items-center rounded-full border border-hp-ink/15 text-hp-ink"
-                  aria-label={t("Share {place}", { place: place.name })}
-                >
-                  <Share2 size={14} />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => onToggleVisited(place.id)}
+                aria-pressed={visited}
+                className={`inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-bold ${visited ? "bg-hp-sunset/12 text-hp-sunset" : "bg-hp-ink/5 text-hp-ink"}`}
+              >
+                <Check size={15} strokeWidth={visited ? 3 : 2.4} />
+                {t("I've been here")}
+              </button>
+              <a
+                href={openStreetMapUrl(place)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("Open {place} in OpenStreetMap", { place: place.name })}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-hp-ink/5 text-hp-ink"
+              >
+                <ExternalLink size={15} />
+              </a>
             </div>
           </motion.div>
         </motion.div>
@@ -514,6 +546,101 @@ export function PlaceDetailModal({
     </AnimatePresence>
   );
 }
+const PLACE_TYPE_LABEL: Record<Place["type"], string> = {
+  beach: "Beach",
+  culture: "Culture",
+  nature: "Nature",
+  food: "Food",
+  local: "Local spot",
+  village: "Village",
+  night: "Night",
+  sunset: "Sunset",
+};
+
+/** Swipeable hero: the place's own photo, owner photos, stories, posts and nearby Commons photos. */
+function PlaceGallery({
+  items,
+  placeName,
+  onOpenStory,
+}: {
+  items: ExploreMedia[];
+  placeName: string;
+  onOpenStory: () => void;
+}) {
+  const { t } = useI18n();
+  const [index, setIndex] = useState(0);
+  const current = items[index];
+  const dots = items.slice(0, 12);
+  return (
+    <div className="pd-gallery">
+      <div
+        className="pd-gallery__track hp-no-scrollbar"
+        onScroll={(event) => {
+          const track = event.currentTarget;
+          setIndex(Math.round(track.scrollLeft / Math.max(1, track.clientWidth)));
+        }}
+        aria-label={t("Photos of {place}", { place: placeName })}
+      >
+        {items.map((item, itemIndex) => (
+          <button
+            key={item.id}
+            type="button"
+            className="pd-gallery__slide"
+            onClick={item.kind === "story" ? onOpenStory : undefined}
+            tabIndex={item.kind === "story" ? 0 : -1}
+            aria-label={
+              item.kind === "story"
+                ? t("Open stories from {place}", { place: placeName })
+                : item.caption || placeName
+            }
+          >
+            <img
+              src={itemIndex === 0 ? item.url : thumbnailUrl(item.url, 960)}
+              alt={item.caption ?? ""}
+              loading={itemIndex < 2 ? "eager" : "lazy"}
+              decoding="async"
+            />
+          </button>
+        ))}
+      </div>
+      <div className="pd-gallery__shade" aria-hidden="true" />
+      {current && current.kind !== "place" && (
+        <span className="pd-gallery__badge" data-kind={current.kind}>
+          {t(
+            current.kind === "story"
+              ? "Story"
+              : current.kind === "post"
+                ? "Community photo"
+                : current.kind === "business"
+                  ? "From the business"
+                  : "Nearby photo",
+          )}
+        </span>
+      )}
+      {current?.credit && current.kind === "commons" && (
+        <a
+          className="pd-gallery__credit"
+          href={current.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t("Photo: {credit}", { credit: current.credit })}
+        </a>
+      )}
+      {dots.length > 1 && (
+        <div className="pd-gallery__dots" aria-hidden="true">
+          {dots.map((item, dotIndex) => (
+            <span
+              key={item.id}
+              data-active={dotIndex === Math.min(index, dots.length - 1) ? "true" : "false"}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Typography-led place stats: an activity byline (only non-zero counts, joined
 // with "·") over a no-box descriptor row, then a single "Best for" line. No
 // tiles, no colour -- ink for the values, muted for everything else.
