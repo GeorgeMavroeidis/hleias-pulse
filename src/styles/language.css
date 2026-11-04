@@ -1,0 +1,126 @@
+/*
+ * Design language — one voice for every screen.
+ *
+ * Unlayered on purpose: Tailwind utilities live in a cascade layer, so these
+ * rules settle the long tail of per-component choices (8px type, 900 weights,
+ * a border around every card) without rewriting thirty components by hand.
+ * Element and pattern selectors only; no colours are forced on text, so
+ * anything over a photo keeps its own contrast.
+ */
+
+/* ---- texture ---------------------------------------------------------------- */
+
+.hp-app-shell::after {
+  position: absolute;
+  inset: 0;
+  z-index: 300;
+  content: "";
+  background-image: var(--hp-grain);
+  background-size: 160px 160px;
+  opacity: 0.55;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.dark .hp-app-shell::after {
+  opacity: 0.35;
+  mix-blend-mode: screen;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--hp-sunset) 26%, transparent);
+}
+
+/* ---- type ------------------------------------------------------------------- */
+
+h1,
+h2,
+.hp-display {
+  font-family: var(--hp-font-display);
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  line-height: 1.06;
+}
+
+h3:is(
+  .text-lg,
+  .text-xl,
+  .text-2xl,
+  .text-\[16px\],
+  .text-\[17px\],
+  .text-\[18px\],
+  .text-\[20px\],
+  .text-\[22px\],
+  .text-\[24px\],
+  .text-\[26px\]
+) {
+  font-family: var(--hp-font-display);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.1;
+}
+
+h1.font-black,
+h2.font-black,
+h3.font-black {
+  font-weight: 600;
+}
+
+/* 900 shouts; a confident bold speaks. */
+.font-black {
+  font-weight: 760;
+}
+
+/* Eyebrow labels stay, but as quiet editorial small caps. */
+.uppercase:is(.tracking-wider, .tracking-widest, .tracking-wide) {
+  letter-spacing: 0.08em;
+  font-weight: 650;
+}
+
+/* Nothing in a premium app is set in 8px type. */
+.text-\[8px\] {
+  font-size: 10px;
+}
+.text-\[9px\] {
+  font-size: 10.5px;
+}
+.text-\[10px\] {
+  font-size: 11px;
+}
+
+/* ---- surfaces ------------------------------------------------------------------ */
+
+/* Cards float on the canvas instead of being drawn with a pen. */
+:is(.rounded-2xl, .rounded-3xl, .rounded-xl).border:not(.border-dashed):is(
+    .bg-hp-paper,
+    .bg-hp-raised,
+    .bg-hp-paper\/95,
+    .bg-hp-paper\/90
+  ) {
+  border-color: transparent;
+  box-shadow: var(--hp-shadow-card);
+}
+
+.rounded-3xl {
+  border-radius: 26px;
+}
+
+/* Outline pills become soft fills: fewer lines on screen. */
+.rounded-full.border:is(.border-hp-ink\/10, .border-hp-ink\/15):not(:focus-visible) {
+  border-color: transparent;
+  background-color: color-mix(in srgb, var(--hp-ink) 6%, transparent);
+}
+
+.border-dashed {
+  border-color: color-mix(in srgb, var(--hp-ink) 16%, transparent);
+}
+
+/* Photos sit a touch warmer and softer, like prints. */
+img.object-cover {
+  image-rendering: auto;
+}
+
+/* Pressed things give way slightly. */
+button:not(:disabled):active {
+  transition: transform 90ms ease;
+}

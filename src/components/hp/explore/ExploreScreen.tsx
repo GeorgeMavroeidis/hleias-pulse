@@ -21,6 +21,7 @@ import type { MarkerPulseSnapshot } from "@/lib/hp/marker-pulse";
 import type { PlaceStoryGroup } from "@/lib/hp/place-stories";
 import type { AtmospherePaletteKey } from "@/lib/hp/temporal-atmosphere";
 import { useCommonsPhotos } from "@/lib/hp/commons-photos";
+import { formatCountdown, iliaSky, iliaTime } from "@/lib/hp/sky";
 import {
   areaCover,
   areaMatchesLens,
@@ -88,6 +89,8 @@ type Props = {
   onSetMarkerMotion: (motion: MarkerMotion) => void;
   onSetLanguage: (language: "GR" | "EN") => void;
   onToast: (message: string) => void;
+  /** The shared clock: the overview speaks about Ilia's light right now. */
+  nowMs?: number;
 };
 
 const INTERACTION_RELEASE_MS = 520;
@@ -259,9 +262,16 @@ export function ExploreScreen(props: Props) {
       : mode === "area" && selectedArea
         ? selectedArea.name
         : t("Explore Ilia");
+  const sky = props.nowMs !== undefined ? iliaSky(props.nowMs) : null;
+  const skyText = sky?.sun
+    ? sky.sun.kind === "sunset"
+      ? t("Sunset in {time}", { time: formatCountdown(sky.sun.minutes, language) })
+      : t("Sunrise at {time}", { time: iliaTime(sky.sun.at) })
+    : null;
   const carouselSubtitle =
     mode === "overview"
-      ? t("{areas} areas · {places} places", { areas: clusters.length, places: placeCount })
+      ? (skyText ??
+        t("{areas} areas · {places} places", { areas: clusters.length, places: placeCount }))
       : t("{count} places", { count: carouselItems.length });
 
   // ---- map data -------------------------------------------------------------------

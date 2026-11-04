@@ -122,14 +122,14 @@ export function PulseFeed({
       <PlaceStoryRail groups={storyGroups} onOpen={onOpenStory} />
 
       {/* Filter tabs */}
-      <div className="hp-no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
+      <div className="fd-tabs hp-no-scrollbar" role="group" aria-label={t("Filter posts")}>
         {filters.map((f) => (
           <button
             key={f}
             type="button"
             onClick={() => setFilter(f)}
             aria-pressed={filter === f}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold ${filter === f ? "bg-hp-ink text-hp-paper" : "border border-hp-ink/10 text-hp-ink/70"}`}
+            className="fd-tab"
           >
             {t(f)}
           </button>
@@ -149,10 +149,10 @@ export function PulseFeed({
         />
       )}
 
-      <div className="flex flex-col gap-3">
+      <div className="fd-stream">
         {visiblePosts.length === 0 && (
-          <div className="rounded-3xl border border-dashed border-hp-ink/15 bg-hp-raised/45 px-5 py-10 text-center text-[13px] text-hp-muted">
-            {t("No posts match this filter yet.")}
+          <div className="fd-empty">
+            <p>{t("No posts match this filter yet.")}</p>
           </div>
         )}
         {visiblePosts.map((post) => {
@@ -163,54 +163,46 @@ export function PulseFeed({
           const lc = (postLikes[post.id] ?? post.likes) + (liked ? 1 : 0);
           const sv = savedPosts[post.id];
           const commentCount = post.comments.length + (commentsByPost[post.id]?.length ?? 0);
+          const placeName = language === "GR" && p.greekName ? p.greekName : p.name;
           return (
             <motion.article
               key={post.id}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              className="overflow-hidden rounded-3xl border border-hp-ink/10 bg-hp-paper"
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="fd-post"
             >
-              {/* Author row */}
-              <div className="flex items-center gap-2 px-3.5 pt-3">
+              <header className="fd-post__head">
                 <img
                   src={a.avatarUrl}
-                  alt={a.name}
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 rounded-full border border-hp-ink/10 object-cover"
+                  alt=""
+                  width={38}
+                  height={38}
+                  className="fd-avatar"
+                  data-role={a.type}
                   loading="lazy"
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[12px] font-bold text-hp-ink">{a.name}</span>
-                    <span
-                      className="rounded-sm px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-on-media"
-                      style={{ background: authorTypeColor[a.type] }}
-                    >
-                      {a.type}
+                <div className="fd-post__who">
+                  <p className="fd-post__name">
+                    <span>{a.name}</span>
+                    <span className="fd-role" data-role={a.type}>
+                      {t(AUTHOR_ROLE_LABEL[a.type] ?? "Local")}
                     </span>
-                    {post.kind === "question" && (
-                      <span className="inline-flex items-center gap-0.5 rounded-sm bg-hp-sea px-1 py-[1px] text-[8px] font-bold uppercase tracking-wider text-hp-ink dark:text-hp-bg">
-                        <HelpCircle size={9} /> {t("Question")}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 text-[10px] text-hp-muted">
-                    <MapPin size={9} />{" "}
+                  </p>
+                  <button
+                    type="button"
+                    className="fd-post__place"
+                    onClick={() => onOpenMap(p.id)}
+                    aria-label={t("open on map")}
+                  >
+                    <MapPin size={12} strokeWidth={2.2} aria-hidden="true" />
+                    <span>{placeName}</span>
+                    <span aria-hidden="true">·</span>
                     <span title={observationLabel(post.createdAt, nowMs, language).exact}>
-                      {p.name}
-                    </span>{" "}
-                    · {displayPostTime(post, nowMs, language)}
-                  </div>
+                      {displayPostTime(post, nowMs, language)}
+                    </span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => toggleSavePost(post.id)}
-                  className={`p-1 ${sv ? "text-hp-sunset" : "text-hp-ink/40"}`}
-                  aria-label={t(sv ? "Unsave post" : "Save post")}
-                >
-                  <Bookmark size={16} fill={sv ? "currentColor" : "none"} />
-                </button>
                 {!previewMode && (
                   <ContentMenu
                     target={{
@@ -223,54 +215,46 @@ export function PulseFeed({
                     }}
                   />
                 )}
-              </div>
+              </header>
 
               <button
                 type="button"
                 onClick={() => onOpenPost(post)}
-                className="mt-2 block w-full text-left"
+                className="fd-post__media"
                 aria-label={`Open post about ${p.name}`}
               >
                 <ImageBox
                   src={post.imageUrl}
                   alt={`${p.name} post`}
-                  className="h-48 w-full"
+                  className="fd-post__img"
                   rounded="rounded-none"
                 />
+                {post.kind === "question" && (
+                  <span className="fd-post__badge">
+                    <HelpCircle size={13} strokeWidth={2.4} aria-hidden="true" /> {t("Question")}
+                  </span>
+                )}
               </button>
 
-              <div className="px-3.5 pb-3 pt-2">
+              <div className="fd-post__actions">
+                <button
+                  type="button"
+                  onClick={() => toggleLike(post.id)}
+                  className="fd-act"
+                  data-on={liked ? "true" : "false"}
+                  aria-label={t(liked ? "Unlike post" : "Like post")}
+                >
+                  <Heart size={22} strokeWidth={1.9} fill={liked ? "currentColor" : "none"} />
+                  <span>{lc}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => onOpenPost(post)}
-                  className="block w-full select-none text-left"
-                  aria-label={`Open post details for ${p.name}`}
+                  className="fd-act"
+                  aria-label={t("Open comments")}
                 >
-                  <p className="text-[13px] leading-snug text-hp-ink">{post.text}</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {post.tags.map((t) => (
-                      <span key={t} className="text-[11px] font-semibold text-hp-deep/80">
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-                <div className="mt-2.5 flex items-center gap-3 text-[12px] text-hp-ink/70">
-                  <button
-                    type="button"
-                    onClick={() => toggleLike(post.id)}
-                    className={`inline-flex items-center gap-1 ${liked ? "text-hp-sunset" : ""}`}
-                    aria-label={t(liked ? "Unlike post" : "Like post")}
-                  >
-                    <Heart size={15} fill={liked ? "currentColor" : "none"} /> {lc}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onOpenPost(post)}
-                    className="inline-flex items-center gap-1"
-                    aria-label={t("Open comments")}
-                  >
-                    <MessageCircle size={15} />{" "}
+                  <MessageCircle size={22} strokeWidth={1.9} />
+                  <span>
                     {post.kind === "question"
                       ? commentCount === 0
                         ? t("No answers yet")
@@ -278,37 +262,54 @@ export function PulseFeed({
                             n: commentCount,
                           })
                       : commentCount}
-                  </button>
-                  {!previewMode && (
-                    <button
-                      type="button"
-                      onClick={() => onShare(post)}
-                      aria-label={t("Share post")}
-                      className="inline-flex items-center"
-                    >
-                      <Share2 size={15} className="text-hp-ink/50" />
-                    </button>
-                  )}
-                  {!previewMode && (
-                    <AddToTripButton
-                      kind="place"
-                      id={p.id}
-                      name={p.name}
-                      compact
-                      className="hp-add-to-trip--small ml-auto"
-                    />
-                  )}
+                  </span>
+                </button>
+                {!previewMode && (
                   <button
                     type="button"
-                    onClick={() => onOpenMap(p.id)}
-                    aria-label={t("open on map")}
-                    className={`${previewMode ? "ml-auto " : ""}inline-flex min-h-[28px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-hp-ink/10 px-2.5 text-[11px] font-semibold`}
+                    onClick={() => onShare(post)}
+                    aria-label={t("Share post")}
+                    className="fd-act"
                   >
-                    {/* Short label so Trip and Map fit on one line beside likes and comments. */}
-                    <MapIcon size={12} /> {t("Map")}
+                    <Share2 size={21} strokeWidth={1.9} />
                   </button>
-                </div>
+                )}
+                <span className="fd-post__spacer" />
+                {!previewMode && (
+                  <AddToTripButton
+                    kind="place"
+                    id={p.id}
+                    name={p.name}
+                    compact
+                    className="hp-add-to-trip--small"
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => toggleSavePost(post.id)}
+                  className="fd-act"
+                  data-on={sv ? "true" : "false"}
+                  aria-label={t(sv ? "Unsave post" : "Save post")}
+                >
+                  <Bookmark size={21} strokeWidth={1.9} fill={sv ? "currentColor" : "none"} />
+                </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => onOpenPost(post)}
+                className="fd-post__caption"
+                aria-label={`Open post details for ${p.name}`}
+              >
+                <p>
+                  <b>{a.name}</b> {post.text}
+                </p>
+                {post.tags.length > 0 && (
+                  <span className="fd-post__tags">
+                    {post.tags.map((tag) => `#${tag}`).join("  ")}
+                  </span>
+                )}
+              </button>
             </motion.article>
           );
         })}
@@ -316,6 +317,14 @@ export function PulseFeed({
     </div>
   );
 }
+
+const AUTHOR_ROLE_LABEL: Record<string, string> = {
+  LOCAL: "Local",
+  TOURIST: "Visitor",
+  GUIDE: "Guide",
+  BUSINESS: "Business",
+  EDITOR: "Editor",
+};
 
 /* ============== "Must-see today" deck (Tourist orientation, Routes tab) ============== */
 // TEMP stopgap until a real `places.featured` flag exists (phase 2). Hotness

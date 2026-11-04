@@ -17,6 +17,7 @@
 @import "./styles/map-overlays.css";
 @import "./styles/explore.css";
 @import "./styles/premium.css";
+@import "./styles/language.css";
 
 @source "../src";
 

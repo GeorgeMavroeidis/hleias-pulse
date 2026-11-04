@@ -41,7 +41,7 @@
     "smoke:verification-guards": "tsx scripts/smoke-verification-guards.ts",
     "test:intelligence": "tsx --test src/lib/hp/area-intelligence.test.ts",
     "test:discovery": "tsx --test src/lib/hp/discovery.test.ts",
-    "test:explore": "tsx --test src/lib/hp/explore-media.test.ts",
+    "test:explore": "tsx --test src/lib/hp/explore-media.test.ts src/lib/hp/sky.test.ts",
     "test:recovery": "node --import tsx --test src/lib/hp/saved-items.test.ts src/components/hp/recovery-screens.test.tsx scripts/saved-items-api.test.ts",
     "test:place-defaults": "tsx --test src/lib/hp/place-defaults.test.ts",
     "test:essentials": "tsx --test src/lib/hp/essentials.test.ts",

@@ -4,7 +4,7 @@ export const SITE_DESCRIPTION =
   "Live local map of Ilia, Greece: beaches, routes, food, events, sunsets, and village nights.";
 export const SITE_IMAGE = "/social/ilia-pulse-share.png";
 export const SITE_IMAGE_ALT = "ΗΛΕΙΑ PULSE logo with an orange map pin over blue waves";
-export const THEME_COLOR = "#f4f3ef";
+export const THEME_COLOR = "#f5f0e8";
 
 export const siteMeta = [
   { title: SITE_TITLE },

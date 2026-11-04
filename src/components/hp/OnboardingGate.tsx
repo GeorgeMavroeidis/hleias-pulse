@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { MapPin, Radio, Users, Check, LocateFixed } from "lucide-react";
+import { Check, LocateFixed } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { thumbnailUrl } from "@/lib/hp/explore-media";
 
 interface Props {
   open: boolean;
@@ -10,22 +11,26 @@ interface Props {
   onRequestLocation: () => void;
 }
 
+// Ilia's own light carries the welcome: the same Wikimedia photos the places use.
 const SLIDES = [
   {
-    Icon: Radio,
-    tint: "var(--hp-sunset)",
+    photo:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2f/Katakolo-sunset.jpg/1280px-Katakolo-sunset.jpg",
+    place: "Katakolo",
     title: "Feel the pulse",
     body: "See what's hot right now — beaches, sunsets, village nights and panigyri, live.",
   },
   {
-    Icon: MapPin,
-    tint: "var(--hp-sea)",
+    photo:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg/1280px-Aerial_view_of_the_archaeological_site_of_Ancient_Olympia%2C_Greece_%2851223832734%29.jpg",
+    place: "Ancient Olympia",
     title: "Discover around you",
     body: "We show what's moving nearby, so you never miss the thing happening tonight.",
   },
   {
-    Icon: Users,
-    tint: "var(--hp-purple)",
+    photo:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg/1280px-Sunset_in_Kourouta%2C_western_Peloponnese%2C_Greece.jpg",
+    place: "Kourouta",
     title: "Meet up, easily",
     body: "RSVP to gatherings or host your own. Say you're in — see who's going.",
   },
@@ -54,64 +59,62 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0 z-[90] flex flex-col bg-hp-bg"
+          className="ob-root"
+          data-step={isVibes ? "vibes" : "photo"}
         >
-          {/* progress dots */}
-          <div className="flex justify-center gap-1.5 pt-[calc(env(safe-area-inset-top)+1.25rem)]">
+          {/* Ilia in full bleed; each slide crossfades to the next. */}
+          <AnimatePresence initial={false}>
+            {isIntro && (
+              <motion.div
+                key={`photo-${step}`}
+                className="ob-photo"
+                initial={{ opacity: 0, scale: 1.06 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+                aria-hidden="true"
+              >
+                <img src={thumbnailUrl(SLIDES[step].photo, 960)} alt="" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <div className="ob-shade" aria-hidden="true" />
+
+          {/* Story-style progress */}
+          <div className="ob-progress" aria-hidden="true">
             {[...SLIDES, "vibes"].map((_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === step ? "w-6 bg-hp-ink" : "w-1.5 bg-hp-ink/20"
-                }`}
-              />
+              <span key={i} data-state={i < step ? "done" : i === step ? "now" : "next"} />
             ))}
           </div>
 
-          <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+          <div className="ob-body">
             <AnimatePresence mode="wait">
               {isIntro && (
                 <motion.div
                   key={step}
-                  initial={{ opacity: 0, y: 18, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -18, scale: 0.98 }}
-                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex max-w-sm flex-col items-center"
+                  initial={{ opacity: 0, y: 22 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -14 }}
+                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                  className="ob-copy"
                 >
-                  <span
-                    className="mb-6 grid h-20 w-20 place-items-center rounded-3xl text-hp-on-media dark:text-[#101c2a] shadow-lg"
-                    style={{ background: SLIDES[step].tint }}
-                  >
-                    {(() => {
-                      const Icon = SLIDES[step].Icon;
-                      return <Icon size={34} strokeWidth={2.2} />;
-                    })()}
-                  </span>
-                  <h2 className="text-[26px] font-black leading-tight text-hp-ink">
-                    {t(SLIDES[step].title)}
-                  </h2>
-                  <p className="mt-2 text-[14px] leading-relaxed text-hp-muted">
-                    {t(SLIDES[step].body)}
-                  </p>
+                  <span className="ob-place">{SLIDES[step].place}</span>
+                  <h2>{t(SLIDES[step].title)}</h2>
+                  <p>{t(SLIDES[step].body)}</p>
                 </motion.div>
               )}
 
               {isVibes && (
                 <motion.div
                   key="vibes"
-                  initial={{ opacity: 0, y: 18 }}
+                  initial={{ opacity: 0, y: 22 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -18 }}
-                  className="flex w-full max-w-sm flex-col items-center"
+                  exit={{ opacity: 0, y: -14 }}
+                  className="ob-copy ob-copy--vibes"
                 >
-                  <h2 className="text-[24px] font-black leading-tight text-hp-ink">
-                    {t("What's your vibe?")}
-                  </h2>
-                  <p className="mt-1.5 text-[13px] text-hp-muted">
-                    {t("Pick a few — we'll tune your feed.")}
-                  </p>
-                  <div className="mt-5 flex flex-wrap justify-center gap-2">
+                  <h2>{t("What's your vibe?")}</h2>
+                  <p>{t("Pick a few — we'll tune your feed.")}</p>
+                  <div className="ob-vibes">
                     {vibeChips.map((v) => {
                       const on = picked.includes(v);
                       return (
@@ -119,20 +122,15 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
                           key={v}
                           type="button"
                           onClick={() => toggleVibe(v)}
-                          className={`rounded-full px-3.5 py-2 text-[12.5px] font-bold transition active:scale-95 ${
-                            on
-                              ? "bg-hp-ink text-hp-paper"
-                              : "border border-hp-ink/12 bg-hp-paper text-hp-ink/70"
-                          }`}
+                          aria-pressed={on}
+                          className="ob-vibe"
                         >
-                          {on ? "✓ " : ""}
+                          {on && <Check size={14} strokeWidth={2.6} aria-hidden="true" />}
                           {v}
                         </button>
                       );
                     })}
-                    {vibeChips.length === 0 && (
-                      <p className="text-[12px] text-hp-muted">{t("Loading vibes…")}</p>
-                    )}
+                    {vibeChips.length === 0 && <p className="ob-loading">{t("Loading vibes…")}</p>}
                   </div>
 
                   <button
@@ -141,13 +139,10 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
                       onRequestLocation();
                       setLocRequested(true);
                     }}
-                    className={`mt-6 inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-[12.5px] font-bold transition active:scale-95 ${
-                      locRequested
-                        ? "bg-hp-olive/15 text-hp-olive"
-                        : "border border-hp-ink/15 text-hp-ink"
-                    }`}
+                    className="ob-location"
+                    data-on={locRequested ? "true" : "false"}
                   >
-                    {locRequested ? <Check size={15} /> : <LocateFixed size={15} />}
+                    {locRequested ? <Check size={16} /> : <LocateFixed size={16} />}
                     {t(locRequested ? "Location on" : "Enable location")}
                   </button>
                 </motion.div>
@@ -156,18 +151,14 @@ export function OnboardingGate({ open, vibeChips, onClose, onRequestLocation }: 
           </div>
 
           {/* Footer controls */}
-          <div className="flex items-center justify-between gap-3 px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2">
-            <button
-              type="button"
-              onClick={finish}
-              className="text-[12.5px] font-bold text-hp-muted"
-            >
+          <div className="ob-footer">
+            <button type="button" onClick={finish} className="ob-skip">
               {t(isVibes ? "Finish" : "Skip")}
             </button>
             <button
               type="button"
               onClick={() => (isVibes ? finish() : setStep((s) => s + 1))}
-              className="rounded-full bg-hp-ink px-6 py-3 text-[13px] font-black text-hp-paper transition active:scale-95"
+              className="ob-next"
             >
               {t(isVibes ? "Enter ΗΛΕΙΑ PULSE" : "Continue")}
             </button>

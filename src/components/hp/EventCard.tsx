@@ -199,8 +199,8 @@ export function EventCard({
             aria-pressed={isGoing}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-[12.5px] font-black transition disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.97] ${
               isGoing
-                ? "bg-hp-ink text-hp-paper"
-                : "border-2 border-hp-ink text-hp-ink hover:bg-hp-ink/5"
+                ? "bg-hp-olive/15 text-hp-olive"
+                : "bg-hp-sunset text-white shadow-[0_10px_24px_-12px_rgba(228,87,46,0.8)]"
             }`}
           >
             {isGoing ? <Check size={14} /> : null}
@@ -218,7 +218,7 @@ export function EventCard({
             onClick={() => onToggle(event, "maybe")}
             aria-pressed={isMaybe}
             className={`rounded-full px-3.5 py-2.5 text-[12px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 ${
-              isMaybe ? "bg-hp-purple/15 text-hp-purple" : "border border-hp-ink/12 text-hp-ink/70"
+              isMaybe ? "bg-hp-purple/15 text-hp-purple" : "bg-hp-ink/6 text-hp-ink/75"
             }`}
           >
             {language === "GR" ? "Ίσως" : "Maybe"}

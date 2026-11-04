@@ -586,6 +586,13 @@ export function ExploreMap(props: Props) {
         const onReady = () => {
           if (!lifecycle.isActive()) return;
           loaded = true;
+          // The basemap is the stage, not the show: its own labels and icons step
+          // back so the photographs lead. Opacity only — no layout or colour change.
+          for (const layer of instance.getStyle().layers) {
+            if (layer.type !== "symbol" || layer.id.startsWith("hp-")) continue;
+            instance.setPaintProperty(layer.id, "text-opacity", 0.62);
+            instance.setPaintProperty(layer.id, "icon-opacity", 0.45);
+          }
           // Start the credits as a small (i); one tap expands them.
           container
             ?.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact-show")

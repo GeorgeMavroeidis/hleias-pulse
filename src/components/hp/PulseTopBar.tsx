@@ -1,7 +1,9 @@
 import { useTheme } from "@/lib/theme-provider";
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Search, Check, Gift, Palette, X } from "lucide-react";
+import { Search, Check, Gift, Palette, X, Sunrise, Sunset } from "lucide-react";
+import { formatCountdown, iliaSky, iliaTime } from "@/lib/hp/sky";
+import type { TemporalPeriod } from "@/lib/hp/temporal-atmosphere";
 import { type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -48,6 +50,32 @@ interface TopBarProps {
   onOpenAccount: () => void;
   onOpenAuth: () => void;
   onOpenDeals: () => void;
+  /** The shared clock and Ilia's light: the header's sky follows them. */
+  nowMs?: number;
+  period?: TemporalPeriod | null;
+}
+
+/** "Καλησπέρα · 18:42 · Ηλιοβασίλεμα σε 38′" — what the light is doing in Ilia now. */
+export function SkyLine({ nowMs, className = "" }: { nowMs: number; className?: string }) {
+  const { language, t } = useI18n();
+  const sky = iliaSky(nowMs);
+  if (!sky.time) return null;
+  const SunIcon = sky.sun?.kind === "sunset" ? Sunset : Sunrise;
+  return (
+    <p className={`hp-sky-line ${className}`}>
+      <span className="hp-sky-line__greeting">{t(sky.greeting)}</span>
+      <span aria-hidden="true">·</span>
+      <span>{sky.time}</span>
+      {sky.sun && (
+        <span className="hp-sky-line__sun">
+          <SunIcon size={14} strokeWidth={2} aria-hidden="true" />
+          {sky.sun.kind === "sunset"
+            ? t("Sunset in {time}", { time: formatCountdown(sky.sun.minutes, language) })
+            : t("Sunrise at {time}", { time: iliaTime(sky.sun.at) })}
+        </span>
+      )}
+    </p>
+  );
 }
 
 export function TopBar({
@@ -64,6 +92,8 @@ export function TopBar({
   onOpenAccount,
   onOpenAuth,
   onOpenDeals,
+  nowMs,
+  period = null,
 }: TopBarProps) {
   const { language, t } = useI18n();
   const reducedMotion = useReducedMotion();
@@ -103,7 +133,7 @@ export function TopBar({
   }, [appearanceOpen, setAppearanceOpen]);
 
   return (
-    <div className="hp-topbar relative z-[60]">
+    <div className="hp-topbar hp-sky relative z-[60]" data-period={period ?? "unavailable"}>
       <div className="hp-topbar-row hp-safe-px">
         <div className="hp-topbar-brand" aria-label="ΗΛΕΙΑ PULSE">
           <img
@@ -114,10 +144,10 @@ export function TopBar({
             aria-hidden="true"
             className="hp-topbar-logo"
           />
-          <div className="hp-brand leading-[0.85]">
-            <div className="text-[14px] font-black tracking-[0.04em] text-hp-ink">ΗΛΕΙΑ</div>
-            <div className="text-[14px] font-black tracking-[0.18em] text-hp-sunset">PULSE</div>
-          </div>
+          <span className="hp-wordmark" aria-hidden="true">
+            <span className="hp-wordmark__name">Ηλεία</span>
+            <span className="hp-wordmark__pulse">pulse</span>
+          </span>
         </div>
         <div className="hp-topbar-actions">
           <button
@@ -165,6 +195,7 @@ export function TopBar({
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
       </div>
+      {nowMs !== undefined && <SkyLine nowMs={nowMs} className="hp-safe-px" />}
       <AnimatePresence>
         {appearanceOpen && (
           <motion.div

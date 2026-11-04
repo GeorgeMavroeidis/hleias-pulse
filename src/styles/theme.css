@@ -73,19 +73,20 @@
   --hp-type-control: 0.875rem;
   --hp-type-meta: 0.75rem;
   --hp-type-title: 1.0625rem;
-  --hp-text-secondary: #6b6b73;
-  --hp-text-accent: #c9401c;
+  --hp-text-secondary: #776d61;
+  --hp-text-accent: #b8461f;
   --hp-focus-color: var(--hp-sunset);
   /* Layered shadows: a tight contact shadow plus a soft ambient one. */
-  --hp-shadow-control: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 14px rgb(0 0 0 / 0.07);
-  --hp-shadow-float: 0 2px 6px rgb(0 0 0 / 0.07), 0 14px 36px rgb(0 0 0 / 0.14);
-  --hp-shadow-sheet: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -16px 48px rgb(0 0 0 / 0.12);
-  --hp-shadow-popover: 0 4px 12px rgb(0 0 0 / 0.08), 0 22px 48px rgb(0 0 0 / 0.16);
+  --hp-shadow-control: 0 1px 2px rgb(60 38 18 / 0.07), 0 4px 14px rgb(60 38 18 / 0.07);
+  --hp-shadow-float: 0 2px 6px rgb(60 38 18 / 0.07), 0 14px 36px rgb(60 38 18 / 0.14);
+  --hp-shadow-card: 0 1px 2px rgb(60 38 18 / 0.05), 0 8px 28px rgb(60 38 18 / 0.08);
+  --hp-shadow-sheet: 0 -1px 0 rgb(60 38 18 / 0.04), 0 -16px 48px rgb(60 38 18 / 0.12);
+  --hp-shadow-popover: 0 4px 12px rgb(60 38 18 / 0.08), 0 22px 48px rgb(60 38 18 / 0.16);
   /* Glass: translucent surfaces that float over the map and photos. */
-  --hp-glass: rgb(255 255 255 / 0.76);
-  --hp-glass-strong: rgb(255 255 255 / 0.92);
+  --hp-glass: rgb(255 252 247 / 0.78);
+  --hp-glass-strong: rgb(255 252 247 / 0.93);
   --hp-glass-edge: rgb(255 255 255 / 0.65);
-  --hp-glass-hairline: rgb(0 0 0 / 0.07);
+  --hp-glass-hairline: rgb(60 38 18 / 0.08);
   --hp-glass-blur: saturate(180%) blur(20px);
   /* The one gradient: reserved for live things (stories, live places). */
   --hp-story-ring: conic-gradient(
@@ -97,7 +98,10 @@
     #ffc247
   );
   --hp-live: #ff3b5c;
-  --hp-photo-frame: #ffffff;
+  --hp-photo-frame: #fffdf9;
+  --hp-gold: #d39a32;
+  /* Paper grain: barely-there texture that keeps flat colour from feeling digital. */
+  --hp-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   --hp-safe-left: max(var(--hp-space-4), env(safe-area-inset-left, 0px));
   --hp-safe-right: max(var(--hp-space-4), env(safe-area-inset-right, 0px));
   --hp-motion-state: 160ms;
@@ -111,23 +115,25 @@
   --hp-font-body:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
-  --hp-font-display:
+  /* Headlines speak in an editorial serif with full Greek coverage; UI stays sans. */
+  --hp-font-display: "Noto Serif Display", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --hp-font-ui-display:
     -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   /* Ηλεία Pulse palette — neutral canvas so photos carry the colour. */
-  --hp-bg: #f4f3ef;
-  --hp-raised: #ffffff;
+  --hp-bg: #f5f0e8;
+  --hp-raised: #fffdf9;
   --hp-on-media: #ffffff;
-  --hp-paper: #ffffff;
-  --hp-ink: #121214;
-  --hp-muted: #6b6b73;
-  --hp-sea: #1f9bd1;
-  --hp-deep: #0c3550;
-  --hp-olive: #5c7a3a;
-  --hp-sunset: #ff5b35;
-  --hp-night: #17132b;
-  --hp-purple: #7b5cfa;
-  --hp-border: rgb(18 18 20 / 0.08);
+  --hp-paper: #fffdf9;
+  --hp-ink: #1b1712;
+  --hp-muted: #776d61;
+  --hp-sea: #1d6e8f;
+  --hp-deep: #123a52;
+  --hp-olive: #66763a;
+  --hp-sunset: #e4572e;
+  --hp-night: #1a1530;
+  --hp-purple: #7356d8;
+  --hp-border: rgb(27 23 18 / 0.09);
 
   --background: var(--hp-bg);
   --foreground: var(--hp-ink);
@@ -137,9 +143,9 @@
   --popover-foreground: var(--hp-ink);
   --primary: var(--hp-ink);
   --primary-foreground: var(--hp-paper);
-  --secondary: #efeeea;
+  --secondary: #ede6da;
   --secondary-foreground: var(--hp-ink);
-  --muted: #efeeea;
+  --muted: #ede6da;
   --muted-foreground: var(--hp-muted);
   --accent: var(--hp-sunset);
   --accent-foreground: #ffffff;
@@ -165,29 +171,31 @@
 
 .dark {
   --hp-text-secondary: var(--hp-muted);
-  --hp-text-accent: #ff8f70;
-  --hp-bg: #0b0c0e;
-  --hp-paper: #151618;
-  --hp-ink: #f4f4f6;
-  --hp-muted: #9b9ba4;
-  --hp-sea: #5ac8fa;
-  --hp-deep: #8dcbf2;
-  --hp-olive: #a9c98a;
-  --hp-sunset: #ff6b47;
-  --hp-purple: #b7a3ff;
-  --hp-border: rgb(255 255 255 / 0.09);
-  --hp-raised: #1e1f23;
+  --hp-text-accent: #ff9a72;
+  --hp-bg: #0f0e0c;
+  --hp-paper: #1a1815;
+  --hp-ink: #f4eee5;
+  --hp-muted: #a69d90;
+  --hp-sea: #5cb8d6;
+  --hp-deep: #9fd0ea;
+  --hp-olive: #b2c98a;
+  --hp-sunset: #ff7149;
+  --hp-purple: #b9a4ff;
+  --hp-border: rgb(244 238 229 / 0.09);
+  --hp-raised: #24211d;
+  --hp-gold: #e8b456;
+  --hp-shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 28px rgb(0 0 0 / 0.35);
   --hp-on-media: #ffffff;
   --hp-shadow-control: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 14px rgb(0 0 0 / 0.32);
   --hp-shadow-float: 0 2px 6px rgb(0 0 0 / 0.4), 0 16px 40px rgb(0 0 0 / 0.5);
   --hp-shadow-sheet: 0 -1px 0 rgb(255 255 255 / 0.05), 0 -16px 48px rgb(0 0 0 / 0.55);
   --hp-shadow-popover: 0 4px 12px rgb(0 0 0 / 0.45), 0 22px 48px rgb(0 0 0 / 0.55);
-  --hp-glass: rgb(26 27 31 / 0.72);
-  --hp-glass-strong: rgb(26 27 31 / 0.9);
+  --hp-glass: rgb(30 28 24 / 0.74);
+  --hp-glass-strong: rgb(30 28 24 / 0.92);
   --hp-glass-edge: rgb(255 255 255 / 0.1);
   --hp-glass-hairline: rgb(0 0 0 / 0.5);
   --hp-live: #ff4d6a;
-  --hp-photo-frame: #f4f4f6;
+  --hp-photo-frame: #f4eee5;
   --background: var(--hp-bg);
   --foreground: var(--hp-ink);
   --card: var(--hp-paper);

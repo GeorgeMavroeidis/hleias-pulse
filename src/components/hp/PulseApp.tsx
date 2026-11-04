@@ -233,7 +233,7 @@ import {
   readyProfile,
   composerIdentity,
 } from "./pulse-shared";
-import { Toast, TopBar, VibeChips } from "./PulseTopBar";
+import { Toast, TopBar } from "./PulseTopBar";
 import { EssentialsScreen } from "./EssentialsScreen";
 import type { EssentialsSectionId } from "@/lib/hp/essentials";
 import { PulseFeed, MustSeeTodayDeck } from "./PulseFeed";
@@ -2176,6 +2176,7 @@ export function PulseApp() {
             onSetMarkerMotion={updateMarkerMotion}
             onSetLanguage={setAppLanguage}
             onToast={showToast}
+            nowMs={nowMs}
           />
           <div className="contents" inert={!mapAvailable} aria-hidden={!mapAvailable}>
             <AnimatePresence>
@@ -2280,7 +2281,7 @@ export function PulseApp() {
     if (tab === "meet") {
       return (
         <div className="flex h-full flex-col">
-          <div className="flex shrink-0 gap-1.5 px-4 pt-3">
+          <div className="hp-segmented mx-4 mt-3 shrink-0" role="group" aria-label={t("Meet")}>
             {(
               [
                 { id: "community" as MeetSubTab, label: t("Community"), Icon: CalendarHeart },
@@ -2294,13 +2295,9 @@ export function PulseApp() {
                   type="button"
                   onClick={() => setMeetSubTab(id)}
                   aria-pressed={active}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-2xl border py-2 text-[12.5px] font-bold transition active:scale-[0.98] ${
-                    active
-                      ? "border-hp-ink bg-hp-ink text-hp-paper"
-                      : "border-hp-ink/10 bg-hp-paper text-hp-ink/70"
-                  }`}
+                  className="hp-segmented__option"
                 >
-                  <Icon size={14} strokeWidth={2.6} />
+                  <Icon size={15} strokeWidth={2.2} aria-hidden="true" />
                   {label}
                 </button>
               );
@@ -2455,11 +2452,12 @@ export function PulseApp() {
               onOpenAccount={() => setProfileOpen(true)}
               onOpenAuth={() => setAuthOpen(true)}
               onOpenDeals={() => setTab("deals")}
+              nowMs={nowMs}
+              period={temporalAtmosphere.period}
             />
           )}
-          {tab === "map" || tab === "trip" || tab === "essentials" || tab === "quicklook" ? null : (
-            <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
-          )}
+          {/* The global vibe-chip row was removed in the 2026-11 redesign: it only
+              filtered the Pulse feed, which keeps its own filter row. */}
 
           <div className="relative isolate min-h-0 flex-1 overflow-hidden bg-hp-bg">
             {refreshFailed && dataStatus === "ready" && (

@@ -99,7 +99,7 @@
 
 .xp-map__error-card strong {
   color: var(--hp-ink);
-  font: 700 17px/1.2 var(--hp-font-display);
+  font: 600 19px/1.2 var(--hp-font-display);
 }
 
 .xp-map__error-card button {
@@ -291,7 +291,7 @@
   transform: translateX(-50%);
   transition: opacity 200ms ease;
   color: var(--hp-ink);
-  font: 750 12.5px/1.1 var(--hp-font-display);
+  font: 700 12.5px/1.1 var(--hp-font-ui-display);
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1132,7 +1132,7 @@
 .xp-carousel__title strong {
   overflow: hidden;
   color: var(--hp-ink);
-  font: 750 14.5px/1 var(--hp-font-display);
+  font: 600 17px/1 var(--hp-font-display);
   letter-spacing: -0.015em;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1269,7 +1269,7 @@
 
 .xp-card__copy strong {
   overflow: hidden;
-  font: 760 19px/1.12 var(--hp-font-display);
+  font: 600 21px/1.1 var(--hp-font-display);
   letter-spacing: -0.022em;
   text-overflow: ellipsis;
   text-shadow: 0 1px 10px rgb(0 0 0 / 0.35);
@@ -1607,7 +1607,7 @@
 }
 
 .xp-viewer__copy strong {
-  font: 760 20px/1.15 var(--hp-font-display);
+  font: 600 23px/1.12 var(--hp-font-display);
   letter-spacing: -0.02em;
 }
 
@@ -1767,4 +1767,108 @@
   box-shadow: 0 0 0 2px var(--hp-photo-frame);
   font: 750 10.5px/20px var(--hp-font-body);
   text-align: center;
+}
+
+/* ---- calmer map (redesign pass 2) --------------------------------------------- */
+
+/* Area tiles: one photo and a name. Count and stacked prints appear on focus. */
+.xp-area .xp-area__card,
+.xp-area .xp-area__count {
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.xp-area[data-state="focused"] .xp-area__card,
+.xp-area[data-state="focused"] .xp-area__count {
+  opacity: 1;
+}
+
+.xp-area__photo {
+  border-radius: 20px;
+}
+
+.xp-area__label {
+  font-weight: 650;
+}
+
+/* Mood chips: lighter, no shadow — they float, they do not shout. */
+.xp-lens.xp-glass {
+  height: 32px;
+  box-shadow:
+    inset 0 0 0 0.5px var(--hp-glass-edge),
+    0 0 0 0.5px var(--hp-glass-hairline);
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.xp-lens svg {
+  opacity: 0.7;
+}
+
+/* The carousel rises out of a soft wash of the canvas instead of a hard pill. */
+.xp-carousel::before {
+  position: absolute;
+  inset: -70px 0 calc(-1 * var(--xp-nav-clearance, 92px)) 0;
+  z-index: -1;
+  content: "";
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--hp-bg) 92%, transparent) 0%,
+    color-mix(in srgb, var(--hp-bg) 70%, transparent) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.xp-carousel__title.xp-glass {
+  height: auto;
+  padding: 0 4px;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.xp-carousel__title strong {
+  font: 600 21px/1.05 var(--hp-font-display);
+  letter-spacing: -0.02em;
+}
+
+.xp-carousel__title span {
+  color: var(--hp-text-secondary);
+  font: italic 500 14px/1 var(--hp-font-display);
+}
+
+.xp-carousel__back.xp-glass {
+  align-self: center;
+}
+
+.xp-chip {
+  font-weight: 600;
+}
+
+.xp-carousel::before {
+  inset: -110px 0 calc(-1 * var(--xp-nav-clearance, 92px)) 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--hp-bg) 96%, transparent) 0%,
+    color-mix(in srgb, var(--hp-bg) 88%, transparent) 50%,
+    color-mix(in srgb, var(--hp-bg) 40%, transparent) 78%,
+    transparent 100%
+  );
+}
+
+.xp-carousel__title strong,
+.xp-carousel__title span {
+  text-shadow:
+    0 0 10px var(--hp-bg),
+    0 0 18px var(--hp-bg);
+}
+
+.xp-area[data-collapsed="true"] .xp-area__stack {
+  transform: scale(0.3);
+  opacity: 0.85;
 }

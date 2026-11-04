@@ -1194,6 +1194,12 @@ const EL: Record<string, string> = {
   "Community photo": "Φωτογραφία κοινότητας",
   "From the business": "Από την επιχείρηση",
   "Nearby photo": "Φωτογραφία της περιοχής",
+  // Living header
+  "Good afternoon": "Καλό απόγευμα",
+  "Good evening": "Καλησπέρα",
+  "Good night": "Καληνύχτα",
+  "Sunset in {time}": "Ηλιοβασίλεμα σε {time}",
+  "Sunrise at {time}": "Ανατολή στις {time}",
 };
 
 function interpolate(message: string, params?: TranslationParams) {

@@ -37,10 +37,14 @@ export function PlaceStoryRail({ groups, onOpen }: Props) {
                 ? `Άνοιγμα ${group.count} stories για ${group.placeName}`
                 : `Open ${group.count} stor${group.count === 1 ? "y" : "ies"} for ${group.placeName}`
             }
-            className="hp-story-bubble flex w-[4.25rem] shrink-0 flex-col items-center gap-1 text-center"
+            className="hp-story-bubble flex w-[4.75rem] shrink-0 flex-col items-center gap-1.5 text-center"
           >
-            <div className="hp-story-bubble__ring" style={{ background: tone.gradient }}>
-              <div className="hp-story-bubble__thumb h-14 w-14">
+            <div
+              className="hp-story-bubble__ring"
+              data-unseen={group.hasUnseen ? "true" : "false"}
+              style={{ background: group.hasUnseen ? "var(--hp-story-ring)" : tone.gradient }}
+            >
+              <div className="hp-story-bubble__thumb h-[62px] w-[62px]">
                 <ImageBox
                   src={lead.mediaUrl}
                   alt={group.placeName}
@@ -56,7 +60,7 @@ export function PlaceStoryRail({ groups, onOpen }: Props) {
               )}
             </div>
             <span
-              className="block w-full truncate text-[10px] font-bold text-hp-ink/85"
+              className="block w-full truncate text-[11.5px] font-medium text-hp-ink/80"
               title={group.placeName}
             >
               {group.placeName}

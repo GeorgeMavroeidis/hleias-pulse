@@ -315,7 +315,7 @@ h3 {
 }
 
 .pd-title h2 {
-  font: 800 30px/1.05 var(--hp-font-display);
+  font: 600 33px/1.04 var(--hp-font-display);
   letter-spacing: -0.03em;
   text-shadow: 0 2px 16px rgb(0 0 0 / 0.3);
 }
@@ -449,7 +449,7 @@ h3 {
   justify-content: space-between;
   margin: 22px 0 10px;
   color: var(--hp-ink);
-  font: 750 17px/1.2 var(--hp-font-display);
+  font: 600 20px/1.15 var(--hp-font-display);
   letter-spacing: -0.015em;
 }
 
@@ -476,4 +476,688 @@ h3 {
 .hp-deals-action {
   min-height: 36px;
   height: 36px;
+}
+
+/* ---- living sky header ---------------------------------------------------------
+   The header's light follows Ilia's actual time of day (temporal atmosphere):
+   pale dawn, bright midday, honey golden hour, rose evening, deep night. */
+
+.hp-sky {
+  --sky-top: #efe7da;
+  --sky-mid: #f3ede4;
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 62%, var(--hp-bg) 100%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  transition: background 800ms ease;
+}
+
+.hp-sky[data-period="morning"] {
+  --sky-top: #f6e3cd;
+  --sky-mid: #f5ece0;
+}
+.hp-sky[data-period="afternoon"] {
+  --sky-top: #e3edee;
+  --sky-mid: #eef0e9;
+}
+.hp-sky[data-period="golden-hour"] {
+  --sky-top: #f6d19c;
+  --sky-mid: #f6e2c8;
+}
+.hp-sky[data-period="evening"] {
+  --sky-top: #e8c6cc;
+  --sky-mid: #efe0dc;
+}
+.hp-sky[data-period="late-night"] {
+  --sky-top: #d9d6e6;
+  --sky-mid: #ebe5e2;
+}
+
+.dark .hp-sky {
+  --sky-top: #1d1a16;
+  --sky-mid: #14120f;
+}
+.dark .hp-sky[data-period="morning"] {
+  --sky-top: #2c2218;
+  --sky-mid: #17130e;
+}
+.dark .hp-sky[data-period="afternoon"] {
+  --sky-top: #182123;
+  --sky-mid: #121310;
+}
+.dark .hp-sky[data-period="golden-hour"] {
+  --sky-top: #3b2612;
+  --sky-mid: #1c150e;
+}
+.dark .hp-sky[data-period="evening"] {
+  --sky-top: #2f1c2b;
+  --sky-mid: #171118;
+}
+.dark .hp-sky[data-period="late-night"] {
+  --sky-top: #131830;
+  --sky-mid: #0f0e13;
+}
+
+.hp-topbar.hp-sky .hp-topbar-row {
+  padding-top: 12px;
+  padding-bottom: 2px;
+}
+
+.hp-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  line-height: 1;
+}
+
+.hp-wordmark__name {
+  color: var(--hp-ink);
+  font: 600 25px/1 var(--hp-font-display);
+  letter-spacing: -0.02em;
+}
+
+.hp-wordmark__pulse {
+  color: var(--hp-sunset);
+  font: 700 10.5px/1 var(--hp-font-body);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.hp-topbar-logo {
+  width: 26px;
+  height: 30px;
+}
+
+.hp-sky-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+  padding-bottom: 12px;
+  color: var(--hp-text-secondary);
+  font: 520 13px/1.3 var(--hp-font-body);
+}
+
+.hp-sky-line__greeting {
+  color: var(--hp-ink);
+  font: italic 500 15px/1 var(--hp-font-display);
+  letter-spacing: -0.005em;
+}
+
+.hp-sky-line__sun {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+  padding: 3px 9px 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hp-gold) 18%, transparent);
+  color: color-mix(in srgb, var(--hp-gold) 55%, var(--hp-ink));
+  font-weight: 620;
+}
+
+/* Header actions: quiet icons, the deals pill keeps the only colour. */
+.hp-topbar.hp-sky .hp-topbar-actions .hp-topbar-search,
+.hp-topbar.hp-sky .hp-topbar-actions .hp-appearance-trigger {
+  color: var(--hp-ink);
+}
+
+.hp-deals-action {
+  background: color-mix(in srgb, var(--hp-paper) 70%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--hp-border);
+  color: var(--hp-text-accent);
+}
+
+/* The header keeps one line: deals become a tinted gift icon. */
+.hp-topbar .hp-deals-action-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.hp-topbar .hp-deals-action {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+/* ---- Pulse feed: an editorial stream, not a stack of boxes ------------------- */
+
+.fd-tabs {
+  display: flex;
+  gap: 22px;
+  margin: 6px -16px 18px;
+  overflow-x: auto;
+  padding: 0 16px;
+  border-bottom: 0.5px solid var(--hp-border);
+}
+
+.fd-tab {
+  position: relative;
+  flex: none;
+  padding: 10px 0 12px;
+  border: 0;
+  background: none;
+  color: var(--hp-text-secondary);
+  font: 600 14.5px/1 var(--hp-font-body);
+  letter-spacing: -0.01em;
+  transition: color 160ms ease;
+}
+
+.fd-tab[aria-pressed="true"] {
+  color: var(--hp-ink);
+}
+
+.fd-tab[aria-pressed="true"]::after {
+  position: absolute;
+  right: 0;
+  bottom: -0.5px;
+  left: 0;
+  height: 2px;
+  content: "";
+  border-radius: 2px;
+  background: var(--hp-ink);
+}
+
+.fd-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+
+.fd-empty {
+  padding: 42px 12px;
+  color: var(--hp-text-secondary);
+  font: italic 500 17px/1.4 var(--hp-font-display);
+  text-align: center;
+}
+
+.fd-post__head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 10px;
+}
+
+.fd-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--hp-border);
+  object-fit: cover;
+}
+
+.fd-avatar[data-role="LOCAL"] {
+  background: var(--hp-story-ring);
+}
+
+.fd-post__who {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+}
+
+.fd-post__name {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--hp-ink);
+  font: 650 15px/1.15 var(--hp-font-body);
+  letter-spacing: -0.01em;
+}
+
+.fd-role {
+  color: var(--hp-text-secondary);
+  font: italic 500 13px/1 var(--hp-font-display);
+}
+
+.fd-role[data-role="LOCAL"] {
+  color: var(--hp-olive);
+}
+
+.fd-role[data-role="BUSINESS"] {
+  color: var(--hp-text-accent);
+}
+
+.fd-post__place {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hp-text-secondary);
+  font: 500 12.5px/1.2 var(--hp-font-body);
+  text-align: left;
+}
+
+.fd-post__place span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fd-post__media {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--hp-ink) 6%, transparent);
+  box-shadow: var(--hp-shadow-card);
+}
+
+.fd-post__img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  max-height: 68vh;
+}
+
+.fd-post__media:active .fd-post__img img {
+  transform: scale(1.015);
+}
+
+.fd-post__img img {
+  transition: transform 500ms var(--hp-ease-out);
+}
+
+.fd-post__badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 14px;
+  background: rgb(0 0 0 / 0.34);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  font: 650 12px/1 var(--hp-font-body);
+}
+
+.fd-post__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 4px 6px;
+}
+
+.fd-post__spacer {
+  flex: 1;
+}
+
+.fd-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hp-ink);
+  font: 600 14px/1 var(--hp-font-body);
+  transition: transform 160ms cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+
+.fd-act:active {
+  transform: scale(0.86);
+}
+
+.fd-act[data-on="true"] {
+  color: var(--hp-sunset);
+}
+
+.fd-act[data-on="true"] svg {
+  animation: fd-pop 360ms cubic-bezier(0.34, 1.6, 0.5, 1);
+}
+
+@keyframes fd-pop {
+  40% {
+    transform: scale(1.28);
+  }
+}
+
+.fd-post__caption {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 2px 4px 0;
+  border: 0;
+  background: none;
+  color: var(--hp-ink);
+  text-align: left;
+}
+
+.fd-post__caption p {
+  font: 450 15px/1.45 var(--hp-font-body);
+}
+
+.fd-post__caption b {
+  margin-right: 4px;
+  font-weight: 650;
+}
+
+.fd-post__tags {
+  color: var(--hp-sea);
+  font: 520 13px/1.3 var(--hp-font-body);
+}
+
+/* Story rail: Instagram's grammar — a gradient ring means "new for you". */
+.hp-story-bubble__ring {
+  padding: 2.5px;
+  border-radius: 50%;
+}
+
+.hp-story-bubble__ring[data-unseen="false"] {
+  opacity: 0.55;
+}
+
+.hp-story-bubble__thumb {
+  border: 2.5px solid var(--hp-bg);
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.fd-post__place {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.fd-post__place > span:last-child {
+  flex: none;
+}
+
+/* ---- onboarding: Ilia in full bleed ------------------------------------------ */
+
+.ob-root {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #120e0a;
+  color: #fff;
+}
+
+.ob-root[data-step="vibes"] {
+  background: var(--hp-bg);
+  color: var(--hp-ink);
+}
+
+.ob-photo {
+  position: absolute;
+  inset: 0;
+}
+
+.ob-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ob-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgb(0 0 0 / 0.42) 0%,
+    rgb(0 0 0 / 0) 22%,
+    rgb(0 0 0 / 0) 42%,
+    rgb(10 6 2 / 0.82) 100%
+  );
+  pointer-events: none;
+}
+
+.ob-root[data-step="vibes"] .ob-shade {
+  display: none;
+}
+
+.ob-progress {
+  position: relative;
+  display: flex;
+  gap: 5px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 0;
+}
+
+.ob-progress span {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.32);
+  transition: background 300ms ease;
+}
+
+.ob-progress span[data-state="done"],
+.ob-progress span[data-state="now"] {
+  background: #fff;
+}
+
+.ob-root[data-step="vibes"] .ob-progress span {
+  background: color-mix(in srgb, var(--hp-ink) 14%, transparent);
+}
+
+.ob-root[data-step="vibes"] .ob-progress span[data-state="done"],
+.ob-root[data-step="vibes"] .ob-progress span[data-state="now"] {
+  background: var(--hp-ink);
+}
+
+.ob-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 24px 10px;
+}
+
+.ob-root[data-step="vibes"] .ob-body {
+  justify-content: center;
+}
+
+.ob-copy {
+  display: grid;
+  gap: 12px;
+  max-width: 360px;
+}
+
+.ob-place {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.16);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  font: 600 12.5px/1 var(--hp-font-body);
+  letter-spacing: 0.01em;
+}
+
+.ob-copy h2 {
+  font: 600 42px/1.02 var(--hp-font-display);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.ob-copy p {
+  color: rgb(255 255 255 / 0.84);
+  font: 450 16px/1.5 var(--hp-font-body);
+  text-wrap: pretty;
+}
+
+.ob-copy--vibes h2 {
+  font-size: 36px;
+}
+
+.ob-copy--vibes p {
+  color: var(--hp-text-secondary);
+}
+
+.ob-vibes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ob-vibe {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--hp-ink) 6%, transparent);
+  color: var(--hp-ink);
+  font: 600 14px/1 var(--hp-font-body);
+  transition:
+    background 160ms ease,
+    transform 120ms ease;
+}
+
+.ob-vibe[aria-pressed="true"] {
+  background: var(--hp-ink);
+  color: var(--hp-paper);
+}
+
+.ob-vibe:active {
+  transform: scale(0.95);
+}
+
+.ob-loading {
+  color: var(--hp-text-secondary);
+}
+
+.ob-location {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--hp-sea) 12%, transparent);
+  color: var(--hp-sea);
+  font: 650 14px/1 var(--hp-font-body);
+}
+
+.ob-location[data-on="true"] {
+  background: color-mix(in srgb, var(--hp-olive) 15%, transparent);
+  color: var(--hp-olive);
+}
+
+.ob-footer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px calc(env(safe-area-inset-bottom, 0px) + 22px);
+}
+
+.ob-skip {
+  border: 0;
+  background: none;
+  color: rgb(255 255 255 / 0.75);
+  font: 600 15px/1 var(--hp-font-body);
+}
+
+.ob-root[data-step="vibes"] .ob-skip {
+  color: var(--hp-text-secondary);
+}
+
+.ob-next {
+  height: 52px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: 26px;
+  background: #fff;
+  color: #1b1712;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.25);
+  font: 700 15.5px/1 var(--hp-font-body);
+  transition: transform 140ms ease;
+}
+
+.ob-root[data-step="vibes"] .ob-next {
+  background: var(--hp-ink);
+  color: var(--hp-paper);
+}
+
+.ob-next:active {
+  transform: scale(0.96);
+}
+
+/* One iOS-style segmented control instead of two heavy pills. */
+.hp-segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--hp-ink) 7%, transparent);
+}
+
+.hp-segmented__option {
+  display: flex;
+  flex: 1;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--hp-text-secondary);
+  font: 620 14px/1 var(--hp-font-body);
+  transition:
+    background 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.hp-segmented__option[aria-pressed="true"] {
+  background: var(--hp-paper);
+  color: var(--hp-ink);
+  box-shadow:
+    0 1px 2px rgb(60 38 18 / 0.08),
+    0 3px 10px rgb(60 38 18 / 0.08);
+}
+
+.dark .hp-segmented__option[aria-pressed="true"] {
+  background: var(--hp-raised);
+}
+
+/* The sky line never wraps: greeting and time left, the sun on the right. */
+.hp-sky-line {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.hp-sky-line__greeting {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hp-sky-line__sun {
+  flex: none;
+  margin-left: auto;
 }
