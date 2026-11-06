@@ -303,7 +303,13 @@ function updatePulseIcon(
   const hasEvents = node.kind === "child" && node.eventCount > 0;
   shell.classList.toggle("has-events", hasEvents);
   shell.classList.toggle("has-stories", hasStory);
-  const name = node.kind === "child" ? node.place.name : node.dominantCluster.name;
+  // Labels speak the app's language: places by their Greek name, areas translated.
+  const name =
+    node.kind === "child"
+      ? language === "GR" && node.place.greekName
+        ? node.place.greekName
+        : node.place.name
+      : t(node.dominantCluster.name);
   const setText = (selector: string, value: string) => {
     const part = shell.querySelector<HTMLElement>(selector);
     if (part && part.textContent !== value) part.textContent = value;
