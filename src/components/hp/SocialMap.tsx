@@ -1,6 +1,7 @@
 import { useTheme } from "@/lib/theme-provider";
 import {
   applyMapAppearance,
+  applyMapLabelLanguage,
   createMapAppearanceStyle,
   resolveMapPalette,
   type MapAppearance,
@@ -63,13 +64,9 @@ import {
   type MapDiscoveryViewport,
 } from "@/lib/hp/regional-discovery";
 import {
-  installRegionalLayer,
-  applyRegionalMapPalette,
-  regionalGeoJson,
-  regionalDescription,
   markerActivityDescription,
-  REGION_LAYER_ID,
-  REGION_SOURCE_ID,
+  nonOverlappingBubbles,
+  regionBubbleView,
 } from "@/lib/hp/map-region-layer";
 export type { MapDiscoveryViewport } from "@/lib/hp/regional-discovery";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -78,7 +75,6 @@ import type {
   Map as MapLibreMap,
   Marker as MapLibreMarker,
   StyleSpecification,
-  GeoJSONSource,
 } from "maplibre-gl";
 import { type EventItem, type Place } from "@/lib/hp-model";
 import { ATMOSPHERE_TRANSITION_MS, type AtmospherePaletteKey } from "@/lib/hp/temporal-atmosphere";
@@ -113,7 +109,7 @@ import {
   type MarkerPulseSnapshot,
 } from "@/lib/hp/marker-pulse";
 import type { TranslationParams } from "@/lib/i18n";
-import { createMarkerPhoto } from "@/lib/hp/marker-photo";
+import { bubblePhotoUrl, createMarkerPhoto, markerPhotoIds } from "@/lib/hp/marker-photo";
 
 const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
 
@@ -159,7 +155,6 @@ function paintMapAppearance(
     );
   } else if (session.provider) {
     applyMapAppearance(session.map, session.provider, appearance, duration);
-    applyRegionalMapPalette(session.map, resolveMapPalette(appearance), duration);
   }
 }
 
@@ -194,7 +189,6 @@ const MAP_PAN_DURATION = HP_MOTION.pan / 1000;
 const MAP_OVERVIEW_DURATION = HP_MOTION.overview / 1000;
 const MAP_FOCUS_DURATION = MAP_POLICY.focusDurationMs / 1000;
 const MIN_UTILITY_RAIL_HEIGHT = 248;
-const MIN_MAP_CHROME_HEIGHT = 188;
 const SAFE_MARKER_RADIUS = 48;
 
 const prefersReducedMapMotion = () =>
@@ -475,7 +469,9 @@ export function SocialMap({
   const markerRuntimeRef = useRef<Map<string, MarkerRuntimeState>>(new Map());
   const markerPhotosRef = useRef(new Map<string, ReturnType<typeof createMarkerPhoto>>());
   const markerExitsRef = useRef(createMarkerExits());
-  const previewRegionMarkersRef = useRef<Map<string, MapLibreMarker>>(new Map());
+  const regionMarkersRef = useRef(
+    new Map<string, { marker: MapLibreMarker; photo: ReturnType<typeof createMarkerPhoto> }>(),
+  );
   const renderNodesRef = useRef<Map<string, RenderNode>>(new Map());
   const scheduleMarkerViewportSyncRef = useRef<() => void>(() => {});
   const activateMarkerByIdRef = useRef<(id: string) => void>(() => undefined);
@@ -494,8 +490,6 @@ export function SocialMap({
   const userNavigatedRef = useRef(false);
   const explicitBackRef = useRef(false);
   const [settledBounds, setSettledBounds] = useState<MapBounds>(MAP_POLICY.panBounds);
-  const [visibleRegionSymbolIds, setVisibleRegionSymbolIds] = useState<string[]>([]);
-  const [settledViewport, setSettledViewport] = useState<MapDiscoveryViewport | null>(null);
   const bottomOverlayHeightRef = useRef(sheetGeometry?.get().height ?? bottomOverlayHeight);
   bottomOverlayHeightRef.current = sheetGeometry?.get().height ?? bottomOverlayHeight;
   const availableMapHeightRef = useRef(availableMapHeight);
@@ -553,10 +547,6 @@ export function SocialMap({
     });
     return places;
   }, [clusters]);
-  const selectedAreaCluster = useMemo(
-    () => (selectedAreaId ? (clusterById.get(selectedAreaId) ?? null) : null),
-    [clusterById, selectedAreaId],
-  );
   const selectedPlaceNode = useMemo(() => {
     if (!selectedPlaceId) return null;
     return placeById.get(selectedPlaceId) ?? null;
@@ -746,42 +736,6 @@ export function SocialMap({
   const hasPrimaryMarkerSelection = Boolean(primarySelectedNode);
   const primarySelectedNodeRef = useRef(primarySelectedNode);
   primarySelectedNodeRef.current = primarySelectedNode;
-
-  const summaryText = useMemo(() => {
-    if (selectedPlaceNode) return selectedPlaceNode.place.name;
-    if (selectedAreaCluster) return t("{area} places", { area: selectedAreaCluster.name });
-    if (isSplitZoom) return t("Tap a place or cluster");
-    if (activeFilterLabel) return t("{filter} areas", { filter: activeFilterLabel });
-    return t("{count} places", {
-      count: clusters.reduce((sum, cluster) => sum + cluster.places.length, 0),
-    });
-  }, [activeFilterLabel, clusters, isSplitZoom, selectedAreaCluster, selectedPlaceNode, t]);
-
-  const discoveryChipClusters = useMemo(() => {
-    const visible = new Set(
-      settledViewport?.hierarchyLevel === "region" ||
-        settledViewport?.hierarchyLevel === "transition"
-        ? visibleRegionSymbolIds
-        : (settledViewport?.visibleAreaIds ?? []),
-    );
-    return regions
-      .filter(
-        (row) =>
-          row.searchedPlaceIds.length &&
-          (visible.has(row.region.id) || row.region.id === selectedAreaId),
-      )
-      .sort(
-        (a, b) =>
-          Number(b.region.id === selectedAreaId) - Number(a.region.id === selectedAreaId) ||
-          b.contextualPlaceIds.length - a.contextualPlaceIds.length ||
-          a.region.id.localeCompare(b.region.id),
-      )
-      .slice(0, 24)
-      .flatMap((row) => {
-        const cluster = clusterById.get(row.region.id);
-        return cluster ? [{ cluster, row }] : [];
-      });
-  }, [regions, selectedAreaId, settledViewport, visibleRegionSymbolIds, clusterById]);
 
   const zoomIntoCluster = useCallback((cluster: MapAreaCluster) => {
     const map = mapRef.current;
@@ -1063,30 +1017,9 @@ export function SocialMap({
         map.on("error", onBasemapError);
         attempt.addCleanup(() => map?.off("error", onBasemapError));
 
-        const onMapClick = (event: {
-          originalEvent: MouseEvent;
-          point: { x: number; y: number };
-        }) => {
+        // Area bubbles and place markers are buttons with their own handlers.
+        const onMapClick = (event: { originalEvent: MouseEvent }) => {
           if (!attempt.isActive() || Date.now() < ignoreBackgroundClickUntilRef.current) return;
-          if (
-            !previewMode &&
-            map &&
-            mapRef.current === map &&
-            mapDisclosure(map.getZoom()).regionOpacity > 0.08 &&
-            map.getLayer(REGION_LAYER_ID)
-          ) {
-            const [hit] = map.queryRenderedFeatures(
-              [
-                [event.point.x - 14, event.point.y - 14],
-                [event.point.x + 14, event.point.y + 14],
-              ],
-              { layers: [REGION_LAYER_ID] },
-            );
-            if (hit?.properties?.regionId) {
-              selectRegionRef.current(String(hit.properties.regionId));
-              return;
-            }
-          }
           const target = event.originalEvent?.target as Element | null;
           if (target?.closest(".maplibregl-marker, .maplibregl-control-container, button, a"))
             return;
@@ -1229,7 +1162,6 @@ export function SocialMap({
         const onMapReady = () => {
           if (!attempt.isActive() || !map) return;
           try {
-            if (!previewMode) installRegionalLayer(map, resolveMapPalette(appearanceRef.current));
             if (appearanceSession) paintMapAppearance(appearanceSession, appearanceRef.current, 0);
           } catch {
             attempt.fail();
@@ -1271,8 +1203,11 @@ export function SocialMap({
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       locationRequestRef.current?.cancel();
       markerExitsRef.current.flush();
-      previewRegionMarkersRef.current.forEach((marker) => marker.remove());
-      previewRegionMarkersRef.current.clear();
+      regionMarkersRef.current.forEach(({ marker, photo }) => {
+        photo.dispose();
+        marker.remove();
+      });
+      regionMarkersRef.current.clear();
       markerPhotosRef.current.forEach((photo) => photo.dispose());
       markerPhotosRef.current.clear();
       markers.forEach((marker) => marker.remove());
@@ -1416,34 +1351,6 @@ export function SocialMap({
           availableMapHeightRef.current,
           0,
         );
-        const symbolIds = previewMode
-          ? regionsRef.current
-              .filter((row) => {
-                if (
-                  !row.searchedPlaceIds.length ||
-                  mapDisclosure(map.getZoom()).regionOpacity <= 0.08
-                )
-                  return false;
-                const point = map.project([row.region.anchor.lng, row.region.anchor.lat]);
-                return pointIsInSafeRect(point, rect);
-              })
-              .map((row) => row.region.id)
-              .sort()
-          : map.getZoom() < MAP_POLICY.regionFadeEnd && map.getLayer(REGION_LAYER_ID)
-            ? [
-                ...new Set(
-                  map
-                    .queryRenderedFeatures(
-                      [
-                        [rect.left, rect.top],
-                        [rect.right, rect.bottom],
-                      ],
-                      { layers: [REGION_LAYER_ID] },
-                    )
-                    .map((feature) => String(feature.properties.regionId)),
-                ),
-              ].sort()
-            : [];
         const { bounds: usableBounds, places: visiblePlaces } = visibleScreenMembers(
           rect,
           { unproject: (point) => map.unproject(point), project: (point) => map.project(point) },
@@ -1460,19 +1367,15 @@ export function SocialMap({
           contextualIds,
           { bearing: map.getBearing(), pitch: map.getPitch() },
         );
-        return { viewport, bounds, symbolIds };
+        return { viewport, bounds };
       },
-      publishViewport: ({ viewport, bounds, symbolIds }) => {
-        setVisibleRegionSymbolIds((previous) =>
-          previous.join("|") === symbolIds.join("|") ? previous : symbolIds,
-        );
+      publishViewport: ({ viewport, bounds }) => {
         const signature = viewportSignature(viewport);
         if (signature !== lastDiscoveryViewportRef.current) {
           lastDiscoveryViewportRef.current = signature;
           setSettledBounds((previous) =>
             JSON.stringify(previous) === JSON.stringify(bounds) ? previous : bounds,
           );
-          setSettledViewport(viewport);
           onDiscoveryViewportChangeRef.current?.(viewport);
         }
       },
@@ -1506,70 +1409,122 @@ export function SocialMap({
     scheduleMarkerViewportSyncRef.current();
   }, [bottomOverlayHeight, availableMapHeight, regions, placeTopology, activitySnapshot]);
 
+  // Town names follow the app language instead of printing Latin and Greek twice.
   useEffect(() => {
     const map = mapRef.current;
-    if (previewMode || !map || !mapReady || mapRef.current !== map) return;
-    const source = map.getSource(REGION_SOURCE_ID) as GeoJSONSource | undefined;
-    if (!source) return;
-    source.setData(regionalGeoJson(regions, selectedAreaId, activeFilterLabel, t, nowMs, language));
-  }, [mapReady, regions, selectedAreaId, activeFilterLabel, t, nowMs, language, previewMode]);
+    if (previewMode || !map || !mapReady) return;
+    applyMapLabelLanguage(map, language);
+  }, [mapReady, language, previewMode]);
 
+  // Zoomed out, each area is one photo bubble: its most popular place and its name.
   useEffect(() => {
     const map = mapRef.current;
     const maplibre = maplibreModuleRef.current;
-    if (!previewMode || !mapReady || !map || !maplibre) return;
+    if (!mapReady || !map || !maplibre) return;
     const currentIds = new Set(
       regions.filter((row) => row.searchedPlaceIds.length).map((row) => row.region.id),
     );
-    previewRegionMarkersRef.current.forEach((marker, id) => {
+    regionMarkersRef.current.forEach(({ marker, photo }, id) => {
       if (currentIds.has(id)) return;
+      photo.dispose();
       marker.remove();
-      previewRegionMarkersRef.current.delete(id);
+      regionMarkersRef.current.delete(id);
     });
     const opacity = mapDisclosure(zoom).regionOpacity;
+    const laidOut: {
+      id: string;
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+      matches: number;
+      hotness: number;
+      photoUrl: string;
+    }[] = [];
     regions.forEach((row) => {
       if (!currentIds.has(row.region.id) || mapRef.current !== map) return;
-      let marker = previewRegionMarkersRef.current.get(row.region.id);
-      if (!marker) {
+      let entry = regionMarkersRef.current.get(row.region.id);
+      if (!entry) {
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "hp-preview-region-marker";
+        button.className = "hp-region-marker";
         const core = document.createElement("span");
-        core.className = "hp-preview-region-core";
+        core.className = "hp-region-core";
         core.setAttribute("aria-hidden", "true");
         const name = document.createElement("span");
-        name.className = "hp-preview-region-name";
-        const description = document.createElement("span");
-        description.className = "hp-preview-region-description";
-        button.append(core, name, description);
+        name.className = "hp-region-name";
+        button.append(core, name);
         button.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
           if (mapRef.current !== map || button.tabIndex < 0) return;
           selectRegionRef.current(row.region.id);
         });
-        marker = new maplibre.Marker({ element: button, anchor: "top" })
-          .setLngLat([row.region.anchor.lng, row.region.anchor.lat])
-          .addTo(map);
-        previewRegionMarkersRef.current.set(row.region.id, marker);
+        entry = {
+          // The 48px photo is centred on the area; its name hangs below.
+          marker: new maplibre.Marker({ element: button, anchor: "top", offset: [0, -24] })
+            .setLngLat([row.region.anchor.lng, row.region.anchor.lat])
+            .addTo(map),
+          photo: createMarkerPhoto(button),
+        };
+        regionMarkersRef.current.set(row.region.id, entry);
       }
-      const element = marker.getElement();
-      const description = regionalDescription(row, activeFilterLabel, t, nowMs, language);
-      const accessible = `${t(row.region.name)}. ${regionalDescription(row, activeFilterLabel, t, nowMs, language, true)}`;
-      element.querySelector(".hp-preview-region-name")!.textContent = t(row.region.name);
-      element.querySelector(".hp-preview-region-description")!.textContent = description;
-      element.setAttribute("aria-label", accessible);
-      element.title = accessible;
+      const element = entry.marker.getElement();
+      const cluster = clusterById.get(row.region.id);
+      const view = regionBubbleView(
+        row,
+        cluster?.places ?? [],
+        activeFilterLabel,
+        t,
+        nowMs,
+        language,
+      );
+      element.querySelector(".hp-region-name")!.textContent = view.name;
+      element.setAttribute("aria-label", view.label);
+      element.title = view.label;
       element.setAttribute("aria-pressed", String(selectedAreaId === row.region.id));
-      element.style.opacity = String(opacity * (row.contextualPlaceIds.length ? 1 : 0.55));
-      element.style.pointerEvents = opacity > 0.08 ? "auto" : "none";
-      element.style.visibility = opacity > 0.001 ? "visible" : "hidden";
-      element.setAttribute("aria-hidden", String(opacity <= 0.08));
-      element.tabIndex = opacity > 0.08 ? 0 : -1;
-      marker.setLngLat([row.region.anchor.lng, row.region.anchor.lat]);
+      entry.marker.setLngLat([row.region.anchor.lng, row.region.anchor.lat]);
+      const point = map.project([row.region.anchor.lng, row.region.anchor.lat]);
+      const width = Math.max(48, element.offsetWidth);
+      laidOut.push({
+        id: row.region.id,
+        left: point.x - width / 2,
+        top: point.y - 24,
+        width,
+        height: element.offsetHeight || 72,
+        matches: row.contextualPlaceIds.length,
+        hotness: cluster?.hotness ?? 0,
+        photoUrl: view.photoUrl,
+      });
     });
+    // Bubbles never overlap: the selected area claims space first, then the areas with
+    // the most matching places. The rest wait for a closer zoom, like map labels.
+    const shown = nonOverlappingBubbles(
+      laidOut.sort(
+        (a, b) =>
+          Number(b.id === selectedAreaId) - Number(a.id === selectedAreaId) ||
+          b.matches - a.matches ||
+          b.hotness - a.hotness ||
+          a.id.localeCompare(b.id),
+      ),
+    );
+    for (const bubble of laidOut) {
+      const entry = regionMarkersRef.current.get(bubble.id);
+      if (!entry) continue;
+      const element = entry.marker.getElement();
+      const interactive = opacity > 0.08 && shown.has(bubble.id);
+      // MapLibre rewrites a marker's style.opacity on every frame; setOpacity is the API.
+      entry.marker.setOpacity(
+        String(shown.has(bubble.id) ? opacity * (bubble.matches ? 1 : 0.55) : 0),
+      );
+      element.style.pointerEvents = interactive ? "auto" : "none";
+      element.style.visibility = shown.has(bubble.id) && opacity > 0.001 ? "visible" : "hidden";
+      element.setAttribute("aria-hidden", String(!interactive));
+      element.tabIndex = interactive ? 0 : -1;
+      entry.photo.update(bubble.photoUrl, interactive);
+    }
     scheduleMarkerViewportSyncRef.current();
-  }, [mapReady, previewMode, regions, selectedAreaId, activeFilterLabel, zoom, nowMs, language, t]);
+  }, [mapReady, regions, clusterById, selectedAreaId, activeFilterLabel, zoom, nowMs, language, t]);
 
   useEffect(() => {
     const maplibre = maplibreModuleRef.current;
@@ -1610,6 +1565,10 @@ export function SocialMap({
       } else exits.start(id, remove);
     });
 
+    // A capped few places show their photo; every other place stays a dot.
+    const photoIds = markerPhotoIds(
+      renderNodes.filter((node): node is ChildRenderNode => node.kind === "child"),
+    );
     renderNodes.forEach((node) => {
       const zIndexOffset = node.selected
         ? 2400
@@ -1685,7 +1644,10 @@ export function SocialMap({
             markerPhotosRef.current.set(node.id, photo);
           }
           // A one-place region can highlight a child without selecting its place sheet.
-          photo.update(node.place.imageUrl, node.place.id === selectedPlaceId);
+          photo.update(
+            bubblePhotoUrl(node.place.imageUrl),
+            node.place.id === selectedPlaceId || photoIds.has(node.id),
+          );
         }
 
         if (created) {
@@ -2062,15 +2024,6 @@ export function SocialMap({
     onResetView();
   };
 
-  const selectDiscoveryCluster = (cluster: MapAreaCluster) => {
-    const nextSelectionKey = `${cluster.id}|`;
-    if (selectionKeyRef.current !== nextSelectionKey) {
-      cameraHandledSelectionRef.current = nextSelectionKey;
-    }
-    onSelectArea(cluster);
-    zoomIntoCluster(cluster);
-  };
-
   const zoomOut = () => {
     userNavigatedRef.current = true;
     selectionMotionUntilRef.current = 0;
@@ -2138,7 +2091,6 @@ export function SocialMap({
   }, [mapReady]);
 
   const utilityRailHidden = availableMapHeight < MIN_UTILITY_RAIL_HEIGHT;
-  const mapChromeHidden = availableMapHeight < MIN_MAP_CHROME_HEIGHT;
   const mapStyle = {
     "--hp-map-bottom-overlay-height": `${Math.max(0, sheetGeometry?.get().height ?? bottomOverlayHeight)}px`,
     "--hp-map-land": themeReady ? palette.land : "var(--hp-bg)",
@@ -2149,14 +2101,11 @@ export function SocialMap({
     <div
       ref={mapRootRef}
       data-atmosphere-palette={atmospherePalette}
-      className={`hp-real-map relative ${mapReady ? "z-0" : "z-40"} h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""} ${activeLens ? "has-discovery-lens" : ""} ${mapChromeHidden ? "is-map-compressed" : ""}`}
+      className={`hp-real-map relative ${mapReady ? "z-0" : "z-40"} h-full w-full overflow-hidden bg-hp-paper ${hasPrimaryMarkerSelection ? "has-marker-selection" : ""} ${activeLens ? "has-discovery-lens" : ""}`}
       data-map-state={mapAttemptState.status}
       data-map-attempt={mapAttemptState.attempt}
       data-discovery-lens={activeLens ?? undefined}
       data-map-hierarchy={mapDisclosure(zoom).level}
-      data-attribution-position={
-        availableMapHeight < MIN_UTILITY_RAIL_HEIGHT + 64 ? "left" : undefined
-      }
       style={mapStyle}
     >
       <div
@@ -2312,50 +2261,16 @@ export function SocialMap({
       )}
 
       {mapReady && (
-        <div className="hp-map-summary pointer-events-none">
-          <span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-hp-sunset" />
-          <span className="hp-map-summary__text">{summaryText}</span>
-        </div>
-      )}
-
-      {mapReady && discoveryChipClusters.length > 0 && (
-        <div
-          className={`hp-map-chip-rail hp-no-scrollbar ${canGoBack ? "has-back" : ""} ${selectedAreaId ? "has-selection" : ""}`}
-          inert={mapChromeHidden ? true : undefined}
-          aria-hidden={mapChromeHidden ? true : undefined}
-          aria-label={t("Visible map areas")}
-        >
-          {discoveryChipClusters.map(({ cluster, row }) => {
-            const selected = cluster.id === selectedAreaId;
-            return (
-              <button
-                key={cluster.id}
-                type="button"
-                onClick={() => selectDiscoveryCluster(cluster)}
-                aria-pressed={selected}
-                aria-label={`${t(cluster.name)}. ${regionalDescription(row, activeFilterLabel, t, nowMs, language, true)}`}
-                title={regionalDescription(row, activeFilterLabel, t, nowMs, language, true)}
-                tabIndex={mapChromeHidden ? -1 : undefined}
-                className={`hp-map-chip ${selected ? "is-active" : ""}`}
-              >
-                <span className="hp-map-chip__face">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-hp-sunset" />
-                  {t(cluster.name)}
-                  <span className="hp-map-chip__count">{row.contextualPlaceIds.length}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {mapReady && (
         <div
           className={`hp-map-utility-rail ${utilityRailHidden ? "is-hidden" : ""}`}
           inert={utilityRailHidden ? true : undefined}
           aria-hidden={utilityRailHidden ? true : undefined}
         >
-          <div className="hp-map-control-group" role="group" aria-label={t("Map zoom controls")}>
+          <div
+            className="hp-map-control-group hp-map-zoom-group"
+            role="group"
+            aria-label={t("Map zoom controls")}
+          >
             <Button
               variant="hpMap"
               size="hpIcon"

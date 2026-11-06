@@ -6,13 +6,7 @@ import { type PulseAccountState } from "@/lib/hp-auth";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { AccountBubble } from "./AuthAccountSheets";
-import { DISCOVERY_LENSES, type DiscoveryLens } from "@/lib/hp/discovery";
-import {
-  type MarkerMotion,
-  DISCOVERY_LENS_LABEL,
-  HP_TRANSITION,
-  MARKER_MOTION_OPTIONS,
-} from "./pulse-shared";
+import { type MarkerMotion, HP_TRANSITION, MARKER_MOTION_OPTIONS } from "./pulse-shared";
 
 export function Toast({ msg }: { msg: string | null }) {
   return (
@@ -167,9 +161,6 @@ export function TopBar({
           </Button>
           <AccountBubble account={account} onOpenAccount={onOpenAccount} onOpenAuth={onOpenAuth} />
         </div>
-      </div>
-      <div className="hp-topbar-subtitle hp-safe-px">
-        <p className="hp-topbar-subtitle-copy">{t("Local spots, routes, and tips.")}</p>
       </div>
       <AnimatePresence>
         {appearanceOpen && (
@@ -348,38 +339,6 @@ export function VibeChips({
             className={`hp-chip shrink-0 text-[12px] ${on ? "is-active" : ""}`}
           >
             {c}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-export function DiscoveryLensRail({
-  active,
-  onChange,
-}: {
-  active: DiscoveryLens | null;
-  onChange: (lens: DiscoveryLens | null) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div
-      className="hp-discovery-lens-rail hp-no-scrollbar hp-safe-px"
-      role="group"
-      aria-label={t("Map discovery lenses")}
-    >
-      {DISCOVERY_LENSES.map((lens) => {
-        const selected = lens === active;
-        return (
-          <button
-            key={lens}
-            type="button"
-            onClick={() => onChange(selected ? null : lens)}
-            aria-pressed={selected}
-            className={`hp-discovery-lens ${selected ? "is-active" : ""}`}
-          >
-            {t(DISCOVERY_LENS_LABEL[lens])}
           </button>
         );
       })}

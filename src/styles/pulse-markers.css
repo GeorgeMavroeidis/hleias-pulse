@@ -369,12 +369,12 @@
   }
 }
 
-/* DOM regional markers keep the fictional preview free of worker-backed data sources. */
-.hp-preview-region-marker {
+/* Zoomed out, each area is a photo bubble with its name. */
+.hp-region-marker {
   display: flex;
   min-width: 44px;
   min-height: 44px;
-  max-width: 170px;
+  max-width: 150px;
   flex-direction: column;
   align-items: center;
   padding: 0;
@@ -383,33 +383,49 @@
   color: var(--hp-ink);
   text-align: center;
   cursor: pointer;
+  touch-action: manipulation;
+  transition: opacity var(--hp-motion-state) var(--hp-ease-standard);
 }
-.hp-preview-region-core {
+/* Until (or unless) its photo loads, a bubble is a white disc with the pulse dot. */
+.hp-region-core {
+  position: relative;
   display: block;
   flex: none;
-  width: 28px;
-  height: 28px;
-  margin: 2px 0 7px;
-  border: 2px solid var(--hp-paper);
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 2.5px solid var(--hp-paper);
   border-radius: 50%;
-  background: var(--hp-sunset);
-  box-shadow: 0 0 0 1px var(--hp-ink);
+  background: radial-gradient(circle, var(--hp-sunset) 0 7px, var(--hp-paper) 7.5px);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--hp-ink) 28%, transparent);
+  transition: transform var(--hp-motion-press) var(--hp-ease-standard);
 }
-.hp-preview-region-marker[aria-pressed="true"] .hp-preview-region-core {
-  outline: 2px solid var(--hp-ink);
-  outline-offset: 4px;
+.hp-region-core .hp-pulse-photo {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
-.hp-preview-region-name,
-.hp-preview-region-description {
-  padding: 1px 4px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--hp-paper) 94%, transparent);
+.hp-region-core.has-place-photo .hp-pulse-photo {
+  opacity: 1;
 }
-.hp-preview-region-name {
-  font: 600 13px/1.3 var(--hp-font-body);
+.hp-region-marker:active .hp-region-core {
+  transform: scale(0.94);
 }
-.hp-preview-region-description {
-  font: 400 10px/1.35 var(--hp-font-body);
+.hp-region-marker[aria-pressed="true"] .hp-region-core,
+.hp-region-marker:focus-visible .hp-region-core {
+  outline: 2.5px solid var(--hp-sunset);
+  outline-offset: 2px;
+}
+.hp-region-name {
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--hp-paper) 90%, transparent);
+  font: 650 12.5px/1.3 var(--hp-font-body);
+  white-space: nowrap;
 }
 
 /* Exiting markers remain only as a brief visual trace, never as controls. */

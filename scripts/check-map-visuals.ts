@@ -230,10 +230,12 @@ assert.ok(
 );
 assert.ok(mapSource.includes("if (!marker) {"));
 assert.match(mapSource, /if \(node\.kind === "child"\) \{\s+let photo = markerPhotosRef/);
+// Photos show for the selected place and a capped few prominent ones, at bubble size.
 assert.match(
   mapSource,
-  /photo\.update\(node\.place\.imageUrl, node\.place\.id === selectedPlaceId\)/,
+  /photo\.update\(\s*bubblePhotoUrl\(node\.place\.imageUrl\),\s*node\.place\.id === selectedPlaceId \|\| photoIds\.has\(node\.id\),?\s*\)/,
 );
+assert.match(mapSource, /const photoIds = markerPhotoIds\(/);
 assert.match(mapSource, /markerPhotosRef\.current\.get\(id\)\?\.dispose\(\)/);
 assert.match(mapSource, /markerPhotosRef\.current\.forEach\(\(photo\) => photo\.dispose\(\)\)/);
 assert.match(pulseCss, /border: 1\.5px solid var\(--hp-on-media\)/);
@@ -275,7 +277,10 @@ console.log(
 // These source contracts complement the recovery unit suites and pending browser checks.
 assert.match(mapSource, /startMapInitialization/);
 assert.match(mapSource, /attempt\.ready\(\)/);
-assert.match(mapSource, /if \(!previewMode\) installRegionalLayer\(map[,)]/);
+// Areas are photo-bubble buttons on every map; the canvas-drawn dot layer is gone.
+assert.doesNotMatch(mapSource, /installRegionalLayer|REGION_LAYER_ID|queryRenderedFeatures/);
+assert.match(mapSource, /button\.className = "hp-region-marker"/);
+assert.match(mapSource, /photo: createMarkerPhoto\(button\)/);
 assert.match(mapSource, /if \(previewMode \|\| !maplibre \|\| !map \|\| !mapReady\) return/);
 const previewSource = readFileSync(
   new URL("../src/lib/hp/map-preview-appearance.ts", import.meta.url),
@@ -284,7 +289,7 @@ const previewSource = readFileSync(
 assert.match(previewSource, /sources: \{\}/);
 assert.match(mapSource, /createLocalPreviewBasemapStyle\(resolveMapPalette/);
 assert.match(mapSource, /attachLocalPreviewLand/);
-assert.match(mapSource, /hp-preview-region-marker/);
+assert.match(mapSource, /hp-region-marker/);
 assert.match(mapSource, /hp-map-recovery__places/);
 assert.match(mapSource, /maplibre-gl-worker\.mjs\?worker&url/);
 assert.match(mapSource, /markerExitsRef\.current\.flush\(\)/);
@@ -312,10 +317,8 @@ assert.match(
   /if \(previewMode \|\| !mapHasLoaded \|\| !map \|\| mapRef\.current !== map\) return/,
 );
 assert.match(mapSource, /framedRouteRevisionRef\.current !== routeFrameRevision/);
-assert.match(
-  mapSource,
-  /applyRegionalMapPalette\(session\.map, resolveMapPalette\(appearance\), duration\)/,
-);
+// Area bubbles take their colours from CSS tokens, so a theme change cannot rebuild them.
+assert.doesNotMatch(mapSource, /applyRegionalMapPalette/);
 assert.match(
   mapSource,
   /if \(mapRef\.current !== session\.map \|\| appearanceSessionRef\.current !== session\) return/,

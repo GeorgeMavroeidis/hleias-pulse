@@ -1,109 +1,44 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateStyleMin } from "@maplibre/maplibre-gl-style-spec";
-import { ATMOSPHERE_MAP_PALETTES } from "./map-cartography";
 import {
-  applyRegionalMapPalette,
-  installRegionalLayer,
   markerActivityDescription,
-  regionalSymbolLayer,
-  REGION_LAYER_ID,
-  REGION_SOURCE_ID,
+  nonOverlappingBubbles,
+  regionBubbleView,
 } from "./map-region-layer";
 import type { MarkerPulseSignal } from "./marker-pulse";
+import type { RegionalDiscovery } from "./regional-discovery";
 import { FRESHNESS_LIMITS } from "./freshness";
 
 const now = Date.parse("2026-10-05T12:00:00Z");
 const t = (key: string, params?: Record<string, string | number>) =>
   key.replace(/\{(\w+)\}/g, (_, k) => String(params?.[k] ?? k));
 
-test("all atmosphere regional labels validate without changing disclosure or sprite topology", () => {
-  const day = regionalSymbolLayer();
-  for (const palette of Object.values(ATMOSPHERE_MAP_PALETTES)) {
-    const layer = regionalSymbolLayer(palette);
-    assert.deepEqual(
-      validateStyleMin({
-        version: 8,
-        glyphs: "https://example.test/{fontstack}/{range}.pbf",
-        sources: {
-          [REGION_SOURCE_ID]: {
-            type: "geojson",
-            data: { type: "FeatureCollection", features: [] },
-          },
-        },
-        layers: [layer],
-      }).map((e) => e.message),
-      [],
-    );
-    assert.deepEqual(layer.layout, day.layout);
-    assert.equal(layer.maxzoom, day.maxzoom);
-    assert.deepEqual(layer.paint?.["icon-opacity"], day.paint?.["icon-opacity"]);
-    assert.equal(layer.paint?.["text-color"], palette.primaryText);
-    assert.equal(layer.paint?.["text-halo-color"], palette.land);
-  }
-});
+const QUIET: MarkerPulseSignal = {
+  level: null,
+  tier: "quiet",
+  quality: "confirmed",
+  lastSignalAt: null,
+  score: 0,
+  contributorCount: 0,
+};
 
-test("regional atmosphere updates paint only and skip an absent layer during recovery", () => {
-  const writes: unknown[][] = [];
-  let exists = false;
-  const map = {
-    getLayer: () => (exists ? ({ id: REGION_LAYER_ID } as never) : undefined),
-    setPaintProperty: (...args: unknown[]) => {
-      writes.push(args);
-    },
-  } as unknown as Parameters<typeof applyRegionalMapPalette>[0];
-  const palette = ATMOSPHERE_MAP_PALETTES["late-night"];
-  applyRegionalMapPalette(map, palette, 800);
-  assert.deepEqual(writes, []);
-  exists = true;
-  applyRegionalMapPalette(map, palette, 0);
-  assert.deepEqual(writes, [
-    [REGION_LAYER_ID, "text-color-transition", { duration: 0, delay: 0 }],
-    [REGION_LAYER_ID, "text-color", palette.primaryText],
-    [REGION_LAYER_ID, "text-halo-color-transition", { duration: 0, delay: 0 }],
-    [REGION_LAYER_ID, "text-halo-color", palette.land],
-  ]);
-});
+function area(contextualPlaceIds: string[], signal: MarkerPulseSignal = QUIET) {
+  return {
+    region: { id: "katakolo", name: "Katakolo", anchor: { lat: 37.64, lng: 21.32 } },
+    searchedPlaceIds: ["a", "b", "c"],
+    contextualPlaceIds,
+    signal,
+  } as unknown as RegionalDiscovery;
+}
 
-test("a source left by partial installation can finish without fetching or duplicating sprites", () => {
-  const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
-  const styleDescriptor = Object.getOwnPropertyDescriptor(globalThis, "getComputedStyle");
-  const images = new Set(["hp-region-core", "hp-region-selected"]);
-  const layers: ReturnType<typeof regionalSymbolLayer>[] = [];
-  const source = { type: "geojson", data: { type: "FeatureCollection", features: [] } };
-  Object.defineProperty(globalThis, "document", {
-    configurable: true,
-    value: {
-      createElement() {
-        throw new Error("Sprites already exist");
-      },
-    },
-  });
-  Object.defineProperty(globalThis, "getComputedStyle", {
-    configurable: true,
-    value: () => ({ getPropertyValue: () => "" }),
-  });
-  try {
-    const map = {
-      getContainer: () => ({}),
-      getSource: () => source,
-      getLayer: () => layers[0],
-      hasImage: (id: string) => images.has(id),
-      addImage: () => assert.fail("duplicate sprite"),
-      addSource: () => assert.fail("duplicate source"),
-      addLayer: (layer: ReturnType<typeof regionalSymbolLayer>) => layers.push(layer),
-    } as unknown as Parameters<typeof installRegionalLayer>[0];
-    installRegionalLayer(map, ATMOSPHERE_MAP_PALETTES.evening);
-    installRegionalLayer(map);
-    assert.equal(layers.length, 1);
-    assert.equal(layers[0].paint?.["text-color"], ATMOSPHERE_MAP_PALETTES.evening.primaryText);
-  } finally {
-    if (documentDescriptor) Object.defineProperty(globalThis, "document", documentDescriptor);
-    else Reflect.deleteProperty(globalThis, "document");
-    if (styleDescriptor) Object.defineProperty(globalThis, "getComputedStyle", styleDescriptor);
-    else Reflect.deleteProperty(globalThis, "getComputedStyle");
-  }
-});
+const THUMB =
+  "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Katakolo.jpg/1280px-Katakolo.jpg";
+const ORIGINAL = "https://upload.wikimedia.org/wikipedia/commons/8/8e/Lighthouse.jpg";
+const PLACES = [
+  { id: "a", hotness: 9, imageUrl: "https://visit-olympia.gr/files/a.jpeg" },
+  { id: "b", hotness: 7, imageUrl: THUMB },
+  { id: "c", hotness: 5, imageUrl: ORIGINAL },
+];
 
 test("palette context cannot grant Live to uncertain or aged retained evidence", () => {
   const signal: MarkerPulseSignal = {
@@ -127,4 +62,64 @@ test("palette context cannot grant Live to uncertain or aged retained evidence",
     markerActivityDescription(signal, now + FRESHNESS_LIMITS.recentMs, "EN", t),
     /Historical community activity/,
   );
+});
+
+test("an area bubble shows its name and the most popular matching photo at bubble size", () => {
+  const view = regionBubbleView(area(["b", "c"]), PLACES, null, t, now, "EN");
+  assert.equal(view.name, "Katakolo");
+  assert.equal(view.label, "Katakolo. Explore · 2 places");
+  // "a" is more popular but does not match the current lens, so it never leads.
+  assert.equal(
+    view.photoUrl,
+    "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Katakolo.jpg/120px-Katakolo.jpg",
+  );
+});
+
+test("with no matching photo a bubble falls back to the area's places, then to its dot", () => {
+  const fallback = regionBubbleView(area([]), PLACES.slice(1), null, t, now, "EN");
+  assert.match(fallback.photoUrl, /\/120px-Katakolo\.jpg$/);
+  const dot = regionBubbleView(
+    area([]),
+    [{ id: "a", hotness: 1, imageUrl: " " }],
+    null,
+    t,
+    now,
+    "EN",
+  );
+  assert.equal(dot.photoUrl, "");
+  assert.equal(dot.label, "Katakolo. No matching places");
+});
+
+test("a single-place area speaks Greek through its place's own Greek name", () => {
+  const solo = {
+    ...area(["b"]),
+    region: { id: "solo-b", name: "Lechaina", anchor: { lat: 37.9, lng: 21.3 } },
+  } as unknown as RegionalDiscovery;
+  const lechaina = [{ id: "b", hotness: 1, imageUrl: THUMB, greekName: "Λεχαινά" }];
+  assert.equal(regionBubbleView(solo, lechaina, null, t, now, "GR").name, "Λεχαινά");
+  assert.equal(regionBubbleView(solo, lechaina, null, t, now, "EN").name, "Lechaina");
+});
+
+test("overlapping bubbles yield to the more important one, like map labels", () => {
+  const box = (id: string, left: number, top: number) => ({ id, left, top, width: 80, height: 70 });
+  const shown = nonOverlappingBubbles([
+    box("first", 0, 0),
+    box("touching", 60, 20),
+    box("clear", 200, 0),
+  ]);
+  assert.deepEqual([...shown], ["first", "clear"]);
+});
+
+test("bubble copy never carries raw evidence, contributor IDs, scores or timestamps", () => {
+  const live: MarkerPulseSignal = {
+    level: "lively",
+    tier: "live",
+    quality: "confirmed",
+    lastSignalAt: new Date(now - 60000).toISOString(),
+    score: 99,
+    contributorCount: 3,
+  };
+  const view = regionBubbleView(area(["b"], live), PLACES, null, t, now, "EN");
+  assert.match(view.label, /Recent community activity: Live/);
+  assert.doesNotMatch(JSON.stringify(view), /contributor|score|evidence|99|\d{4}-\d{2}-\d{2}T/);
 });

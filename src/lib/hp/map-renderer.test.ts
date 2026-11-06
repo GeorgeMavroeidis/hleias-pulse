@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createRequire } from "node:module";
-import { validateStyleMin } from "@maplibre/maplibre-gl-style-spec";
 import { PLACES } from "../../../scripts/hp-seed-data";
 import { MAP_POLICY, mapDisclosure, topologyBlend, type MapBounds } from "./map-policy";
 import {
@@ -12,13 +11,7 @@ import {
   viewportSignature,
 } from "./regional-discovery";
 import { createMapTopology, topologyKey, blendTopologies } from "./map-topology";
-import {
-  regionalGeoJson,
-  regionalSymbolLayer,
-  REGION_SOURCE_ID,
-  installRegionalLayer,
-  markerActivityDescription,
-} from "./map-region-layer";
+import { markerActivityDescription, regionBubbleView } from "./map-region-layer";
 import {
   markerPulseInputFromActivity,
   deriveMarkerPulseSnapshot,
@@ -62,24 +55,6 @@ test("disclosure thresholds are continuous, monotonic, complementary and central
   assert.deepEqual(topologyBlend(12.5), { lower: 12, upper: 13, mix: 0 });
   assert.equal(topologyBlend(13).mix, 0);
   assert.ok(topologyBlend(12.999).mix > 0.999);
-});
-
-test("regional symbol layer validates against installed SDK with collision-aware labels", () => {
-  const layer = regionalSymbolLayer();
-  assert.deepEqual(
-    validateStyleMin({
-      version: 8,
-      glyphs: "https://example.test/{fontstack}/{range}.pbf",
-      sources: {
-        [REGION_SOURCE_ID]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-      },
-      layers: [layer],
-    }).map((e) => e.message),
-    [],
-  );
-  assert.equal(layer.layout?.["text-allow-overlap"], false);
-  assert.equal(layer.layout?.["icon-optional"], false);
-  assert.equal(layer.maxzoom, MAP_POLICY.regionFadeEnd);
 });
 
 test("one spatial index preserves every member at all zooms and caches queries/leaves", () => {
@@ -244,21 +219,13 @@ test("every preview scene exposes canonical tiers and actual observation time wi
       input,
       scene.nowMs,
     );
-    const geo = regionalGeoJson(rows, rows[0].region.id, null, t, scene.nowMs, "EN");
-    assert.doesNotMatch(JSON.stringify(geo), /contributor|timestamp|score|evidence/);
-    assert.equal(geo.features[0].properties.priority, -10000);
-    assert.ok(geo.features.every((feature) => feature.properties.count > 0));
-    assert.equal(
-      regionalGeoJson(
-        rows.map((row) => ({ ...row, searchedPlaceIds: [] })),
-        null,
-        null,
-        t,
-        scene.nowMs,
-        "EN",
-      ).features.length,
-      0,
-    );
+    // Area bubbles say tiers and counts; raw evidence never reaches the map's DOM.
+    assert.ok(rows.length > 0);
+    for (const row of rows) {
+      const view = regionBubbleView(row, scene.data.places, null, t, scene.nowMs, "EN");
+      assert.doesNotMatch(JSON.stringify(view), /contributor|timestamp|score|evidence/);
+      assert.ok(view.label.startsWith(`${view.name}. `));
+    }
   }
 });
 
@@ -380,87 +347,4 @@ test("teardown flushes marker exits exactly once and leaves no timers", () => {
   c.advance(1000);
   assert.equal(removed, 1);
   assert.equal(c.timers.size, 0);
-});
-
-function regionalMapFixture(availableContext: boolean) {
-  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
-  const originalComputedStyle = Object.getOwnPropertyDescriptor(globalThis, "getComputedStyle");
-  const context = {
-    fillStyle: "",
-    strokeStyle: "",
-    lineWidth: 0,
-    clearRect() {},
-    beginPath() {},
-    arc() {},
-    fill() {},
-    stroke() {},
-    getImageData: () => ({ width: 64, height: 64, data: new Uint8ClampedArray(64 * 64 * 4) }),
-  };
-  Object.defineProperty(globalThis, "document", {
-    configurable: true,
-    value: {
-      createElement: () => ({
-        width: 0,
-        height: 0,
-        getContext: () => (availableContext ? context : null),
-      }),
-    },
-  });
-  Object.defineProperty(globalThis, "getComputedStyle", {
-    configurable: true,
-    value: () => ({ getPropertyValue: () => "" }),
-  });
-  const images: string[] = [],
-    layers: ReturnType<typeof regionalSymbolLayer>[] = [];
-  const sources = new Map<string, unknown>();
-  const map = {
-    getSource: (id: string) => sources.get(id),
-    getLayer: (id: string) => layers.find((layer) => layer.id === id),
-    hasImage: (id: string) => images.includes(id),
-    getContainer: () => ({}),
-    addImage: (id: string) => images.push(id),
-    addSource: (id: string, source: unknown) => sources.set(id, source),
-    addLayer: (layer: ReturnType<typeof regionalSymbolLayer>) => layers.push(layer),
-  } as unknown as Parameters<typeof installRegionalLayer>[0];
-  return {
-    map,
-    images,
-    sources,
-    layers,
-    restore() {
-      if (originalDocument) Object.defineProperty(globalThis, "document", originalDocument);
-      else Reflect.deleteProperty(globalThis, "document");
-      if (originalComputedStyle)
-        Object.defineProperty(globalThis, "getComputedStyle", originalComputedStyle);
-      else Reflect.deleteProperty(globalThis, "getComputedStyle");
-    },
-  };
-}
-
-test("regional installation uses only local sprites and an empty safe source, once per map", () => {
-  const fixture = regionalMapFixture(true);
-  try {
-    installRegionalLayer(fixture.map);
-    installRegionalLayer(fixture.map);
-    assert.deepEqual(fixture.images, ["hp-region-core", "hp-region-selected"]);
-    assert.deepEqual(fixture.sources.get(REGION_SOURCE_ID), {
-      type: "geojson",
-      data: { type: "FeatureCollection", features: [] },
-    });
-    assert.equal(fixture.layers.length, 1);
-  } finally {
-    fixture.restore();
-  }
-});
-
-test("unavailable canvas context fails before installing a regional source or layer", () => {
-  const fixture = regionalMapFixture(false);
-  try {
-    assert.throws(() => installRegionalLayer(fixture.map), /Regional sprite unavailable/);
-    assert.equal(fixture.sources.size, 0);
-    assert.equal(fixture.layers.length, 0);
-    assert.equal(fixture.images.length, 0);
-  } finally {
-    fixture.restore();
-  }
 });

@@ -1,4 +1,49 @@
-/** A place marker owns its photo; loading never publishes React or map state. */
+/**
+ * Map bubbles are 44px wide. Wikimedia serves fixed thumbnail widths, so ask for the
+ * 120px one (3–6 KB) instead of the 1280px or original file (100–450 KB).
+ */
+export function bubblePhotoUrl(url: string | null | undefined) {
+  const source = url?.trim() ?? "";
+  const thumb = source.match(
+    /^(https:\/\/(?:upload|thumb)\.wikimedia\.org\/.+\/thumb\/.+\/)\d+px-([^/]+)$/,
+  );
+  if (thumb) return `${thumb[1]}120px-${thumb[2]}`;
+  const original = source.match(
+    /^(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)([0-9a-f]\/[0-9a-f]{2}\/)([^/]+\.(?:jpe?g|png|webp))$/i,
+  );
+  if (original) return `${original[1]}thumb/${original[2]}${original[3]}/120px-${original[3]}`;
+  return source;
+}
+
+/** At most this many place photos show at once; every other place stays a dot. */
+export const MAX_MARKER_PHOTOS = 12;
+
+type PhotoCandidate = {
+  id: string;
+  opacity: number;
+  selected: boolean;
+  prominence: { score: number };
+  place: { hotness: number; imageUrl?: string | null };
+};
+
+/** Visible places that show their photo: the selected one, then the most prominent. */
+export function markerPhotoIds(nodes: readonly PhotoCandidate[], limit = MAX_MARKER_PHOTOS) {
+  return new Set(
+    nodes
+      .filter((node) => node.opacity > 0.08 && node.place.imageUrl?.trim())
+      .sort(
+        (a, b) =>
+          Number(b.selected) - Number(a.selected) ||
+          b.prominence.score - a.prominence.score ||
+          b.place.hotness - a.place.hotness ||
+          a.id.localeCompare(b.id),
+      )
+      .slice(0, limit)
+      .map((node) => node.id),
+  );
+}
+
+/** A marker owns its photo; loading never publishes React or map state. */
 export function createMarkerPhoto(element: HTMLElement) {
   const shell = element.firstElementChild as HTMLElement;
   const failedSources = new Set<string>();
@@ -49,7 +94,7 @@ export function createMarkerPhoto(element: HTMLElement) {
         show();
       };
       shell.insertBefore(pending, shell.querySelector(".hp-pulse-event"));
-      // No src exists until this particular place is selected or keyboard-focused.
+      // No src exists until the caller activates this marker or it gets keyboard focus.
       pending.src = source;
     }
     show();

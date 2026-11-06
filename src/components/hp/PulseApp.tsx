@@ -233,7 +233,7 @@ import {
   readyProfile,
   composerIdentity,
 } from "./pulse-shared";
-import { Toast, TopBar, VibeChips, DiscoveryLensRail } from "./PulseTopBar";
+import { Toast, TopBar, VibeChips } from "./PulseTopBar";
 import { EssentialsScreen } from "./EssentialsScreen";
 import type { EssentialsSectionId } from "@/lib/hp/essentials";
 import { MapBottomSheet } from "./MapBottomSheet";
@@ -673,11 +673,14 @@ export function PulseApp() {
       }),
     [],
   );
-  const selectMapPlacePreview = (place: Place, cluster: MapAreaCluster) =>
+  // A place with stories plays them straight away; its card waits underneath.
+  const selectMapPlacePreview = (place: Place, cluster: MapAreaCluster) => {
     discoveryDispatch({
       type: "select",
       selection: { kind: "placeSelected", regionId: cluster.id, placeId: place.id },
     });
+    if (storyPlaceIds.has(place.id)) setStoryViewer({ placeId: place.id });
+  };
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -2231,6 +2234,7 @@ export function PulseApp() {
               searchQuery={query}
               dataStatus={dataStatus}
               selectedPlaceMatchesLens={selectedPlaceMatchesLens}
+              onSetLens={setActiveLens}
               onClearLens={() => setActiveLens(null)}
               onClearSearch={() => setQuery("")}
               audience={readyProfile(account)?.defaultIdentity ?? null}
@@ -2478,6 +2482,7 @@ export function PulseApp() {
       <div
         className="hp-app-shell relative mx-auto flex h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden bg-hp-bg shadow-[0_30px_80px_rgba(23,20,17,0.15)] sm:my-6 sm:h-[860px] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[36px] sm:border sm:border-hp-ink/10"
         data-marker-motion={markerMotion}
+        data-tab={tab}
       >
         <div
           className="flex min-h-0 flex-1 flex-col"
@@ -2499,9 +2504,7 @@ export function PulseApp() {
             onOpenAuth={() => setAuthOpen(true)}
             onOpenDeals={() => setTab("deals")}
           />
-          {tab === "map" ? (
-            <DiscoveryLensRail active={activeLens} onChange={setActiveLens} />
-          ) : tab === "trip" || tab === "essentials" || tab === "quicklook" ? null : (
+          {tab === "map" || tab === "trip" || tab === "essentials" || tab === "quicklook" ? null : (
             <VibeChips chips={vibeChips} active={activeVibe} setActive={setActiveVibe} />
           )}
 
@@ -2509,7 +2512,7 @@ export function PulseApp() {
             {refreshFailed && dataStatus === "ready" && (
               <div
                 role="status"
-                className="absolute inset-x-4 top-4 z-[60] rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-xs"
+                className="hp-status-banner absolute inset-x-4 top-4 z-[60] rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-xs"
               >
                 {t("Could not refresh. Showing earlier data.")}{" "}
                 {fetchedAtMs && (
@@ -2535,7 +2538,7 @@ export function PulseApp() {
               <div
                 role={dataStatus === "error" ? "alert" : "status"}
                 aria-live="polite"
-                className="absolute inset-x-4 top-4 z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper/95 p-3 text-[12px] font-semibold text-hp-ink shadow-lg backdrop-blur"
+                className="hp-status-banner absolute inset-x-4 top-4 z-[60] flex items-center justify-between gap-3 rounded-2xl border border-hp-ink/10 bg-hp-paper p-3 text-[12px] font-semibold text-hp-ink shadow-lg"
               >
                 <span>
                   {t(
@@ -2557,16 +2560,16 @@ export function PulseApp() {
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={tab}
-                initial={{ opacity: 0, y: 10, scale: 0.996, filter: "blur(2px)" }}
-                animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: -8, scale: 0.996, filter: "blur(2px)" }}
+                initial={{ opacity: 0, y: 10, scale: 0.996 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.996 }}
                 transition={HP_TRANSITION.tab}
                 className="absolute inset-0 overflow-hidden bg-hp-bg"
                 style={{
                   backfaceVisibility: "hidden",
                   contain: "layout paint style",
                   transform: "translateZ(0)",
-                  willChange: "opacity, transform, filter",
+                  willChange: "opacity, transform",
                 }}
               >
                 {renderActiveTab()}

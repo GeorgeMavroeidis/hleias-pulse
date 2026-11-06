@@ -1,135 +1,20 @@
-/* Map chrome: back, summary, chip and utility rails, bottom nav, sheet. */
+/* Map chrome: back and utility controls, bottom nav, sheet. The top bar floats
+   over the map (shell.css), so controls start below it. */
 
 .hp-map-back {
   position: absolute;
   left: var(--hp-safe-left);
-  top: 3.5rem;
+  top: calc(env(safe-area-inset-top, 0px) + 4.25rem);
   z-index: 20;
   width: var(--hp-control-target);
   height: var(--hp-control-target);
 }
 
-.hp-map-summary {
-  position: absolute;
-  left: 50%;
-  top: 0.75rem;
-  z-index: 20;
-  display: flex;
-  max-width: min(72%, calc(100% - var(--hp-safe-left) - var(--hp-safe-right) - 4rem));
-  min-width: 0;
-  align-items: center;
-  transform: translateX(-50%);
-  border: 0;
-  border-radius: var(--hp-radius-control);
-  background: color-mix(in srgb, var(--hp-paper) 92%, transparent);
-  color: var(--hp-text-secondary);
-  font-size: var(--hp-type-meta);
-  font-weight: 500;
-  line-height: 1.25;
-  padding: 0.45rem 0.7rem;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
-
-.hp-map-summary__text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hp-map-summary,
-.hp-map-chip-rail {
-  transition:
-    opacity var(--hp-motion-state) var(--hp-ease-standard),
-    visibility 0s linear;
-}
-
-.hp-real-map.is-map-compressed :is(.hp-map-summary, .hp-map-chip-rail) {
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity var(--hp-motion-state) var(--hp-ease-standard),
-    visibility 0s linear var(--hp-motion-state);
-}
-
-.hp-map-chip-rail {
-  position: absolute;
-  left: var(--hp-safe-left);
-  right: calc(var(--hp-safe-right) + var(--hp-control-target) + var(--hp-space-2) + 2px);
-  top: 3.5rem;
-  z-index: 20;
-  display: flex;
-  gap: var(--hp-space-2);
-  overflow-x: auto;
-  border-radius: var(--hp-radius-control);
-  background: color-mix(in srgb, var(--hp-paper) 94%, transparent);
-  padding: 0 var(--hp-space-1);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
-
-.hp-map-chip-rail.has-back {
-  left: calc(var(--hp-safe-left) + var(--hp-control-target) + var(--hp-space-2));
-}
-
-.hp-map-chip {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  min-height: var(--hp-control-target);
-  min-width: var(--hp-control-target);
-  align-items: center;
-  padding: 0 var(--hp-space-2);
-  border: 0;
-  border-radius: var(--hp-radius-control);
-  background: transparent;
-  color: var(--hp-text-secondary);
-  font-size: var(--hp-type-meta);
-  font-weight: 500;
-  text-align: left;
-}
-
-.hp-map-chip__face {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--hp-space-1);
-  white-space: nowrap;
-}
-
-.hp-map-chip__count {
-  color: var(--hp-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.hp-map-chip.is-active {
-  color: var(--hp-ink);
-  font-weight: 600;
-  background: color-mix(in srgb, var(--hp-sunset) 9%, transparent);
-}
-
-.hp-map-chip.is-active::after {
-  position: absolute;
-  content: "";
-  left: var(--hp-space-2);
-  right: var(--hp-space-2);
-  bottom: 4px;
-  height: 2px;
-  background: var(--hp-sunset);
-}
-
-@media (hover: hover) {
-  .hp-map-chip:not(.is-active):hover {
-    color: var(--hp-ink);
-    background: color-mix(in srgb, var(--hp-ink) 4%, transparent);
-  }
-}
-
+/* Locate and whole-of-Ilia sit at thumb height, just above the panel. */
 .hp-map-utility-rail {
   position: absolute;
   right: var(--hp-safe-right);
-  top: 3.5rem;
+  bottom: calc(var(--hp-map-bottom-overlay-height) + var(--hp-space-3));
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -159,10 +44,15 @@
   flex-direction: column;
   border: 1px solid var(--hp-border);
   border-radius: var(--hp-radius-control);
-  background: color-mix(in srgb, var(--hp-paper) 96%, transparent);
+  background: var(--hp-paper);
   box-shadow: var(--hp-shadow-control);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+}
+
+/* Fingers pinch and double-tap; zoom buttons stay for mouse users only. */
+@media (pointer: coarse) {
+  .hp-map-zoom-group {
+    display: none;
+  }
 }
 
 .hp-map-control-group .hp-map-icon-button {
@@ -230,10 +120,14 @@
   place-items: center;
 }
 
+/* 11px is the iOS tab-bar size; "Συναντήσεις" fits on one line, unhyphenated. */
 .hp-bottom-nav-label {
-  font-size: var(--hp-type-meta);
+  max-width: 100%;
+  font-size: 0.6875rem;
   font-weight: 500;
   line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .hp-bottom-nav-item.is-active .hp-bottom-nav-label {
@@ -383,10 +277,6 @@
   background: var(--hp-ink);
 }
 
-.hp-map-chip:focus-visible {
-  outline-offset: -3px !important;
-}
-
 /* Recovery occupies the map stage, above its sibling sheet, without resetting
    the sheet's selection or the shell's filters and drafts. */
 .hp-map-recovery {
@@ -509,6 +399,10 @@
   text-align: left;
   gap: 3px;
   padding: 2px 0;
+}
+/* Idle, the summary is one headline line; the lens chips sit under it. */
+.hp-discovery-sheet[data-selection="idle"] .hp-discovery-sheet__summary {
+  min-height: 44px;
 }
 .hp-discovery-sheet__summary > span:first-child {
   font-size: 16px;
@@ -783,12 +677,6 @@
     padding-top: 0;
     min-height: 44px;
   }
-  .hp-topbar-subtitle {
-    display: none;
-  }
-  .hp-discovery-lens-rail {
-    padding-block: 0;
-  }
   .hp-bottom-nav {
     padding-top: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -818,12 +706,6 @@
   pointer-events: none;
 }
 
-.hp-bottom-nav-label {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  hyphens: auto;
-  text-align: center;
-}
 @container (max-width: 18rem) {
   .hp-bottom-nav {
     padding-left: max(8px, env(safe-area-inset-left, 0px));

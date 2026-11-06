@@ -13,23 +13,28 @@
   opacity: 1;
 }
 
+/* Credits sit bottom-left; the locate controls own the bottom-right corner. */
 .hp-map-attribution {
   position: absolute;
   z-index: 28;
-  right: max(0.55rem, env(safe-area-inset-right));
+  left: max(0.55rem, env(safe-area-inset-left));
+  right: calc(0.55rem + var(--hp-control-target) + 0.75rem);
   bottom: calc(var(--hp-map-bottom-overlay-height, 0px) + 0.55rem);
   display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
   align-items: center;
   gap: 0.35rem;
   color: var(--hp-muted);
   font-size: 9px;
+  pointer-events: none;
 }
 .hp-map-attribution__credits,
 .hp-map-attribution__info {
   border: 1px solid color-mix(in srgb, var(--hp-ink) 10%, transparent);
-  background: color-mix(in srgb, var(--hp-paper) 92%, transparent);
+  background: var(--hp-paper);
   box-shadow: var(--hp-shadow-control);
-  backdrop-filter: blur(8px);
+  pointer-events: auto;
 }
 .hp-map-attribution__credits {
   max-width: min(64vw, 320px);
@@ -50,12 +55,4 @@
   color: var(--hp-deep);
   font-size: 15px;
   font-weight: 800;
-}
-
-/* Keep credits reachable without covering the reset control above a tall sheet. */
-.hp-real-map[data-attribution-position="left"] .hp-map-attribution {
-  left: max(0.55rem, env(safe-area-inset-left));
-  right: calc(0.55rem + var(--hp-control-target) + 0.75rem);
-  flex-direction: row-reverse;
-  justify-content: flex-end;
 }

@@ -73,15 +73,14 @@
   color: var(--hp-paper);
 }
 
+/* Lives in the map panel's header, under its headline. */
 .hp-discovery-lens-rail {
   display: flex;
   flex: none;
   gap: var(--hp-space-4);
   overflow-x: auto;
-  background: var(--hp-paper);
-  border-bottom: 1px solid var(--hp-border);
-  padding-top: var(--hp-space-1);
-  padding-bottom: var(--hp-space-1);
+  margin-inline: calc(var(--hp-safe-left) * -1) calc(var(--hp-safe-right) * -1);
+  padding-inline: var(--hp-safe-left) var(--hp-safe-right);
   scroll-padding-inline: var(--hp-space-4);
 }
 

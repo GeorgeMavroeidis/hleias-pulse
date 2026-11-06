@@ -95,7 +95,8 @@ test("bilingual settlement names, provider classes, rank and collision behavior 
     }
   }
   assert.deepEqual(symbol("label_town").layout?.["text-font"], ["Noto Sans Bold"]);
-  assert.equal(symbol("label_village").minzoom, 9);
+  // Villages wait until the area photo bubbles start fading into places (was 9).
+  assert.equal(symbol("label_village").minzoom, 10.5);
   assert.equal(symbol("label_other").minzoom, 13);
 });
 

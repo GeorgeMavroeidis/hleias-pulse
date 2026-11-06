@@ -57,15 +57,49 @@
   gap: var(--hp-space-1);
 }
 
-.hp-topbar-subtitle {
-  padding-top: var(--hp-space-1);
+.hp-topbar-row {
   padding-bottom: var(--hp-space-2);
 }
 
-.hp-topbar-subtitle-copy {
-  color: var(--hp-text-secondary);
-  font-size: var(--hp-type-meta);
-  line-height: 1.4;
+/* Map tab: the map runs under the status bar and the top bar; only controls catch
+   taps, so the map pans everywhere else. Each control carries its own surface. */
+.hp-app-shell[data-tab="map"] {
+  padding-top: 0;
+}
+.hp-app-shell[data-tab="map"] .hp-topbar {
+  position: absolute;
+  inset: 0 0 auto;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: transparent;
+  pointer-events: none;
+}
+/* One row of round controls: on the map, Deals is its gift icon alone. */
+.hp-app-shell[data-tab="map"] .hp-topbar-row {
+  flex-wrap: nowrap;
+}
+.hp-app-shell[data-tab="map"] .hp-deals-action-label {
+  display: none;
+}
+.hp-app-shell[data-tab="map"] .hp-topbar-brand {
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  background: var(--hp-paper);
+  box-shadow: var(--hp-shadow-control);
+}
+.hp-app-shell[data-tab="map"] .hp-topbar :is(button, a, input, [role="dialog"]) {
+  pointer-events: auto;
+}
+.hp-app-shell[data-tab="map"] .hp-topbar-actions > button {
+  background: var(--hp-paper);
+  border-radius: 999px;
+  box-shadow: var(--hp-shadow-control);
+}
+.hp-app-shell[data-tab="map"] .hp-topbar > [role="group"] > * {
+  background: var(--hp-paper);
+  box-shadow: var(--hp-shadow-control);
+}
+.hp-app-shell[data-tab="map"] .hp-status-banner {
+  top: calc(env(safe-area-inset-top, 0px) + 4.25rem);
 }
 
 .hp-deals-action {
@@ -128,12 +162,9 @@
   }
 }
 
-/* At enlarged text sizes, reserve space for the map instead of the tagline.
-   The text-relative query leaves ordinary 320px layouts unchanged. */
+/* At enlarged text sizes the bar tightens. The text-relative query leaves
+   ordinary 320px layouts unchanged. */
 @container (max-width: 18rem) {
-  .hp-topbar-subtitle {
-    display: none;
-  }
   .hp-topbar-row {
     gap: 4px;
     padding-top: 4px;

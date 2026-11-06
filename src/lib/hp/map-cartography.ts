@@ -431,6 +431,8 @@ function styleLayer(
       return {
         ...layer,
         ...(id === "label_other" ? { minzoom: Math.max(layer.minzoom ?? 0, 13) } : {}),
+        // Villages wait until the area photo bubbles start fading into places.
+        ...(id === "label_village" ? { minzoom: Math.max(layer.minzoom ?? 0, 10.5) } : {}),
         layout: {
           ...layer.layout,
           ...(prominent ? { "text-font": ["Noto Sans Bold"] } : {}),
@@ -509,6 +511,27 @@ function styleLayer(
     }
   }
   return layer;
+}
+
+/**
+ * The provider prints names in Latin and Greek on two lines. Show the app's language
+ * only. Layout writes on provider labels; colours, sources and camera stay untouched.
+ */
+export function applyMapLabelLanguage(
+  map: Pick<MapLibreMap, "getStyle" | "getLayoutProperty" | "setLayoutProperty">,
+  language: "GR" | "EN",
+): void {
+  const name = (
+    language === "GR"
+      ? ["coalesce", ["get", "name:el"], ["get", "name:nonlatin"], ["get", "name"]]
+      : ["coalesce", ["get", "name:en"], ["get", "name:latin"], ["get", "name"]]
+  ) as ExpressionSpecification;
+  for (const layer of map.getStyle().layers) {
+    if (layer.type !== "symbol" || layer.id.startsWith("hp-")) continue;
+    const field = map.getLayoutProperty(layer.id, "text-field");
+    if (field && JSON.stringify(field).includes("name:nonlatin"))
+      map.setLayoutProperty(layer.id, "text-field", name);
+  }
 }
 
 /** Pure, one-time transform. Never call from move/zoom/filter/selection effects. */

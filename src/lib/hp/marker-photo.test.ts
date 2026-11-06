@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createMarkerPhoto } from "./marker-photo";
+import {
+  bubblePhotoUrl,
+  createMarkerPhoto,
+  markerPhotoIds,
+  MAX_MARKER_PHOTOS,
+} from "./marker-photo";
 
 // A controllable DOM boundary keeps network completion order explicit in these tests.
 class PhotoImage {
@@ -83,6 +88,50 @@ test("500 ordinary place markers request no photos, including on metadata update
     assert.equal(shown(), false);
     photo.dispose();
   }
+});
+
+test("500 visible place markers activate at most 12 photos: the selected place, then prominence", () => {
+  const nodes = Array.from({ length: 500 }, (_, i) => ({
+    id: `place-${String(i).padStart(3, "0")}`,
+    opacity: 1,
+    selected: i === 499,
+    prominence: { score: i % 7 },
+    place: { hotness: i % 5, imageUrl: `/place-${i}.jpg` },
+  }));
+  const ids = markerPhotoIds(nodes);
+  assert.equal(ids.size, MAX_MARKER_PHOTOS);
+  assert.ok(ids.has("place-499"), "the selected place always shows its photo");
+  for (const id of ids) {
+    const node = nodes.find((candidate) => candidate.id === id)!;
+    assert.ok(node.selected || node.prominence.score === 6, `${id} must outrank the rest`);
+  }
+  // Hidden markers and places without a photo never take a slot.
+  assert.equal(markerPhotoIds(nodes.map((node) => ({ ...node, opacity: 0.05 }))).size, 0);
+  assert.equal(
+    markerPhotoIds(nodes.map((node) => ({ ...node, place: { ...node.place, imageUrl: " " } })))
+      .size,
+    0,
+  );
+});
+
+test("bubble photos ask Wikimedia for its 120px thumbnail and leave other hosts unchanged", () => {
+  assert.equal(
+    bubblePhotoUrl(
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/A_b.jpg/1280px-A_b.jpg",
+    ),
+    "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/A_b.jpg/120px-A_b.jpg",
+  );
+  assert.equal(
+    bubblePhotoUrl("https://upload.wikimedia.org/wikipedia/commons/8/8e/Olympia_the_stadium.jpg"),
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Olympia_the_stadium.jpg/120px-Olympia_the_stadium.jpg",
+  );
+  for (const unchanged of [
+    "https://visit-olympia.gr/files/9065.jpeg",
+    "https://upload.wikimedia.org/wikipedia/commons/1/1a/Map.svg",
+  ])
+    assert.equal(bubblePhotoUrl(unchanged), unchanged);
+  assert.equal(bubblePhotoUrl(null), "");
+  assert.equal(bubblePhotoUrl("  "), "");
 });
 
 test("selection keeps the dot until success and reuses the image across repeated updates", () => {

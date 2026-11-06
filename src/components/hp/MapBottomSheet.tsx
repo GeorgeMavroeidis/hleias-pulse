@@ -55,6 +55,7 @@ import {
 } from "@/lib/hp/map-discovery-content";
 import type { SheetGeometry } from "@/lib/hp/sheet-geometry";
 import type { PlaceStoryGroup } from "@/lib/hp/place-stories";
+import { DISCOVERY_LENSES, type DiscoveryLens } from "@/lib/hp/discovery";
 import { ImageBox } from "./ImageBox";
 import { AddToTripButton } from "./AddToTripButton";
 import { DirectionsLink } from "./DirectionsLink";
@@ -81,6 +82,8 @@ export type MapBottomSheetProps = {
   onSavePlace: (id: string) => void;
   onSharePlace: (place: Place) => void;
   onOpenStory: (placeId: string) => void;
+  /** Shows the lens chips in the idle panel; the map keeps no filter bar of its own. */
+  onSetLens?: (lens: DiscoveryLens | null) => void;
   onClearLens: () => void;
   onClearSearch: () => void;
   savedPlaceIds: string[];
@@ -256,7 +259,8 @@ export function MapBottomSheet(props: Props) {
         ref={headerRef}
         className="hp-discovery-sheet__header touch-none select-none"
         onPointerDown={(event) => {
-          if (event.button !== 0 || (event.target as HTMLElement).closest("button, a")) return;
+          const target = event.target as HTMLElement;
+          if (event.button !== 0 || target.closest("button, a, .hp-discovery-lens-rail")) return;
           height.stop();
           drag.current = {
             pointerId: event.pointerId,
@@ -306,7 +310,10 @@ export function MapBottomSheet(props: Props) {
               >
                 {title}
               </span>
-              <span className="hp-discovery-sheet__subtitle">{summary}</span>
+              {/* Idle, the count only repeats the map; it stays in the spoken label. */}
+              {state.selection.kind !== "idle" && (
+                <span className="hp-discovery-sheet__subtitle">{summary}</span>
+              )}
             </button>
           </h2>
           {state.selection.kind !== "idle" && (
@@ -344,6 +351,9 @@ export function MapBottomSheet(props: Props) {
             </button>
           )}
         </div>
+        {state.selection.kind === "idle" && props.onSetLens && (
+          <LensRail active={state.activeLens} onChange={props.onSetLens} />
+        )}
       </div>
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {state.selection.kind !== "idle" ? t("Selected {name}", { name: title }) : ""}
@@ -436,6 +446,39 @@ export function MapBottomSheet(props: Props) {
         </div>
       )}
     </motion.section>
+  );
+}
+
+/** The map's lenses, at thumb height in the panel instead of a bar over the map. */
+function LensRail({
+  active,
+  onChange,
+}: {
+  active: DiscoveryLens | null;
+  onChange: (lens: DiscoveryLens | null) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="hp-discovery-lens-rail hp-no-scrollbar"
+      role="group"
+      aria-label={t("Map discovery lenses")}
+    >
+      {DISCOVERY_LENSES.map((lens) => {
+        const selected = lens === active;
+        return (
+          <button
+            key={lens}
+            type="button"
+            onClick={() => onChange(selected ? null : lens)}
+            aria-pressed={selected}
+            className="hp-discovery-lens"
+          >
+            {t(DISCOVERY_LENS_LABEL[lens])}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
