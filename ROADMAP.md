@@ -140,6 +140,84 @@ what's broken, which becomes a pitch slide · approach the Pyrgos Tourism
 Committee with the pilot as a free partnership, not a sale · in meetings, ask
 what they're trying to fix in tourism before presenting anything.
 
+## Proposed direction — a social app about what's happening now · ⚠️ not yet agreed
+
+> Proposed `2026-11-07`. **It changes what Stage 2 builds, so it needs
+> Mavroeidis's agreement before it changes anything below.** Until then, "Next
+> up" and the stages stand as written. The pull request that added this section
+> has the full plan.
+
+**The idea.** Make the app the place to see what is happening near you right
+now, and give locals a reason to post it; not a travel planner. The loop:
+_see something → tap the camera → it is on the map in seconds → people see it →
+you see that they saw it → you come back tomorrow._ That is Stage 2's objective
+("worth opening a second time") and Stage 3's done-when ("50–100 locals posting
+without being asked"), made concrete.
+
+**What stops it today** (checked in the code, `2026-11-07`):
+
+1. **Nobody can post their own photo.** `createPulsePost` and
+   `createPulseStory` attach the place's stock photo, the composer has no camera
+   or file input, and `content-media` accepts uploads only from admins,
+   organizers and businesses.
+2. **New content is invisible until approved.** The insert policies force
+   `moderation_status = 'pending'` on posts, comments, places, stories and Meets
+   (`20260904120000`), and public reads require `published`.
+3. **Posting is buried.** The general "+" is on Pulse only, and a story takes
+   about five taps through the five-mode composer.
+4. **No reward for posting.** Authors cannot see how many people viewed their
+   story, the posting streak sits in the profile sheet, and push is not
+   deployed.
+5. **Cold start.** The live database has 8 posts, all from August, and 0
+   stories.
+
+**Decisions it needs** (also under Open decisions; each schema change is its
+own approved migration):
+
+- **D1 — approve first, or publish instantly?** Proposed: trusted after one
+  approved post. A new account's first post waits for a moderator; after that
+  its posts go live at once. Verified businesses, organizers and the team are
+  trusted from the start. Three reports from different users hide an item until
+  a moderator looks. The server sets the status, never the client. _Schema:_
+  insert trigger plus policy changes, reviewed against the push design (answers
+  notify on their first move to `published`).
+- **D2 — photos for everyone.** Proposed: each user uploads only into their own
+  folder (`user-media/<uid>/`); the phone shrinks photos to ~1080 px JPEG
+  (~200 KB) plus a thumbnail, which also strips their GPS metadata; story media
+  is deleted 7 days after expiry, which answers Next up #1's retention question.
+  No video on the free plan. _Schema:_ storage policy plus a scheduled clean-up.
+- **D3 — the centre button.** Proposed: the camera. Where Trip goes is
+  Margaris's call; one option is Trip and Routes sharing a tab. _Schema:_ none.
+- **D4 — story view counts.** Proposed: a count kept by a trigger, like
+  `going_count`; never who viewed. _Schema:_ column plus trigger.
+- **D5 — story-for-a-deal.** Proposed: a verified business can require a
+  published story at its place today before `issue_deal_code` issues a code.
+  _Schema:_ function change plus smoke tests.
+- **D6 — a 6 PM digest.** Proposed: opt-in, by `home_area` (no GPS), sent only
+  when something is on. Needs the push deployment approval in `SECURITY.md`;
+  iPhones get it only via Add to Home Screen until the App Store app.
+  _Schema:_ new event type plus a schedule.
+- **Also:** who applies approved migrations to the live database?
+
+**Order.** (1) "Τώρα κοντά σου": with location already allowed, the map opens
+on your area and shows live stories and tonight's events; Pulse opens with the
+newest posts. No schema change, so it is being built first, on the `tedprod`
+preview. (2) Post a photo story in two taps (D1–D3). (3) Being seen: view
+counts, top story tonight per area, "Local · Πύργος" from `home_area`, the
+streak on the camera button (D4). (4) Businesses and organizers post first,
+and story-for-a-deal (D5); recruiting them is the real cold-start fix. (5) The
+6 PM digest (D6). Later: ranking, which is pointless at 8 posts, and an AI
+moderator, after February 2027 or on a free tier.
+
+**How it meets the sale proposal above.** A locals-fed app answers why
+VisitOlympia died (nobody kept it updated), which strengthens that pitch. But
+open posting is also moderation liability a public buyer would inherit, so D1
+and the "Community roles" decision matter more under a sale, not less.
+
+**Already built:** a full-screen photo map, on the `tedprod` branch only (not
+merged). Its commit message lists the test rules it changes on purpose: photos
+on up to 12 markers, village labels from zoom 10.5, one-language town names.
+
 ## Right now
 
 **Stage 1 (REPAIR) is done. We're in Stage 2 (BUILD).**
@@ -303,8 +381,14 @@ is slow and can't be compressed near the deadline.
 ## Open decisions
 
 - [ ] **Sell the app to a public body?** Proposed `2026-10-29`. See
-      "Proposed direction" above. Needs both maintainers' agreement. If agreed,
-      it replaces the billing-model question below.
+      "Proposed direction — sell the app to a public body" above. Needs both
+      maintainers' agreement. If agreed, it replaces the billing-model question
+      below.
+- [ ] **A social app about what's happening now?** Proposed `2026-11-07`. See
+      "Proposed direction — a social app" above. Needs Mavroeidis's agreement;
+      if agreed, six smaller decisions follow (D1–D6): publish instantly vs.
+      approve first · photos for everyone · the centre button · story view
+      counts · story-for-a-deal · a 6 PM digest.
 - [ ] **Billing model** — flat monthly partnership fee vs. per-redemption cut.
       Blocks the business-facing Stage 2 work.
 - [ ] **Web build** — the budget gate makes it the near-term focus by default
