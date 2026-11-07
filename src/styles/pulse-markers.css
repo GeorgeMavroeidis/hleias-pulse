@@ -419,6 +419,19 @@
   outline: 2.5px solid var(--hp-sunset);
   outline-offset: 2px;
 }
+/* A live story in the area rings its photo, as in the story rail. */
+.hp-region-marker.has-stories .hp-region-core {
+  border: 3px solid transparent;
+  background:
+    radial-gradient(circle, var(--hp-sunset) 0 7px, var(--hp-paper) 7.5px) padding-box,
+    linear-gradient(135deg, var(--hp-sunset), var(--hp-purple)) border-box;
+}
+/* Recent community activity: a soft warm halo, without motion. */
+.hp-region-marker.has-activity .hp-region-core {
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--hp-sunset) 30%, transparent),
+    0 2px 8px color-mix(in srgb, var(--hp-ink) 28%, transparent);
+}
 .hp-region-name {
   margin-top: 4px;
   padding: 1px 6px;

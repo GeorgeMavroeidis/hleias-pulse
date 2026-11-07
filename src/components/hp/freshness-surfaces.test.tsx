@@ -107,9 +107,51 @@ test("Now feed never admits old event posts through display time, tags or busy p
       findAuthor={() => data.authors[0]}
       findPostAuthor={() => data.authors[0]}
       nowMs={NOW}
+      initialFilter="Now"
     />,
   );
   assert.doesNotMatch(html, /OLD_SENTINEL/);
+});
+
+test("with nothing recent, Pulse opens on the newest posts with their real age, not on Now", () => {
+  const scene = buildTrafficPreviewScene("live", NOW);
+  const data = scene.data;
+  const post = (text: string, hoursAgo: number) => ({
+    ...data.posts[0],
+    id: text,
+    text,
+    kind: "event" as const,
+    time: "Tonight",
+    tags: ["live", "packed"],
+    createdAt: new Date(NOW - hoursAgo * 3_600_000).toISOString(),
+  });
+  const html = render(
+    <PulseFeed
+      posts={[post("OLDER_POST", 30), post("NEWER_POST", 3)]}
+      storyGroups={[]}
+      activityTicks={[]}
+      trendingPlace={null}
+      onOpenStory={noop}
+      likes={{}}
+      postLikes={{}}
+      toggleLike={noop}
+      savedPosts={{}}
+      toggleSavePost={noop}
+      commentsByPost={{}}
+      onOpenPost={noop}
+      onOpenMap={noop}
+      onShare={noop}
+      onTrendingGoing={noop}
+      findPlace={() => ({ ...data.places[0], status: "busy" })}
+      findAuthor={() => data.authors[0]}
+      findPostAuthor={() => data.authors[0]}
+      nowMs={NOW}
+    />,
+  );
+  assert.match(html, /aria-pressed="true"[^>]*>Πρόσφατα</);
+  assert.match(html, /aria-pressed="false"[^>]*>Τώρα</);
+  assert.ok(html.indexOf("NEWER_POST") < html.indexOf("OLDER_POST"), "newest first");
+  assert.match(html, /3 ώρες/);
 });
 
 test("Meet cards show phases from duration and retain old scheduled announcements", () => {

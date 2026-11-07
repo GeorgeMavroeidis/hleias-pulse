@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -55,6 +56,8 @@ import {
 } from "@/lib/hp/map-discovery-content";
 import type { SheetGeometry } from "@/lib/hp/sheet-geometry";
 import type { PlaceStoryGroup } from "@/lib/hp/place-stories";
+import { byDistance, useNearOrigin, type NearOrigin } from "@/lib/hp/near-me";
+import { PlaceStoryRail } from "./PlaceStoryRail";
 import { DISCOVERY_LENSES, type DiscoveryLens } from "@/lib/hp/discovery";
 import { ImageBox } from "./ImageBox";
 import { AddToTripButton } from "./AddToTripButton";
@@ -97,6 +100,8 @@ export type MapBottomSheetProps = {
   audience?: AccountIdentity | null;
   /** Opens the post composer on a place (the local "post something" nudge). */
   onPostHere?: (placeId: string) => void;
+  /** Opens the composer with no place chosen: "post the first story" when nothing is on. */
+  onPost?: () => void;
 };
 type Props = MapBottomSheetProps;
 
@@ -120,6 +125,20 @@ export function MapBottomSheet(props: Props) {
   const { t, language } = useI18n();
   const reducedMotion = useReducedMotion();
   const height = useMotionValue(heights[state.snap]);
+  // "Now": live stories nearest first once the visitor shared where they are.
+  const origin = useNearOrigin();
+  const placeById = useMemo(() => {
+    const byId = new Map<string, Place>();
+    for (const row of content.regions.values())
+      for (const place of row.places) byId.set(place.id, place);
+    return byId;
+  }, [content.regions]);
+  const nearStories = useMemo(
+    () => byDistance(props.storyGroups, (group) => placeById.get(group.placeId), origin),
+    [props.storyGroups, placeById, origin],
+  );
+  // Idle, live stories take the lenses' row; the lenses then open the panel's content.
+  const storiesInHeader = state.selection.kind === "idle" && nearStories.length > 0;
   const headerRef = useRef<HTMLDivElement>(null);
   const summaryRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -260,7 +279,11 @@ export function MapBottomSheet(props: Props) {
         className="hp-discovery-sheet__header touch-none select-none"
         onPointerDown={(event) => {
           const target = event.target as HTMLElement;
-          if (event.button !== 0 || target.closest("button, a, .hp-discovery-lens-rail")) return;
+          if (
+            event.button !== 0 ||
+            target.closest("button, a, .hp-discovery-lens-rail, .hp-discovery-story-rail")
+          )
+            return;
           height.stop();
           drag.current = {
             pointerId: event.pointerId,
@@ -351,8 +374,15 @@ export function MapBottomSheet(props: Props) {
             </button>
           )}
         </div>
-        {state.selection.kind === "idle" && props.onSetLens && (
-          <LensRail active={state.activeLens} onChange={props.onSetLens} />
+        {storiesInHeader ? (
+          <PlaceStoryRail
+            groups={nearStories}
+            onOpen={props.onOpenStory}
+            className="hp-discovery-story-rail"
+          />
+        ) : (
+          state.selection.kind === "idle" &&
+          props.onSetLens && <LensRail active={state.activeLens} onChange={props.onSetLens} />
         )}
       </div>
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -378,6 +408,13 @@ export function MapBottomSheet(props: Props) {
             <RegionDiscoveryContent {...props} row={row} lensLabel={lensLabel} />
           ) : (
             <>
+              <NowSection
+                {...props}
+                origin={origin}
+                placeById={placeById}
+                hasStories={nearStories.length > 0}
+                showLenses={storiesInHeader}
+              />
               <h3 className="hp-discovery-sheet__section-title">{t("Explore this view")}</h3>
               {content.visibleRegions.length ? (
                 <ul className="hp-discovery-sheet__list">
@@ -479,6 +516,77 @@ function LensRail({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * What is on now, before the list of areas: today's events and live deals, deals
+ * nearest first once the visitor shared where they are. Only dated, real items;
+ * when there are none it says so and offers to post the first story.
+ */
+function NowSection(
+  props: Props & {
+    origin: NearOrigin | null;
+    placeById: Map<string, Place>;
+    hasStories: boolean;
+    showLenses: boolean;
+  },
+) {
+  const { t } = useI18n();
+  const today = eventsToday(props.content.events, props.nowMs);
+  const deals = byDistance(
+    props.dealPlaceIds
+      .map((id) => props.placeById.get(id))
+      .filter((place): place is Place => Boolean(place)),
+    (place) => place,
+    props.origin,
+  ).slice(0, 5);
+  const nothingOn = !props.hasStories && today.length === 0 && deals.length === 0;
+  return (
+    <>
+      {props.showLenses && props.onSetLens && (
+        <LensRail active={props.state.activeLens} onChange={props.onSetLens} />
+      )}
+      {/* Live stories already sit in the header; the heading needs something under it. */}
+      {(today.length > 0 || deals.length > 0 || nothingOn) && (
+        <h3 className="hp-discovery-sheet__section-title">
+          {t(props.origin ? "Now near you" : "Now in Ilia")}
+        </h3>
+      )}
+      {today.length > 0 && (
+        <DiscoveryEvents events={today} onOpen={props.onOpenEvent} heading={false} />
+      )}
+      {deals.length > 0 && (
+        <ul className="hp-discovery-sheet__list">
+          {deals.map((place) => (
+            <li key={place.id}>
+              <button
+                type="button"
+                className="hp-discovery-sheet__row"
+                onClick={() => props.onSelectPlace(place)}
+              >
+                <Gift size={18} aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <strong>{place.name}</strong>
+                  <span>{t("Deal")}</span>
+                </span>
+                <span aria-hidden="true">→</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {nothingOn && (
+        <div className="hp-discovery-sheet__empty">
+          <p>{t("Nothing new right now.")}</p>
+          {props.onPost && (
+            <button type="button" onClick={props.onPost}>
+              {t("Post the first story")}
+            </button>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -670,18 +778,23 @@ function RegionGlance(props: Props & { row: DiscoveryRegionRow }) {
 function DiscoveryEvents({
   events,
   onOpen,
+  heading = true,
 }: {
   events: DiscoveryEvent[];
   onOpen: (event: DiscoveryEvent) => void;
+  /** The count heading; the "now" section has its own. */
+  heading?: boolean;
 }) {
   const { language, t } = useI18n();
   return (
     <>
-      <h3 className="hp-discovery-sheet__section-title">
-        {t(events.length === 1 ? "{count} scheduled event" : "{count} scheduled events", {
-          count: events.length,
-        })}
-      </h3>
+      {heading && (
+        <h3 className="hp-discovery-sheet__section-title">
+          {t(events.length === 1 ? "{count} scheduled event" : "{count} scheduled events", {
+            count: events.length,
+          })}
+        </h3>
+      )}
       {events.length > 0 && (
         <ul className="hp-discovery-sheet__list">
           {events.map((event) => (

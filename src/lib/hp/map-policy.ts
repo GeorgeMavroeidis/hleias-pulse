@@ -17,6 +17,9 @@ export const MAP_POLICY = {
   clusterMinPoints: 2,
   topologyFadeWidth: 0.35,
   regionFocusMaxZoom: 13.25,
+  /** Opening near a visitor whose surroundings are sparse: the areas around them as
+   *  photo bubbles at full strength, just before places take over. */
+  nearbyAreaZoom: 10.25,
   placeFocusZoom: 14.25,
   labelZoom: 15.5,
   motionZoom: 11.5,

@@ -63,6 +63,7 @@ export function PulseFeed({
   findPostAuthor,
   previewMode = false,
   nowMs = Date.now(),
+  initialFilter,
 }: {
   posts: Post[];
   storyGroups: PlaceStoryGroup[];
@@ -88,20 +89,30 @@ export function PulseFeed({
   /** Keep moderation and external sharing actions out of the local simulation. */
   previewMode?: boolean;
   nowMs?: number;
+  /** Start on this filter instead of choosing one from what is on. */
+  initialFilter?: string;
 }) {
   const { t, language } = useI18n();
   const moderation = useModeration();
-  const [filter, setFilter] = useState(previewMode ? "All" : "Now");
-  const filters = previewMode
-    ? ["All", "Now", "Tonight", "Weekend", "Local tips"]
-    : ["Now", "Tonight", "Weekend", "Local tips"];
-  const visiblePosts = posts.filter((post) => {
+  const [chosenFilter, setFilter] = useState<string | null>(
+    initialFilter ?? (previewMode ? "Recent" : null),
+  );
+  const filters = ["Recent", "Now", "Tonight", "Weekend", "Local tips"];
+  const isNow = (post: Post) =>
+    Boolean(findPlace(post.placeId)) &&
+    !moderation.isHidden(post.userId) &&
+    isPublishedContent(post) &&
+    isRecentlyPosted(post, nowMs);
+  // Open on "Now" when something is; otherwise on the newest posts, each with its real
+  // age, instead of an empty page. "Now" itself never admits an old post.
+  const filter = chosenFilter ?? (posts.some(isNow) ? "Now" : "Recent");
+  const filtered = posts.filter((post) => {
     const place = findPlace(post.placeId);
     const author = findPostAuthor(post);
     if (!place) return false;
     // Blocked authors are filtered server-side; muted ones are hidden here.
     if (moderation.isHidden(post.userId)) return false;
-    if (filter === "Now") return isPublishedContent(post) && isRecentlyPosted(post, nowMs);
+    if (filter === "Now") return isNow(post);
     if (filter === "Tonight") return postQualifiesTonight(post, meetEvents, nowMs);
     if (filter === "Weekend") {
       return place.tags.some((tag) => ["beach", "roadtrip", "village", "nature"].includes(tag));
@@ -116,6 +127,12 @@ export function PulseFeed({
     }
     return true;
   });
+  const visiblePosts =
+    filter === "Recent"
+      ? [...filtered].sort(
+          (a, b) => (Date.parse(b.createdAt ?? "") || 0) - (Date.parse(a.createdAt ?? "") || 0),
+        )
+      : filtered;
   return (
     <div className="px-4 pb-28 pt-3">
       <LiveTicker nowMs={nowMs} ticks={activityTicks} onOpenPlace={onOpenMap} />

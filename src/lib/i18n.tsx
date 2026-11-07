@@ -99,6 +99,10 @@ const EL: Record<string, string> = {
   "Zoom into {count} places near {area}": "Μεγέθυνση σε {count} σημεία κοντά στο {area}",
   "Events listed": "Υπάρχουν εκδηλώσεις",
   "Stories available": "Υπάρχουν ιστορίες",
+  "Now near you": "Τώρα κοντά σου",
+  "Now in Ilia": "Τώρα στην Ηλεία",
+  "Nothing new right now.": "Τίποτα καινούργιο αυτή τη στιγμή.",
+  "Post the first story": "Ανέβασε το πρώτο story",
   "Submitting comment…": "Υποβολή σχολίου…",
   "Could not submit. Your draft is saved. Try again.":
     "Η υποβολή απέτυχε. Το πρόχειρό σου διατηρήθηκε. Δοκίμασε ξανά.",
@@ -714,6 +718,7 @@ const EL: Record<string, string> = {
   tight: "δύσκολο",
   full: "γεμάτο",
   Now: "Τώρα",
+  Recent: "Πρόσφατα",
   Tonight: "Απόψε",
   Weekend: "Σαββατοκύριακο",
   "Local tips": "Τοπικές συμβουλές",

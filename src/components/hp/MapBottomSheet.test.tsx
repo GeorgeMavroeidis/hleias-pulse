@@ -10,7 +10,9 @@ import {
   deriveMapDiscoveryContent,
   formatDiscoveryEventDate,
 } from "@/lib/hp/map-discovery-content";
-import { initialMapDiscoveryState } from "@/lib/hp/map-discovery-state";
+import { initialMapDiscoveryState, type SheetSnap } from "@/lib/hp/map-discovery-state";
+import { setOrigin } from "@/lib/hp/near-me";
+import { eventsToday } from "@/lib/hp/region-glance";
 import {
   markerPulseInputFromActivity,
   deriveMarkerPulseSnapshot,
@@ -410,4 +412,106 @@ test("a quiet area nudges a local to post, but never a tourist", () => {
   assert.ok(text(local.markup).includes(local.t("Post something")));
   const tourist = render({ ...regionProps, audience: "TOURIST" });
   assert.ok(!text(tourist.markup).includes(tourist.t("Nobody has posted here yet.")));
+});
+
+function idleSheet(props: MapBottomSheetProps, snap: SheetSnap): MapBottomSheetProps {
+  return {
+    ...props,
+    state: { ...props.state, selection: { kind: "idle" }, snap },
+    selectedPlace: null,
+    onSetLens: noop,
+  };
+}
+
+test("idle with live stories: stories take the lenses' row, and the lenses move into the panel", () => {
+  const props = fixture("live");
+  assert.ok(props.storyGroups.length > 0, "the live scene has stories");
+  const collapsed = render(idleSheet(props, "collapsed")).markup;
+  assert.ok(collapsed.includes("hp-discovery-story-rail"));
+  assert.ok(!collapsed.includes("hp-discovery-lens-rail"), "no lens row next to the stories");
+  const expanded = render(idleSheet(props, "expanded")).markup;
+  assert.ok(expanded.includes("hp-discovery-story-rail"));
+  assert.ok(expanded.includes("hp-discovery-lens-rail"), "lenses stay one swipe away");
+  const storiesOnly = render({
+    ...idleSheet(props, "expanded"),
+    content: { ...props.content, events: [] },
+    dealPlaceIds: [],
+  });
+  assert.ok(
+    !text(storiesOnly.markup).includes(storiesOnly.t("Now in Ilia")),
+    "no empty heading when the stories above are all that is on",
+  );
+  const quiet = render(idleSheet({ ...props, storyGroups: [] }, "collapsed")).markup;
+  assert.ok(quiet.includes("hp-discovery-lens-rail"), "without stories the lenses keep their row");
+  assert.ok(!quiet.includes("hp-discovery-story-rail"));
+});
+
+test("idle, the panel opens with what is on now: today's events and live deals", () => {
+  const props = fixture("live");
+  const today = eventsToday(props.content.events, props.nowMs);
+  const dealPlace = [...props.content.regions.values()][0].places[0];
+  const { markup, t } = render({
+    ...idleSheet(props, "expanded"),
+    dealPlaceIds: [dealPlace.id],
+  });
+  const visible = text(markup);
+  assert.ok(visible.includes(t("Now in Ilia")));
+  for (const event of today) assert.ok(visible.includes(event.title), event.title);
+  assert.ok(visible.includes(dealPlace.name));
+  assert.ok(visible.includes(t("Deal")));
+  assert.ok(!visible.includes(t("Nothing new right now.")));
+  assert.ok(visible.indexOf(t("Now in Ilia")) < visible.indexOf(t("Explore this view")));
+});
+
+test("idle with nothing on, the panel says so and offers the first story, never invented activity", () => {
+  const props = fixture("quiet");
+  const quiet = {
+    ...idleSheet(props, "expanded"),
+    storyGroups: [],
+    dealPlaceIds: [],
+    content: { ...props.content, events: [] },
+  };
+  let posted = 0;
+  const { markup, t } = render({ ...quiet, onPost: () => posted++ });
+  const visible = text(markup);
+  assert.ok(visible.includes(t("Nothing new right now.")));
+  assert.ok(visible.includes(t("Post the first story")));
+  assert.doesNotMatch(visible, /Tonight's pulse|Lively|#1/);
+  const withoutComposer = text(render(quiet).markup);
+  assert.ok(!withoutComposer.includes(t("Post the first story")), "no dead button");
+  assert.equal(posted, 0);
+});
+
+test("once the visitor shared where they are, live stories run nearest first", () => {
+  const props = fixture("live");
+  const scene = buildTrafficPreviewScene("live", ANCHOR);
+  const inView = [...props.content.regions.values()].flatMap((row) => row.places);
+  // Two places far apart, each with one current story.
+  const [first, last] = [inView[0], inView[inView.length - 1]];
+  assert.notEqual(first.id, last.id);
+  const story = scene.data.stories[0];
+  const stories = [first, last].map((place) => ({
+    ...story,
+    id: `story-${place.id}`,
+    placeId: place.id,
+  }));
+  const storyGroups = buildPlaceStoryGroups(scene.data.places, new Set(), stories, scene.nowMs);
+  assert.equal(storyGroups.length, 2);
+  const railOrder = (markup: string) => {
+    const rail = markup.slice(markup.indexOf("hp-discovery-story-rail"));
+    return storyGroups
+      .map((group) => ({ id: group.placeId, at: rail.indexOf(`>${group.placeName}<`) }))
+      .sort((a, b) => a.at - b.at)
+      .map((entry) => entry.id);
+  };
+  for (const here of [first, last]) {
+    setOrigin({ lat: here.lat, lng: here.lng, source: "gps", label: "My location" });
+    try {
+      const { markup, t } = render({ ...idleSheet(props, "expanded"), storyGroups });
+      assert.equal(railOrder(markup)[0], here.id, `nearest first from ${here.id}`);
+      assert.ok(text(markup).includes(t("Now near you")));
+    } finally {
+      setOrigin(null);
+    }
+  }
 });

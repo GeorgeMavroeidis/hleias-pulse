@@ -29,6 +29,14 @@ import {
   pointIsInSafeRect,
 } from "@/lib/hp/map-sheet-camera";
 import { createMarkerExits } from "@/lib/hp/marker-exit";
+import { communityActivityCopy } from "@/lib/hp/context-copy";
+import {
+  gpsOrigin,
+  isNearAnyPlace,
+  nearbyBounds,
+  readGpsIfAllowed,
+  setOrigin,
+} from "@/lib/hp/near-me";
 import { isFatalBasemapError } from "@/lib/hp/map-core";
 import {
   createMapViewportSync,
@@ -455,6 +463,8 @@ export function SocialMap({
       ? selection.placeId
       : null
     : legacySelectedPlaceId;
+  const hasSelectionRef = useRef(false);
+  hasSelectionRef.current = Boolean(selectedAreaId || selectedPlaceId);
   const initialCameraRef = useRef(initialCamera);
   const framedRouteRevisionRef = useRef(initialCamera?.framedRouteRevision ?? null);
   const focusSheetHeightsRef = useRef(
@@ -1446,6 +1456,7 @@ export function SocialMap({
       matches: number;
       hotness: number;
       photoUrl: string;
+      stories: boolean;
     }[] = [];
     regions.forEach((row) => {
       if (!currentIds.has(row.region.id) || mapRef.current !== map) return;
@@ -1485,9 +1496,17 @@ export function SocialMap({
         nowMs,
         language,
       );
+      // A live story anywhere in the area rings its photo, like the story rail;
+      // recent community activity gives a soft warm halo. Both are dated signals.
+      const hasStories = (cluster?.places ?? []).some(
+        (place) => storyPlaceIds?.has(place.id) ?? false,
+      );
+      element.classList.toggle("has-stories", hasStories);
+      element.classList.toggle("has-activity", Boolean(communityActivityCopy(row.signal, nowMs)));
       element.querySelector(".hp-region-name")!.textContent = view.name;
-      element.setAttribute("aria-label", view.label);
-      element.title = view.label;
+      const label = hasStories ? `${view.label}. ${t("Stories available")}` : view.label;
+      element.setAttribute("aria-label", label);
+      element.title = label;
       element.setAttribute("aria-pressed", String(selectedAreaId === row.region.id));
       entry.marker.setLngLat([row.region.anchor.lng, row.region.anchor.lat]);
       const point = map.project([row.region.anchor.lng, row.region.anchor.lat]);
@@ -1501,14 +1520,16 @@ export function SocialMap({
         matches: row.contextualPlaceIds.length,
         hotness: cluster?.hotness ?? 0,
         photoUrl: view.photoUrl,
+        stories: hasStories,
       });
     });
-    // Bubbles never overlap: the selected area claims space first, then the areas with
-    // the most matching places. The rest wait for a closer zoom, like map labels.
+    // Bubbles never overlap: the selected area claims space first, then areas with live
+    // stories, then those with the most matching places. The rest wait for a closer zoom.
     const shown = nonOverlappingBubbles(
       laidOut.sort(
         (a, b) =>
           Number(b.id === selectedAreaId) - Number(a.id === selectedAreaId) ||
+          Number(b.stories) - Number(a.stories) ||
           b.matches - a.matches ||
           b.hotness - a.hotness ||
           a.id.localeCompare(b.id),
@@ -1530,7 +1551,18 @@ export function SocialMap({
       entry.photo.update(bubble.photoUrl, interactive);
     }
     scheduleMarkerViewportSyncRef.current();
-  }, [mapReady, regions, clusterById, selectedAreaId, activeFilterLabel, zoom, nowMs, language, t]);
+  }, [
+    mapReady,
+    regions,
+    clusterById,
+    selectedAreaId,
+    activeFilterLabel,
+    storyPlaceIds,
+    zoom,
+    nowMs,
+    language,
+    t,
+  ]);
 
   useEffect(() => {
     const maplibre = maplibreModuleRef.current;
@@ -2038,26 +2070,37 @@ export function SocialMap({
       .zoomOut({ easing: HP_MAP_EASE, duration: prefersReducedMapMotion() ? 0 : HP_MOTION.pan });
   };
 
+  // One "you are here" dot, shared by the locate button and opening on your area.
+  const placeUserDot = (lngLat: [number, number]) => {
+    const map = mapRef.current;
+    const maplibre = maplibreModuleRef.current;
+    if (!map || !maplibre) return;
+    if (userMarkerRef.current) userMarkerRef.current.setLngLat(lngLat);
+    else {
+      const element = document.createElement("div");
+      element.className = "hp-user-marker";
+      const dot = document.createElement("span");
+      dot.className = "hp-user-dot";
+      dot.style.display = "block";
+      dot.style.width = dot.style.height = "15px";
+      element.append(dot);
+      userMarkerRef.current = new maplibre.Marker({ element, anchor: "center" })
+        .setLngLat(lngLat)
+        .addTo(map);
+    }
+  };
+  const languageRef = useRef(language);
+  languageRef.current = language;
+
   const locationRequest = useMemo(
     () =>
       createMapLocationRequest(setLocationStatus, ({ coords }) => {
         const map = mapRef.current;
-        const maplibre = maplibreModuleRef.current;
-        if (!map || !maplibre) return;
+        if (!map || !maplibreModuleRef.current) return;
         const lngLat: [number, number] = [coords.longitude, coords.latitude];
-        if (userMarkerRef.current) userMarkerRef.current.setLngLat(lngLat);
-        else {
-          const element = document.createElement("div");
-          element.className = "hp-user-marker";
-          const dot = document.createElement("span");
-          dot.className = "hp-user-dot";
-          dot.style.display = "block";
-          dot.style.width = dot.style.height = "15px";
-          element.append(dot);
-          userMarkerRef.current = new maplibre.Marker({ element, anchor: "center" })
-            .setLngLat(lngLat)
-            .addTo(map);
-        }
+        placeUserDot(lngLat);
+        // "Now near you" sorts from here: rounded to ~100 m, memory only (near-me.ts).
+        setOrigin(gpsOrigin(coords.latitude, coords.longitude, languageRef.current));
         userNavigatedRef.current = true;
         selectionMotionUntilRef.current = 0;
         map.stop().easeTo({
@@ -2080,6 +2123,42 @@ export function SocialMap({
   const locateUser = () => {
     if (!previewMode && mapReady) locationRequest.start(navigator.geolocation);
   };
+
+  // Opening the app: if this phone already lets the site know where it is, open on
+  // that area instead of all of Ilia. It never asks (the locate button does), and
+  // coming back to the map tab keeps the view that was left.
+  const openedNearUserRef = useRef(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (previewMode || !map || !mapReady || !clusters.length || openedNearUserRef.current) return;
+    openedNearUserRef.current = true;
+    if (initialCameraRef.current || routePreview) return;
+    const places = clusters.flatMap((cluster) => cluster.places);
+    void readGpsIfAllowed(languageRef.current).then((origin) => {
+      if (!origin || mapRef.current !== map || !isNearAnyPlace(origin, places)) return;
+      if (userNavigatedRef.current || hasSelectionRef.current) return;
+      setOrigin(origin);
+      placeUserDot([origin.lng, origin.lat]);
+      didInitialFitRef.current = true;
+      // Dense surroundings: the nearest few places, as places. Sparse ones (most of Ilia
+      // today): the areas around the visitor as photo bubbles, twice as close as all Ilia.
+      const box = nearbyBounds(origin, places);
+      const fitZoom = box
+        ? map.cameraForBounds(box, {
+            padding: { left: 48, top: 108, right: 48, bottom: bottomOverlayHeight + 24 },
+          })?.zoom
+        : undefined;
+      map.stop().easeTo({
+        center: [origin.lng, origin.lat],
+        zoom:
+          fitZoom !== undefined && fitZoom >= MAP_POLICY.regionFadeEnd
+            ? Math.min(MAP_POLICY.placeFocusZoom, fitZoom)
+            : MAP_POLICY.nearbyAreaZoom,
+        easing: HP_MAP_EASE,
+        duration: prefersReducedMapMotion() ? 0 : HP_MOTION.focus,
+      });
+    });
+  }, [bottomOverlayHeight, clusters, mapReady, previewMode, routePreview]);
 
   useEffect(() => {
     if (!mapReady) return;

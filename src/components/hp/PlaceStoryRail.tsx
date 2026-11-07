@@ -6,19 +6,21 @@ import { useI18n } from "@/lib/i18n";
 interface Props {
   groups: PlaceStoryGroup[];
   onOpen: (placeId: string, storyId?: string) => void;
+  /** Spacing for where the rail sits; the feed's edge-to-edge spacing by default. */
+  className?: string;
 }
 
 /**
  * Horizontal rail of place-story bubbles. Each bubble = a place; the ring encodes
  * its tone (sea/olive/purple/sunset) and dims once every story has been seen.
  */
-export function PlaceStoryRail({ groups, onOpen }: Props) {
+export function PlaceStoryRail({ groups, onOpen, className = "-mx-4 mb-4 px-4" }: Props) {
   const { language, t } = useI18n();
   if (groups.length === 0) return null;
 
   return (
     <div
-      className="hp-no-scrollbar -mx-4 mb-4 flex gap-3 overflow-x-auto px-4"
+      className={`hp-no-scrollbar flex gap-3 overflow-x-auto ${className}`}
       role="list"
       aria-label={language === "GR" ? "Stories ανά σημείο" : "Place stories"}
     >

@@ -2242,6 +2242,7 @@ export function PulseApp() {
                 setComposerPlaceId(placeId);
                 openComposer("post");
               }}
+              onPost={() => openComposer("story")}
             />
           </div>
         </div>
